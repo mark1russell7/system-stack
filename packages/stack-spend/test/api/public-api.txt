@@ -1,0 +1,229 @@
+# The public API of @mark1russell7/stack-spend
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+BILLINGS: build/layer.chunk.d.ts#BILLINGS
+BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
+Billing: build/layer.chunk.d.ts#Billing
+HARD_COUNT: build/index.d.ts#HARD_COUNT
+HARD_LIMIT: build/index.d.ts#HARD_LIMIT
+HARD_LIMITS: build/index.d.ts#HARD_LIMITS
+IS_HARD: build/index.d.ts#IS_HARD
+LAYER_KEY: build/index.d.ts#LAYER_KEY
+LIMIT_KINDS: build/layer.chunk.d.ts#LIMIT_KINDS
+Limit: build/layer.chunk.d.ts#Limit
+LimitKind: build/layer.chunk.d.ts#LimitKind
+MONTH_MAX: build/index.d.ts#MONTH_MAX
+MonthTotal: build/index.d.ts#MonthTotal
+NODE_KINDS: build/index.d.ts#NODE_KINDS
+NodeKind: build/index.d.ts#NodeKind
+OPEN_SERVICES: build/index.d.ts#OPEN_SERVICES
+OWNER_CODES: build/index.d.ts#OWNER_CODES
+OwnerCode: build/index.d.ts#OwnerCode
+OwnerStep: build/index.d.ts#OwnerStep
+Proof: build/layer.chunk.d.ts#Proof
+SAMPLE_SPEND: build/index.d.ts#SAMPLE_SPEND
+SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
+SPEND_CODES: build/index.d.ts#SPEND_CODES
+SPEND_SCHEMA: build/layer.chunk.d.ts#SPEND_SCHEMA
+Service: build/layer.chunk.d.ts#Service
+ServiceState: build/index.d.ts#ServiceState
+SpendCode: build/index.d.ts#SpendCode
+SpendFault: build/index.d.ts#SpendFault
+SpendLayer: build/layer.chunk.d.ts#SpendLayer
+SpendOptions: build/index.d.ts#SpendOptions
+checkSpend: build/index.d.ts#checkSpend
+dayNumber: build/index.d.ts#dayNumber
+evaluateService: build/index.d.ts#evaluateService
+firstServices: build/index.d.ts#firstServices
+monthTotal: build/index.d.ts#monthTotal
+ownerSteps: build/index.d.ts#ownerSteps
+serviceKey: build/index.d.ts#serviceKey
+serviceStates: build/index.d.ts#serviceStates
+spendSpace: build/index.d.ts#spendSpace
+
+## ./schema (build/schema.d.ts): names
+
+SpendParse: build/schema.d.ts#SpendParse
+parseSpend: build/schema.d.ts#parseSpend
+spendSchema: build/schema.d.ts#spendSchema
+
+## Declarations
+
+### build/index.d.ts#BOUNDED_TOTAL
+export declare const BOUNDED_TOTAL: Expr;
+
+### build/index.d.ts#HARD_COUNT
+export declare const HARD_COUNT: Expr;
+
+### build/index.d.ts#HARD_LIMIT
+export declare const HARD_LIMIT: Expr;
+
+### build/index.d.ts#HARD_LIMITS
+export declare const HARD_LIMITS: Axis;
+
+### build/index.d.ts#IS_HARD
+export declare const IS_HARD: Expr;
+
+### build/index.d.ts#LAYER_KEY
+export declare const LAYER_KEY = "layer";
+
+### build/index.d.ts#MONTH_MAX
+export declare const MONTH_MAX: Expr;
+
+### build/index.d.ts#MonthTotal
+export interface MonthTotal {
+  readonly bounded: number;
+  readonly open: readonly string[];
+}
+
+### build/index.d.ts#NODE_KINDS
+export declare const NODE_KINDS: readonly ["layer", "service", "limit"];
+
+### build/index.d.ts#NodeKind
+export type NodeKind = (typeof NODE_KINDS)[number];
+
+### build/index.d.ts#OPEN_SERVICES
+export declare const OPEN_SERVICES: Expr;
+
+### build/index.d.ts#OWNER_CODES
+export declare const OWNER_CODES: readonly ["limit-wanted", "limit-recharge", "proof-none", "proof-old"];
+
+### build/index.d.ts#OwnerCode
+export type OwnerCode = (typeof OWNER_CODES)[number];
+
+### build/index.d.ts#OwnerStep
+export interface OwnerStep {
+  readonly part: string;
+  readonly name: string;
+  readonly code: OwnerCode;
+  readonly text: string;
+  readonly steps: readonly string[];
+}
+
+### build/index.d.ts#SAMPLE_SPEND
+export declare const SAMPLE_SPEND: SpendLayer;
+
+### build/index.d.ts#SAMPLE_TODAY
+export declare const SAMPLE_TODAY = "2026-11-16";
+
+### build/index.d.ts#SPEND_CODES
+export declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "proof-none", "proof-date", "proof-old"];
+
+### build/index.d.ts#ServiceState
+export interface ServiceState {
+  readonly part: string;
+  readonly billing: Billing;
+  readonly hardLimit?: number | undefined;
+  readonly monthMax?: number | undefined;
+}
+
+### build/index.d.ts#SpendCode
+export type SpendCode = (typeof SPEND_CODES)[number];
+
+### build/index.d.ts#SpendFault
+export interface SpendFault extends Fault {
+  readonly code: SpendCode;
+}
+
+### build/index.d.ts#SpendOptions
+export interface SpendOptions {
+  readonly today: string;
+}
+
+### build/index.d.ts#checkSpend
+export declare function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOptions): SpendFault[];
+
+### build/index.d.ts#dayNumber
+export declare function dayNumber(date: string): number | undefined;
+
+### build/index.d.ts#evaluateService
+export declare function evaluateService(program: Expr, tree: Space, part: string): Result<unknown>;
+
+### build/index.d.ts#firstServices
+export declare function firstServices(layer: SpendLayer): readonly Service[];
+
+### build/index.d.ts#monthTotal
+export declare function monthTotal(layer: SpendLayer): MonthTotal;
+
+### build/index.d.ts#ownerSteps
+export declare function ownerSteps(layer: SpendLayer, stack: Stack, options: SpendOptions): OwnerStep[];
+
+### build/index.d.ts#serviceKey
+export declare function serviceKey(part: string): string;
+
+### build/index.d.ts#serviceStates
+export declare function serviceStates(layer: SpendLayer): ServiceState[];
+
+### build/index.d.ts#spendSpace
+export declare function spendSpace(layer: SpendLayer): Space;
+
+### build/layer.chunk.d.ts#BILLINGS
+declare const BILLINGS: readonly ["free", "fixed", "metered"];
+
+### build/layer.chunk.d.ts#Billing
+type Billing = (typeof BILLINGS)[number];
+
+### build/layer.chunk.d.ts#LIMIT_KINDS
+declare const LIMIT_KINDS: readonly ["provider", "prepaid", "code", "alert"];
+
+### build/layer.chunk.d.ts#Limit
+interface Limit {
+  readonly kind: LimitKind;
+  readonly amount: number;
+  readonly recharge?: boolean | undefined;
+  readonly stop?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#LimitKind
+type LimitKind = (typeof LIMIT_KINDS)[number];
+
+### build/layer.chunk.d.ts#Proof
+interface Proof {
+  readonly date: string;
+  readonly by: string;
+  readonly source?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#SPEND_SCHEMA
+declare const SPEND_SCHEMA = "spend/1";
+
+### build/layer.chunk.d.ts#Service
+interface Service {
+  readonly part: string;
+  readonly plan?: string | undefined;
+  readonly billing: Billing;
+  readonly price?: number | undefined;
+  readonly limits?: readonly Limit[] | undefined;
+  readonly wanted?: Limit | undefined;
+  readonly proof?: Proof | undefined;
+  readonly steps?: readonly string[] | undefined;
+}
+
+### build/layer.chunk.d.ts#SpendLayer
+interface SpendLayer {
+  readonly schema: typeof SPEND_SCHEMA;
+  readonly currency: string;
+  readonly kinds: readonly string[];
+  readonly proofDays: number;
+  readonly services: readonly Service[];
+}
+
+### build/schema.d.ts#SpendParse
+export type SpendParse = {
+  readonly ok: true;
+  readonly layer: SpendLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#parseSpend
+export declare function parseSpend(value: unknown): SpendParse;
+
+### build/schema.d.ts#spendSchema
+export declare const spendSchema: z.ZodType<SpendLayer>;

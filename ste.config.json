@@ -20,7 +20,7 @@
     "**/*.spec.ts",
     "**/*.spec.tsx"
   ],
-  "technicalNouns": [],
+  "technicalNouns": ["billing"],
   "technicalVerbs": [],
   "properNouns": [
     "ASD",
