@@ -1,8 +1,8 @@
 # @mark1russell7/system-stack
 
-A system stack as data: the parts of a system, and what each part needs. The package has the format of a stack, the parts that work when some parts are down, and the checks of a stack.
+A system stack as data: the parts of a system, and what each part needs. The package has the format of a stack, the parts that work when some parts are down, and the checks of a stack. It also gives the paths of a part and the sets of parts whose failure stops it.
 
-The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. [`@mark1russell7/stack-spend`](../stack-spend/README.md) is the first add-on.
+The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md) and [`@mark1russell7/stack-risk`](../stack-risk/README.md).
 
 Each function is a plain function with no clock and no network.
 
@@ -10,7 +10,7 @@ Each function is a plain function with no clock and no network.
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the checks and a sample stack. |
+| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks and a sample stack. |
 | `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, and `formErrors` for the layers of add-ons. |
 
 The root entry has no schema library. Thus a page that only asks which parts work gets no zod.
@@ -84,6 +84,44 @@ works(SAMPLE_STACK, "alert", ["home-power", "card"]); // => false
 works(SAMPLE_STACK, "alert", ["phone"]); // => false: each path needs the phone
 ```
 
+## The paths and the stop sets
+
+Three functions tell why a part works, and which failures stop it. They read only the parts and their needs.
+
+| Function | What it gives |
+| --- | --- |
+| `pathSets(stack, part)` | Each smallest set of other parts with which the part works. |
+| `stopSets(stack, part, { size })` | Each smallest set of other parts whose failure stops the part, up to `size` parts. The default of `size` is 1. |
+| `smallestStop(stack, part)` | One stop set with the smallest count of parts. |
+
+```ts
+import { pathSets, smallestStop, stopSets } from "@mark1russell7/system-stack";
+
+pathSets(stack, "program"); // => { kind: "exact", sets: [["host-b"], ["power", "host-a"]] }
+stopSets(stack, "program"); // => { kind: "exact", sets: [] }: no failure of one part stops the program
+stopSets(stack, "program", { size: 2 }); // => { kind: "exact", sets: [["power", "host-b"], ["host-a", "host-b"]] }
+smallestStop(stack, "program"); // => { kind: "exact", parts: ["power", "host-b"] }
+```
+
+A stop set of one part is a single point of failure. The sample alert has two:
+
+```ts
+import { SAMPLE_STACK, stopSets } from "@mark1russell7/system-stack";
+
+stopSets(SAMPLE_STACK, "alert"); // => { kind: "exact", sets: [["reader"], ["phone"]] }
+stopSets(SAMPLE_STACK, "alert", { down: ["program-cloud"] });
+// => { kind: "exact", sets: [["reader"], ["phone"], ["home-power"], ["home-network"], ["home-host"], ["program-home"]] }
+```
+
+- The option `down` names the parts that are down at this time. The sets then have only parts that are not down.
+- A set does not contain the part itself, and no set of a result contains a second set of it.
+- The sets agree with `working`. The part works with the parts of a path set. It does not work without the parts of a stop set.
+- `smallestStop` gives `{ kind: "none" }` for a part that no failure of other parts stops.
+
+The count of the sets can grow fast with the size of a stack. The option `maxSets` is the largest count of sets in one step of a search, and its default is 4096. A search that passes it gives `{ kind: "budget" }`. That result is not an answer: do not read it as "no stop set".
+
+[`@mark1russell7/stack-risk`](../stack-risk/README.md) puts goals on these sets, and it has a gate.
+
 ## The checks
 
 `checkStack(stack)` gives the faults of a stack. An empty list tells that the stack is correct.
@@ -113,6 +151,8 @@ checkStack({
 ```
 
 A fault has a `level`, a `code`, the `id` of its part in `at`, and a `message` for a reader. The checks of the add-ons give faults of the same form.
+
+`dayNumber(date)` gives the count of days of a date `YYYY-MM-DD` from 1970-01-01. The gates of the add-ons compare dates with it, so they have no clock.
 
 ## The read of JSON
 

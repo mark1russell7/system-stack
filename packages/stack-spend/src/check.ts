@@ -1,4 +1,4 @@
-import { partsById, type Fault, type Stack } from "@mark1russell7/system-stack";
+import { dayNumber, partsById, type Fault, type Stack } from "@mark1russell7/system-stack";
 import type { Limit, SpendLayer } from "./layer.ts";
 import { serviceStates } from "./states.ts";
 
@@ -35,20 +35,8 @@ export interface SpendOptions {
   readonly today: string;
 }
 
-const DAY = 86_400_000;
-
-/**
- * This function gives the number of the day of a date `YYYY-MM-DD`: the count of days from 1970-01-01.
- * A text that is not a date of the calendar gives `undefined`. Thus `2026-02-30` is not a date.
- */
-export function dayNumber(date: string): number | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (match === null) return undefined;
-  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const time = new Date(Date.UTC(year, month - 1, day));
-  if (time.getUTCFullYear() !== year || time.getUTCMonth() !== month - 1 || time.getUTCDate() !== day) return undefined;
-  return time.getTime() / DAY;
-}
+// The function `dayNumber` is in the core since 0.1.1. This entry keeps the name.
+export { dayNumber } from "@mark1russell7/system-stack";
 
 /** This function tells if a value is a finite number, 0 or more. */
 function isZeroOrMore(value: number): boolean {

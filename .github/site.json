@@ -3,7 +3,7 @@
   "build": "pnpm --filter @system-stack/site run build",
   "out": "packages/site/dist",
   "env": { "SITE_BASE": "/{repo}" },
-  "packages": "@mark1russell7/system-stack",
+  "packages": "@mark1russell7/system-stack,@mark1russell7/stack-spend,@mark1russell7/stack-risk",
   "site-name": "system-stack",
   "roadmap": "docs/ROADMAP.md",
   "site-check": true,

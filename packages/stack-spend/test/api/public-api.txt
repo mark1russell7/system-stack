@@ -37,7 +37,7 @@ SpendFault: build/index.d.ts#SpendFault
 SpendLayer: build/layer.chunk.d.ts#SpendLayer
 SpendOptions: build/index.d.ts#SpendOptions
 checkSpend: build/index.d.ts#checkSpend
-dayNumber: build/index.d.ts#dayNumber
+dayNumber: @mark1russell7/system-stack#dayNumber (external)
 evaluateService: build/index.d.ts#evaluateService
 firstServices: build/index.d.ts#firstServices
 monthTotal: build/index.d.ts#monthTotal
@@ -137,9 +137,6 @@ export interface SpendOptions {
 
 ### build/index.d.ts#checkSpend
 export declare function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOptions): SpendFault[];
-
-### build/index.d.ts#dayNumber
-export declare function dayNumber(date: string): number | undefined;
 
 ### build/index.d.ts#evaluateService
 export declare function evaluateService(program: Expr, tree: Space, part: string): Result<unknown>;

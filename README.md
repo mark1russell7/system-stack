@@ -10,8 +10,9 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 
 | Package | What it has |
 | --- | --- |
-| [`@mark1russell7/system-stack`](packages/system-stack/README.md) | The core: the parts and their needs, the parts that work when some parts are down, and the checks of a stack. |
+| [`@mark1russell7/system-stack`](packages/system-stack/README.md) | The core: the parts and their needs, the parts that work when some parts are down, the paths and the stop sets of a part, and the checks of a stack. |
 | [`@mark1russell7/stack-spend`](packages/stack-spend/README.md) | The spend add-on: the cost of each part, the hard limits of its cost in a month, and a gate. |
+| [`@mark1russell7/stack-risk`](packages/stack-risk/README.md) | The risk add-on: the failures that a part must survive, the chance that it works, accepted risks, and a gate. |
 
 The core names no topic. Each topic is an add-on package. An add-on keeps its records in a layer of the stack, and it has its own checks and formulas. The add-ons do not know each other.
 
