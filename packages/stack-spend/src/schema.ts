@@ -21,6 +21,18 @@ const proof = z.strictObject({
   source: z.string().optional(),
 });
 
+const next = z.strictObject({
+  plan: z.string().optional(),
+  billing: z.enum([...BILLINGS]),
+  price: z.number().optional(),
+  limits: z.array(limit).readonly().optional(),
+});
+
+const ends = z.strictObject({
+  date: z.string(),
+  next: next.optional(),
+});
+
 const service = z.strictObject({
   part: id,
   plan: z.string().optional(),
@@ -28,6 +40,7 @@ const service = z.strictObject({
   price: z.number().optional(),
   limits: z.array(limit).readonly().optional(),
   wanted: limit.optional(),
+  ends: ends.optional(),
   proof: proof.optional(),
   steps: z.array(z.string()).readonly().optional(),
 });
@@ -41,6 +54,7 @@ export const spendSchema: z.ZodType<SpendLayer> = z.strictObject({
   currency: z.string().regex(/^[A-Z]{3}$/, "The currency is a code of three capital letters."),
   kinds: z.array(z.string().min(1)).readonly(),
   proofDays: z.number().positive(),
+  endDays: z.number().nonnegative().optional(),
   services: z.array(service).readonly(),
 });
 

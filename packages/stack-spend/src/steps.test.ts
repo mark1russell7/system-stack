@@ -2,7 +2,7 @@ import { SAMPLE_STACK, STACK_SCHEMA, type Stack } from "@mark1russell7/system-st
 import { describe, expect, it } from "vitest";
 import { SPEND_CODES } from "./check.ts";
 import { SPEND_SCHEMA, type Proof, type Service, type SpendLayer } from "./layer.ts";
-import { SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
+import { SAMPLE_ENDS, SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
 import { OWNER_CODES, ownerSteps } from "./steps.ts";
 
 const today = "2026-11-16";
@@ -54,6 +54,36 @@ describe("ownerSteps", () => {
     const read = "Read the plan and the limits in the account, and give them with the date of the read.";
     expect(steps({ part: "b", billing: "free" })).toEqual([{ part: "b", name: "b", code: "proof-none", text: read, steps: [] }]);
     expect(steps({ part: "b", billing: "free", proof: { date: "2026-01-01", by: "The owner" } })).toEqual([{ part: "b", name: "b", code: "proof-old", text: read, steps: [] }]);
+  });
+
+  it("gives a step to decide for a service that stops soon", () => {
+    const text = "Decide before 2026-11-30 if the service continues. With no change, the provider stops it after that date.";
+    expect(steps({ part: "a", billing: "free", ends: { date: "2026-11-30" }, proof, steps: ["Open the plan page."] })).toEqual([{ part: "a", name: "The account A", code: "end-soon", text, steps: ["Open the plan page."] }]);
+  });
+
+  it("gives a step to stop a service before a cost that is not wanted", () => {
+    const text = "Stop the service before 2026-11-30 if the cost after that date is not wanted.";
+    expect(steps({ part: "b", billing: "free", ends: { date: "2026-11-30", next: { billing: "fixed", price: 20 } }, proof })).toEqual([{ part: "b", name: "b", code: "end-soon", text, steps: [] }]);
+  });
+
+  it("gives one step for a cost after the end that has no hard limit, also when the plan ends soon", () => {
+    const text = "Set a hard limit for the cost after 2026-11-30, or stop the service before that date.";
+    expect(steps({ part: "b", billing: "free", ends: { date: "2026-11-30", next: { billing: "metered" } }, proof })).toEqual([{ part: "b", name: "b", code: "end-open", text, steps: [] }]);
+    const later = "Set a hard limit for the cost after 2027-06-01, or stop the service before that date.";
+    expect(steps({ part: "b", billing: "free", ends: { date: "2027-06-01", next: { billing: "metered" } }, proof })).toEqual([{ part: "b", name: "b", code: "end-open", text: later, steps: [] }]);
+  });
+
+  it("gives a step to read the account for a plan that ended", () => {
+    const read = "Read the plan and the limits in the account, and give them with the date of the read.";
+    expect(steps({ part: "b", billing: "free", ends: { date: "2026-11-01" }, proof })).toEqual([{ part: "b", name: "b", code: "end-past", text: read, steps: [] }]);
+  });
+
+  it("gives no step for a plan that ends after the days of warning, or for an end with no date", () => {
+    expect(steps({ part: "b", billing: "free", ends: { date: "2027-06-01" }, proof }, { part: "a", billing: "free", ends: { date: "soon" }, proof })).toEqual([]);
+  });
+
+  it("gives the two steps of the sample of ends: a limit for the cloud account, and a decision for the call account", () => {
+    expect(ownerSteps(SAMPLE_ENDS, SAMPLE_STACK, { today: SAMPLE_TODAY }).map((step) => `${step.code} ${step.part}`)).toEqual(["end-open cloud-account", "end-soon call-account"]);
   });
 
   it("gives no step for a fault of the records", () => {
