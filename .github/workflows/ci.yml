@@ -167,13 +167,41 @@ jobs:
     permissions:
       contents: read
 
+  # The package stack-tofu with a real OpenTofu (packages/stack-tofu/e2e). OpenTofu reads the files of the generator,
+  # and the gate of a plan reads the plans of a real run: a first plan, a plan after the apply, a delete and an import.
+  # Each resource is a terraform_data, so the job needs no provider, no account and no secret.
+  tofu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # The version of OpenTofu that reads the files
+      TOFU_VERSION: 1.13.9
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          # The check reads the output of the program itself
+          tofu_wrapper: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mark1russell7/stack-tofu run test:tofu
+
   # The one check of the ruleset of main (CI.md, "The check of the ruleset"). It passes only when
   # each job of needs passed, or was skipped by its own if and ALLOW_SKIP names it. A new job of this
   # file goes in needs, so the ruleset never has to change, and gh pr merge --auto waits for the whole gate.
   ci-ok:
     name: CI OK
     if: ${{ !cancelled() }}
-    needs: [ci, presets, renovate-presets, stamp, site]
+    needs: [ci, presets, renovate-presets, stamp, site, tofu]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}

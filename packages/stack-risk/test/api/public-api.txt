@@ -1,0 +1,173 @@
+# The public API of @mark1russell7/stack-risk
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+Accepted: build/layer.chunk.d.ts#Accepted
+Chance: build/layer.chunk.d.ts#Chance
+ChanceOptions: build/index.d.ts#ChanceOptions
+Goal: build/layer.chunk.d.ts#Goal
+GoalState: build/index.d.ts#GoalState
+PartImportance: build/index.d.ts#PartImportance
+RISK_CODES: build/check.chunk.d.ts#RISK_CODES
+RISK_SCHEMA: build/layer.chunk.d.ts#RISK_SCHEMA
+RiskCode: build/check.chunk.d.ts#RiskCode
+RiskFault: build/check.chunk.d.ts#RiskFault
+RiskLayer: build/layer.chunk.d.ts#RiskLayer
+RiskOptions: build/check.chunk.d.ts#RiskOptions
+SAMPLE_RISK: build/index.d.ts#SAMPLE_RISK
+SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
+WorksChance: build/index.d.ts#WorksChance
+chancesByPart: build/layer.chunk.d.ts#chancesByPart
+checkRisk: build/check.chunk.d.ts#checkRisk
+firstGoals: build/layer.chunk.d.ts#firstGoals
+goalStates: build/index.d.ts#goalStates
+isChance: build/layer.chunk.d.ts#isChance
+joinRisk: build/index.d.ts#joinRisk
+worksChance: build/index.d.ts#worksChance
+
+## ./schema (build/schema.d.ts): names
+
+RiskParse: build/schema.d.ts#RiskParse
+parseRisk: build/schema.d.ts#parseRisk
+riskSchema: build/schema.d.ts#riskSchema
+
+## ./add-on (build/add-on.d.ts): names
+
+riskAddOn: build/add-on.d.ts#riskAddOn
+
+## Declarations
+
+### build/add-on.d.ts#riskAddOn
+export declare function riskAddOn(options: RiskOptions): StackJoiner<RiskLayer>;
+
+### build/check.chunk.d.ts#RISK_CODES
+declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "chance-part", "chance-duplicate", "chance-range", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
+
+### build/check.chunk.d.ts#RiskCode
+type RiskCode = (typeof RISK_CODES)[number];
+
+### build/check.chunk.d.ts#RiskFault
+interface RiskFault extends Fault {
+  readonly code: RiskCode;
+  readonly parts?: readonly string[] | undefined;
+}
+
+### build/check.chunk.d.ts#RiskOptions
+interface RiskOptions {
+  readonly today: string;
+  readonly maxSets?: number | undefined;
+  readonly maxSteps?: number | undefined;
+}
+
+### build/check.chunk.d.ts#checkRisk
+declare function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions): RiskFault[];
+
+### build/index.d.ts#ChanceOptions
+export interface ChanceOptions extends PathOptions {
+  readonly maxSteps?: number | undefined;
+}
+
+### build/index.d.ts#GoalState
+export type GoalState = {
+  readonly part: string;
+  readonly read: true;
+  readonly works: boolean;
+  readonly margin: number;
+  readonly stop: readonly string[];
+  readonly points: readonly string[];
+} | {
+  readonly part: string;
+  readonly read: false;
+};
+
+### build/index.d.ts#PartImportance
+export interface PartImportance {
+  readonly part: string;
+  readonly importance: number;
+}
+
+### build/index.d.ts#SAMPLE_RISK
+export declare const SAMPLE_RISK: RiskLayer;
+
+### build/index.d.ts#SAMPLE_TODAY
+export declare const SAMPLE_TODAY = "2026-11-16";
+
+### build/index.d.ts#WorksChance
+export type WorksChance = {
+  readonly kind: "exact";
+  readonly value: number;
+  readonly importance: readonly PartImportance[];
+  readonly assumed: readonly string[];
+} | {
+  readonly kind: "budget";
+};
+
+### build/index.d.ts#goalStates
+export declare function goalStates(layer: RiskLayer, stack: Stack, options?: PathOptions): GoalState[];
+
+### build/index.d.ts#joinRisk
+export declare function joinRisk(pieces: readonly LayerPiece<RiskLayer>[]): LayerParse<RiskLayer>;
+
+### build/index.d.ts#worksChance
+export declare function worksChance(layer: RiskLayer, stack: Stack, part: string, options?: ChanceOptions): WorksChance;
+
+### build/layer.chunk.d.ts#Accepted
+interface Accepted {
+  readonly part: string;
+  readonly stop: readonly string[];
+  readonly reason: string;
+  readonly until?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#Chance
+interface Chance {
+  readonly part: string;
+  readonly works: number;
+  readonly source?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#Goal
+interface Goal {
+  readonly part: string;
+  readonly survives: number;
+  readonly chance?: number | undefined;
+}
+
+### build/layer.chunk.d.ts#RISK_SCHEMA
+declare const RISK_SCHEMA = "risk/1";
+
+### build/layer.chunk.d.ts#RiskLayer
+interface RiskLayer {
+  readonly schema: typeof RISK_SCHEMA;
+  readonly goals: readonly Goal[];
+  readonly chances?: readonly Chance[] | undefined;
+  readonly accepted?: readonly Accepted[] | undefined;
+}
+
+### build/layer.chunk.d.ts#chancesByPart
+declare function chancesByPart(layer: RiskLayer): Map<string, Chance>;
+
+### build/layer.chunk.d.ts#firstGoals
+declare function firstGoals(layer: RiskLayer): readonly Goal[];
+
+### build/layer.chunk.d.ts#isChance
+declare function isChance(value: number): boolean;
+
+### build/schema.d.ts#RiskParse
+export type RiskParse = {
+  readonly ok: true;
+  readonly layer: RiskLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#parseRisk
+export declare function parseRisk(value: unknown): RiskParse;
+
+### build/schema.d.ts#riskSchema
+export declare const riskSchema: z.ZodType<RiskLayer>;
