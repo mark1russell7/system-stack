@@ -63,10 +63,23 @@ describe("worksChance", () => {
     expect(result.importance.map((entry) => entry.part)).toEqual(["c", "a"]);
   });
 
+  it("puts the parts with one importance in the sequence of the stack, after the part itself", () => {
+    const chances = layer({ b: 0.9, c: 0.9 });
+    const needs = { id: "a", kind: "function", needs: ["b", "c"] };
+    const parts = (result: WorksChance): string[] => exact(result).importance.map((entry) => entry.part);
+    expect(parts(worksChance(chances, stack({ id: "c", kind: "x" }, { id: "b", kind: "x" }, needs), "a"))).toEqual(["c", "b", "a"]);
+    expect(parts(worksChance(chances, stack(needs, { id: "b", kind: "x" }, { id: "c", kind: "x" }), "a"))).toEqual(["b", "c", "a"]);
+    // With no chance record, each of the three parts has the importance 1.
+    expect(parts(worksChance(layer({}), stack({ id: "c", kind: "x" }, { id: "b", kind: "x" }, needs), "a"))).toEqual(["a", "c", "b"]);
+  });
+
   it("names each part of the paths with no chance record, and uses the chance 1 for it", () => {
     const result = exact(worksChance(layer({ b: 0.9 }), pair, "a"));
     expect(result.value).toBeCloseTo(1, 12);
     expect(result.assumed).toEqual(["c"]);
+    // The names are in the sequence of the stack.
+    const both = stack({ id: "c", kind: "x" }, { id: "b", kind: "x" }, { id: "a", kind: "function", needs: ["b", "c"] });
+    expect(exact(worksChance(layer({}), both, "a")).assumed).toEqual(["c", "b"]);
   });
 
   it("uses the first chance record of a part", () => {
@@ -158,5 +171,41 @@ describe("the chance of generated stacks", () => {
       }),
       { seed: 20261116, numRuns: 300 },
     );
+  });
+
+  it("gives the same value and the same importances, to the last digit, for each sequence of the parts", () => {
+    // These chances have no short binary form, so a different sequence of the multiplications changes the last digits.
+    const odd = fc.array(fc.constantFrom(0.3, 0.9, 0.97, 0.995, 0.999), { minLength: IDS.length, maxLength: IDS.length });
+    fc.assert(
+      fc.property(stackArbitrary, fc.constantFrom(...IDS), odd, fc.array(fc.nat(), { minLength: IDS.length, maxLength: IDS.length }), (generated, root, values, keys) => {
+        const records = Object.fromEntries(IDS.map((id, index) => [id, values[index] ?? 1]));
+        // The parts in a second sequence, from the generated keys.
+        const moved = stack(...generated.parts.map((part, index) => ({ part, key: keys[index] ?? 0 })).sort((a, b) => a.key - b.key).map((entry) => entry.part));
+        const first = worksChance(layer(records), generated, root);
+        const second = worksChance(layer(records), moved, root);
+        if (first.kind !== "exact" || second.kind !== "exact") throw new Error("A small stack gave no result.");
+        expect(second.value).toBe(first.value);
+        const byPart = (result: typeof first): [string, number][] => result.importance.map((entry): [string, number] => [entry.part, entry.importance]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        expect(byPart(second)).toEqual(byPart(first));
+      }),
+      { seed: 20261117, numRuns: 300 },
+    );
+  });
+
+  it("gives the same chance of the sample alert for each start of the sequence of its parts", () => {
+    const result = exact(worksChance(SAMPLE_RISK, SAMPLE_STACK, "alert"));
+    const value = result.value;
+    // The README of the package shows these values, to the last digit.
+    expect(value).toBe(0.9649835920528091);
+    expect(result.importance.slice(0, 4)).toEqual([
+      { part: "reader", importance: 0.9948284454152673 },
+      { part: "phone", importance: 0.9698327558319689 },
+      { part: "alert", importance: 0.9649835920528091 },
+      { part: "card", importance: 0.02187312796942623 },
+    ]);
+    for (let start = 1; start < SAMPLE_STACK.parts.length; start += 1) {
+      const moved: Stack = { ...SAMPLE_STACK, parts: [...SAMPLE_STACK.parts.slice(start), ...SAMPLE_STACK.parts.slice(0, start)] };
+      expect(exact(worksChance(SAMPLE_RISK, moved, "alert")).value).toBe(value);
+    }
   });
 });

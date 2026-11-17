@@ -5,7 +5,7 @@ import * as schema from "./schema.ts";
 describe("the root entry", () => {
   it("has the format, the states, the chance, the gate and the sample", () => {
     expect(entry.RISK_SCHEMA).toBe("risk/1");
-    for (const name of ["firstGoals", "chancesByPart", "isChance", "goalStates", "worksChance", "checkRisk"] as const) {
+    for (const name of ["firstGoals", "chancesByPart", "isChance", "goalStates", "worksChance", "checkRisk", "joinRisk"] as const) {
       expect(entry[name]).toBeTypeOf("function");
     }
     expect(entry.RISK_CODES).toContain("no-read");
