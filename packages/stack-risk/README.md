@@ -22,6 +22,7 @@ A search that passes its limit gives no result. The gate then fails, because no 
 | --- | --- |
 | `@mark1russell7/stack-risk` | The records of a layer, the states of the goals, the chance, the gate and a sample. |
 | `@mark1russell7/stack-risk/schema` | `riskSchema`, the zod schema of a layer, and `parseRisk`. |
+| `@mark1russell7/stack-risk/add-on` | `riskAddOn`, the add-on in the form of the layer contract of the core. |
 
 The root entry has no schema library. Thus a page that only shows the states gets no zod.
 
@@ -189,6 +190,19 @@ parseRisk({ schema: "risk/1", goals: [{ part: "alert", survives: "1" }] });
 
 The schema examines the form of a record. `checkRisk` examines the meaning of a layer with a correct form.
 
-## License
+## The add-on for one check of a stack
 
+`riskAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers.
+
+```ts
+import { riskAddOn } from "@mark1russell7/stack-risk/add-on";
+import { checkStackLayers } from "@mark1russell7/system-stack";
+
+checkStackLayers(stack, [riskAddOn({ today: "2026-11-16" })]);
+// => the faults of the stack, then the faults of `checkRisk` for the layer `risk/1`, each with the name of its layer
+```
+
+A layer with a wrong form gives one finding `layer-form` for each fault of the form, and the gate does not start. The function refuses a date of a wrong form at once, with a `RangeError`.
+
+## License
 MIT

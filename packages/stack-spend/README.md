@@ -25,6 +25,7 @@ An alert stops nothing, so an alert is not a limit. A balance that gets money au
 | --- | --- |
 | `@mark1russell7/stack-spend` | The records of a layer, the cost formulas, the states, the gate, the steps of the owner, the used amounts and a sample. |
 | `@mark1russell7/stack-spend/schema` | `spendSchema` and `parseSpend` for a layer, and `readsSchema` and `parseReads` for a list of reads. |
+| `@mark1russell7/stack-spend/add-on` | `spendAddOn`, the add-on in the form of the layer contract of the core. |
 
 The root entry has no schema library. Thus a page that only shows the cost of a month gets no zod.
 
@@ -320,6 +321,19 @@ The schema examines the form of a record. `checkSpend` examines the meaning of a
 
 `parseReads` reads the JSON of a list of reads in the same way, and `checkUse` examines the meaning of the reads.
 
-## License
+## The add-on for one check of a stack
 
+`spendAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers.
+
+```ts
+import { spendAddOn } from "@mark1russell7/stack-spend/add-on";
+import { checkStackLayers } from "@mark1russell7/system-stack";
+
+checkStackLayers(stack, [spendAddOn({ today: "2026-11-16" })]);
+// => the faults of the stack, then the faults of `checkSpend` for the layer `spend/1`, each with the name of its layer
+```
+
+A layer with a wrong form gives one finding `layer-form` for each fault of the form, and the gate does not start. The function refuses a date of a wrong form at once, with a `RangeError`.
+
+## License
 MIT

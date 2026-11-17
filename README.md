@@ -36,6 +36,42 @@ works(stack, "program", ["power"]); // => true: the program has the second host
 works(stack, "program", ["power", "host-b"]); // => false
 ```
 
+## One check for a whole stack
+
+A host gives the add-ons to `checkStackLayers` of the core. The function gives the faults of the core and of each layer.
+
+```ts
+import { riskAddOn } from "@mark1russell7/stack-risk/add-on";
+import { serviceStates } from "@mark1russell7/stack-spend";
+import { spendAddOn } from "@mark1russell7/stack-spend/add-on";
+import { tofuAddOn } from "@mark1russell7/stack-tofu/add-on";
+import { checkStackLayers, readLayer, type Stack } from "@mark1russell7/system-stack";
+
+// The parts, with the layers `spend/1`, `risk/1` and `tofu/1`
+declare const stack: Stack;
+
+const today = "2026-11-16";
+const spend = spendAddOn({ today });
+// The host connects two add-ons: the hard limits of the spend layer are the budgets of the OpenTofu gate.
+const read = readLayer(stack, spend);
+const budgets = read?.ok === true ? serviceStates(read.layer) : [];
+
+const findings = checkStackLayers(stack, [spend, riskAddOn({ today }), tofuAddOn({ budgets })]);
+const pass = !findings.some((finding) => finding.level === "error");
+```
+
+The samples of the packages have faults that show the gates. With the three sample layers, the findings are these errors.
+
+| Layer | Code | Part | The fault |
+| --- | --- | --- | --- |
+| `risk/1` | `stop-set` | `alert` | The failure of the phone alone stops the alert. |
+| `risk/1` | `chance-low` | `alert` | The chance that the alert works is less than its goal. |
+| `spend/1` | `limit-alert` | `cloud-account` | The only limit of the cloud account is an alert. |
+| `spend/1` | `limit-recharge` | `call-account` | The prepaid balance of the call account gets money automatically. |
+| `tofu/1` | `limit-none` | `cloud-account` | The resources have a planned cost, and the account has no hard limit. |
+
+The last finding comes from two layers. The spend layer has no hard limit for the cloud account, so the OpenTofu gate refuses the cost of its resources.
+
 ## The data
 
 This repository has sample data only. Keep the records of a real system in a private repository: they name accounts and hosts.

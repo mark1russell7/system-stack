@@ -24,6 +24,7 @@ A gate that cannot read its input does not pass. An account with no budget is a 
 | --- | --- |
 | `@mark1russell7/stack-tofu` | The records of a layer, the queries, the cost of each account, the gate, the generator, the gate of a plan and a sample. |
 | `@mark1russell7/stack-tofu/schema` | `tofuSchema` and `planSchema`, the zod schemas of a layer and of a plan, with `parseTofu` and `parsePlan`. |
+| `@mark1russell7/stack-tofu/add-on` | `tofuAddOn`, the add-on in the form of the layer contract of the core. |
 
 The root entry has no schema library. Thus a page that only shows a document gets no zod.
 
@@ -362,6 +363,19 @@ The format `tofu/1` has resources, provider configurations, variables, one backe
 
 A plan with a data source or a module gives the fault `plan-unknown`.
 
-## License
+## The add-on for one check of a stack
 
+`tofuAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers.
+
+```ts
+import { tofuAddOn } from "@mark1russell7/stack-tofu/add-on";
+import { checkStackLayers } from "@mark1russell7/system-stack";
+
+checkStackLayers(stack, [tofuAddOn({ budgets })]);
+// => the faults of the stack, then the faults of `checkTofu` for the layer `tofu/1`, each with the name of its layer
+```
+
+A layer with a wrong form gives one finding `layer-form` for each fault of the form, and the gate does not start. The add-on does not read the layer of a different add-on. The host gives the limit of each account as `budgets`, for example from the states of a spend layer.
+
+## License
 MIT

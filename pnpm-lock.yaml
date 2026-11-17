@@ -352,6 +352,9 @@ importers:
 
   packages/system-stack:
     dependencies:
+      '@mark1russell7/coeval':
+        specifier: ^0.37.1
+        version: 0.37.1(zod@4.6.7)
       '@mark1russell7/collections':
         specifier: ^0.11.2
         version: 0.11.2(zod@4.6.7)
@@ -615,6 +618,9 @@ packages:
 
   '@mark1russell7/coeval@0.34.0':
     resolution: {integrity: sha512-RBffEYCcXuHYuEWUzQw6ebrT86aCsfp3SGvUiKlZ/cfZE7RVNbWLITtUtnPDorD+radOYxDZNSo3kS1LsqBfkg==}
+
+  '@mark1russell7/coeval@0.37.1':
+    resolution: {integrity: sha512-oxViEDiDEyP0wiXAGziLburwKqclYBwheEg/97iZ1DLi5Gbs04ldVDC9cekXHMq8fHgNJIPS/xRCjNs+tPTiMw==}
 
   '@mark1russell7/collections@0.10.2':
     resolution: {integrity: sha512-uOqrK6ZYqgbG8DLchTU2FO8DcNeeeLbNAqR8E3YTe/HKK3rk4ZpR0M0GlYG/7ApiWfrFkVhW1rCF6opaeiL16g==}
@@ -1970,6 +1976,13 @@ snapshots:
   '@mark1russell7/coeval@0.34.0(zod@4.6.7)':
     dependencies:
       '@mark1russell7/collections': 0.10.2(zod@4.6.7)
+      '@mark1russell7/rigor-generators': 0.1.19
+    transitivePeerDependencies:
+      - zod
+
+  '@mark1russell7/coeval@0.37.1(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/collections': 0.11.2(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.1.19
     transitivePeerDependencies:
       - zod

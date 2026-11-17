@@ -6,9 +6,9 @@
 
 ## . (build/index.d.ts): names
 
-BILLINGS: build/reads.chunk.d.ts#BILLINGS
+BILLINGS: build/layer.chunk.d.ts#BILLINGS
 BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
-Billing: build/reads.chunk.d.ts#Billing
+Billing: build/layer.chunk.d.ts#Billing
 COUNT_USED: build/index.d.ts#COUNT_USED
 HARD_COUNT: build/index.d.ts#HARD_COUNT
 HARD_LIMIT: build/index.d.ts#HARD_LIMIT
@@ -16,9 +16,9 @@ HARD_LIMITS: build/index.d.ts#HARD_LIMITS
 IS_HARD: build/index.d.ts#IS_HARD
 LAYER_KEY: build/index.d.ts#LAYER_KEY
 LEVEL_TOLERANCE: build/index.d.ts#LEVEL_TOLERANCE
-LIMIT_KINDS: build/reads.chunk.d.ts#LIMIT_KINDS
-Limit: build/reads.chunk.d.ts#Limit
-LimitKind: build/reads.chunk.d.ts#LimitKind
+LIMIT_KINDS: build/layer.chunk.d.ts#LIMIT_KINDS
+Limit: build/layer.chunk.d.ts#Limit
+LimitKind: build/layer.chunk.d.ts#LimitKind
 MONTH_MAX: build/index.d.ts#MONTH_MAX
 MONTH_READS: build/index.d.ts#MONTH_READS
 MonthTotal: build/index.d.ts#MonthTotal
@@ -29,19 +29,19 @@ OWNER_CODES: build/index.d.ts#OWNER_CODES
 OwnerCode: build/index.d.ts#OwnerCode
 OwnerStep: build/index.d.ts#OwnerStep
 PROVIDER_USED: build/index.d.ts#PROVIDER_USED
-Proof: build/reads.chunk.d.ts#Proof
+Proof: build/layer.chunk.d.ts#Proof
 READ_AGE: build/index.d.ts#READ_AGE
 SAMPLE_READS: build/index.d.ts#SAMPLE_READS
 SAMPLE_SPEND: build/index.d.ts#SAMPLE_SPEND
 SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
-SPEND_CODES: build/index.d.ts#SPEND_CODES
-SPEND_SCHEMA: build/reads.chunk.d.ts#SPEND_SCHEMA
-Service: build/reads.chunk.d.ts#Service
+SPEND_CODES: build/check.chunk.d.ts#SPEND_CODES
+SPEND_SCHEMA: build/layer.chunk.d.ts#SPEND_SCHEMA
+Service: build/layer.chunk.d.ts#Service
 ServiceState: build/index.d.ts#ServiceState
-SpendCode: build/index.d.ts#SpendCode
-SpendFault: build/index.d.ts#SpendFault
-SpendLayer: build/reads.chunk.d.ts#SpendLayer
-SpendOptions: build/index.d.ts#SpendOptions
+SpendCode: build/check.chunk.d.ts#SpendCode
+SpendFault: build/check.chunk.d.ts#SpendFault
+SpendLayer: build/layer.chunk.d.ts#SpendLayer
+SpendOptions: build/check.chunk.d.ts#SpendOptions
 USED: build/index.d.ts#USED
 USE_CODES: build/index.d.ts#USE_CODES
 USE_LEVEL: build/index.d.ts#USE_LEVEL
@@ -55,7 +55,7 @@ UseOptions: build/reads.chunk.d.ts#UseOptions
 UseRead: build/reads.chunk.d.ts#UseRead
 UseSource: build/reads.chunk.d.ts#UseSource
 UseState: build/index.d.ts#UseState
-checkSpend: build/index.d.ts#checkSpend
+checkSpend: build/check.chunk.d.ts#checkSpend
 checkUse: build/index.d.ts#checkUse
 dayNumber: @mark1russell7/system-stack#dayNumber (external)
 evaluateService: build/index.d.ts#evaluateService
@@ -77,7 +77,33 @@ parseSpend: build/schema.d.ts#parseSpend
 readsSchema: build/schema.d.ts#readsSchema
 spendSchema: build/schema.d.ts#spendSchema
 
+## ./add-on (build/add-on.d.ts): names
+
+spendAddOn: build/add-on.d.ts#spendAddOn
+
 ## Declarations
+
+### build/add-on.d.ts#spendAddOn
+export declare function spendAddOn(options: SpendOptions): StackAddOn<SpendLayer>;
+
+### build/check.chunk.d.ts#SPEND_CODES
+declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "proof-none", "proof-date", "proof-old"];
+
+### build/check.chunk.d.ts#SpendCode
+type SpendCode = (typeof SPEND_CODES)[number];
+
+### build/check.chunk.d.ts#SpendFault
+interface SpendFault extends Fault {
+  readonly code: SpendCode;
+}
+
+### build/check.chunk.d.ts#SpendOptions
+interface SpendOptions {
+  readonly today: string;
+}
+
+### build/check.chunk.d.ts#checkSpend
+declare function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOptions): SpendFault[];
 
 ### build/index.d.ts#BOUNDED_TOTAL
 export declare const BOUNDED_TOTAL: Expr;
@@ -154,28 +180,12 @@ export declare const SAMPLE_SPEND: SpendLayer;
 ### build/index.d.ts#SAMPLE_TODAY
 export declare const SAMPLE_TODAY = "2026-11-16";
 
-### build/index.d.ts#SPEND_CODES
-export declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "proof-none", "proof-date", "proof-old"];
-
 ### build/index.d.ts#ServiceState
 export interface ServiceState {
   readonly part: string;
   readonly billing: Billing;
   readonly hardLimit?: number | undefined;
   readonly monthMax?: number | undefined;
-}
-
-### build/index.d.ts#SpendCode
-export type SpendCode = (typeof SPEND_CODES)[number];
-
-### build/index.d.ts#SpendFault
-export interface SpendFault extends Fault {
-  readonly code: SpendCode;
-}
-
-### build/index.d.ts#SpendOptions
-export interface SpendOptions {
-  readonly today: string;
 }
 
 ### build/index.d.ts#USED
@@ -215,9 +225,6 @@ export interface UseState {
   readonly age?: number | undefined;
 }
 
-### build/index.d.ts#checkSpend
-export declare function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOptions): SpendFault[];
-
 ### build/index.d.ts#checkUse
 export declare function checkUse(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): UseFault[];
 
@@ -248,16 +255,16 @@ export declare function useSpace(layer: SpendLayer, reads: readonly UseRead[], o
 ### build/index.d.ts#useStates
 export declare function useStates(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): UseState[];
 
-### build/reads.chunk.d.ts#BILLINGS
+### build/layer.chunk.d.ts#BILLINGS
 declare const BILLINGS: readonly ["free", "fixed", "metered"];
 
-### build/reads.chunk.d.ts#Billing
+### build/layer.chunk.d.ts#Billing
 type Billing = (typeof BILLINGS)[number];
 
-### build/reads.chunk.d.ts#LIMIT_KINDS
+### build/layer.chunk.d.ts#LIMIT_KINDS
 declare const LIMIT_KINDS: readonly ["provider", "prepaid", "code", "alert"];
 
-### build/reads.chunk.d.ts#Limit
+### build/layer.chunk.d.ts#Limit
 interface Limit {
   readonly kind: LimitKind;
   readonly amount: number;
@@ -265,20 +272,20 @@ interface Limit {
   readonly stop?: string | undefined;
 }
 
-### build/reads.chunk.d.ts#LimitKind
+### build/layer.chunk.d.ts#LimitKind
 type LimitKind = (typeof LIMIT_KINDS)[number];
 
-### build/reads.chunk.d.ts#Proof
+### build/layer.chunk.d.ts#Proof
 interface Proof {
   readonly date: string;
   readonly by: string;
   readonly source?: string | undefined;
 }
 
-### build/reads.chunk.d.ts#SPEND_SCHEMA
+### build/layer.chunk.d.ts#SPEND_SCHEMA
 declare const SPEND_SCHEMA = "spend/1";
 
-### build/reads.chunk.d.ts#Service
+### build/layer.chunk.d.ts#Service
 interface Service {
   readonly part: string;
   readonly plan?: string | undefined;
@@ -290,7 +297,7 @@ interface Service {
   readonly steps?: readonly string[] | undefined;
 }
 
-### build/reads.chunk.d.ts#SpendLayer
+### build/layer.chunk.d.ts#SpendLayer
 interface SpendLayer {
   readonly schema: typeof SPEND_SCHEMA;
   readonly currency: string;

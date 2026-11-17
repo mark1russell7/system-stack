@@ -2,7 +2,7 @@
 
 A system stack as data: the parts of a system, and what each part needs. The package has the format of a stack, the parts that work when some parts are down, and the checks of a stack. It also gives the paths of a part and the sets of parts whose failure stops it.
 
-The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md) and [`@mark1russell7/stack-risk`](../stack-risk/README.md).
+The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md), [`@mark1russell7/stack-risk`](../stack-risk/README.md) and [`@mark1russell7/stack-tofu`](../stack-tofu/README.md).
 
 Each function is a plain function with no clock and no network.
 
@@ -10,7 +10,7 @@ Each function is a plain function with no clock and no network.
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks and a sample stack. |
+| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers and a sample stack. |
 | `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, and `formErrors` for the layers of add-ons. |
 
 The root entry has no schema library. Thus a page that only asks which parts work gets no zod.
@@ -153,6 +153,44 @@ checkStack({
 A fault has a `level`, a `code`, the `id` of its part in `at`, and a `message` for a reader. The checks of the add-ons give faults of the same form.
 
 `dayNumber(date)` gives the count of days of a date `YYYY-MM-DD` from 1970-01-01. The gates of the add-ons compare dates with it, so they have no clock.
+
+## The layers of the add-ons
+
+An add-on keeps its records in a layer of the stack: a value in `layers`, with the name of its format as the key. The core keeps each layer, and it reads none.
+
+`checkStackLayers(stack, addOns)` gives the findings of a whole document. A finding is a fault with the name of its layer in `layer`.
+
+- A fault of `checkStack` has the layer `stack/1`. When the core has an error, the function examines no layer.
+- `layer-name`: the name of a layer is not a word, a slash and a version, for example `spend/1`.
+- `layer-unknown`: no add-on of the list reads the layer. This finding is a warning, and the stack keeps the layer.
+- `layer-form`: the add-on cannot read its layer. Each fault of the form is one finding.
+- Each other finding is a fault of the meaning of a layer, from its add-on.
+
+The findings of the layers are in the order of the layer names. Thus the order of the add-ons does not change the result.
+
+An add-on has the name of its layer, a function `parse` for the form and a function `check` for the meaning. Each add-on package gives its add-on in its entry `/add-on`. This example makes a small one.
+
+```ts
+import { checkStackLayers, partsById, type StackAddOn } from "@mark1russell7/system-stack";
+
+// A layer with the list of the parts that a person examined.
+const examined: StackAddOn<readonly string[]> = {
+  schema: "examined/1",
+  parse: (value) => (Array.isArray(value) && value.every((id) => typeof id === "string") ? { ok: true, layer: value } : { ok: false, errors: ['The layer "examined/1" is not a list of texts.'] }),
+  check: (layer, stack) =>
+    layer.filter((id) => !partsById(stack).has(id)).map((id) => ({ level: "error", code: "examined-part", at: id, message: `The list names "${id}", which is no part of the stack.` })),
+};
+
+checkStackLayers({ schema: "stack/1", parts: [{ id: "a", kind: "host" }], layers: { "examined/1": ["a", "b"], "notes/1": {} } }, [examined]);
+// => [
+//   { level: "error", code: "examined-part", at: "b", message: 'The list names "b", which is no part of the stack.', layer: "examined/1" },
+//   { level: "warning", code: "layer-unknown", layer: "notes/1", at: "", message: 'The document has the layer "notes/1", and no add-on of the check reads it. The document keeps the layer.' },
+// ]
+```
+
+`readLayer(stack, addOn)` gives the layer of one add-on, for a query of a host. A stack without the layer gives `undefined`.
+
+The contract of the layers is the entry `@mark1russell7/coeval/layers`. The core gives its names again: `AddOn`, `LayerFault`, `LayerFinding`, `LayerParse`, `readLayer` and `isLayerName`.
 
 ## The read of JSON
 

@@ -12,17 +12,17 @@ ChanceOptions: build/index.d.ts#ChanceOptions
 Goal: build/layer.chunk.d.ts#Goal
 GoalState: build/index.d.ts#GoalState
 PartImportance: build/index.d.ts#PartImportance
-RISK_CODES: build/index.d.ts#RISK_CODES
+RISK_CODES: build/check.chunk.d.ts#RISK_CODES
 RISK_SCHEMA: build/layer.chunk.d.ts#RISK_SCHEMA
-RiskCode: build/index.d.ts#RiskCode
-RiskFault: build/index.d.ts#RiskFault
+RiskCode: build/check.chunk.d.ts#RiskCode
+RiskFault: build/check.chunk.d.ts#RiskFault
 RiskLayer: build/layer.chunk.d.ts#RiskLayer
-RiskOptions: build/index.d.ts#RiskOptions
+RiskOptions: build/check.chunk.d.ts#RiskOptions
 SAMPLE_RISK: build/index.d.ts#SAMPLE_RISK
 SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
 WorksChance: build/index.d.ts#WorksChance
 chancesByPart: build/layer.chunk.d.ts#chancesByPart
-checkRisk: build/index.d.ts#checkRisk
+checkRisk: build/check.chunk.d.ts#checkRisk
 firstGoals: build/layer.chunk.d.ts#firstGoals
 goalStates: build/index.d.ts#goalStates
 isChance: build/layer.chunk.d.ts#isChance
@@ -34,7 +34,36 @@ RiskParse: build/schema.d.ts#RiskParse
 parseRisk: build/schema.d.ts#parseRisk
 riskSchema: build/schema.d.ts#riskSchema
 
+## ./add-on (build/add-on.d.ts): names
+
+riskAddOn: build/add-on.d.ts#riskAddOn
+
 ## Declarations
+
+### build/add-on.d.ts#riskAddOn
+export declare function riskAddOn(options: RiskOptions): StackAddOn<RiskLayer>;
+
+### build/check.chunk.d.ts#RISK_CODES
+declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "chance-part", "chance-duplicate", "chance-range", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
+
+### build/check.chunk.d.ts#RiskCode
+type RiskCode = (typeof RISK_CODES)[number];
+
+### build/check.chunk.d.ts#RiskFault
+interface RiskFault extends Fault {
+  readonly code: RiskCode;
+  readonly parts?: readonly string[] | undefined;
+}
+
+### build/check.chunk.d.ts#RiskOptions
+interface RiskOptions {
+  readonly today: string;
+  readonly maxSets?: number | undefined;
+  readonly maxSteps?: number | undefined;
+}
+
+### build/check.chunk.d.ts#checkRisk
+declare function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions): RiskFault[];
 
 ### build/index.d.ts#ChanceOptions
 export interface ChanceOptions extends PathOptions {
@@ -60,25 +89,6 @@ export interface PartImportance {
   readonly importance: number;
 }
 
-### build/index.d.ts#RISK_CODES
-export declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "chance-part", "chance-duplicate", "chance-range", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
-
-### build/index.d.ts#RiskCode
-export type RiskCode = (typeof RISK_CODES)[number];
-
-### build/index.d.ts#RiskFault
-export interface RiskFault extends Fault {
-  readonly code: RiskCode;
-  readonly parts?: readonly string[] | undefined;
-}
-
-### build/index.d.ts#RiskOptions
-export interface RiskOptions {
-  readonly today: string;
-  readonly maxSets?: number | undefined;
-  readonly maxSteps?: number | undefined;
-}
-
 ### build/index.d.ts#SAMPLE_RISK
 export declare const SAMPLE_RISK: RiskLayer;
 
@@ -94,9 +104,6 @@ export type WorksChance = {
 } | {
   readonly kind: "budget";
 };
-
-### build/index.d.ts#checkRisk
-export declare function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions): RiskFault[];
 
 ### build/index.d.ts#goalStates
 export declare function goalStates(layer: RiskLayer, stack: Stack, options?: PathOptions): GoalState[];
