@@ -11,6 +11,7 @@ BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
 Billing: build/layer.chunk.d.ts#Billing
 COUNT_USED: build/index.d.ts#COUNT_USED
 END_DAYS: build/layer.chunk.d.ts#END_DAYS
+EndDecision: build/layer.chunk.d.ts#EndDecision
 EndOptions: build/index.d.ts#EndOptions
 EndStops: build/index.d.ts#EndStops
 HARD_COUNT: build/index.d.ts#HARD_COUNT
@@ -205,6 +206,7 @@ export interface PlanEndState {
   readonly date: string;
   readonly days: number;
   readonly stops: boolean;
+  readonly decided: boolean;
 }
 
 ### build/index.d.ts#READ_AGE
@@ -322,6 +324,12 @@ type Billing = (typeof BILLINGS)[number];
 ### build/layer.chunk.d.ts#END_DAYS
 declare const END_DAYS = 30;
 
+### build/layer.chunk.d.ts#EndDecision
+interface EndDecision {
+  readonly date: string;
+  readonly by: string;
+}
+
 ### build/layer.chunk.d.ts#LIMIT_KINDS
 declare const LIMIT_KINDS: readonly ["provider", "prepaid", "code", "alert"];
 
@@ -348,6 +356,7 @@ interface NextPlan {
 interface PlanEnd {
   readonly date: string;
   readonly next?: NextPlan | undefined;
+  readonly decided?: EndDecision | undefined;
 }
 
 ### build/layer.chunk.d.ts#Proof

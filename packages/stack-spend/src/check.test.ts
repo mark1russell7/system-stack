@@ -162,6 +162,29 @@ describe("checkSpend: the end of a plan", () => {
     expect(codes(ended, "2026-11-15")).toEqual(["end-soon a"]);
   });
 
+  it("tells the decision of the owner in the warning, and the gate passes", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    const stop = layer({ part: "a", billing: "free", ends: { date: "2026-11-30", decided }, proof });
+    expect(faultsOf(stop)).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-11-30, in 14 days. Then the provider stops the service. The owner decided this on 2026-11-10.']]);
+    const paid = layer({ part: "a", billing: "free", ends: { date: "2026-11-30", next: { billing: "fixed", price: 20 }, decided }, proof });
+    expect(faultsOf(paid)).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-11-30, in 14 days. Then the cost changes. The owner decided this on 2026-11-10.']]);
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", decided }, proof }))).toEqual([]);
+  });
+
+  it("finds a date of a decision that is not a date, or that is after the date of the check", () => {
+    const withDate = (date: string): SpendLayer => layer({ part: "a", billing: "free", ends: { date: "2027-06-01", decided: { date, by: "The owner" } }, proof });
+    for (const date of ["", "2026-11", "2026-02-30", "last week"]) expect(codes(withDate(date))).toEqual(["end-date a"]);
+    expect(faultsOf(withDate("2026-11-17"))).toEqual([
+      ["error", "end-date", 'The date 2026-11-17 of the decision about the end of the plan of "a" is after the date of the check, 2026-11-16.'],
+    ]);
+    expect(codes(withDate("2026-11-16"))).toEqual([]);
+  });
+
+  it("does not let a decision pass a cost after the end that has no hard limit", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: { billing: "metered" }, decided }, proof }))).toEqual(["end-open a"]);
+  });
+
   it("finds a date of an end that is not a date", () => {
     for (const date of ["", "2026-12", "2026-02-30", "December"]) expect(codes(layer({ part: "a", billing: "free", ends: { date }, proof }))).toEqual(["end-date a"]);
   });

@@ -28,9 +28,15 @@ const next = z.strictObject({
   limits: z.array(limit).readonly().optional(),
 });
 
+const decided = z.strictObject({
+  date: z.string(),
+  by: z.string().min(1),
+});
+
 const ends = z.strictObject({
   date: z.string(),
   next: next.optional(),
+  decided: decided.optional(),
 });
 
 const service = z.strictObject({

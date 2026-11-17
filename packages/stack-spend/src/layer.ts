@@ -75,6 +75,19 @@ export interface PlanEnd {
   readonly date: string;
   /** The cost of the service after the end. A service that stops has none. */
   readonly next?: NextPlan | undefined;
+  /** The decision of the owner that the result after the end is wanted: the stop, or the cost of `next`. */
+  readonly decided?: EndDecision | undefined;
+}
+
+/**
+ * The decision of the owner about the end of a plan: the stop of the service, or the cost of its next plan, is wanted.
+ * An end with a decision gives no step to the owner. A cost with no hard limit after the end stays a fault.
+ */
+export interface EndDecision {
+  /** The date of the decision, as `YYYY-MM-DD`. */
+  readonly date: string;
+  /** The person who decided, for example the owner of the account. */
+  readonly by: string;
 }
 
 /** The cost record of one part of the stack. */

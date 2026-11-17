@@ -89,9 +89,10 @@ function inDays(days: number): string {
  * - `limit-wanted`: a wanted limit is not in force.
  *
  * The end of a plan:
- * - `end-date`: the date of an end is not a date.
+ * - `end-date`: the date of an end is not a date. The date of its decision is not a date, or it is after `today`.
  * - `end-past`: the plan ended before `today`. The record gives the cost before the end, so it is not correct.
  * - `end-soon`: the plan ends in `endDays` days, or fewer. This fault is a warning: it does not stop the gate.
+ *   Its message tells the decision of the owner, when the record has one.
  * - `end-open`: the cost after the end grows with the use, and it has no hard limit.
  *
  * The proofs:
@@ -146,13 +147,20 @@ export function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOption
       else add("limit-none", at, `The cost of "${at}" grows with the use, and it has no limit.`);
     }
     if (service.ends !== undefined) {
-      const { date, next } = service.ends;
+      const { date, next, decided } = service.ends;
       const end = dayNumber(date);
       if (end === undefined) add("end-date", at, `The date "${date}" of the end of the plan of "${at}" is not a date of the form YYYY-MM-DD.`);
       else if (end < today) add("end-past", at, `The plan of "${at}" ended on ${date}. The record gives the cost before the end.`);
       else if (end - today <= endDays) {
         const then = next === undefined ? "Then the provider stops the service." : "Then the cost changes.";
-        push("warning", "end-soon", at, `The plan of "${at}" ends on ${date}, ${inDays(end - today)}. ${then}`);
+        const agreed = decided === undefined ? "" : ` ${decided.by} decided this on ${decided.date}.`;
+        push("warning", "end-soon", at, `The plan of "${at}" ends on ${date}, ${inDays(end - today)}. ${then}${agreed}`);
+      }
+      if (decided !== undefined) {
+        const day = dayNumber(decided.date);
+        const about = `of the decision about the end of the plan of "${at}"`;
+        if (day === undefined) add("end-date", at, `The date "${decided.date}" ${about} is not a date of the form YYYY-MM-DD.`);
+        else if (day > today) add("end-date", at, `The date ${decided.date} ${about} is after the date of the check, ${options.today}.`);
       }
       if (next !== undefined) {
         const when = " after the end of its plan";

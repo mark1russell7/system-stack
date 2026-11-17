@@ -29,15 +29,26 @@ describe("planEnds", () => {
 
   it("gives the two ends of the sample, with the nearest date first", () => {
     expect(planEnds(SAMPLE_ENDS, { today: SAMPLE_TODAY })).toEqual([
-      { part: "call-account", date: "2026-11-30", days: 14, stops: true },
-      { part: "cloud-account", date: "2026-12-01", days: 15, stops: false },
+      { part: "call-account", date: "2026-11-30", days: 14, stops: true, decided: false },
+      { part: "cloud-account", date: "2026-12-01", days: 15, stops: false, decided: false },
     ]);
   });
 
   it("gives a count of days below 0 for a plan that ended, and 0 for the last day", () => {
     expect(planEnds(layer(stops("a", "2026-11-15"), stops("b", "2026-11-16")), { today })).toEqual([
-      { part: "a", date: "2026-11-15", days: -1, stops: true },
-      { part: "b", date: "2026-11-16", days: 0, stops: true },
+      { part: "a", date: "2026-11-15", days: -1, stops: true, decided: false },
+      { part: "b", date: "2026-11-16", days: 0, stops: true, decided: false },
+    ]);
+  });
+
+  it("tells the decision of the owner about an end", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    const stop: Service = { part: "a", billing: "free", ends: { date: "2026-11-30", decided } };
+    const paid: Service = { part: "b", billing: "free", ends: { date: "2026-12-01", next: { billing: "fixed", price: 20 }, decided } };
+    expect(planEnds(layer(stop, paid, stops("c", "2026-12-02")), { today })).toEqual([
+      { part: "a", date: "2026-11-30", days: 14, stops: true, decided: true },
+      { part: "b", date: "2026-12-01", days: 15, stops: false, decided: true },
+      { part: "c", date: "2026-12-02", days: 16, stops: true, decided: false },
     ]);
   });
 
@@ -47,7 +58,7 @@ describe("planEnds", () => {
   });
 
   it("does not give a record whose date is not a date, and uses the first record of a part", () => {
-    expect(planEnds(layer(stops("a", "soon"), stops("b", "2026-12-01"), stops("b", "2026-11-20")), { today })).toEqual([{ part: "b", date: "2026-12-01", days: 15, stops: true }]);
+    expect(planEnds(layer(stops("a", "soon"), stops("b", "2026-12-01"), stops("b", "2026-11-20")), { today })).toEqual([{ part: "b", date: "2026-12-01", days: 15, stops: true, decided: false }]);
   });
 
   it("refuses a date of the check that is not a date, and does not change the layer", () => {
