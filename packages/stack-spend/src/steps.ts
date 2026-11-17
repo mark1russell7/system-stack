@@ -51,6 +51,7 @@ function endText(ends: PlanEnd): string {
  * - `limit-wanted`: set the wanted limit in the account. A wanted stop by code is the work of a programmer, so it gives no step.
  * - `limit-recharge`: stop the automatic recharge of the balance.
  * - `end-soon`: decide before the date. A service with no plan after the end stops, and the cost of each other service changes.
+ *   An end with a decision (`ends.decided`) gives no step.
  * - `end-open`: set a hard limit for the cost after the end, or stop the service before the date. Then `end-soon` gives no second step.
  * - `end-past`, `proof-none` and `proof-old`: read the plan and the limits in the account, and give them with the date.
  *
@@ -69,7 +70,7 @@ export function ownerSteps(layer: SpendLayer, stack: Stack, options: SpendOption
     const service = services.get(fault.at);
     if (code === undefined || service === undefined) continue;
     if (code === "limit-wanted" && service.wanted?.kind === "code") continue;
-    if (code === "end-soon" && open.has(fault.at)) continue;
+    if (code === "end-soon" && (open.has(fault.at) || service.ends?.decided !== undefined)) continue;
     let text = "Read the plan and the limits in the account, and give them with the date of the read.";
     if (code === "limit-recharge") text = "Stop the automatic recharge of the prepaid balance.";
     if (code === "limit-wanted" && service.wanted !== undefined) text = wantedText(service.wanted, layer.currency);

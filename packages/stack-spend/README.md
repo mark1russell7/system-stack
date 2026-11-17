@@ -134,7 +134,7 @@ checkSpend(SAMPLE_SPEND, SAMPLE_STACK, { today: SAMPLE_TODAY }).map((fault) => `
 | `limit-recharge` | error | A prepaid balance gets money automatically. |
 | `limit-stop` | error | A stop by code does not name the part of the stack that stops the use. |
 | `limit-wanted` | error | A wanted limit is not in force. |
-| `end-date` | error | The date of the end of a plan is not a date. |
+| `end-date` | error | The date of the end of a plan is not a date. The date of its decision is not a date, or it is after `today`. |
 | `end-past` | error | The plan ended before the date of the check. The record gives the cost before the end. |
 | `end-soon` | warning | The plan ends in `endDays` days, or fewer. |
 | `end-open` | error | The cost after the end of a plan grows with the use, and it has no hard limit. |
@@ -152,10 +152,12 @@ A trial, a free credit or a term ends on a date. The field `ends` of a cost reco
 | --- | --- |
 | `date` | The last day of the plan, as `YYYY-MM-DD`. |
 | `next` | The cost after the end: its `plan`, its `billing`, its `price` and its `limits`. A service that stops has none. |
+| `decided` | The decision of the owner that the result after the end is wanted: its `date` and the person in `by`. |
 
 - With no `next`, the provider stops the service after the date, and it takes no money. The part does not work after the date.
 - With a `next`, the service continues after the date, with the cost of `next`.
 - The rule holds for the cost of `next` too: a `metered` cost must have a hard limit.
+- With a `decided`, the end gives no step to the owner. A cost after the end with no hard limit stays a fault.
 
 `SAMPLE_ENDS` of the package is a layer for `SAMPLE_STACK` with two plans that end:
 
@@ -197,6 +199,15 @@ The free credit of the call account ends with no plan after it. The provider tak
 - The warning starts `endDays` days before the last day of the plan. The default is `END_DAYS`, 30 days.
 - After the last day, the fault is `end-past`: the record gives the old plan. The owner reads the account again.
 - A plan that ends later than the days of warning gives no fault. The fault `end-open` does not wait for the days of warning.
+- The warning tells the decision of the owner, when the record has one. The fault `end-date` finds a decision with a date that is not valid.
+
+The owner of the call account decides that the stop is wanted. The record keeps the decision:
+
+```ts
+const decided = { part: "call-account", plan: "A free credit", billing: "free", ends: { date: "2026-11-30", decided: { date: "2026-11-12", by: "The owner" } }, proof };
+// The warning: 'The plan of "call-account" ends on 2026-11-30, in 14 days. Then the provider stops the service. The owner decided this on 2026-11-12.'
+// `ownerSteps` gives no step for this end, and `planEnds` gives `decided: true` for it.
+```
 - The faults `price`, `amount` and `limit-stop` examine the cost of `next` too.
 
 ### The parts that stop
@@ -209,8 +220,8 @@ import { SAMPLE_STACK } from "@mark1russell7/system-stack";
 
 planEnds(SAMPLE_ENDS, { today: SAMPLE_TODAY });
 // => [
-//   { part: "call-account", date: "2026-11-30", days: 14, stops: true },
-//   { part: "cloud-account", date: "2026-12-01", days: 15, stops: false },
+//   { part: "call-account", date: "2026-11-30", days: 14, stops: true, decided: false },
+//   { part: "cloud-account", date: "2026-12-01", days: 15, stops: false, decided: false },
 // ]
 
 endStops(SAMPLE_ENDS, SAMPLE_STACK, { today: SAMPLE_TODAY });
@@ -274,7 +285,7 @@ ownerSteps(SAMPLE_SPEND, SAMPLE_STACK, { today: SAMPLE_TODAY });
 | --- | --- |
 | `limit-wanted` | Set the wanted limit in the account. A wanted stop by code is the work of a programmer, so it gives no step. |
 | `limit-recharge` | Stop the automatic recharge of the balance. |
-| `end-soon` | Decide before the date. A service with no plan after the end stops, and the cost of each other service changes. |
+| `end-soon` | Decide before the date. A service with no plan after the end stops, and the cost of each other service changes. An end with a `decided` gives no step. |
 | `end-open` | Set a hard limit for the cost after the end, or stop the service before the date. Then `end-soon` gives no second step. |
 | `end-past`, `proof-none`, `proof-old` | Read the plan and the limits in the account, and give them with the date of the read. |
 

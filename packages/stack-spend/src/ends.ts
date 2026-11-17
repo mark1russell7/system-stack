@@ -16,6 +16,8 @@ export interface PlanEndState {
   readonly days: number;
   /** This field tells if the provider stops the service after the date: the record gives no plan after the end. */
   readonly stops: boolean;
+  /** This field tells if the record has the decision of the owner about the end. An end with no decision is work of the owner. */
+  readonly decided: boolean;
 }
 
 /**
@@ -36,7 +38,7 @@ export function planEnds(layer: SpendLayer, options: SpendOptions): PlanEndState
     if (service.ends === undefined) continue;
     const end = dayNumber(service.ends.date);
     if (end === undefined) continue;
-    ends.push({ part: service.part, date: service.ends.date, days: end - today, stops: service.ends.next === undefined });
+    ends.push({ part: service.part, date: service.ends.date, days: end - today, stops: service.ends.next === undefined, decided: service.ends.decided !== undefined });
   }
   // The sort of an array is stable, so two ends on one date keep the sequence of the records.
   return ends.sort((first, second) => first.days - second.days);

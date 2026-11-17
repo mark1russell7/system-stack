@@ -78,6 +78,18 @@ describe("ownerSteps", () => {
     expect(steps({ part: "b", billing: "free", ends: { date: "2026-11-01" }, proof })).toEqual([{ part: "b", name: "b", code: "end-past", text: read, steps: [] }]);
   });
 
+  it("gives no step for an end that the owner decided: the stop, or the cost after the end", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    expect(steps({ part: "a", billing: "free", ends: { date: "2026-11-30", decided }, proof })).toEqual([]);
+    expect(steps({ part: "b", billing: "free", ends: { date: "2026-11-30", next: { billing: "fixed", price: 20 }, decided }, proof })).toEqual([]);
+  });
+
+  it("keeps the step for a cost after the end that has no hard limit, also with a decision", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    const open: Service = { part: "a", billing: "free", ends: { date: "2026-11-30", next: { billing: "metered" }, decided }, proof };
+    expect(ownerSteps(layer(open), stack, { today }).map((step) => step.code)).toEqual(["end-open"]);
+  });
+
   it("gives no step for a plan that ends after the days of warning, or for an end with no date", () => {
     expect(steps({ part: "b", billing: "free", ends: { date: "2027-06-01" }, proof }, { part: "a", billing: "free", ends: { date: "soon" }, proof })).toEqual([]);
   });

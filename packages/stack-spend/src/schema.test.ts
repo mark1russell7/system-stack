@@ -30,6 +30,17 @@ describe("parseSpend", () => {
     expect(parseSpend({ ...sample(), endDays: 14 })).toMatchObject({ ok: true, layer: { endDays: 14 } });
   });
 
+  it("reads the decision about an end, and refuses a decision with no date, with no person or with a different field", () => {
+    const decided = { date: "2026-11-10", by: "The owner" };
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided } })).ok).toBe(true);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: { billing: "fixed", price: 20 }, decided } })).ok).toBe(true);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided: { by: "The owner" } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided: { date: "2026-11-10" } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided: { date: "2026-11-10", by: "" } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided: { ...decided, result: "stop" } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", decided: true } })).ok).toBe(false);
+  });
+
   it("refuses an end with no date, a plan after the end with no billing, and a field that the format does not have", () => {
     expect(parseSpend(service({ ends: {} })).ok).toBe(false);
     expect(parseSpend(service({ ends: { date: 20261201 } })).ok).toBe(false);
