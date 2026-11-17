@@ -3,6 +3,7 @@ export * from "./values.ts";
 export * from "./queries.ts";
 export * from "./cost.ts";
 export * from "./check.ts";
+export * from "./join.ts";
 export * from "./generate.ts";
 export * from "./plan.ts";
 export * from "./sample.ts";

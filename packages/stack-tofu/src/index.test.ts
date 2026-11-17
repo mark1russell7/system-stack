@@ -5,7 +5,7 @@ import * as schema from "./schema.ts";
 describe("the root entry", () => {
   it("has the format, the queries, the cost, the gates, the generator and the sample", () => {
     expect(entry.TOFU_SCHEMA).toBe("tofu/1");
-    for (const name of ["resourceAddress", "renderValue", "dependsOn", "resourceCycles", "accountStates", "plannedTotal", "checkTofu", "generateTofu", "documentText", "checkPlan"] as const) {
+    for (const name of ["resourceAddress", "renderValue", "dependsOn", "resourceCycles", "accountStates", "plannedTotal", "checkTofu", "generateTofu", "documentText", "checkPlan", "joinTofu"] as const) {
       expect(entry[name]).toBeTypeOf("function");
     }
     expect(entry.TOFU_CODES).toContain("cost-over");

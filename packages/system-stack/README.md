@@ -10,7 +10,7 @@ Each function is a plain function with no clock and no network.
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers and a sample stack. |
+| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers, the join of stacks and a sample stack. |
 | `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, and `formErrors` for the layers of add-ons. |
 
 The root entry has no schema library. Thus a page that only asks which parts work gets no zod.
@@ -82,6 +82,15 @@ works(SAMPLE_STACK, "alert", ["home-power"]); // => true: the copy in the cloud 
 works(SAMPLE_STACK, "alert", ["card"]); // => true: the copy at home and the push service need no card
 works(SAMPLE_STACK, "alert", ["home-power", "card"]); // => false
 works(SAMPLE_STACK, "alert", ["phone"]); // => false: each path needs the phone
+```
+
+`stopped(stack, down)` gives the parts that stop: each part that works with no part down, and that does not work with the parts of `down` down. The result is in the order of the parts.
+
+```ts
+import { SAMPLE_STACK, stopped } from "@mark1russell7/system-stack";
+
+stopped(SAMPLE_STACK, ["call-account"]); // => ["call-account", "call"]: the alert still gets to its reader through the push service
+stopped(SAMPLE_STACK, ["call", "push-account"]); // => ["push-account", "push", "call", "alert"]
 ```
 
 ## The paths and the stop sets
@@ -191,6 +200,77 @@ checkStackLayers({ schema: "stack/1", parts: [{ id: "a", kind: "host" }], layers
 `readLayer(stack, addOn)` gives the layer of one add-on, for a query of a host. A stack without the layer gives `undefined`.
 
 The contract of the layers is the entry `@mark1russell7/coeval/layers`. The core gives its names again: `AddOn`, `LayerFault`, `LayerFinding`, `LayerParse`, `readLayer` and `isLayerName`.
+
+## One stack from the documents of some owners
+
+A large stack has more than one owner, and each owner keeps a document. `joinStacks(fragments, addOns)` joins the documents into one stack. A fragment is one document with a name, for example the path of its file.
+
+- The parts of the stack are the parts of each fragment, in the order of the fragments.
+- `part-twice`: two or more fragments have a part with one `id`. Equal parts give the finding too.
+- `fragment-name`: two fragments have one name.
+- A layer of one fragment stays as it is, and no add-on reads it.
+- A layer of two or more fragments goes to the function `join` of its add-on.
+- `layer-twice`: two or more fragments have a layer, and no add-on of the list joins it.
+- `layer-form`: the add-on cannot read the layer of a fragment.
+- `layer-join`: the add-on cannot join the layers. Each fault of the join is one finding.
+
+A join with a finding gives no stack. Thus no document removes or replaces a record of a different owner.
+
+```ts
+import { joinStacks, type StackFragment } from "@mark1russell7/system-stack";
+
+// One owner has the function. A different owner has the host that the function needs.
+const service: StackFragment = { name: "service.json", stack: { schema: "stack/1", parts: [{ id: "web", kind: "function", needs: ["host"] }] } };
+const platform: StackFragment = { name: "platform.json", stack: { schema: "stack/1", parts: [{ id: "host", kind: "host" }] } };
+
+joinStacks([service, platform], []);
+// => { ok: true, stack: { schema: "stack/1", parts: [{ id: "web", kind: "function", needs: ["host"] }, { id: "host", kind: "host" }] } }
+
+joinStacks([service, platform, { name: "copy.json", stack: platform.stack }], []);
+// => {
+//   ok: false,
+//   findings: [
+//     { level: "error", code: "part-twice", layer: "stack/1", at: "host", from: ["platform.json", "copy.json"], message: 'The fragments "platform.json", "copy.json" each have the part "host".' },
+//   ],
+// }
+```
+
+A finding has the names of its fragments in `from`. The findings are in this order: the names of the fragments, the parts, then the layers in the order of their names.
+
+The join does not examine the meaning of the stack. Thus a fragment can need a part of a different fragment. Give the joined stack to `checkStackLayers` afterward.
+
+An add-on that joins its layer is a `StackJoiner`: an add-on with the function `join`. The function gets the layer of each fragment, with the name of the fragment. Two tools do the usual work. `joinRecords` joins lists of records with a key, and a key in two or more fragments is a fault. `joinSetting` joins a setting, and two different values are a fault. This example adds a join to the add-on `examined`.
+
+```ts
+import { joinRecords, joinStacks, type StackFragment, type StackJoiner } from "@mark1russell7/system-stack";
+
+// A part is in the list of one fragment.
+const joiner: StackJoiner<readonly string[]> = {
+  ...examined,
+  join: (pieces) => {
+    const ids = joinRecords(pieces, (layer) => layer, (id) => id, "examined part");
+    return ids.errors.length > 0 ? { ok: false, errors: ids.errors } : { ok: true, layer: ids.items };
+  },
+};
+const withList = (fragment: StackFragment, list: readonly string[]): StackFragment => ({ name: fragment.name, stack: { ...fragment.stack, layers: { "examined/1": list } } });
+
+joinStacks([withList(service, ["web"]), withList(platform, ["host"])], [joiner]);
+// => { ok: true, stack: { schema: "stack/1", parts: [...], layers: { "examined/1": ["web", "host"] } } }
+
+joinStacks([withList(service, ["web", "host"]), withList(platform, ["host"])], [joiner]);
+// => {
+//   ok: false,
+//   findings: [
+//     { level: "error", code: "layer-join", layer: "examined/1", at: "", from: ["service.json", "platform.json"], message: 'The fragments "service.json", "platform.json" each have the examined part "host".' },
+//   ],
+// }
+```
+
+Each add-on package gives a `StackJoiner` in its entry `/add-on`. Thus a host gives one list of add-ons to `joinStacks` and to `checkStackLayers`.
+
+A join of joined stacks gives the stack of one join of all the fragments. A fragment with no parts and no layers changes nothing. A layer has these two properties when the join of its add-on has them.
+
+The join of the layers is `joinLayers` of the entry `@mark1russell7/coeval/layers`. The core gives its names again: `LayerJoiner`, `LayerPiece`, `joinRecords`, `joinSetting` and the types of their results.
 
 ## The read of JSON
 

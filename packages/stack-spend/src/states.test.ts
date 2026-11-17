@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { HARD_COUNT, IS_HARD } from "./formulas.ts";
-import { SPEND_SCHEMA, type Limit, type Service, type SpendLayer } from "./layer.ts";
-import { SAMPLE_SPEND } from "./sample.ts";
-import { evaluateService, firstServices, monthTotal, serviceKey, serviceStates, spendSpace } from "./states.ts";
-import { evaluate } from "@mark1russell7/vex";
+import { HARD_COUNT, IS_HARD, MONTH_MAX, NODE_KINDS, PLAN_MAX } from "./formulas.ts";
+import { SPEND_SCHEMA, type Limit, type NextPlan, type Service, type SpendLayer } from "./layer.ts";
+import { SAMPLE_ENDS, SAMPLE_SPEND } from "./sample.ts";
+import { evaluateNext, evaluateService, firstServices, monthTotal, nextKey, serviceKey, serviceStates, spendSpace } from "./states.ts";
+import { evaluate, ref, type Expr } from "@mark1russell7/vex";
 import { BoolDomain, NumDomain, TextDomain } from "@mark1russell7/vex-domains";
 
 const layer = (...services: Service[]): SpendLayer => ({ schema: SPEND_SCHEMA, currency: "USD", kinds: [], proofDays: 90, services });
@@ -81,6 +81,75 @@ describe("monthTotal", () => {
 
   it("keeps a colon in the id of a part", () => {
     expect(monthTotal(layer(metered("a:b")))).toEqual({ bounded: 0, open: ["a:b"] });
+  });
+});
+
+describe("the plan after the end of a plan", () => {
+  const ends = (service: Omit<Service, "part" | "ends">, next?: NextPlan): Service => ({ part: "a", ...service, ends: { date: "2026-12-01", ...(next === undefined ? {} : { next }) } });
+
+  it("gives the cost of the plan before the end for a service that stops", () => {
+    expect(stateOf(ends({ billing: "free" }))).toEqual({ part: "a", billing: "free", monthMax: 0 });
+    expect(stateOf(ends({ billing: "fixed", price: 4 }))).toEqual({ part: "a", billing: "fixed", monthMax: 4 });
+  });
+
+  it("gives the larger of the cost before the end and the cost after it", () => {
+    expect(stateOf(ends({ billing: "free" }, { billing: "fixed", price: 20 }))).toEqual({ part: "a", billing: "free", monthMax: 20 });
+    expect(stateOf(ends({ billing: "fixed", price: 30 }, { billing: "fixed", price: 20 }))).toEqual({ part: "a", billing: "fixed", monthMax: 30 });
+    expect(stateOf(ends({ billing: "fixed", price: 30 }, { billing: "free" }))).toEqual({ part: "a", billing: "fixed", monthMax: 30 });
+    const metered: NextPlan = { billing: "metered", price: 5, limits: [{ kind: "alert", amount: 1 }, { kind: "provider", amount: 15 }, { kind: "prepaid", amount: 40 }] };
+    expect(stateOf(ends({ billing: "free" }, metered))).toEqual({ part: "a", billing: "free", nextLimit: 15, monthMax: 20 });
+  });
+
+  it("has no bound when the cost after the end has no bound", () => {
+    expect(stateOf(ends({ billing: "free" }, { billing: "metered" }))).toEqual({ part: "a", billing: "free" });
+    expect(stateOf(ends({ billing: "free" }, { billing: "metered", limits: [{ kind: "alert", amount: 5 }] }))).toEqual({ part: "a", billing: "free" });
+    expect(stateOf(ends({ billing: "fixed", price: 3 }, { billing: "metered", limits: [{ kind: "prepaid", amount: 5, recharge: true }] }))).toEqual({ part: "a", billing: "fixed" });
+    expect(stateOf(ends({ billing: "free" }, { billing: "fixed" }))).toEqual({ part: "a", billing: "free" });
+  });
+
+  it("has no bound when the cost before the end has no bound", () => {
+    expect(stateOf(ends({ billing: "metered" }, { billing: "free" }))).toEqual({ part: "a", billing: "metered" });
+    expect(stateOf(ends({ billing: "metered" }, { billing: "metered", limits: [{ kind: "provider", amount: 5 }] }))).toEqual({ part: "a", billing: "metered", nextLimit: 5 });
+  });
+
+  it("keeps the limits of the two plans apart", () => {
+    const service = ends({ billing: "metered", limits: [{ kind: "provider", amount: 9 }] }, { billing: "metered", limits: [{ kind: "provider", amount: 2 }, { kind: "code", amount: 1, stop: "x" }] });
+    expect(stateOf(service)).toEqual({ part: "a", billing: "metered", hardLimit: 9, nextLimit: 1, monthMax: 9 });
+    const tree = spendSpace(layer(service));
+    expect(evaluateService(HARD_COUNT, tree, "a")).toEqual({ ok: true, value: 1 });
+    expect(evaluateNext(HARD_COUNT, tree, "a")).toEqual({ ok: true, value: 2 });
+    expect(evaluateNext(PLAN_MAX, tree, "a")).toEqual({ ok: true, value: 1 });
+    expect(evaluateService(PLAN_MAX, tree, "a")).toEqual({ ok: true, value: 9 });
+    expect(evaluateService(MONTH_MAX, tree, "a")).toEqual({ ok: true, value: 9 });
+  });
+
+  it("gives an error value for the plan after the end of a service that has none", () => {
+    const tree = spendSpace(layer(ends({ billing: "free" }), { part: "b", billing: "free" }));
+    expect(evaluateNext(PLAN_MAX, tree, "a").ok).toBe(false);
+    expect(evaluateNext(PLAN_MAX, tree, "b").ok).toBe(false);
+  });
+
+  it("names a service with no bound after the end in the total, and adds the larger cost of each other service", () => {
+    const total = monthTotal(layer(ends({ billing: "free" }, { billing: "metered" }), { part: "b", billing: "free", ends: { date: "2026-12-01", next: { billing: "fixed", price: 20 } } }, { part: "c", billing: "fixed", price: 3 }));
+    expect(total).toEqual({ bounded: 23, open: ["a"] });
+    expect(monthTotal(SAMPLE_ENDS)).toEqual({ bounded: 0, open: ["cloud-account"] });
+  });
+
+  it("has a node for the plan after the end, with its limits as children", () => {
+    const tree = spendSpace(layer(ends({ billing: "free" }, { billing: "metered", price: 2, limits: [{ kind: "alert", amount: 1 }, { kind: "provider", amount: 2 }] })));
+    const at = (program: Expr, origin: string): unknown => evaluate(program, { space: tree, origin, domains: [NumDomain, BoolDomain, TextDomain] });
+    expect(nextKey("a")).toBe("next:a");
+    expect(at(ref("kind"), "next:a")).toEqual({ ok: true, value: "next" });
+    expect(at(ref("billing"), "next:a")).toEqual({ ok: true, value: "metered" });
+    expect(at(ref("price"), "next:a")).toEqual({ ok: true, value: 2 });
+    expect(at(IS_HARD, "next-limit:a:0")).toEqual({ ok: true, value: false });
+    expect(at(IS_HARD, "next-limit:a:1")).toEqual({ ok: true, value: true });
+    expect(NODE_KINDS).toEqual(["layer", "service", "limit", "next"]);
+  });
+
+  it("uses the plan after the end of the first record of a part", () => {
+    const twice = layer({ part: "a", billing: "free" }, ends({ billing: "free" }, { billing: "metered" }));
+    expect(serviceStates(twice)).toEqual([{ part: "a", billing: "free", monthMax: 0 }]);
   });
 });
 

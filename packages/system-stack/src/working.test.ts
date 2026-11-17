@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SAMPLE_STACK } from "./sample.ts";
 import { STACK_SCHEMA, type Part, type Stack } from "./stack.ts";
-import { needHolds, working, works } from "./working.ts";
+import { needHolds, stopped, working, works } from "./working.ts";
 
 const stack = (...parts: Part[]): Stack => ({ schema: STACK_SCHEMA, parts });
 
@@ -101,5 +101,47 @@ describe("working", () => {
         for (const id of working(SAMPLE_STACK, [first, second])) expect(one.has(id)).toBe(true);
       }
     }
+  });
+});
+
+describe("stopped", () => {
+  it("gives the parts of down that work, and each part that cannot work without them, in the order of the parts", () => {
+    expect(stopped(SAMPLE_STACK, ["call-account"])).toEqual(["call-account", "call"]);
+    expect(stopped(SAMPLE_STACK, ["home-power"])).toEqual(["home-power", "home-network", "home-host", "program-home"]);
+    expect(stopped(SAMPLE_STACK, ["call", "push-account"])).toEqual(["push-account", "push", "call", "alert"]);
+  });
+
+  it("gives nothing when no part is down, or when the down part is no part of the stack", () => {
+    expect(stopped(SAMPLE_STACK, [])).toEqual([]);
+    expect(stopped(SAMPLE_STACK, ["none"])).toEqual([]);
+  });
+
+  it("does not give a part that did not work before", () => {
+    const parts = stack({ id: "a", kind: "x", needs: ["none"] }, { id: "b", kind: "x", needs: ["a"] }, { id: "c", kind: "x" }, { id: "d", kind: "x", needs: ["c"] });
+    expect(stopped(parts, ["a", "c"])).toEqual(["c", "d"]);
+  });
+
+  it("gives an id one time for a stack with two parts of one id", () => {
+    const parts = stack({ id: "a", kind: "x" }, { id: "a", kind: "x" }, { id: "b", kind: "x", needs: ["a"] });
+    expect(stopped(parts, ["a"])).toEqual(["a", "b"]);
+  });
+
+  it("is the difference of two results of working, for each pair of parts of the sample", () => {
+    const ids = SAMPLE_STACK.parts.map((part) => part.id);
+    const before = working(SAMPLE_STACK);
+    for (const first of ids) {
+      for (const second of ids) {
+        const after = working(SAMPLE_STACK, [first, second]);
+        expect(stopped(SAMPLE_STACK, [first, second])).toEqual(ids.filter((id) => before.has(id) && !after.has(id)));
+      }
+    }
+  });
+
+  it("does not change its arguments", () => {
+    const down = ["card"];
+    const before = JSON.stringify(SAMPLE_STACK);
+    stopped(SAMPLE_STACK, down);
+    expect(JSON.stringify(SAMPLE_STACK)).toBe(before);
+    expect(down).toEqual(["card"]);
   });
 });

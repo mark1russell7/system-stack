@@ -58,6 +58,28 @@ export function working(stack: Stack, down: Iterable<string> = []): Set<string> 
   return up;
 }
 
+/**
+ * This function gives the `id` of each part that stops when the parts of `down` do not work.
+ *
+ * - A part stops when it works with no part down, and it does not work with the parts of `down` down.
+ * - Thus a part of `down` that works is in the result, with each part that cannot work without it.
+ * - A part that does not work with no part down is not in the result: it did not stop.
+ *
+ * The result is in the order of the parts of the stack. The function is pure. Refer to `working`.
+ */
+export function stopped(stack: Stack, down: Iterable<string>): string[] {
+  const before = working(stack);
+  const after = working(stack, down);
+  const seen = new Set<string>();
+  return stack.parts
+    .map((part) => part.id)
+    .filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return before.has(id) && !after.has(id);
+    });
+}
+
 /** This function tells if a part works when the parts of `down` do not work. Refer to `working`. */
 export function works(stack: Stack, part: string, down: Iterable<string> = []): boolean {
   return working(stack, down).has(part);
