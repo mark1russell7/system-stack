@@ -321,9 +321,48 @@ The schema examines the form of a record. `checkSpend` examines the meaning of a
 
 `parseReads` reads the JSON of a list of reads in the same way, and `checkUse` examines the meaning of the reads.
 
+## The cost records of some owners
+
+`joinSpend(pieces)` joins the spend layers of the fragments of a stack into one layer. A piece is the layer of one fragment, with the name of the fragment.
+
+- The cost records are in the order of the fragments. The record of a part is in one fragment.
+- A part with a record in two or more fragments is a fault. Equal records give the fault too.
+- The layer has one `currency` and one `proofDays`. A fragment with a different value is a fault.
+- The `kinds` are the kinds of each fragment, one time each.
+
+The kinds of the joined layer hold for each part of the joined stack. Thus a kind of one fragment asks a cost record of the parts of that kind in each fragment.
+
+```ts
+import { joinSpend } from "@mark1russell7/stack-spend";
+
+const proof = { date: "2026-11-10", by: "The owner" };
+const shared = { schema: "spend/1", currency: "USD", proofDays: 90 } as const;
+
+joinSpend([
+  { from: "a.json", layer: { ...shared, kinds: ["account"], services: [{ part: "one", billing: "free", proof }] } },
+  { from: "b.json", layer: { ...shared, kinds: ["account", "license"], services: [{ part: "two", billing: "free", proof }] } },
+]);
+// => { ok: true, layer: { schema: "spend/1", currency: "USD", kinds: ["account", "license"], proofDays: 90, services: [{ part: "one", ... }, { part: "two", ... }] } }
+
+joinSpend([
+  { from: "a.json", layer: { ...shared, kinds: ["account"], services: [{ part: "one", billing: "free", proof }] } },
+  { from: "b.json", layer: { ...shared, currency: "EUR", proofDays: 30, kinds: ["account"], services: [{ part: "one", billing: "free", proof }] } },
+]);
+// => {
+//   ok: false,
+//   errors: [
+//     'The fragment "a.json" has the currency "USD", and the fragment "b.json" has "EUR".',
+//     'The fragment "a.json" has the largest age of a proof in days 90, and the fragment "b.json" has 30.',
+//     'The fragments "a.json", "b.json" each have the cost record of the part "one".',
+//   ],
+// }
+```
+
+The add-on of the entry `/add-on` has the function as `join`. `joinStacks` of the core uses it for a stack in two or more documents, and the gate `checkSpend` examines the joined layer afterward.
+
 ## The add-on for one check of a stack
 
-`spendAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers.
+`spendAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers. A host with a stack in two or more documents gives it to `joinStacks` first.
 
 ```ts
 import { spendAddOn } from "@mark1russell7/stack-spend/add-on";

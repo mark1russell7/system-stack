@@ -2,6 +2,7 @@ import { checkStackLayers, readLayer, SAMPLE_STACK, type Stack } from "@mark1rus
 import { describe, expect, it } from "vitest";
 import { riskAddOn } from "./add-on.ts";
 import { checkRisk } from "./check.ts";
+import { joinRisk } from "./join.ts";
 import { RISK_SCHEMA, type RiskLayer } from "./layer.ts";
 import { SAMPLE_RISK, SAMPLE_TODAY } from "./sample.ts";
 
@@ -9,6 +10,10 @@ const options = { today: SAMPLE_TODAY };
 const withLayer = (layer: unknown): Stack => ({ ...SAMPLE_STACK, layers: { [RISK_SCHEMA]: layer } });
 
 describe("riskAddOn", () => {
+  it("has the join of the risk layers of the fragments of a stack", () => {
+    expect(riskAddOn(options).join).toBe(joinRisk);
+  });
+
   it("has the name of the risk layer", () => {
     expect(riskAddOn(options).schema).toBe("risk/1");
   });

@@ -72,6 +72,43 @@ The samples of the packages have faults that show the gates. With the three samp
 
 The last finding comes from two layers. The spend layer has no hard limit for the cloud account, so the OpenTofu gate refuses the cost of its resources.
 
+## A stack in the documents of some owners
+
+A large stack has more than one owner, and each owner keeps a document. `joinStacks` of the core joins the documents into one stack, and each add-on joins its own layer.
+
+```ts
+import { riskAddOn } from "@mark1russell7/stack-risk/add-on";
+import { serviceStates } from "@mark1russell7/stack-spend";
+import { spendAddOn } from "@mark1russell7/stack-spend/add-on";
+import { tofuAddOn } from "@mark1russell7/stack-tofu/add-on";
+import { checkStackLayers, joinStacks, readLayer, type StackFragment } from "@mark1russell7/system-stack";
+
+// One document for each owner: some parts of the stack, with the records of the layers for them
+declare const files: readonly StackFragment[];
+
+const today = "2026-11-16";
+const spend = spendAddOn({ today });
+const risk = riskAddOn({ today });
+const join = joinStacks(files, [spend, risk, tofuAddOn()]);
+if (join.ok) {
+  // The joined stack is one whole document, so the check is the check of the example above.
+  const read = readLayer(join.stack, spend);
+  const budgets = read?.ok === true ? serviceStates(read.layer) : [];
+  const findings = checkStackLayers(join.stack, [spend, risk, tofuAddOn({ budgets })]);
+}
+```
+
+The sample stack in two documents gives the five errors of the table above. A part or a record of two owners is an error of the join, and the join gives no stack then.
+
+| Layer | Code | The fault |
+| --- | --- | --- |
+| `stack/1` | `part-twice` | Two documents have a part with one `id`. |
+| `spend/1` | `layer-join` | Two documents have the cost record of one part, or a different currency. |
+| `risk/1` | `layer-join` | Two documents have the goal or the chance record of one part. |
+| `tofu/1` | `layer-join` | Two documents have one resource address, or each has a backend. |
+
+Thus no document removes or replaces a record of a different owner.
+
 ## The data
 
 This repository has sample data only. Keep the records of a real system in a private repository: they name accounts and hosts.

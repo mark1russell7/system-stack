@@ -1,3 +1,4 @@
+import * as layers from "@mark1russell7/coeval/layers";
 import { describe, expect, it } from "vitest";
 import * as entry from "./index.ts";
 import * as schema from "./schema.ts";
@@ -12,6 +13,14 @@ describe("the root entry", () => {
       expect(entry[name]).toBeTypeOf("function");
     }
     expect(entry.SAMPLE_STACK.schema).toBe(entry.STACK_SCHEMA);
+  });
+
+  it("has the join of stacks, with the tools for the join of a layer", () => {
+    for (const name of ["joinStacks", "joinRecords", "joinSetting"] as const) expect(entry[name]).toBeTypeOf("function");
+    expect(entry.STACK_JOIN_CODES).toEqual(["fragment-name", "part-twice"]);
+    // The tools are the functions of the layer contract, not a second copy.
+    expect(entry.joinRecords).toBe(layers.joinRecords);
+    expect(entry.joinSetting).toBe(layers.joinSetting);
   });
 
   it("has no schema", () => {

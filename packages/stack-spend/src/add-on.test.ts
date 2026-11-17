@@ -2,6 +2,7 @@ import { checkStackLayers, readLayer, SAMPLE_STACK, type Stack } from "@mark1rus
 import { describe, expect, it } from "vitest";
 import { spendAddOn } from "./add-on.ts";
 import { checkSpend } from "./check.ts";
+import { joinSpend } from "./join.ts";
 import { SPEND_SCHEMA, type SpendLayer } from "./layer.ts";
 import { SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
 
@@ -9,6 +10,10 @@ const options = { today: SAMPLE_TODAY };
 const withLayer = (layer: unknown): Stack => ({ ...SAMPLE_STACK, layers: { [SPEND_SCHEMA]: layer } });
 
 describe("spendAddOn", () => {
+  it("has the join of the spend layers of the fragments of a stack", () => {
+    expect(spendAddOn(options).join).toBe(joinSpend);
+  });
+
   it("has the name of the spend layer", () => {
     expect(spendAddOn(options).schema).toBe("spend/1");
   });

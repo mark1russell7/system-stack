@@ -84,7 +84,7 @@ import { SAMPLE_STACK } from "@mark1russell7/system-stack";
 checkRisk(SAMPLE_RISK, SAMPLE_STACK, { today: SAMPLE_TODAY }).map((fault) => `${fault.code}: ${fault.message}`);
 // => [
 //   'stop-set: The failure of the set ["phone"] stops "alert". The goal of "alert" is to survive each set of 1 or fewer parts.',
-//   'chance-low: The chance that "alert" works is 0.9649835920528093. The goal is 0.99.',
+//   'chance-low: The chance that "alert" works is 0.9649835920528091. The goal is 0.99.',
 // ]
 ```
 
@@ -156,12 +156,12 @@ import { SAMPLE_STACK } from "@mark1russell7/system-stack";
 const chance = worksChance(SAMPLE_RISK, SAMPLE_STACK, "alert");
 // => {
 //   kind: "exact",
-//   value: 0.9649835920528093,
+//   value: 0.9649835920528091,
 //   importance: [
 //     { part: "reader", importance: 0.9948284454152673 },
-//     { part: "phone", importance: 0.969832755831969 },
-//     { part: "alert", importance: 0.9649835920528093 },
-//     { part: "card", importance: 0.0218731279694261 },
+//     { part: "phone", importance: 0.9698327558319689 },
+//     { part: "alert", importance: 0.9649835920528091 },
+//     { part: "card", importance: 0.02187312796942623 },
 //     ...
 //   ],
 //   assumed: [],
@@ -190,9 +190,41 @@ parseRisk({ schema: "risk/1", goals: [{ part: "alert", survives: "1" }] });
 
 The schema examines the form of a record. `checkRisk` examines the meaning of a layer with a correct form.
 
+## The goals of some owners
+
+`joinRisk(pieces)` joins the risk layers of the fragments of a stack into one layer. A piece is the layer of one fragment, with the name of the fragment.
+
+- The goals and the chance records are in the order of the fragments. The record of a part is in one fragment.
+- A part with a goal in two or more fragments is a fault. Equal goals give the fault too.
+- A part with a chance record in two or more fragments is a fault. Equal records give the fault too.
+- The accepted risks are in the order of the fragments. A fragment can accept a risk of a goal of a different fragment.
+
+```ts
+import { joinRisk } from "@mark1russell7/stack-risk";
+
+const goals = { schema: "risk/1", goals: [{ part: "alert", survives: 1 }], chances: [{ part: "phone", works: 0.99 }] } as const;
+const accepted = [{ part: "alert", stop: ["reader"], reason: "One reader is enough for this year.", until: "2027-06-30" }];
+
+joinRisk([
+  { from: "a.json", layer: goals },
+  { from: "b.json", layer: { schema: "risk/1", goals: [], accepted } },
+]);
+// => { ok: true, layer: { schema: "risk/1", goals: [{ part: "alert", survives: 1 }], chances: [{ part: "phone", works: 0.99 }], accepted: [{ part: "alert", stop: ["reader"], ... }] } }
+
+joinRisk([
+  { from: "a.json", layer: goals },
+  { from: "b.json", layer: { schema: "risk/1", goals: [], chances: [{ part: "phone", works: 0.9 }], accepted } },
+]);
+// => { ok: false, errors: ['The fragments "a.json", "b.json" each have the chance record of the part "phone".'] }
+```
+
+The add-on of the entry `/add-on` has the function as `join`. `joinStacks` of the core uses it for a stack in two or more documents, and the gate `checkRisk` examines the joined layer afterward.
+
+The sequence of the parts of a stack does not change a chance, to its last digit. Thus the joined stack and one whole document give the same faults.
+
 ## The add-on for one check of a stack
 
-`riskAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers.
+`riskAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers. A host with a stack in two or more documents gives it to `joinStacks` first.
 
 ```ts
 import { riskAddOn } from "@mark1russell7/stack-risk/add-on";

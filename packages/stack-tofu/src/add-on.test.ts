@@ -2,6 +2,7 @@ import { checkStackLayers, readLayer, SAMPLE_STACK, type Stack } from "@mark1rus
 import { describe, expect, it } from "vitest";
 import { tofuAddOn } from "./add-on.ts";
 import { checkTofu } from "./check.ts";
+import { joinTofu } from "./join.ts";
 import { TOFU_SCHEMA, type TofuLayer } from "./layer.ts";
 import { SAMPLE_BUDGETS, SAMPLE_TOFU } from "./sample.ts";
 
@@ -9,6 +10,10 @@ const options = { budgets: SAMPLE_BUDGETS };
 const withLayer = (layer: unknown): Stack => ({ ...SAMPLE_STACK, layers: { [TOFU_SCHEMA]: layer } });
 
 describe("tofuAddOn", () => {
+  it("has the join of the OpenTofu layers of the fragments of a stack", () => {
+    expect(tofuAddOn(options).join).toBe(joinTofu);
+  });
+
   it("has the name of the OpenTofu layer", () => {
     expect(tofuAddOn().schema).toBe("tofu/1");
   });
