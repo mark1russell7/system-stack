@@ -322,6 +322,21 @@ To take an object that exists, put its id in the field `import` of the record. T
 
 Do not keep a state file of OpenTofu in a public repository: it can hold secrets.
 
+## The check with a real OpenTofu
+
+The file `e2e/tofu.e2e.ts` does these steps with a real OpenTofu. The job `tofu` of the CI workflow starts it for each pull request. Each resource of the check is a `terraform_data`, so the check needs no provider and no account.
+
+The check holds these facts:
+
+- OpenTofu accepts the files of the generator, with no warning.
+- A literal text with `${` or `%{` comes back as the record has it.
+- A plan has one change with the action `no-op` for each resource that stays the same.
+- A delete of a resource stops the gate until the option `removes` names its address.
+- OpenTofu refuses a plan that replaces a resource with `keep`.
+- An import of an object that exists gives a plan with no change.
+
+To start the check on your computer, install OpenTofu. Then start `pnpm --filter @mark1russell7/stack-tofu run test:tofu`.
+
 ## The read of JSON
 
 `parseTofu` and `parsePlan` of the entry `/schema` read the JSON of a layer and of a plan. Each gives its record, or the faults of the form with the place of each fault.

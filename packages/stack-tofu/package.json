@@ -38,6 +38,7 @@
     "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:tofu": "node --test e2e/tofu.e2e.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
