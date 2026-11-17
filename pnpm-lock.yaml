@@ -194,8 +194,8 @@ importers:
         specifier: ^0.1.9
         version: 0.1.9
       '@mark1russell7/text':
-        specifier: ^0.0.12
-        version: 0.0.12
+        specifier: ^0.0.13
+        version: 0.0.13
       '@swc/core':
         specifier: ^1.15.0
         version: 1.16.22
@@ -602,8 +602,8 @@ packages:
     engines: {node: '>=22.12'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.12':
-    resolution: {integrity: sha512-30jXr0d3UlV2pHUNalpwnbxEZoutZACNpu6liDYPEc8grmxqfPaCFGgFFEl9ujrmNShKf/ROw6c6t4qPgFFE5A==}
+  '@mark1russell7/text@0.0.13':
+    resolution: {integrity: sha512-8Tu7DTTpfmpXIy0F2JCyOW1RD91X7tm38c5xiqz3cLdmEkUQViH/06kTBLj+hrzuQPMBGVyxd7snqVG6EpNLdQ==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/vex-domains@0.19.1':
@@ -1943,7 +1943,7 @@ snapshots:
     dependencies:
       '@clack/prompts': 1.9.0
 
-  '@mark1russell7/text@0.0.12': {}
+  '@mark1russell7/text@0.0.13': {}
 
   '@mark1russell7/vex-domains@0.19.1(zod@4.6.7)':
     dependencies:
