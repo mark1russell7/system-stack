@@ -24,6 +24,7 @@ A gate that cannot read its input does not pass. An account with no budget is a 
 | --- | --- |
 | `@mark1russell7/stack-tofu` | The records of a layer, the queries, the cost of each account, the gate, the generator, the gate of a plan and a sample. |
 | `@mark1russell7/stack-tofu/schema` | `tofuSchema` and `planSchema`, the zod schemas of a layer and of a plan, with `parseTofu` and `parsePlan`. |
+| `@mark1russell7/stack-tofu/add-on` | `tofuAddOn`, the add-on in the form of the layer contract of the core. |
 
 The root entry has no schema library. Thus a page that only shows a document gets no zod.
 
@@ -362,6 +363,60 @@ The format `tofu/1` has resources, provider configurations, variables, one backe
 
 A plan with a data source or a module gives the fault `plan-unknown`.
 
-## License
+## The resources of some owners
 
+`joinTofu(pieces)` joins the OpenTofu layers of the fragments of a stack into one layer. A piece is the layer of one fragment, with the name of the fragment.
+
+- The resources, the provider configurations and the variables are in the order of the fragments.
+- A resource address in two or more fragments is a fault. Equal resources give the fault too.
+- The same rule holds for the address of a provider configuration and for the name of a variable.
+- The layer has one `version`. A fragment with a different value is a fault.
+- The state has one place. Thus a `backend` in two or more fragments is a fault.
+
+A resource of one fragment can use a provider configuration or a variable of a different fragment.
+
+```ts
+import { joinTofu } from "@mark1russell7/stack-tofu";
+
+const first = { schema: "tofu/1", version: ">= 1.8", backend: { type: "local" }, resources: [{ part: "one", type: "example_server" }] } as const;
+
+joinTofu([
+  { from: "a.json", layer: first },
+  { from: "b.json", layer: { schema: "tofu/1", resources: [{ part: "two", type: "example_server" }] } },
+]);
+// => { ok: true, layer: { schema: "tofu/1", version: ">= 1.8", backend: { type: "local" }, resources: [{ part: "one", type: "example_server" }, { part: "two", type: "example_server" }] } }
+
+joinTofu([
+  { from: "a.json", layer: first },
+  { from: "b.json", layer: { schema: "tofu/1", version: ">= 1.9", backend: { type: "local" }, resources: [{ part: "one", type: "example_server" }] } },
+]);
+// => {
+//   ok: false,
+//   errors: [
+//     'The fragment "a.json" has the version of OpenTofu ">= 1.8", and the fragment "b.json" has ">= 1.9".',
+//     'The fragments "a.json", "b.json" each have a backend. The state has one place.',
+//     'The fragments "a.json", "b.json" each have the resource "example_server.one".',
+//   ],
+// }
+```
+
+The add-on of the entry `/add-on` has the function as `join`. `joinStacks` of the core uses it for a stack in two or more documents, and the gate `checkTofu` examines the joined layer afterward.
+
+The generator sorts the records. Thus it gives the same text of the file for each division of the records into fragments.
+
+## The add-on for one check of a stack
+
+`tofuAddOn` of the entry `/add-on` gives the add-on in the form of the layer contract. A host gives it to `checkStackLayers` of the core, with the add-ons of the other layers. A host with a stack in two or more documents gives it to `joinStacks` first.
+
+```ts
+import { tofuAddOn } from "@mark1russell7/stack-tofu/add-on";
+import { checkStackLayers } from "@mark1russell7/system-stack";
+
+checkStackLayers(stack, [tofuAddOn({ budgets })]);
+// => the faults of the stack, then the faults of `checkTofu` for the layer `tofu/1`, each with the name of its layer
+```
+
+A layer with a wrong form gives one finding `layer-form` for each fault of the form, and the gate does not start. The add-on does not read the layer of a different add-on. The host gives the limit of each account as `budgets`, for example from the states of a spend layer.
+
+## License
 MIT
