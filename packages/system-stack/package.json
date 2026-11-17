@@ -40,7 +40,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/coeval": "^0.37.1",
+    "@mark1russell7/coeval": "^0.38.0",
     "@mark1russell7/collections": "^0.11.2",
     "zod": "^4.6.7"
   },

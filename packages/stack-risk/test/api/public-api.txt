@@ -26,6 +26,7 @@ checkRisk: build/check.chunk.d.ts#checkRisk
 firstGoals: build/layer.chunk.d.ts#firstGoals
 goalStates: build/index.d.ts#goalStates
 isChance: build/layer.chunk.d.ts#isChance
+joinRisk: build/index.d.ts#joinRisk
 worksChance: build/index.d.ts#worksChance
 
 ## ./schema (build/schema.d.ts): names
@@ -41,7 +42,7 @@ riskAddOn: build/add-on.d.ts#riskAddOn
 ## Declarations
 
 ### build/add-on.d.ts#riskAddOn
-export declare function riskAddOn(options: RiskOptions): StackAddOn<RiskLayer>;
+export declare function riskAddOn(options: RiskOptions): StackJoiner<RiskLayer>;
 
 ### build/check.chunk.d.ts#RISK_CODES
 declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "chance-part", "chance-duplicate", "chance-range", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
@@ -107,6 +108,9 @@ export type WorksChance = {
 
 ### build/index.d.ts#goalStates
 export declare function goalStates(layer: RiskLayer, stack: Stack, options?: PathOptions): GoalState[];
+
+### build/index.d.ts#joinRisk
+export declare function joinRisk(pieces: readonly LayerPiece<RiskLayer>[]): LayerParse<RiskLayer>;
 
 ### build/index.d.ts#worksChance
 export declare function worksChance(layer: RiskLayer, stack: Stack, part: string, options?: ChanceOptions): WorksChance;

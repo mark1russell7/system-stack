@@ -15,19 +15,30 @@ Fault: build/index.d.ts#Fault
 FaultLevel: build/index.d.ts#FaultLevel
 type LayerFault: @mark1russell7/coeval/layers#LayerFault (external)
 type LayerFinding: @mark1russell7/coeval/layers#LayerFinding (external)
+type LayerJoiner: @mark1russell7/coeval/layers#LayerJoiner (external)
 type LayerParse: @mark1russell7/coeval/layers#LayerParse (external)
+type LayerPiece: @mark1russell7/coeval/layers#LayerPiece (external)
 Need: build/stack.chunk.d.ts#Need
 Part: build/stack.chunk.d.ts#Part
 PartSets: build/index.d.ts#PartSets
 PathOptions: build/index.d.ts#PathOptions
+type RecordTwice: @mark1russell7/coeval/layers#RecordTwice (external)
+type RecordsJoin: @mark1russell7/coeval/layers#RecordsJoin (external)
 SAMPLE_STACK: build/index.d.ts#SAMPLE_STACK
 STACK_CODES: build/index.d.ts#STACK_CODES
+STACK_JOIN_CODES: build/index.d.ts#STACK_JOIN_CODES
 STACK_SCHEMA: build/stack.chunk.d.ts#STACK_SCHEMA
+type SettingJoin: @mark1russell7/coeval/layers#SettingJoin (external)
 SmallestStop: build/index.d.ts#SmallestStop
 Stack: build/stack.chunk.d.ts#Stack
 StackAddOn: build/index.d.ts#StackAddOn
 StackCode: build/index.d.ts#StackCode
 StackFault: build/index.d.ts#StackFault
+StackFragment: build/index.d.ts#StackFragment
+StackJoin: build/index.d.ts#StackJoin
+StackJoinCode: build/index.d.ts#StackJoinCode
+StackJoinFinding: build/index.d.ts#StackJoinFinding
+StackJoiner: build/index.d.ts#StackJoiner
 StopOptions: build/index.d.ts#StopOptions
 anyCount: build/stack.chunk.d.ts#anyCount
 checkStack: build/index.d.ts#checkStack
@@ -35,6 +46,9 @@ checkStackLayers: build/index.d.ts#checkStackLayers
 dayNumber: build/index.d.ts#dayNumber
 isAllOf: build/stack.chunk.d.ts#isAllOf
 isLayerName: @mark1russell7/coeval/layers#isLayerName (external)
+joinRecords: @mark1russell7/coeval/layers#joinRecords (external)
+joinSetting: @mark1russell7/coeval/layers#joinSetting (external)
+joinStacks: build/index.d.ts#joinStacks
 needHolds: build/index.d.ts#needHolds
 needParts: build/stack.chunk.d.ts#needParts
 partNeeds: build/stack.chunk.d.ts#partNeeds
@@ -95,6 +109,9 @@ export declare const SAMPLE_STACK: Stack;
 ### build/index.d.ts#STACK_CODES
 export declare const STACK_CODES: readonly ["id-duplicate", "need-part", "need-count", "need-cycle", "owner-part"];
 
+### build/index.d.ts#STACK_JOIN_CODES
+export declare const STACK_JOIN_CODES: readonly ["fragment-name", "part-twice"];
+
 ### build/index.d.ts#SmallestStop
 export type SmallestStop = {
   readonly kind: "exact";
@@ -116,6 +133,32 @@ export interface StackFault extends Fault {
   readonly code: StackCode;
 }
 
+### build/index.d.ts#StackFragment
+export interface StackFragment {
+  readonly name: string;
+  readonly stack: Stack;
+}
+
+### build/index.d.ts#StackJoin
+export type StackJoin = {
+  readonly ok: true;
+  readonly stack: Stack;
+} | {
+  readonly ok: false;
+  readonly findings: readonly StackJoinFinding[];
+};
+
+### build/index.d.ts#StackJoinCode
+export type StackJoinCode = (typeof STACK_JOIN_CODES)[number];
+
+### build/index.d.ts#StackJoinFinding
+export interface StackJoinFinding extends LayerFinding$1 {
+  readonly from: readonly string[];
+}
+
+### build/index.d.ts#StackJoiner
+export type StackJoiner<Layer> = StackAddOn<Layer> & LayerJoiner$1<Layer>;
+
 ### build/index.d.ts#StopOptions
 export interface StopOptions extends PathOptions {
   readonly size?: number | undefined;
@@ -129,6 +172,9 @@ export declare function checkStackLayers(stack: Stack, addOns: readonly StackAdd
 
 ### build/index.d.ts#dayNumber
 export declare function dayNumber(date: string): number | undefined;
+
+### build/index.d.ts#joinStacks
+export declare function joinStacks(fragments: readonly StackFragment[], joiners: readonly LayerJoiner$1<unknown>[]): StackJoin;
 
 ### build/index.d.ts#needHolds
 export declare function needHolds(need: Need, up: ReadonlySet<string>): boolean;

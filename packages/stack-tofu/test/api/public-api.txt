@@ -72,6 +72,7 @@ isForm: build/index.d.ts#isForm
 isList: build/index.d.ts#isList
 isObject: build/index.d.ts#isObject
 isZeroOrMore: build/check.chunk.d.ts#isZeroOrMore
+joinTofu: build/index.d.ts#joinTofu
 neededParts: build/index.d.ts#neededParts
 pathText: build/index.d.ts#pathText
 plannedTotal: build/check.chunk.d.ts#plannedTotal
@@ -106,7 +107,7 @@ tofuAddOn: build/add-on.d.ts#tofuAddOn
 ## Declarations
 
 ### build/add-on.d.ts#tofuAddOn
-export declare function tofuAddOn(options?: TofuOptions): StackAddOn<TofuLayer>;
+export declare function tofuAddOn(options?: TofuOptions): StackJoiner<TofuLayer>;
 
 ### build/check.chunk.d.ts#AccountState
 interface AccountState {
@@ -291,6 +292,9 @@ export declare function isList(value: TofuValue): value is readonly TofuValue[];
 
 ### build/index.d.ts#isObject
 export declare function isObject(value: TofuValue): value is TofuObject;
+
+### build/index.d.ts#joinTofu
+export declare function joinTofu(pieces: readonly LayerPiece<TofuLayer>[]): LayerParse<TofuLayer>;
 
 ### build/index.d.ts#neededParts
 export declare function neededParts(stack: Stack, part: string): Set<string>;

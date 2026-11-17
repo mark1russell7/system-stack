@@ -60,6 +60,7 @@ checkUse: build/index.d.ts#checkUse
 dayNumber: @mark1russell7/system-stack#dayNumber (external)
 evaluateService: build/index.d.ts#evaluateService
 firstServices: build/index.d.ts#firstServices
+joinSpend: build/index.d.ts#joinSpend
 monthTotal: build/index.d.ts#monthTotal
 ownerSteps: build/index.d.ts#ownerSteps
 serviceKey: build/index.d.ts#serviceKey
@@ -84,7 +85,7 @@ spendAddOn: build/add-on.d.ts#spendAddOn
 ## Declarations
 
 ### build/add-on.d.ts#spendAddOn
-export declare function spendAddOn(options: SpendOptions): StackAddOn<SpendLayer>;
+export declare function spendAddOn(options: SpendOptions): StackJoiner<SpendLayer>;
 
 ### build/check.chunk.d.ts#SPEND_CODES
 declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "proof-none", "proof-date", "proof-old"];
@@ -233,6 +234,9 @@ export declare function evaluateService(program: Expr, tree: Space, part: string
 
 ### build/index.d.ts#firstServices
 export declare function firstServices(layer: SpendLayer): readonly Service[];
+
+### build/index.d.ts#joinSpend
+export declare function joinSpend(pieces: readonly LayerPiece<SpendLayer>[]): LayerParse<SpendLayer>;
 
 ### build/index.d.ts#monthTotal
 export declare function monthTotal(layer: SpendLayer): MonthTotal;
