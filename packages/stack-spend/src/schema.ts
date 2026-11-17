@@ -1,6 +1,7 @@
 import { formErrors } from "@mark1russell7/system-stack/schema";
 import { z } from "zod";
 import { BILLINGS, LIMIT_KINDS, SPEND_SCHEMA, type SpendLayer } from "./layer.ts";
+import { USE_SOURCES, type UseRead } from "./reads.ts";
 
 // The zod schema of a spend layer, and the read of its JSON. This module is the entry `/schema` of the package.
 // The root entry has no zod, so a page that only evaluates the cost math gets no schema library.
@@ -54,4 +55,33 @@ export function parseSpend(value: unknown): SpendParse {
   const read = spendSchema.safeParse(value);
   if (read.success) return { ok: true, layer: read.data };
   return { ok: false, errors: formErrors(SPEND_SCHEMA, read.error.issues) };
+}
+
+const read = z.strictObject({
+  part: id,
+  source: z.enum([...USE_SOURCES]),
+  amount: z.number(),
+  date: z.string(),
+});
+
+/** The name of a list of reads in a fault of its form. */
+const READS_NAME = `${SPEND_SCHEMA} reads`;
+
+/**
+ * The schema of a list of reads of the used amounts. It examines the form of each read: the fields, their types and the finite numbers.
+ * `checkUse` examines the meaning of the reads with a correct form.
+ */
+export const readsSchema: z.ZodType<readonly UseRead[]> = z.array(read).readonly();
+
+/** The result of the read of a list of reads: the reads, or the faults of their form. */
+export type ReadsParse = { readonly ok: true; readonly reads: readonly UseRead[] } | { readonly ok: false; readonly errors: readonly string[] };
+
+/**
+ * This function reads the JSON of a list of reads of the used amounts. It gives the reads, or the faults of their form.
+ * Each fault names its place in the list, for example `0.amount`.
+ */
+export function parseReads(value: unknown): ReadsParse {
+  const result = readsSchema.safeParse(value);
+  if (result.success) return { ok: true, reads: result.data };
+  return { ok: false, errors: formErrors(READS_NAME, result.error.issues) };
 }

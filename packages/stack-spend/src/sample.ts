@@ -1,4 +1,5 @@
 import { SPEND_SCHEMA, type SpendLayer } from "./layer.ts";
+import type { UseRead } from "./reads.ts";
 
 /** The date of the check of the sample. With it, the gate gives the faults that the README shows. */
 export const SAMPLE_TODAY = "2026-11-16";
@@ -40,3 +41,13 @@ export const SAMPLE_SPEND: SpendLayer = {
     },
   ],
 };
+
+/**
+ * Sample reads of the used amounts of `SAMPLE_SPEND`, for the date `SAMPLE_TODAY`. Each amount is an example.
+ * The provider of the call account shows more than the stack counted, and the used amount is at 50 percent of the hard limit, or more.
+ */
+export const SAMPLE_READS: readonly UseRead[] = [
+  { part: "cloud-account", source: "provider", amount: 0, date: "2026-11-15" },
+  { part: "call-account", source: "count", amount: 4, date: "2026-11-16" },
+  { part: "call-account", source: "provider", amount: 5.2, date: "2026-11-16" },
+];

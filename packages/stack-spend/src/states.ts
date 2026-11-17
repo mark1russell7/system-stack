@@ -2,6 +2,7 @@ import { evaluate, space, type Expr, type Result, type Space } from "@mark1russe
 import { BoolDomain, NumDomain, TextDomain } from "@mark1russell7/vex-domains";
 import { BOUNDED_TOTAL, HARD_LIMIT, MONTH_MAX, OPEN_SERVICES } from "./formulas.ts";
 import type { Billing, Service, SpendLayer } from "./layer.ts";
+import { numberOf } from "./values.ts";
 
 // The state of the cost of each service of a layer. The layer becomes a tree, and the programs of `formulas.ts` evaluate on it.
 
@@ -67,11 +68,6 @@ function run(program: Expr, tree: Space, origin: string): Result<unknown> {
  */
 export function evaluateService(program: Expr, tree: Space, part: string): Result<unknown> {
   return run(program, tree, serviceKey(part));
-}
-
-/** This function gives the number of a result, or `undefined` for an error value. */
-function numberOf(result: Result<unknown>): number | undefined {
-  return result.ok && typeof result.value === "number" ? result.value : undefined;
 }
 
 /** The state of the cost of one service of a layer. */

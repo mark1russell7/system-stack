@@ -1,8 +1,9 @@
 import { SAMPLE_STACK } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkSpend } from "./check.ts";
-import { SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
-import { parseSpend } from "./schema.ts";
+import { SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
+import { parseReads, parseSpend } from "./schema.ts";
+import { checkUse } from "./use-check.ts";
 
 const sample = (): Record<string, unknown> => JSON.parse(JSON.stringify(SAMPLE_SPEND)) as Record<string, unknown>;
 const service = (fields: Record<string, unknown>): unknown => ({ ...sample(), services: [{ part: "a", billing: "free", ...fields }] });
@@ -72,5 +73,42 @@ describe("parseSpend", () => {
       expect(read.ok).toBe(false);
       if (!read.ok) expect(read.errors.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("parseReads", () => {
+  it("reads the sample reads from their JSON, with no change", () => {
+    expect(parseReads(JSON.parse(JSON.stringify(SAMPLE_READS)))).toEqual({ ok: true, reads: SAMPLE_READS });
+  });
+
+  it("gives reads that the gate can examine", () => {
+    const read = parseReads(JSON.parse(JSON.stringify(SAMPLE_READS)));
+    expect(read.ok).toBe(true);
+    if (read.ok) expect(checkUse(SAMPLE_SPEND, read.reads, { today: SAMPLE_TODAY })).toHaveLength(2);
+  });
+
+  it("reads an empty list", () => {
+    expect(parseReads([])).toEqual({ ok: true, reads: [] });
+  });
+
+  it("names the place of a fault of the form", () => {
+    expect(parseReads([{ part: "a", source: "count", amount: 1, date: "2026-11-16" }, { part: "a", source: "guess", amount: 1, date: "2026-11-16" }])).toEqual({
+      ok: false,
+      errors: ['The record "spend/1 reads" has a fault at "1.source": Invalid option: expected one of "count"|"provider"'],
+    });
+  });
+
+  it("refuses an empty part, an amount that is no finite number, a field that the format does not have and a value that is no list", () => {
+    const one = (fields: Record<string, unknown>): unknown => [{ part: "a", source: "count", amount: 1, date: "2026-11-16", ...fields }];
+    expect(parseReads(one({})).ok).toBe(true);
+    expect(parseReads(one({ part: "" })).ok).toBe(false);
+    expect(parseReads(one({ amount: "1" })).ok).toBe(false);
+    expect(parseReads(one({ amount: Number.POSITIVE_INFINITY })).ok).toBe(false);
+    expect(parseReads(one({ month: "2026-11" })).ok).toBe(false);
+    for (const value of [null, 3, {}, "reads"]) expect(parseReads(value).ok).toBe(false);
+  });
+
+  it("leaves the meaning to the gate: a negative amount and a date that is no date have a correct form", () => {
+    expect(parseReads([{ part: "a", source: "provider", amount: -1, date: "soon" }]).ok).toBe(true);
   });
 });

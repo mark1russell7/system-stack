@@ -1,6 +1,6 @@
 # @mark1russell7/stack-spend
 
-The cost of each part of a system stack as data: plans, prices and the limits of the cost of a month. The package has a gate that fails when a cost can grow with no hard limit.
+The cost of each part of a system stack as data: plans, prices and the limits of the cost of a month. The package has a gate that fails when a cost can grow with no hard limit. A second gate compares the used amount of a month with each limit.
 
 It is the spend add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). The core knows only parts and needs. This package puts a cost record on a part.
 
@@ -23,8 +23,8 @@ An alert stops nothing, so an alert is not a limit. A balance that gets money au
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-spend` | The records of a layer, the cost formulas, the states, the gate, the steps of the owner and a sample. |
-| `@mark1russell7/stack-spend/schema` | `spendSchema`, the zod schema of a layer, and `parseSpend`. |
+| `@mark1russell7/stack-spend` | The records of a layer, the cost formulas, the states, the gate, the steps of the owner, the used amounts and a sample. |
+| `@mark1russell7/stack-spend/schema` | `spendSchema` and `parseSpend` for a layer, and `readsSchema` and `parseReads` for a list of reads. |
 
 The root entry has no schema library. Thus a page that only shows the cost of a month gets no zod.
 
@@ -187,8 +187,96 @@ ownerSteps(SAMPLE_SPEND, SAMPLE_STACK, { today: SAMPLE_TODAY });
 
 The alert of the cloud account gives no step, because the records do not tell which limit to set. Add a `wanted` limit to the record. Then the fault is `limit-wanted`, and the owner gets a step.
 
-## The formulas
+## The used amount of a month
 
+A limit tells the largest cost of a month. A read tells the cost until a date. `useStates(layer, reads, { today })` gives the used amount of each service in the month of `today`.
+
+A read is live data, so it is not a record of the layer. A program makes each read, and the functions take a list of reads.
+
+| Field of a read | What it is |
+| --- | --- |
+| `part` | The `id` of the part of the service. |
+| `source` | `count` or `provider`. |
+| `amount` | The cost of the use from the start of the month until the read. |
+| `date` | The date of the read. Its month is the month of the amount. |
+
+The source tells who gives the amount:
+
+- `count`: a part of the stack counted the use, and it gives the cost of that use.
+- `provider`: the provider of the service shows the cost of the use, on a usage page or in a usage API.
+
+The rule: the used amount is the larger of the count of the stack and the amount of the provider.
+A stop by code counts its own use. The provider can show more, because a different program used the account, or because a price changed.
+Thus a stop that follows the rule does not stop too late.
+
+```ts
+import { SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY, useStates } from "@mark1russell7/stack-spend";
+
+SAMPLE_READS;
+// => [
+//   { part: "cloud-account", source: "provider", amount: 0, date: "2026-11-15" },
+//   { part: "call-account", source: "count", amount: 4, date: "2026-11-16" },
+//   { part: "call-account", source: "provider", amount: 5.2, date: "2026-11-16" },
+// ]
+
+useStates(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY });
+// => [
+//   { part: "cloud-account", billing: "metered", provider: 0, used: 0, age: 1 },
+//   { part: "push-account", billing: "fixed" },
+//   { part: "call-account", billing: "metered", count: 4, provider: 5.2, used: 5.2, limit: 10, share: 0.52, level: 0.5, over: false, age: 0 },
+// ]
+```
+
+| Field of a state | What it is |
+| --- | --- |
+| `count` | The largest amount that a part of the stack counted in the month. |
+| `provider` | The largest amount that the provider showed in the month. |
+| `used` | The used amount: the larger of `count` and `provider`. |
+| `limit` | The hard limit of the service for a month. |
+| `share` | The used share of the hard limit: `used` divided by `limit`. |
+| `level` | The largest level that the share reached. The default levels are 0.5, 0.8 and 1. |
+| `over` | `true` when the used amount is more than the hard limit. |
+| `age` | The age of the newest read of the month, in days. |
+
+- A field with no known value is absent. Thus a service with no read of the month has no `used`.
+- The amount of a read is the part of the cost that grows with the use. The fixed price of a plan is not in it.
+- The cost of a month does not go down. Thus the largest read of the month is the used amount, and a smaller read after it changes nothing.
+- A read of a different month does not count.
+- A read with a fault does not count, and the gate tells the fault.
+- The option `levels` gives different levels. Each level is a share of the hard limit, above 0.
+
+### The gate of the used amounts
+
+`checkUse(layer, reads, { today })` gives the faults of the used amounts. An error stops the gate. A warning does not.
+
+```ts
+import { checkUse, SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY } from "@mark1russell7/stack-spend";
+
+checkUse(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY }).map((fault) => `${fault.level} ${fault.code}: ${fault.message}`);
+// => [
+//   'warning use-level: The used amount of "call-account" in the month 2026-11 is 5.2 USD: 50 percent of its hard limit of 10 USD, or more.',
+//   'warning use-count: The provider shows 5.2 USD for "call-account" in the month 2026-11, and the stack counted 4 USD. The count does not have all the use.',
+// ]
+```
+
+| Code | Level | The fault |
+| --- | --- | --- |
+| `read-part` | error | A read names a part with no cost record. |
+| `read-amount` | error | The amount of a read is less than 0 or not finite. |
+| `read-date` | error | The date of a read is not a date, or it is after the date of the check. |
+| `use-billing` | error | A read shows a cost of the use of a `free` or `fixed` service. The cost record is not correct. |
+| `use-over` | error | The used amount is more than the hard limit. The limit did not hold. |
+| `use-level` | warning | The used amount reached a level of the hard limit. |
+| `use-count` | warning | The provider shows more than the stack counted. The count does not have all the use. |
+| `use-none` | warning | A `metered` service has no read of the month, so its used amount is not known. |
+| `use-old` | warning | The newest read of a `metered` service is older than the option `readDays`. |
+
+- A used amount that is equal to the hard limit is no failure: the limit stopped the use. A used amount above the limit is a failure of the limit.
+- A service with no read does not pass and does not fail. The gate tells that it has no read.
+- The gate has no memory. A host that sends a message at each level keeps the last level that it sent for each service.
+- The option `readDays` gives the largest age of the newest read. With no value, the gate examines no age.
+
+## The formulas
 The layer becomes a tree: the layer, then each service, then each limit in force. `spendSpace(layer)` gives this tree as a space of Vex. The programs evaluate on it:
 
 | Program | Where | What it gives |
@@ -202,6 +290,21 @@ The layer becomes a tree: the layer, then each service, then each limit in force
 
 A program is data, so a tool can show each step of a result. `evaluateService(program, tree, part)` evaluates a program at one service.
 
+The reads become a second tree: the layer, then each service, then each read. `useSpace(layer, reads, { today })` gives this tree. These programs evaluate at a service of it:
+
+| Program | What it gives |
+| --- | --- |
+| `COUNT_USED` | The largest amount of the reads of the source `count` in the month. |
+| `PROVIDER_USED` | The largest amount of the reads of the source `provider` in the month. |
+| `USED` | The used amount: the largest amount of the reads of the month. This program is the one definition of the rule. |
+| `USE_SHARE` | The used amount divided by the hard limit. |
+| `USE_OVER` | If the used amount is more than the hard limit. |
+| `USE_LEVEL` | The largest level that the share reached. A share below each level gives 0. |
+| `READ_AGE` | The age of the newest read of the month, in days. |
+
+`MONTH_READS` is the axis of the reads of a service in the month of the check.
+A share reaches a level when it is the level less `LEVEL_TOLERANCE`, or more. Thus the rounding of a division does not hide a level.
+
 ## The read of JSON
 
 `parseSpend` of the entry `/schema` reads the JSON of a layer. It gives the layer, or the faults of its form with the place of each fault.
@@ -214,6 +317,8 @@ parseSpend({ schema: "spend/1", currency: "USD", kinds: [], proofDays: 90, servi
 ```
 
 The schema examines the form of a record. `checkSpend` examines the meaning of a layer with a correct form.
+
+`parseReads` reads the JSON of a list of reads in the same way, and `checkUse` examines the meaning of the reads.
 
 ## License
 
