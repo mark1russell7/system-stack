@@ -1,8 +1,8 @@
 import { SAMPLE_STACK, STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkSpend, dayNumber, SPEND_CODES } from "./check.ts";
-import { SPEND_SCHEMA, type Proof, type Service, type SpendLayer } from "./layer.ts";
-import { SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
+import { SPEND_SCHEMA, type Limit, type NextPlan, type Proof, type Service, type SpendLayer } from "./layer.ts";
+import { SAMPLE_ENDS, SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
 
 const today = "2026-11-16";
 const proof: Proof = { date: "2026-11-01", by: "The owner" };
@@ -122,6 +122,96 @@ describe("checkSpend: the proofs", () => {
 
   it("refuses a date of the check that is not a date", () => {
     expect(() => checkSpend(layer(), stack, { today: "today" })).toThrow(RangeError);
+  });
+});
+
+describe("checkSpend: the end of a plan", () => {
+  const faultsOf = (value: SpendLayer, date: string = today): unknown[] => checkSpend(value, stack, { today: date }).map((fault) => [fault.level, fault.code, fault.message]);
+
+  it("passes a plan that ends after the days of warning, with a plan after the end or with none", () => {
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2026-12-17" }, proof }))).toEqual([]);
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: { billing: "fixed", price: 20 } }, proof }))).toEqual([]);
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: { billing: "metered", limits: [{ kind: "provider", amount: 5 }] } }, proof }))).toEqual([]);
+  });
+
+  it("gives a warning for a plan that ends in the days of warning, and the default is 30 days", () => {
+    const ends = (date: string): SpendLayer => layer({ part: "a", billing: "free", ends: { date }, proof });
+    expect(faultsOf(ends("2026-12-16"))).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-12-16, in 30 days. Then the provider stops the service.']]);
+    expect(faultsOf(ends("2026-11-17"))).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-11-17, in 1 day. Then the provider stops the service.']]);
+    expect(faultsOf(ends("2026-11-16"))).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-11-16, on the date of the check. Then the provider stops the service.']]);
+    expect(faultsOf(ends("2026-12-17"))).toEqual([]);
+  });
+
+  it("tells in the warning that the cost changes, for a service with a plan after the end", () => {
+    const paid = layer({ part: "a", billing: "free", ends: { date: "2026-11-30", next: { billing: "fixed", price: 20 } }, proof });
+    expect(faultsOf(paid)).toEqual([["warning", "end-soon", 'The plan of "a" ends on 2026-11-30, in 14 days. Then the cost changes.']]);
+  });
+
+  it("uses the days of warning of the layer", () => {
+    const ends = (endDays: number, date: string): string[] => codes({ ...layer({ part: "a", billing: "free", ends: { date }, proof }), endDays });
+    expect(ends(7, "2026-11-23")).toEqual(["end-soon a"]);
+    expect(ends(7, "2026-11-24")).toEqual([]);
+    expect(ends(0, "2026-11-16")).toEqual(["end-soon a"]);
+    expect(ends(0, "2026-11-17")).toEqual([]);
+    expect(ends(400, "2027-11-16")).toEqual(["end-soon a"]);
+  });
+
+  it("finds a plan that ended before the date of the check", () => {
+    const ended = layer({ part: "a", billing: "free", ends: { date: "2026-11-15" }, proof });
+    expect(faultsOf(ended)).toEqual([["error", "end-past", 'The plan of "a" ended on 2026-11-15. The record gives the cost before the end.']]);
+    expect(codes(ended, "2026-11-15")).toEqual(["end-soon a"]);
+  });
+
+  it("finds a date of an end that is not a date", () => {
+    for (const date of ["", "2026-12", "2026-02-30", "December"]) expect(codes(layer({ part: "a", billing: "free", ends: { date }, proof }))).toEqual(["end-date a"]);
+  });
+
+  it("finds a cost after the end that grows with the use and has no hard limit", () => {
+    const next = (...limits: Limit[]): SpendLayer => layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: { billing: "metered", limits } }, proof });
+    expect(faultsOf(next())).toEqual([["error", "end-open", 'The plan of "a" ends on 2027-06-01. After the end, the cost grows with the use, and it has no hard limit.']]);
+    expect(codes(next({ kind: "alert", amount: 5 }))).toEqual(["end-open a"]);
+    expect(codes(next({ kind: "prepaid", amount: 5, recharge: true }))).toEqual(["end-open a"]);
+    expect(codes(next({ kind: "prepaid", amount: 5 }))).toEqual([]);
+    expect(codes(next({ kind: "code", amount: 5, stop: "program" }))).toEqual([]);
+    expect(codes(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: { billing: "metered" } }, proof }))).toEqual(["end-open a"]);
+  });
+
+  it("does not use a limit of the plan before the end for the plan after the end, and the reverse", () => {
+    const before = layer({ part: "a", billing: "metered", limits: [{ kind: "provider", amount: 5 }], ends: { date: "2027-06-01", next: { billing: "metered" } }, proof });
+    expect(codes(before)).toEqual(["end-open a"]);
+    const after = layer({ part: "a", billing: "metered", ends: { date: "2027-06-01", next: { billing: "metered", limits: [{ kind: "provider", amount: 5 }] } }, proof });
+    expect(codes(after)).toEqual(["limit-none a"]);
+  });
+
+  it("gives the warning and the fault of the cost for a plan that ends soon with an open cost", () => {
+    const open = layer({ part: "a", billing: "free", ends: { date: "2026-11-30", next: { billing: "metered" } }, proof });
+    expect(codes(open)).toEqual(["end-soon a", "end-open a"]);
+    expect(codes(open, "2026-12-01")).toEqual(["end-past a", "end-open a"]);
+  });
+
+  it("examines the price and the limits of the plan after the end", () => {
+    const next = (plan: NextPlan): unknown[] => faultsOf(layer({ part: "a", billing: "free", ends: { date: "2027-06-01", next: plan }, proof }));
+    expect(next({ billing: "fixed" })).toEqual([["error", "price", 'The service "a" has a fixed price after the end of its plan, and its record gives no price.']]);
+    expect(next({ billing: "fixed", price: -1 })).toEqual([["error", "price", 'The price -1 of "a" after the end of its plan is less than 0 or not finite.']]);
+    expect(next({ billing: "metered", limits: [{ kind: "provider", amount: -2 }] })).toEqual([["error", "amount", 'The amount -2 of a limit of "a" after the end of its plan is less than 0 or not finite.']]);
+    expect(next({ billing: "metered", limits: [{ kind: "code", amount: 2 }] })).toEqual([["error", "limit-stop", 'A stop by code of "a" after the end of its plan does not name the part that stops the use.']]);
+    expect(next({ billing: "metered", limits: [{ kind: "code", amount: 2, stop: "none" }] })).toEqual([["error", "limit-stop", 'A stop by code of "a" after the end of its plan names "none", which is no part of the stack.']]);
+  });
+
+  it("gives no fault of an end for the second record of a part", () => {
+    expect(codes(layer({ part: "a", billing: "free", proof }, { part: "a", billing: "free", ends: { date: "2026-01-01", next: { billing: "metered" } }, proof }))).toEqual(["service-duplicate a"]);
+  });
+
+  it("finds the three faults of the sample of ends: the warnings do not stop the gate, and the open cost does", () => {
+    const faults = checkSpend(SAMPLE_ENDS, SAMPLE_STACK, { today: SAMPLE_TODAY });
+    expect(faults.map((fault) => `${fault.level} ${fault.code} ${fault.at}`)).toEqual(["warning end-soon cloud-account", "error end-open cloud-account", "warning end-soon call-account"]);
+    for (const fault of faults) expect(SPEND_CODES).toContain(fault.code);
+  });
+
+  it("gives only warnings for the sample of ends with a hard limit after the end of the trial", () => {
+    const services = SAMPLE_ENDS.services.map((service) => (service.part === "cloud-account" ? { ...service, ends: { date: "2026-12-01", next: { billing: "metered" as const, limits: [{ kind: "provider" as const, amount: 5 }] } } } : service));
+    const faults = checkSpend({ ...SAMPLE_ENDS, services }, SAMPLE_STACK, { today: SAMPLE_TODAY });
+    expect(faults.map((fault) => fault.level)).toEqual(["warning", "warning"]);
   });
 });
 
