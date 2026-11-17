@@ -84,6 +84,15 @@ works(SAMPLE_STACK, "alert", ["home-power", "card"]); // => false
 works(SAMPLE_STACK, "alert", ["phone"]); // => false: each path needs the phone
 ```
 
+`stopped(stack, down)` gives the parts that stop: each part that works with no part down, and that does not work with the parts of `down` down. The result is in the order of the parts.
+
+```ts
+import { SAMPLE_STACK, stopped } from "@mark1russell7/system-stack";
+
+stopped(SAMPLE_STACK, ["call-account"]); // => ["call-account", "call"]: the alert still gets to its reader through the push service
+stopped(SAMPLE_STACK, ["call", "push-account"]); // => ["push-account", "push", "call", "alert"]
+```
+
 ## The paths and the stop sets
 
 Three functions tell why a part works, and which failures stop it. They read only the parts and their needs.

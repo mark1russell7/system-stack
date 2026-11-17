@@ -11,6 +11,10 @@ describe("the root entry", () => {
     for (const name of ["spendSpace", "evaluateService", "serviceStates", "monthTotal", "dayNumber", "checkSpend", "ownerSteps", "useSpace", "useStates", "checkUse", "joinSpend"] as const) {
       expect(entry[name]).toBeTypeOf("function");
     }
+    for (const name of ["planEnds", "endStops", "evaluateNext", "nextKey"] as const) expect(entry[name]).toBeTypeOf("function");
+    for (const name of ["PLAN_MAX", "NEXT_PLANS"] as const) expect(entry[name]).toBeTypeOf("object");
+    expect(entry.END_DAYS).toBe(30);
+    expect(entry.SAMPLE_ENDS.schema).toBe(entry.SPEND_SCHEMA);
     expect(entry.SAMPLE_SPEND.schema).toBe(entry.SPEND_SCHEMA);
     expect(entry.SAMPLE_READS.length).toBeGreaterThan(0);
     expect(entry.USE_SOURCES).toEqual(["count", "provider"]);

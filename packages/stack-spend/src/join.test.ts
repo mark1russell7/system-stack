@@ -52,6 +52,25 @@ describe("joinSpend", () => {
     });
   });
 
+  it("gives the days of warning before an end when a fragment has them, and a fragment with none takes them", () => {
+    const join = joinSpend([piece("a", layer([free("one")])), piece("b", layer([free("two")], { endDays: 14 })), piece("c", layer([free("three")], { endDays: 14 }))]);
+    expect(join).toEqual({ ok: true, layer: layer([free("one"), free("two"), free("three")], { endDays: 14 }) });
+    const none = joinSpend([piece("a", layer([free("one")])), piece("b", layer([free("two")]))]);
+    expect(none.ok && "endDays" in none.layer).toBe(false);
+    expect(none.ok).toBe(true);
+  });
+
+  it("gives a fault for two fragments with different days of warning", () => {
+    const join = joinSpend([piece("a", layer([free("one")], { endDays: 14 })), piece("b", layer([free("two")])), piece("c", layer([free("three")], { endDays: 0 }))]);
+    expect(join).toEqual({ ok: false, errors: ['The fragment "a" has the count of days of warning before the end of a plan 14, and the fragment "c" has 0.'] });
+  });
+
+  it("keeps the end of a plan in the joined record", () => {
+    const ends: Service = { part: "one", billing: "free", ends: { date: "2026-12-01", next: { billing: "fixed", price: 20 } }, proof };
+    const join = joinSpend([piece("a", layer([ends])), piece("b", layer([free("two")]))]);
+    expect(join).toEqual({ ok: true, layer: layer([ends, free("two")]) });
+  });
+
   it("gives a fault for no layer, and the layer for one layer", () => {
     expect(joinSpend([])).toEqual({ ok: false, errors: ["The join of spend layers got no layer."] });
     expect(joinSpend([piece("a", SAMPLE_SPEND)])).toEqual({ ok: true, layer: SAMPLE_SPEND });

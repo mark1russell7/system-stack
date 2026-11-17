@@ -1,7 +1,7 @@
 import { SAMPLE_STACK } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkSpend } from "./check.ts";
-import { SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
+import { SAMPLE_ENDS, SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY } from "./sample.ts";
 import { parseReads, parseSpend } from "./schema.ts";
 import { checkUse } from "./use-check.ts";
 
@@ -17,6 +17,32 @@ describe("parseSpend", () => {
     const read = parseSpend(sample());
     expect(read.ok).toBe(true);
     if (read.ok) expect(checkSpend(read.layer, SAMPLE_STACK, { today: SAMPLE_TODAY })).toHaveLength(2);
+  });
+
+  it("reads the sample of ends from its JSON, with no change", () => {
+    expect(parseSpend(JSON.parse(JSON.stringify(SAMPLE_ENDS)))).toEqual({ ok: true, layer: SAMPLE_ENDS });
+  });
+
+  it("reads the end of a plan, with a plan after the end or with none, and the days of warning", () => {
+    expect(parseSpend(service({ ends: { date: "2026-12-01" } })).ok).toBe(true);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: { plan: "Paid", billing: "metered", price: 1, limits: [{ kind: "provider", amount: 5 }] } } })).ok).toBe(true);
+    expect(parseSpend({ ...sample(), endDays: 0 }).ok).toBe(true);
+    expect(parseSpend({ ...sample(), endDays: 14 })).toMatchObject({ ok: true, layer: { endDays: 14 } });
+  });
+
+  it("refuses an end with no date, a plan after the end with no billing, and a field that the format does not have", () => {
+    expect(parseSpend(service({ ends: {} })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: 20261201 } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: {} } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: { billing: "trial" } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", then: "stop" } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: { billing: "free", wanted: { kind: "alert", amount: 1 } } } })).ok).toBe(false);
+    expect(parseSpend(service({ ends: { date: "2026-12-01", next: { billing: "metered", limits: [{ kind: "cap", amount: 1 }] } } })).ok).toBe(false);
+  });
+
+  it("refuses days of warning that are less than 0 or no number", () => {
+    expect(parseSpend({ ...sample(), endDays: -1 }).ok).toBe(false);
+    expect(parseSpend({ ...sample(), endDays: "30" }).ok).toBe(false);
   });
 
   it("reads a layer with no service", () => {

@@ -11,7 +11,7 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 | Package | What it has |
 | --- | --- |
 | [`@mark1russell7/system-stack`](packages/system-stack/README.md) | The core: the parts and their needs, the parts that work when some parts are down, the paths and the stop sets of a part, and the checks of a stack. |
-| [`@mark1russell7/stack-spend`](packages/stack-spend/README.md) | The spend add-on: the cost of each part, the hard limits of its cost in a month, the used amount of a month, and a gate for each. |
+| [`@mark1russell7/stack-spend`](packages/stack-spend/README.md) | The spend add-on: the cost of each part, the hard limits of its cost in a month, the used amount of a month, and a gate for each. The gate gives a warning before a plan ends. |
 | [`@mark1russell7/stack-risk`](packages/stack-risk/README.md) | The risk add-on: the failures that a part must survive, the chance that it works, accepted risks, and a gate. |
 | [`@mark1russell7/stack-tofu`](packages/stack-tofu/README.md) | The OpenTofu add-on: the resources of each part, a generator of the files, the planned cost of each account against its hard limit, and a gate of a plan. |
 

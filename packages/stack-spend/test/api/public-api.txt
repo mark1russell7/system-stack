@@ -10,6 +10,9 @@ BILLINGS: build/layer.chunk.d.ts#BILLINGS
 BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
 Billing: build/layer.chunk.d.ts#Billing
 COUNT_USED: build/index.d.ts#COUNT_USED
+END_DAYS: build/layer.chunk.d.ts#END_DAYS
+EndOptions: build/index.d.ts#EndOptions
+EndStops: build/index.d.ts#EndStops
 HARD_COUNT: build/index.d.ts#HARD_COUNT
 HARD_LIMIT: build/index.d.ts#HARD_LIMIT
 HARD_LIMITS: build/index.d.ts#HARD_LIMITS
@@ -22,15 +25,21 @@ LimitKind: build/layer.chunk.d.ts#LimitKind
 MONTH_MAX: build/index.d.ts#MONTH_MAX
 MONTH_READS: build/index.d.ts#MONTH_READS
 MonthTotal: build/index.d.ts#MonthTotal
+NEXT_PLANS: build/index.d.ts#NEXT_PLANS
 NODE_KINDS: build/index.d.ts#NODE_KINDS
+NextPlan: build/layer.chunk.d.ts#NextPlan
 NodeKind: build/index.d.ts#NodeKind
 OPEN_SERVICES: build/index.d.ts#OPEN_SERVICES
 OWNER_CODES: build/index.d.ts#OWNER_CODES
 OwnerCode: build/index.d.ts#OwnerCode
 OwnerStep: build/index.d.ts#OwnerStep
+PLAN_MAX: build/index.d.ts#PLAN_MAX
 PROVIDER_USED: build/index.d.ts#PROVIDER_USED
+PlanEnd: build/layer.chunk.d.ts#PlanEnd
+PlanEndState: build/index.d.ts#PlanEndState
 Proof: build/layer.chunk.d.ts#Proof
 READ_AGE: build/index.d.ts#READ_AGE
+SAMPLE_ENDS: build/index.d.ts#SAMPLE_ENDS
 SAMPLE_READS: build/index.d.ts#SAMPLE_READS
 SAMPLE_SPEND: build/index.d.ts#SAMPLE_SPEND
 SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
@@ -58,11 +67,15 @@ UseState: build/index.d.ts#UseState
 checkSpend: build/check.chunk.d.ts#checkSpend
 checkUse: build/index.d.ts#checkUse
 dayNumber: @mark1russell7/system-stack#dayNumber (external)
+endStops: build/index.d.ts#endStops
+evaluateNext: build/index.d.ts#evaluateNext
 evaluateService: build/index.d.ts#evaluateService
 firstServices: build/index.d.ts#firstServices
 joinSpend: build/index.d.ts#joinSpend
 monthTotal: build/index.d.ts#monthTotal
+nextKey: build/index.d.ts#nextKey
 ownerSteps: build/index.d.ts#ownerSteps
+planEnds: build/index.d.ts#planEnds
 serviceKey: build/index.d.ts#serviceKey
 serviceStates: build/index.d.ts#serviceStates
 spendSpace: build/index.d.ts#spendSpace
@@ -88,7 +101,7 @@ spendAddOn: build/add-on.d.ts#spendAddOn
 export declare function spendAddOn(options: SpendOptions): StackJoiner<SpendLayer>;
 
 ### build/check.chunk.d.ts#SPEND_CODES
-declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "proof-none", "proof-date", "proof-old"];
+declare const SPEND_CODES: readonly ["service-part", "service-duplicate", "part-no-service", "price", "amount", "limit-none", "limit-alert", "limit-recharge", "limit-stop", "limit-wanted", "end-date", "end-past", "end-soon", "end-open", "proof-none", "proof-date", "proof-old"];
 
 ### build/check.chunk.d.ts#SpendCode
 type SpendCode = (typeof SPEND_CODES)[number];
@@ -111,6 +124,17 @@ export declare const BOUNDED_TOTAL: Expr;
 
 ### build/index.d.ts#COUNT_USED
 export declare const COUNT_USED: Expr;
+
+### build/index.d.ts#EndOptions
+export interface EndOptions extends SpendOptions {
+  readonly days?: number | undefined;
+}
+
+### build/index.d.ts#EndStops
+export interface EndStops {
+  readonly ended: readonly string[];
+  readonly stopped: readonly string[];
+}
 
 ### build/index.d.ts#HARD_COUNT
 export declare const HARD_COUNT: Expr;
@@ -142,8 +166,11 @@ export interface MonthTotal {
   readonly open: readonly string[];
 }
 
+### build/index.d.ts#NEXT_PLANS
+export declare const NEXT_PLANS: Axis;
+
 ### build/index.d.ts#NODE_KINDS
-export declare const NODE_KINDS: readonly ["layer", "service", "limit"];
+export declare const NODE_KINDS: readonly ["layer", "service", "limit", "next"];
 
 ### build/index.d.ts#NodeKind
 export type NodeKind = (typeof NODE_KINDS)[number];
@@ -152,7 +179,7 @@ export type NodeKind = (typeof NODE_KINDS)[number];
 export declare const OPEN_SERVICES: Expr;
 
 ### build/index.d.ts#OWNER_CODES
-export declare const OWNER_CODES: readonly ["limit-wanted", "limit-recharge", "proof-none", "proof-old"];
+export declare const OWNER_CODES: readonly ["limit-wanted", "limit-recharge", "end-past", "end-soon", "end-open", "proof-none", "proof-old"];
 
 ### build/index.d.ts#OwnerCode
 export type OwnerCode = (typeof OWNER_CODES)[number];
@@ -166,11 +193,25 @@ export interface OwnerStep {
   readonly steps: readonly string[];
 }
 
+### build/index.d.ts#PLAN_MAX
+export declare const PLAN_MAX: Expr;
+
 ### build/index.d.ts#PROVIDER_USED
 export declare const PROVIDER_USED: Expr;
 
+### build/index.d.ts#PlanEndState
+export interface PlanEndState {
+  readonly part: string;
+  readonly date: string;
+  readonly days: number;
+  readonly stops: boolean;
+}
+
 ### build/index.d.ts#READ_AGE
 export declare const READ_AGE: Expr;
+
+### build/index.d.ts#SAMPLE_ENDS
+export declare const SAMPLE_ENDS: SpendLayer;
 
 ### build/index.d.ts#SAMPLE_READS
 export declare const SAMPLE_READS: readonly UseRead[];
@@ -186,6 +227,7 @@ export interface ServiceState {
   readonly part: string;
   readonly billing: Billing;
   readonly hardLimit?: number | undefined;
+  readonly nextLimit?: number | undefined;
   readonly monthMax?: number | undefined;
 }
 
@@ -229,6 +271,12 @@ export interface UseState {
 ### build/index.d.ts#checkUse
 export declare function checkUse(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): UseFault[];
 
+### build/index.d.ts#endStops
+export declare function endStops(layer: SpendLayer, stack: Stack, options: EndOptions): EndStops;
+
+### build/index.d.ts#evaluateNext
+export declare function evaluateNext(program: Expr, tree: Space, part: string): Result<unknown>;
+
 ### build/index.d.ts#evaluateService
 export declare function evaluateService(program: Expr, tree: Space, part: string): Result<unknown>;
 
@@ -241,8 +289,14 @@ export declare function joinSpend(pieces: readonly LayerPiece<SpendLayer>[]): La
 ### build/index.d.ts#monthTotal
 export declare function monthTotal(layer: SpendLayer): MonthTotal;
 
+### build/index.d.ts#nextKey
+export declare function nextKey(part: string): string;
+
 ### build/index.d.ts#ownerSteps
 export declare function ownerSteps(layer: SpendLayer, stack: Stack, options: SpendOptions): OwnerStep[];
+
+### build/index.d.ts#planEnds
+export declare function planEnds(layer: SpendLayer, options: SpendOptions): PlanEndState[];
 
 ### build/index.d.ts#serviceKey
 export declare function serviceKey(part: string): string;
@@ -265,6 +319,9 @@ declare const BILLINGS: readonly ["free", "fixed", "metered"];
 ### build/layer.chunk.d.ts#Billing
 type Billing = (typeof BILLINGS)[number];
 
+### build/layer.chunk.d.ts#END_DAYS
+declare const END_DAYS = 30;
+
 ### build/layer.chunk.d.ts#LIMIT_KINDS
 declare const LIMIT_KINDS: readonly ["provider", "prepaid", "code", "alert"];
 
@@ -278,6 +335,20 @@ interface Limit {
 
 ### build/layer.chunk.d.ts#LimitKind
 type LimitKind = (typeof LIMIT_KINDS)[number];
+
+### build/layer.chunk.d.ts#NextPlan
+interface NextPlan {
+  readonly plan?: string | undefined;
+  readonly billing: Billing;
+  readonly price?: number | undefined;
+  readonly limits?: readonly Limit[] | undefined;
+}
+
+### build/layer.chunk.d.ts#PlanEnd
+interface PlanEnd {
+  readonly date: string;
+  readonly next?: NextPlan | undefined;
+}
 
 ### build/layer.chunk.d.ts#Proof
 interface Proof {
@@ -297,6 +368,7 @@ interface Service {
   readonly price?: number | undefined;
   readonly limits?: readonly Limit[] | undefined;
   readonly wanted?: Limit | undefined;
+  readonly ends?: PlanEnd | undefined;
   readonly proof?: Proof | undefined;
   readonly steps?: readonly string[] | undefined;
 }
@@ -307,6 +379,7 @@ interface SpendLayer {
   readonly currency: string;
   readonly kinds: readonly string[];
   readonly proofDays: number;
+  readonly endDays?: number | undefined;
   readonly services: readonly Service[];
 }
 
