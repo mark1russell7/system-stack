@@ -310,6 +310,46 @@ importers:
         specifier: ^5.0.3
         version: 5.1.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/stack-tofu:
+    dependencies:
+      '@mark1russell7/collections':
+        specifier: ^0.11.2
+        version: 0.11.2(zod@4.6.7)
+      '@mark1russell7/system-stack':
+        specifier: workspace:*
+        version: link:../system-stack
+      '@mark1russell7/vex':
+        specifier: ^0.19.1
+        version: 0.19.1(zod@4.6.7)
+      '@mark1russell7/vex-domains':
+        specifier: ^0.19.1
+        version: 0.19.1(zod@4.6.7)
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@mark1russell7/cue':
+        specifier: ^2.0.0
+        version: 2.1.4
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.6
+      '@vitest/coverage-v8':
+        specifier: ^5.0.3
+        version: 5.1.0(vitest@5.1.0)
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.2
+      tsdown:
+        specifier: ^0.23.1
+        version: 0.23.7(publint@0.3.25)(tsx@4.23.15)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^5.0.3
+        version: 5.1.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/system-stack:
     dependencies:
       '@mark1russell7/collections':
