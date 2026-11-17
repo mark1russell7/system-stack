@@ -183,7 +183,7 @@ importers:
         version: 0.2.1(@swc/core@1.16.22)(dependency-cruiser@18.7.2)
       '@mark1russell7/conventions':
         specifier: ^0.42.5
-        version: 0.42.5
+        version: 0.42.6
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -194,8 +194,8 @@ importers:
         specifier: ^0.1.9
         version: 0.1.9
       '@mark1russell7/text':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.0.12
+        version: 0.0.12
       '@swc/core':
         specifier: ^1.15.0
         version: 1.16.22
@@ -544,8 +544,8 @@ packages:
     resolution: {integrity: sha512-6JXrfvg2vMGITbc11C3POvDwbbCU7PMkFWSYdYjshJj5o0LSAMnpPsVSQySfA5G4mdYeAdJ/VfN5Yc3foJkdCQ==}
     engines: {node: '>=22.12'}
 
-  '@mark1russell7/conventions@0.42.5':
-    resolution: {integrity: sha512-HdeH2pEQ97jkbXq+8ohJUp7iH+wI76p0h2Bui06URuxGZQDwIGAFf+fzwTP/Yjr+bvnFXjutPWORXAPpWIRqcQ==}
+  '@mark1russell7/conventions@0.42.6':
+    resolution: {integrity: sha512-eXnwV01JOeHuHjQsNG4CXmwhwnxaSZNFqLjh7YNj81b99m++MsB64KN1096iPzKcdML2rAakWwNRQZzrOo/esQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -602,8 +602,8 @@ packages:
     engines: {node: '>=22.12'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.6':
-    resolution: {integrity: sha512-IwKQHx9U+k5AbEzZ8q4CxImQCuYXSFhvzMOSgy5UGYrZRIBO9RES7SYrXDrKqQFtMl5qD2QbibffevUPsrUW+A==}
+  '@mark1russell7/text@0.0.12':
+    resolution: {integrity: sha512-30jXr0d3UlV2pHUNalpwnbxEZoutZACNpu6liDYPEc8grmxqfPaCFGgFFEl9ujrmNShKf/ROw6c6t4qPgFFE5A==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/vex-domains@0.19.1':
@@ -1873,7 +1873,7 @@ snapshots:
 
   '@mark1russell7/api-report@0.5.8':
     dependencies:
-      '@mark1russell7/conventions': 0.42.5
+      '@mark1russell7/conventions': 0.42.6
 
   '@mark1russell7/boundaries@0.2.1(@swc/core@1.16.22)(dependency-cruiser@18.7.2)':
     optionalDependencies:
@@ -1903,7 +1903,7 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  '@mark1russell7/conventions@0.42.5':
+  '@mark1russell7/conventions@0.42.6':
     dependencies:
       yaml: 2.9.1
 
@@ -1943,7 +1943,7 @@ snapshots:
     dependencies:
       '@clack/prompts': 1.9.0
 
-  '@mark1russell7/text@0.0.6': {}
+  '@mark1russell7/text@0.0.12': {}
 
   '@mark1russell7/vex-domains@0.19.1(zod@4.6.7)':
     dependencies:
