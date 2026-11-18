@@ -1,0 +1,292 @@
+# The public API of @mark1russell7/stack-placement
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+BASE_FRAGMENT: build/index.d.ts#BASE_FRAGMENT
+BoundMeasure: build/index.d.ts#BoundMeasure
+BoundReading: build/index.d.ts#BoundReading
+CHOICE_CODES: build/index.d.ts#CHOICE_CODES
+Candidate: build/layer.chunk.d.ts#Candidate
+ChanceMeasure: build/index.d.ts#ChanceMeasure
+ChanceReading: build/index.d.ts#ChanceReading
+Choice: build/layer.chunk.d.ts#Choice
+ChoiceCode: build/index.d.ts#ChoiceCode
+CostMeasure: build/index.d.ts#CostMeasure
+LIMIT_TOLERANCE: build/index.d.ts#LIMIT_TOLERANCE
+OBJECTIVE_STEPS: build/index.d.ts#OBJECTIVE_STEPS
+PLACEMENT_CODES: build/index.d.ts#PLACEMENT_CODES
+PLACEMENT_ENGINE: build/index.d.ts#PLACEMENT_ENGINE
+PLACEMENT_EVALUATOR: build/index.d.ts#PLACEMENT_EVALUATOR
+PLACEMENT_OBJECTIVES: build/index.d.ts#PLACEMENT_OBJECTIVES
+PLACEMENT_SCHEMA: build/layer.chunk.d.ts#PLACEMENT_SCHEMA
+PLAN_BREAKS: build/index.d.ts#PLAN_BREAKS
+PLAN_DEFAULTS: build/index.d.ts#PLAN_DEFAULTS
+PartWeight: build/index.d.ts#PartWeight
+Placed: build/index.d.ts#Placed
+PlacementCode: build/index.d.ts#PlacementCode
+PlacementFault: build/index.d.ts#PlacementFault
+PlacementLayer: build/layer.chunk.d.ts#PlacementLayer
+PlacementLimits: build/layer.chunk.d.ts#PlacementLimits
+PlacementPlan: build/index.d.ts#PlacementPlan
+PlacementRow: build/index.d.ts#PlacementRow
+PlanBreak: build/index.d.ts#PlanBreak
+PlanOptions: build/index.d.ts#PlanOptions
+SAMPLE_BASE: build/index.d.ts#SAMPLE_BASE
+SAMPLE_PLACEMENT: build/index.d.ts#SAMPLE_PLACEMENT
+SAMPLE_STACK: build/index.d.ts#SAMPLE_STACK
+SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
+Shared: build/layer.chunk.d.ts#Shared
+Slot: build/layer.chunk.d.ts#Slot
+checkPlacement: build/index.d.ts#checkPlacement
+choiceOf: build/index.d.ts#choiceOf
+joinPlacement: build/index.d.ts#joinPlacement
+placedStack: build/index.d.ts#placedStack
+placementSpace: build/index.d.ts#placementSpace
+planPlacement: build/index.d.ts#planPlacement
+planProblems: build/index.d.ts#planProblems
+sharedFragment: build/index.d.ts#sharedFragment
+slotFragment: build/index.d.ts#slotFragment
+
+## ./schema (build/schema.d.ts): names
+
+PlacementParse: build/schema.d.ts#PlacementParse
+parsePlacement: build/schema.d.ts#parsePlacement
+placementSchema: build/schema.d.ts#placementSchema
+
+## ./add-on (build/add-on.d.ts): names
+
+placementAddOn: build/add-on.d.ts#placementAddOn
+
+## Declarations
+
+### build/add-on.d.ts#placementAddOn
+export declare function placementAddOn(): StackJoiner<PlacementLayer>;
+
+### build/index.d.ts#BASE_FRAGMENT
+export declare const BASE_FRAGMENT = "base";
+
+### build/index.d.ts#BoundMeasure
+export type BoundMeasure = (stack: Stack) => BoundReading;
+
+### build/index.d.ts#BoundReading
+export interface BoundReading {
+  readonly bounded: number;
+  readonly open: readonly string[];
+}
+
+### build/index.d.ts#CHOICE_CODES
+export declare const CHOICE_CODES: readonly ["slot-unknown", "slot-empty", "candidate-unknown", "shared-unknown"];
+
+### build/index.d.ts#ChanceMeasure
+export type ChanceMeasure = (stack: Stack, part: string) => number | ChanceReading;
+
+### build/index.d.ts#ChanceReading
+export interface ChanceReading {
+  readonly value: number;
+  readonly importance?: readonly PartWeight[] | undefined;
+  readonly assumed?: readonly string[] | undefined;
+}
+
+### build/index.d.ts#ChoiceCode
+export type ChoiceCode = (typeof CHOICE_CODES)[number];
+
+### build/index.d.ts#CostMeasure
+export type CostMeasure = (stack: Stack) => number;
+
+### build/index.d.ts#LIMIT_TOLERANCE
+export declare const LIMIT_TOLERANCE = 1e-9;
+
+### build/index.d.ts#OBJECTIVE_STEPS
+export declare const OBJECTIVE_STEPS: {
+  readonly cost: 1e-9;
+  readonly chance: 1e-12;
+};
+
+### build/index.d.ts#PLACEMENT_CODES
+export declare const PLACEMENT_CODES: readonly ["part-unknown", "slot-twice", "slot-part", "slot-unneeded", "slot-no-candidate", "candidate-twice", "candidate-part", "cost-range", "shared-twice", "shared-unknown", "shared-unused", "limit-range"];
+
+### build/index.d.ts#PLACEMENT_ENGINE
+export declare const PLACEMENT_ENGINE = "stack-placement";
+
+### build/index.d.ts#PLACEMENT_EVALUATOR
+export declare const PLACEMENT_EVALUATOR = "stack-placement/1";
+
+### build/index.d.ts#PLACEMENT_OBJECTIVES
+export declare const PLACEMENT_OBJECTIVES: readonly Objective[];
+
+### build/index.d.ts#PLAN_BREAKS
+export declare const PLAN_BREAKS: readonly ["join", "measure", "cost", "bound", "chance"];
+
+### build/index.d.ts#PLAN_DEFAULTS
+export declare const PLAN_DEFAULTS: {
+  readonly evaluations: 2000;
+  readonly seed: "stack-placement";
+  readonly importance: 5;
+};
+
+### build/index.d.ts#PartWeight
+export interface PartWeight {
+  readonly part: string;
+  readonly importance: number;
+}
+
+### build/index.d.ts#Placed
+export type Placed = {
+  readonly ok: true;
+  readonly stack: Stack;
+  readonly cost: number;
+  readonly shared: readonly string[];
+} | {
+  readonly ok: false;
+  readonly findings: readonly StackJoinFinding[];
+};
+
+### build/index.d.ts#PlacementCode
+export type PlacementCode = (typeof PLACEMENT_CODES)[number];
+
+### build/index.d.ts#PlacementFault
+export interface PlacementFault extends Fault {
+  readonly code: PlacementCode;
+}
+
+### build/index.d.ts#PlacementPlan
+export interface PlacementPlan {
+  readonly method: "grid" | "evolve";
+  readonly run: string;
+  readonly evaluations: number;
+  readonly size: string;
+  readonly counts: SweepCounts;
+  readonly front: readonly PlacementRow[];
+  readonly breaks: Readonly<Partial<Record<PlanBreak, number>>>;
+}
+
+### build/index.d.ts#PlacementRow
+export interface PlacementRow {
+  readonly config: string;
+  readonly choice: Choice;
+  readonly sources: Readonly<Record<string, string>>;
+  readonly shared: readonly string[];
+  readonly cost: number;
+  readonly chance: number;
+  readonly bound: BoundReading | null;
+  readonly importance: readonly PartWeight[];
+  readonly assumed: readonly string[];
+}
+
+### build/index.d.ts#PlanBreak
+export type PlanBreak = (typeof PLAN_BREAKS)[number];
+
+### build/index.d.ts#PlanOptions
+export interface PlanOptions {
+  readonly joiners: readonly LayerJoiner<unknown>[];
+  readonly chance: ChanceMeasure;
+  readonly bound?: BoundMeasure | undefined;
+  readonly cost?: CostMeasure | undefined;
+  readonly evaluations?: number | undefined;
+  readonly seed?: number | string | undefined;
+  readonly importance?: number | undefined;
+}
+
+### build/index.d.ts#SAMPLE_BASE
+export declare const SAMPLE_BASE: Stack;
+
+### build/index.d.ts#SAMPLE_PLACEMENT
+export declare const SAMPLE_PLACEMENT: PlacementLayer;
+
+### build/index.d.ts#SAMPLE_STACK
+export declare const SAMPLE_STACK: Stack;
+
+### build/index.d.ts#SAMPLE_TODAY
+export declare const SAMPLE_TODAY = "2026-11-18";
+
+### build/index.d.ts#checkPlacement
+export declare function checkPlacement(layer: PlacementLayer, stack: Stack): PlacementFault[];
+
+### build/index.d.ts#choiceOf
+export declare function choiceOf(config: StrategyConfig): Choice;
+
+### build/index.d.ts#joinPlacement
+export declare function joinPlacement(pieces: readonly LayerPiece<PlacementLayer>[]): LayerParse<PlacementLayer>;
+
+### build/index.d.ts#placedStack
+export declare function placedStack(layer: PlacementLayer, stack: Stack, choice: Choice, joiners: readonly LayerJoiner<unknown>[]): Placed;
+
+### build/index.d.ts#placementSpace
+export declare function placementSpace(layer: PlacementLayer): StrategySpace;
+
+### build/index.d.ts#planPlacement
+export declare function planPlacement(layer: PlacementLayer, stack: Stack, options: PlanOptions): PlacementPlan;
+
+### build/index.d.ts#planProblems
+export declare function planProblems(options: PlanOptions, layer?: PlacementLayer): string[];
+
+### build/index.d.ts#sharedFragment
+export declare function sharedFragment(id: string): string;
+
+### build/index.d.ts#slotFragment
+export declare function slotFragment(slot: string): string;
+
+### build/layer.chunk.d.ts#Candidate
+interface Candidate {
+  readonly key: string;
+  readonly stack: Stack;
+  readonly cost: number;
+  readonly uses?: readonly string[] | undefined;
+  readonly source?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#Choice
+type Choice = Readonly<Record<string, string | null>>;
+
+### build/layer.chunk.d.ts#PLACEMENT_SCHEMA
+declare const PLACEMENT_SCHEMA = "placement/1";
+
+### build/layer.chunk.d.ts#PlacementLayer
+interface PlacementLayer {
+  readonly schema: typeof PLACEMENT_SCHEMA;
+  readonly part: string;
+  readonly currency: string;
+  readonly slots: readonly Slot[];
+  readonly shared?: readonly Shared[] | undefined;
+  readonly limits?: PlacementLimits | undefined;
+}
+
+### build/layer.chunk.d.ts#PlacementLimits
+interface PlacementLimits {
+  readonly cost?: number | undefined;
+  readonly bound?: number | undefined;
+  readonly chance?: number | undefined;
+}
+
+### build/layer.chunk.d.ts#Shared
+interface Shared {
+  readonly id: string;
+  readonly stack: Stack;
+  readonly cost?: number | undefined;
+}
+
+### build/layer.chunk.d.ts#Slot
+interface Slot {
+  readonly id: string;
+  readonly candidates: readonly Candidate[];
+  readonly optional?: boolean | undefined;
+}
+
+### build/schema.d.ts#PlacementParse
+export type PlacementParse = {
+  readonly ok: true;
+  readonly layer: PlacementLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#parsePlacement
+export declare function parsePlacement(value: unknown): PlacementParse;
+
+### build/schema.d.ts#placementSchema
+export declare const placementSchema: z.ZodType<PlacementLayer>;
