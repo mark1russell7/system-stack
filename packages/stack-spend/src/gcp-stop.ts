@@ -233,8 +233,15 @@ export async function stopBilling(data: unknown, fetch: StopFetch): Promise<Stop
       const ready = Array.isArray(held) && held.includes(STOP_PERMISSION);
       return { action: "kept", reason: decision.reason, project, ready };
     }
-    const info = json(await send(fetch, billingInfoRequest(project, token), "the billing state"), "the billing state");
-    if (info["billingEnabled"] !== true) return { action: "already", reason: `${decision.reason} The project has no billing account.`, project };
+    // The read of the billing state only prevents a write that is not necessary. The stop must not depend on it: when the
+    // read fails, for example because the identity cannot read the project, the function sends the removal all the same.
+    let enabled: boolean | undefined;
+    try {
+      enabled = json(await send(fetch, billingInfoRequest(project, token), "the billing state"), "the billing state")["billingEnabled"] === true;
+    } catch (error) {
+      if (!(error instanceof RequestFailure)) throw error;
+    }
+    if (enabled === false) return { action: "already", reason: `${decision.reason} The project has no billing account.`, project };
     await send(fetch, detachRequest(project, token), "the removal of the billing account");
     return { action: "stopped", reason: `${decision.reason} The stop removed the billing account of the project.`, project };
   } catch (error) {
@@ -341,27 +348,31 @@ SA="$NAME@$PROJECT.iam.gserviceaccount.com"
 DISPLAY="$NAME $AMOUNT $CURRENCY"
 
 gcloud config set project "$PROJECT"
-ACCOUNT="$(gcloud billing projects describe "$PROJECT" --format='value(billingAccountName)')"
+
+echo "1/7 Read the billing account of the project."
+# Cloud Shell signs in as a user, so each billing command uses the project for its quota (--billing-project).
+gcloud services enable cloudbilling.googleapis.com
+ACCOUNT="$(gcloud billing projects describe "$PROJECT" --billing-project="$PROJECT" --format='value(billingAccountName)')"
 ACCOUNT="\${ACCOUNT#billingAccounts/}"
 if [ -z "$ACCOUNT" ]; then
   echo "The project $PROJECT has no billing account. Link it, then run this script again."
   exit 1
 fi
 
-echo "1/6 Turn on the APIs."
-gcloud services enable cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com cloudbilling.googleapis.com billingbudgets.googleapis.com cloudresourcemanager.googleapis.com
+echo "2/7 Turn on the APIs."
+gcloud services enable cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com billingbudgets.googleapis.com cloudresourcemanager.googleapis.com
 
-echo "2/6 Make the identity of the function."
+echo "3/7 Make the identity of the function."
 gcloud iam service-accounts describe "$SA" > /dev/null 2>&1 || gcloud iam service-accounts create "$NAME" --display-name="The stop of the cost"
 # The role Project Billing Manager lets the function remove the billing account of this project only.
 gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="roles/billing.projectManager" --condition=None > /dev/null
 # The trigger calls the function with the same identity.
 gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="roles/run.invoker" --condition=None > /dev/null
 
-echo "3/6 Make the topic."
+echo "4/7 Make the topic."
 gcloud pubsub topics describe "$NAME" > /dev/null 2>&1 || gcloud pubsub topics create "$NAME"
 
-echo "4/6 Deploy the function."
+echo "5/7 Deploy the function."
 SOURCE="$(mktemp -d)"
 cat > "$SOURCE/package.json" <<'JSON'
 ${source.packageJson}
@@ -371,12 +382,12 @@ ${source.indexJs}
 JS
 gcloud functions deploy "$NAME" --gen2 --runtime=${STOP_RUNTIME} --region="$REGION" --source="$SOURCE" --entry-point=${STOP_ENTRY_POINT} --trigger-topic="$NAME" --service-account="$SA" --trigger-service-account="$SA" --max-instances=1 --memory=256Mi --quiet
 
-echo "5/6 Make the budget."
-if [ -z "$(gcloud billing budgets list --billing-account="$ACCOUNT" --filter="displayName='$DISPLAY'" --format='value(name)')" ]; then
-  gcloud billing budgets create --billing-account="$ACCOUNT" --display-name="$DISPLAY" --budget-amount="$AMOUNT$CURRENCY" --calendar-period=month --filter-projects="projects/$PROJECT" --threshold-rule=percent=0.5 --threshold-rule=percent=0.8 --threshold-rule=percent=1.0 --notifications-rule-pubsub-topic="projects/$PROJECT/topics/$NAME"
+echo "6/7 Make the budget."
+if [ -z "$(gcloud billing budgets list --billing-account="$ACCOUNT" --billing-project="$PROJECT" --filter="displayName='$DISPLAY'" --format='value(name)')" ]; then
+  gcloud billing budgets create --billing-account="$ACCOUNT" --billing-project="$PROJECT" --display-name="$DISPLAY" --budget-amount="$AMOUNT$CURRENCY" --calendar-period=month --filter-projects="projects/$PROJECT" --threshold-rule=percent=0.5 --threshold-rule=percent=0.8 --threshold-rule=percent=1.0 --notifications-rule-pubsub-topic="projects/$PROJECT/topics/$NAME"
 fi
 
-echo "6/6 Test the function with a cost of 0. This test does not stop the project."
+echo "7/7 Test the function with a cost of 0. This test does not stop the project."
 gcloud pubsub topics publish "$NAME" --message="{\\"budgetDisplayName\\":\\"$DISPLAY test\\",\\"costAmount\\":0,\\"budgetAmount\\":$AMOUNT,\\"currencyCode\\":\\"$CURRENCY\\",\\"costIntervalStart\\":\\"$(date -u +%Y-%m-01T00:00:00Z)\\"}"
 sleep 90
 gcloud functions logs read "$NAME" --gen2 --region="$REGION" --limit=10

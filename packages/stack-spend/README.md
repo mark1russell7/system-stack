@@ -440,7 +440,8 @@ The rules of the stop:
 - The identity of the function has the role Project Billing Manager on the project only. It holds no role on the billing account.
 - The source of the function is two files with no key. The function gets its token from the metadata server of Google Cloud.
 - Below the amount, the function examines that its identity holds the permission of the stop. The log tells `"ready": true`, so each notification is a proof that the stop works.
-- At the amount, the function reads the billing state of the project. It removes the billing account only when the project has one.
+- At the amount, the function reads the billing state of the project. When the project has no billing account, it does nothing more.
+- The stop does not depend on that read. When the read fails, the function removes the billing account all the same.
 - A request that fails gives the result `failed` and an error in the log. The next notification tries again.
 - The result of the function holds no token.
 

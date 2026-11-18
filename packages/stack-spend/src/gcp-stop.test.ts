@@ -197,7 +197,7 @@ describe("stopBilling", () => {
       { ...base, [`GET ${METADATA_URL}/instance/service-accounts/default/token`]: [200, "{}"] as const },
       { ...base, [`GET ${METADATA_URL}/instance/service-accounts/default/token`]: [200, "not json"] as const },
       { ...base, [`GET ${METADATA_URL}/project/project-id`]: [200, "Not/A/Project"] as const },
-      { ...base, [`GET ${BILLING_URL}/projects/${PROJECT}/billingInfo`]: new TypeError(`fetch failed ${TOKEN}`) },
+      { ...base, [`PUT ${BILLING_URL}/projects/${PROJECT}/billingInfo`]: new TypeError(`fetch failed ${TOKEN}`) },
     ];
     const outcomes = [];
     for (const routes of cases) outcomes.push(await stopBilling(event(notice(9)), fakeFetch(routes).fetch));
@@ -207,9 +207,25 @@ describe("stopBilling", () => {
       "The answer of the token has no access_token.",
       "The answer of the token is not a JSON object.",
       "The metadata server gave a text that is not a project id.",
-      "The request of the billing state failed: TypeError.",
+      "The request of the removal of the billing account failed: TypeError.",
     ]);
     expect(JSON.stringify(outcomes)).not.toContain(TOKEN);
+  });
+
+  it("removes the billing account when the read of the billing state fails", async () => {
+    const failures = [[403, "{}"] as const, [200, "not json"] as const, new TypeError("fetch failed")];
+    for (const failure of failures) {
+      const { fetch, sent } = fakeFetch({ ...base, [`GET ${BILLING_URL}/projects/${PROJECT}/billingInfo`]: failure });
+      expect(await stopBilling(event(notice(5)), fetch)).toMatchObject({ action: "stopped", project: PROJECT });
+      expect(sent.filter((request) => request.method === "PUT")).toHaveLength(1);
+    }
+  });
+
+  // The JSON form of the API leaves out a field with the value false.
+  it("does nothing more when the billing state has no billingEnabled", async () => {
+    const { fetch, sent } = fakeFetch({ ...base, [`GET ${BILLING_URL}/projects/${PROJECT}/billingInfo`]: [200, JSON.stringify({ projectId: PROJECT })] });
+    expect(await stopBilling(event(notice(5)), fetch)).toMatchObject({ action: "already" });
+    expect(sent.some((request) => request.method === "PUT")).toBe(false);
   });
 });
 
@@ -236,6 +252,10 @@ describe("the script of the stop", () => {
     expect(script).toContain("--trigger-topic=\"$NAME\"");
     expect(script).toContain("--threshold-rule=percent=1.0");
     expect(script).toContain('ACCOUNT="${ACCOUNT#billingAccounts/}"');
+    // Cloud Shell signs in as a user, so the billing commands need a project for their quota.
+    expect(script.match(/gcloud billing (projects describe|budgets list|budgets create) [^\n]*--billing-project="\$PROJECT"/g)).toHaveLength(3);
+    // The script turns on the Cloud Billing API before its first billing command.
+    expect(script.indexOf("gcloud services enable cloudbilling.googleapis.com")).toBeLessThan(script.indexOf("gcloud billing projects describe"));
     expect(script).toContain("How to undo a stop:");
     expect(script).not.toMatch(/billingAccounts\/[0-9A-F]{6}-/);
   });
