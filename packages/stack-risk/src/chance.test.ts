@@ -2,7 +2,7 @@ import { SAMPLE_STACK, STACK_SCHEMA, works, type Need, type Part, type Stack } f
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { worksChance, type WorksChance } from "./chance.ts";
-import { RISK_SCHEMA, type RiskLayer } from "./layer.ts";
+import { inTimeChance, RISK_SCHEMA, type Chance, type RiskLayer } from "./layer.ts";
 import { SAMPLE_RISK } from "./sample.ts";
 
 const stack = (...parts: Part[]): Stack => ({ schema: STACK_SCHEMA, parts });
@@ -153,6 +153,52 @@ const bySum = (generated: Stack, root: string, down: readonly string[], chance: 
   }
   return total;
 };
+
+describe("the chance within a limit of time", () => {
+  // The copy waits 10 s, then it sends within 5 s with the chance 0.5, and within 20 s with the chance 0.9.
+  const copy: Chance = { part: "b", works: 0.9, wait: 10, delay: [{ within: 5, chance: 0.5 }, { within: 20, chance: 0.9 }] };
+  const timed = (chances: readonly Chance[]): RiskLayer => ({ schema: RISK_SCHEMA, goals: [], chances });
+  const one = stack({ id: "b", kind: "x" }, { id: "a", kind: "function", needs: ["b"] });
+
+  it("gives the chance that a part ends in time from its wait and the lower point of its delay", () => {
+    expect([0, 9, 12, 15, 29.9, 30, 1000, Number.POSITIVE_INFINITY].map((within) => inTimeChance(copy, within))).toEqual([0, 0, 0, 0.5, 0.5, 0.9, 0.9, 0.9]);
+    expect(inTimeChance(copy, undefined)).toBe(1);
+    expect(inTimeChance(undefined, 0)).toBe(1);
+    expect(inTimeChance({ part: "b", works: 1, wait: 3 }, 2)).toBe(0);
+    expect(inTimeChance({ part: "b", works: 1, wait: 3 }, 3)).toBe(1);
+  });
+
+  it("puts the chance to end in time into the chance of each part", () => {
+    const at = (within?: number): number => exact(worksChance(timed([copy]), one, "a", within === undefined ? {} : { within })).value;
+    expect(at()).toBeCloseTo(0.9, 12);
+    expect(at(12)).toBe(0);
+    expect(at(15)).toBeCloseTo(0.45, 12);
+    expect(at(30)).toBeCloseTo(0.81, 12);
+    expect(at(Number.POSITIVE_INFINITY)).toBeCloseTo(0.81, 12);
+  });
+
+  it("gives the chance that a copy of one of two ranks ends in time", () => {
+    const first: Chance = { part: "b", works: 0.9, delay: [{ within: 2, chance: 0.99 }] };
+    const second: Chance = { part: "c", works: 0.8, wait: 30, delay: [{ within: 2, chance: 0.95 }] };
+    const at = (within: number): number => exact(worksChance(timed([first, second]), pair, "a", { within })).value;
+    expect(at(10)).toBeCloseTo(0.9 * 0.99, 12);
+    expect(at(40)).toBeCloseTo(1 - (1 - 0.9 * 0.99) * (1 - 0.8 * 0.95), 12);
+  });
+
+  it("refuses a limit that is not a time, and a record with a bad wait or delay only when the time is used", () => {
+    for (const within of [-1, Number.NaN]) expect(() => worksChance(timed([copy]), one, "a", { within })).toThrow(RangeError);
+    const bad: Chance = { part: "b", works: 0.9, delay: [{ within: 5, chance: 0.5 }, { within: 4, chance: 0.9 }] };
+    expect(() => worksChance(timed([bad]), one, "a", { within: 10 })).toThrow("The delay point 1 of \"b\" is not after the point before it.");
+    expect(exact(worksChance(timed([bad]), one, "a")).value).toBeCloseTo(0.9, 12);
+  });
+
+  it("refuses a chance that is not from 0 to 1 also when the chance to end in time makes the product a chance", () => {
+    for (const works of [1.5, -0.1, Number.NaN]) {
+      const record: Chance = { part: "b", works, delay: [{ within: 0, chance: 0.5 }] };
+      expect(() => worksChance(timed([record]), one, "a", { within: 10 })).toThrow(`The chance ${String(works)} of "b" is not from 0 to 1.`);
+    }
+  });
+});
 
 describe("the chance of generated stacks", () => {
   it("agrees with the sum over each state of the parts, and each importance agrees too", () => {

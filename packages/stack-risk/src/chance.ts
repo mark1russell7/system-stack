@@ -1,6 +1,6 @@
 import { NUMBER_RING, pathSetReliability } from "@mark1russell7/collections/graph";
 import { pathSets, type PathOptions, type Stack } from "@mark1russell7/system-stack";
-import { chancesByPart, type RiskLayer } from "./layer.ts";
+import { chancesByPart, delayFault, inTimeChance, isChance, type RiskLayer } from "./layer.ts";
 
 // The chance that a part works, from the chance of each part of its paths. Each part works or fails alone.
 
@@ -8,6 +8,12 @@ import { chancesByPart, type RiskLayer } from "./layer.ts";
 export interface ChanceOptions extends PathOptions {
   /** The largest count of steps of the calculation. The default is 1000000. */
   readonly maxSteps?: number | undefined;
+  /**
+   * The limit of time in seconds from the event, from 0. With it, a part works only when it also ends its work within
+   * the limit. `inTimeChance` gives that chance from the wait and the delay of its record. `Infinity` uses the last
+   * point of each delay. Without it, the time has no effect.
+   */
+  readonly within?: number | undefined;
 }
 
 /** The importance of one part for the chance that a different part works. */
@@ -42,13 +48,19 @@ function compareTexts(a: string, b: string): number {
  * - A shared cause of failure is thus a part of the stack: a provider, an account or a power feed. Do not put it in a number.
  * - The value is exact: `pathSetReliability` of `@mark1russell7/collections/graph` counts a shared part one time.
  * - A part that does not work with the parts of `down` has the chance 0.
+ * - With `within`, the chance of each part is the chance that it works and ends in time. The time of each part is
+ *   independent of the others when its needs work. A path ends when its last part ends: the delays do not add. Thus
+ *   give the wait and the delay of each part as its time from the event, for example the time of a copy to send.
  * - The sequence of the parts of the stack does not change the value or an importance, to the last digit.
  *
  * The function is pure.
  *
- * @throws RangeError when a chance of a part of the paths is not from 0 to 1, or an option is not valid
+ * @throws RangeError when a chance of a part of the paths is not from 0 to 1, or an option is not valid. With
+ * `within`, also when the wait or the delay of a part of the paths is not valid.
  */
 export function worksChance(layer: RiskLayer, stack: Stack, part: string, options: ChanceOptions = {}): WorksChance {
+  const { within } = options;
+  if (within !== undefined && !(within >= 0)) throw new RangeError(`The limit of time ${String(within)} is not a time of 0 or more.`);
   const paths = pathSets(stack, part, options);
   if (paths.kind === "budget") return paths;
   if (paths.sets.length === 0) return { kind: "exact", value: 0, importance: [], assumed: [] };
@@ -61,7 +73,15 @@ export function worksChance(layer: RiskLayer, stack: Stack, part: string, option
   const fixed = [...ids].sort(compareTexts);
   const index = new Map(fixed.map((id, at) => [id, at]));
   const records = chancesByPart(layer);
-  const chances = fixed.map((id) => records.get(id)?.works ?? 1);
+  const chances = fixed.map((id) => {
+    const record = records.get(id);
+    if (within === undefined || record === undefined) return record?.works ?? 1;
+    // The product can hide a bad chance from the check of `pathSetReliability`, so this step examines it first.
+    if (!isChance(record.works)) throw new RangeError(`The chance ${String(record.works)} of "${id}" is not from 0 to 1.`);
+    const fault = delayFault(record);
+    if (fault !== undefined) throw new RangeError(fault);
+    return record.works * inTimeChance(record, within);
+  });
   const sets = paths.sets.map((set) => [part, ...set].map((id) => index.get(id) ?? 0));
   const result = pathSetReliability(sets, chances, NUMBER_RING, options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps });
   if (result.kind === "budget") return { kind: "budget" };

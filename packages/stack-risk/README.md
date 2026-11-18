@@ -59,12 +59,15 @@ const layer: RiskLayer = {
 | `part` | The `id` of the part with the goal, for example a function of the system. |
 | `survives` | The count of failures of other parts that the part survives. With 1, no failure of one part stops the part. |
 | `chance` | The smallest chance that the part works, from 0 to 1. |
+| `within` | The limit of time of the chance, in seconds from the event. With it, the part must also end its work in time. A goal with a limit of time needs a chance. |
 
 | Field of a chance record | What it is |
 | --- | --- |
 | `part` | The `id` of the part. |
 | `works` | The chance that the part works at a moment, when each of its needs holds. |
 | `source` | The source of the number, for example a service agreement or a measured period. |
+| `wait` | The wait of the part before it starts, in seconds, for example the wait of the rank of a copy. The default is 0. |
+| `delay` | The points of the distribution of the time from the end of the wait to the end of the work, when the part works. Each point is `{ within, chance }`: the chance that the time is `within` seconds or less. |
 
 | Field of an accepted risk | What it is |
 | --- | --- |
@@ -98,9 +101,11 @@ The gate examines the design: each part of the stack is in operation. A fault of
 | `goal-duplicate` | Two goals name one part. |
 | `goal-survives` | The count of a goal is not a whole number from 0. |
 | `goal-chance` | The chance of a goal is not from 0 to 1. |
+| `goal-within` | The limit of time of a goal is not a time of 0 or more, or the goal has no chance. |
 | `chance-part` | A chance record names no part of the stack. |
 | `chance-duplicate` | Two chance records name one part. |
 | `chance-range` | The chance of a part is not from 0 to 1. |
+| `chance-delay` | The wait of a part is not a time of 0 or more, or its delay points are not in order. |
 | `accept-part` | An accepted risk names a part with no goal. |
 | `accept-stop` | An accepted risk names no part, or a part that is not in the stack. |
 | `accept-date` | The last date of an accepted risk is not a date. |
@@ -109,7 +114,7 @@ The gate examines the design: each part of the stack is in operation. A fault of
 | `accept-old` | The acceptance of a stop set ended before the date of the check. |
 | `accept-unused` | An accepted risk names a set that is no stop set of its goal. |
 | `chance-none` | A goal has a chance, and a part of its paths has no chance record. |
-| `chance-low` | The chance that a part works is less than the chance of its goal. |
+| `chance-low` | The chance that a part works is less than the chance of its goal. With a limit of time, the part must also end in time. |
 | `no-read` | A search passed its limit, so the gate has no result for the goal. |
 
 The gate reports only the smallest sets. When the failure of one part stops a part, each larger set with that part is not a second fault.
@@ -174,6 +179,30 @@ const chance = worksChance(SAMPLE_RISK, SAMPLE_STACK, "alert");
 - A part with no chance record has the chance 1, and `assumed` names it. The gate gives the fault `chance-none` for such a part.
 
 The sample shows where work helps most. The two copies of the program and the two message services have a small importance. The reader and the phone have a large one.
+
+### The chance within a limit of time
+
+`worksChance(layer, stack, part, { within })` gives the chance that a part works and ends its work within `within` seconds of the event.
+
+```ts
+const layer = {
+  schema: "risk/1",
+  goals: [{ part: "send", survives: 1, chance: 0.999, within: 90 }],
+  chances: [
+    { part: "home", works: 0.98, delay: [{ within: 5, chance: 0.9 }, { within: 30, chance: 0.999 }] },
+    { part: "cloud", works: 0.99, wait: 60, delay: [{ within: 5, chance: 0.95 }] },
+  ],
+} as const;
+worksChance(layer, stack, "send", { within: 90 });
+```
+
+- The chance of each part is its chance to work, times `inTimeChance(record, within)`: the chance that its wait and its delay end in time.
+- Between two points of a delay, the chance is the chance of the lower point. The chance of a part does not decrease when the chance of one of its parts increases. Thus the result is a lower bound, which fits a gate.
+- A part with no wait and no delay ends at once. With `within: Infinity`, each delay gives the chance of its last point.
+- The time of each part is independent of the others when its needs work. A path ends when its last part ends: the delays do not add. Thus give the time of each part from the event, for example the time of a copy to send.
+- Without `within`, the time has no effect, and the result is the chance at a moment.
+
+For one copy or more, the result is equal to `sendChance` of [`@mark1russell7/algebra/availability`](https://www.npmjs.com/package/@mark1russell7/algebra). A cause of a placement is a part, and a copy is a part that needs its causes. A property test holds this equivalence.
 
 The paths, the stop sets and the smallest stop set are functions of the core: `pathSets`, `stopSets` and `smallestStop`.
 
