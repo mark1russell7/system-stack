@@ -1,0 +1,205 @@
+# The public API of @mark1russell7/stack-feeds
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+FEED_CODES: build/index.d.ts#FEED_CODES
+FEED_SCHEMA: build/layer.chunk.d.ts#FEED_SCHEMA
+Feed: build/layer.chunk.d.ts#Feed
+FeedCode: build/index.d.ts#FeedCode
+FeedFault: build/index.d.ts#FeedFault
+FeedIgnore: build/layer.chunk.d.ts#FeedIgnore
+FeedKey: build/layer.chunk.d.ts#FeedKey
+FeedLayer: build/layer.chunk.d.ts#FeedLayer
+FeedOptions: build/states.chunk.d.ts#FeedOptions
+FeedRead: build/layer.chunk.d.ts#FeedRead
+FeedState: build/states.chunk.d.ts#FeedState
+OutsideName: build/states.chunk.d.ts#OutsideName
+READ_CODES: build/states.chunk.d.ts#READ_CODES
+ReadCode: build/states.chunk.d.ts#ReadCode
+SAMPLE_FEEDS: build/index.d.ts#SAMPLE_FEEDS
+SAMPLE_FEED_READS: build/index.d.ts#SAMPLE_FEED_READS
+SAMPLE_FEED_TODAY: build/index.d.ts#SAMPLE_FEED_TODAY
+checkFeeds: build/index.d.ts#checkFeeds
+feedCover: build/states.chunk.d.ts#feedCover
+feedKey: build/layer.chunk.d.ts#feedKey
+feedStates: build/states.chunk.d.ts#feedStates
+firstFeeds: build/layer.chunk.d.ts#firstFeeds
+ignoreHolds: build/states.chunk.d.ts#ignoreHolds
+joinFeeds: build/index.d.ts#joinFeeds
+readCodes: build/states.chunk.d.ts#readCodes
+todayNumber: build/states.chunk.d.ts#todayNumber
+
+## ./schema (build/schema.d.ts): names
+
+FeedParse: build/schema.d.ts#FeedParse
+FeedReadsParse: build/schema.d.ts#FeedReadsParse
+feedReadsSchema: build/schema.d.ts#feedReadsSchema
+feedSchema: build/schema.d.ts#feedSchema
+parseFeedReads: build/schema.d.ts#parseFeedReads
+parseFeeds: build/schema.d.ts#parseFeeds
+
+## ./add-on (build/add-on.d.ts): names
+
+feedAddOn: build/add-on.d.ts#feedAddOn
+
+## Declarations
+
+### build/add-on.d.ts#feedAddOn
+export declare function feedAddOn(options: FeedOptions): StackJoiner<FeedLayer>;
+
+### build/index.d.ts#FEED_CODES
+export declare const FEED_CODES: readonly ["feed-duplicate", "feed-days", "feed-scope", "key-feed", "key-part", "key-duplicate", "ignore-feed", "ignore-date", "ignore-part", "read-feed", "read-date", "feed-none", "feed-old", "feed-unknown", "feed-outside", "feed-gone", "ignore-unused", "ignore-old"];
+
+### build/index.d.ts#FeedCode
+export type FeedCode = (typeof FEED_CODES)[number];
+
+### build/index.d.ts#FeedFault
+export interface FeedFault extends Fault {
+  readonly code: FeedCode;
+  readonly key?: string | undefined;
+  readonly part?: string | undefined;
+}
+
+### build/index.d.ts#SAMPLE_FEEDS
+export declare const SAMPLE_FEEDS: FeedLayer;
+
+### build/index.d.ts#SAMPLE_FEED_READS
+export declare const SAMPLE_FEED_READS: readonly FeedRead[];
+
+### build/index.d.ts#SAMPLE_FEED_TODAY
+export declare const SAMPLE_FEED_TODAY = "2026-11-16";
+
+### build/index.d.ts#checkFeeds
+export declare function checkFeeds(layer: FeedLayer, stack: Stack, options: FeedOptions): FeedFault[];
+
+### build/index.d.ts#joinFeeds
+export declare function joinFeeds(pieces: readonly LayerPiece<FeedLayer>[]): LayerParse<FeedLayer>;
+
+### build/layer.chunk.d.ts#FEED_SCHEMA
+declare const FEED_SCHEMA = "feed/1";
+
+### build/layer.chunk.d.ts#Feed
+interface Feed {
+  readonly id: string;
+  readonly name?: string | undefined;
+  readonly kinds: readonly string[];
+  readonly scope?: string | undefined;
+  readonly days: number;
+  readonly complete?: boolean | undefined;
+}
+
+### build/layer.chunk.d.ts#FeedIgnore
+interface FeedIgnore {
+  readonly feed: string;
+  readonly key: string;
+  readonly reason: string;
+  readonly until?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#FeedKey
+interface FeedKey {
+  readonly feed: string;
+  readonly key: string;
+  readonly part: string;
+}
+
+### build/layer.chunk.d.ts#FeedLayer
+interface FeedLayer {
+  readonly schema: typeof FEED_SCHEMA;
+  readonly feeds: readonly Feed[];
+  readonly keys?: readonly FeedKey[] | undefined;
+  readonly ignores?: readonly FeedIgnore[] | undefined;
+}
+
+### build/layer.chunk.d.ts#FeedRead
+interface FeedRead {
+  readonly feed: string;
+  readonly date: string;
+  readonly keys: readonly string[];
+}
+
+### build/layer.chunk.d.ts#feedKey
+declare function feedKey(feed: string, key: string): string;
+
+### build/layer.chunk.d.ts#firstFeeds
+declare function firstFeeds(layer: FeedLayer): readonly Feed[];
+
+### build/schema.d.ts#FeedParse
+export type FeedParse = {
+  readonly ok: true;
+  readonly layer: FeedLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#FeedReadsParse
+export type FeedReadsParse = {
+  readonly ok: true;
+  readonly reads: readonly FeedRead[];
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#feedReadsSchema
+export declare const feedReadsSchema: z.ZodType<readonly FeedRead[]>;
+
+### build/schema.d.ts#feedSchema
+export declare const feedSchema: z.ZodType<FeedLayer>;
+
+### build/schema.d.ts#parseFeedReads
+export declare function parseFeedReads(value: unknown): FeedReadsParse;
+
+### build/schema.d.ts#parseFeeds
+export declare function parseFeeds(value: unknown): FeedParse;
+
+### build/states.chunk.d.ts#FeedOptions
+interface FeedOptions {
+  readonly today: string;
+  readonly reads: readonly FeedRead[];
+}
+
+### build/states.chunk.d.ts#FeedState
+interface FeedState {
+  readonly feed: string;
+  readonly date?: string | undefined;
+  readonly age?: number | undefined;
+  readonly old: boolean;
+  readonly shown: readonly string[];
+  readonly unknown: readonly string[];
+  readonly outside: readonly OutsideName[];
+  readonly ignored: readonly string[];
+  readonly gone: readonly string[];
+}
+
+### build/states.chunk.d.ts#OutsideName
+interface OutsideName {
+  readonly key: string;
+  readonly part: string;
+}
+
+### build/states.chunk.d.ts#READ_CODES
+declare const READ_CODES: readonly ["read-feed", "read-date"];
+
+### build/states.chunk.d.ts#ReadCode
+type ReadCode = (typeof READ_CODES)[number];
+
+### build/states.chunk.d.ts#feedCover
+declare function feedCover(feed: Feed, stack: Stack): Part[];
+
+### build/states.chunk.d.ts#feedStates
+declare function feedStates(layer: FeedLayer, stack: Stack, options: FeedOptions): FeedState[];
+
+### build/states.chunk.d.ts#ignoreHolds
+declare function ignoreHolds(ignore: FeedIgnore, day: number): boolean;
+
+### build/states.chunk.d.ts#readCodes
+declare function readCodes(layer: FeedLayer, reads: readonly FeedRead[], today: string): (ReadCode | undefined)[];
+
+### build/states.chunk.d.ts#todayNumber
+declare function todayNumber(today: string): number;
