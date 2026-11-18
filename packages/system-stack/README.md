@@ -2,7 +2,7 @@
 
 A system stack as data: the parts of a system, and what each part needs. The package has the format of a stack, the parts that work when some parts are down, and the checks of a stack. It also gives the paths of a part and the sets of parts whose failure stops it.
 
-The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md), [`@mark1russell7/stack-risk`](../stack-risk/README.md), [`@mark1russell7/stack-tofu`](../stack-tofu/README.md) and [`@mark1russell7/stack-placement`](../stack-placement/README.md).
+The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md), [`@mark1russell7/stack-risk`](../stack-risk/README.md) and [`@mark1russell7/stack-tofu`](../stack-tofu/README.md).
 
 Each function is a plain function with no clock and no network.
 
