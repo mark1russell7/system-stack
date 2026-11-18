@@ -26,6 +26,7 @@ An alert stops nothing, so an alert is not a limit. A balance that gets money au
 | `@mark1russell7/stack-spend` | The records of a layer, the cost formulas, the states, the gate, the steps of the owner, the used amounts and a sample. |
 | `@mark1russell7/stack-spend/schema` | `spendSchema` and `parseSpend` for a layer, and `readsSchema` and `parseReads` for a list of reads. |
 | `@mark1russell7/stack-spend/add-on` | `spendAddOn`, the add-on in the form of the layer contract of the core. |
+| `@mark1russell7/stack-spend/gcp-stop` | A stop for a project of Google Cloud: the function that removes the billing account at the amount, and the script that makes it. |
 
 The root entry has no schema library. Thus a page that only shows the cost of a month gets no zod.
 
@@ -410,6 +411,46 @@ The reads become a second tree: the layer, then each service, then each read. `u
 
 `MONTH_READS` is the axis of the reads of a service in the month of the check.
 A share reaches a level when it is the level less `LEVEL_TOLERANCE`, or more. Thus the rounding of a division does not hide a level.
+
+## A stop for a project of Google Cloud
+
+Google Cloud has no hard limit of the cost of a project. A budget sends alerts, and an alert stops nothing. The entry `/gcp-stop` makes a limit of the kind `code` for a project:
+
+1. A budget of the project sends a notification to a Pub/Sub topic some times each day.
+2. A function reads each notification. `stopBilling(data, fetch)` is the function.
+3. When the cost of the month is at the amount of the budget, the function removes the billing account of the project. Then Google stops the paid services of the project.
+
+`stopScript(options)` gives a Bash script for Cloud Shell. The script makes the budget, the topic, the identity of the function and the function. Then it tests the function with a cost of 0. The owner of the project starts the script one time.
+
+```ts
+import { stopScript } from "@mark1russell7/stack-spend/gcp-stop";
+
+const script = stopScript({ project: "sample-project-1", amount: 5, currency: "USD", version: "^0.1.8" });
+// A text that starts with "#!/usr/bin/env bash". Save it as a file, and run it in Cloud Shell.
+```
+
+The record of the limit names the function as its `stop`:
+
+```ts
+{ kind: "code", amount: 5, stop: "cloud-stop" }
+```
+
+The rules of the stop:
+
+- The identity of the function has the role Project Billing Manager on the project only. It holds no role on the billing account.
+- The source of the function is two files with no key. The function gets its token from the metadata server of Google Cloud.
+- Below the amount, the function examines that its identity holds the permission of the stop. The log tells `"ready": true`, so each notification is a proof that the stop works.
+- At the amount, the function reads the billing state of the project. It removes the billing account only when the project has one.
+- A request that fails gives the result `failed` and an error in the log. The next notification tries again.
+- The result of the function holds no token.
+
+The limits of the stop:
+
+- The cost data of Google comes some hours late. Thus the cost can go a little above the amount before the stop.
+- A project with no billing account stops each paid service, also a server in the free tier. Google can delete the resources of the project after a time.
+- To undo a stop, raise the amount of the budget, link the billing account again, and start each server again. The script tells the commands.
+
+The entry has no dependencies. The functions that make each request (`tokenRequest`, `projectRequest`, `billingInfoRequest`, `detachRequest` and `permissionRequest`) give the request as data. `readNotification` reads a notification, and `decideStop` gives the decision.
 
 ## The read of JSON
 
