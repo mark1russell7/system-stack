@@ -14,6 +14,7 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 | [`@mark1russell7/stack-spend`](packages/stack-spend/README.md) | The spend add-on: the cost of each part, the hard limits of its cost in a month, the used amount of a month, and a gate for each. The gate gives a warning before a plan ends. |
 | [`@mark1russell7/stack-risk`](packages/stack-risk/README.md) | The risk add-on: the failures that a part must survive, the chance that it works, accepted risks, and a gate. |
 | [`@mark1russell7/stack-tofu`](packages/stack-tofu/README.md) | The OpenTofu add-on: the resources of each part, a generator of the files, the planned cost of each account against its hard limit, and a gate of a plan. |
+| [`@mark1russell7/stack-feeds`](packages/stack-feeds/README.md) | The feed add-on: the live lists of the parts from each source, and a gate that fails when a record or a list is old. |
 
 The core names no topic. Each topic is an add-on package. An add-on keeps its records in a layer of the stack, and it has its own checks and formulas. The add-ons do not know each other.
 
@@ -41,14 +42,18 @@ works(stack, "program", ["power", "host-b"]); // => false
 A host gives the add-ons to `checkStackLayers` of the core. The function gives the faults of the core and of each layer.
 
 ```ts
+import type { FeedRead } from "@mark1russell7/stack-feeds";
+import { feedAddOn } from "@mark1russell7/stack-feeds/add-on";
 import { riskAddOn } from "@mark1russell7/stack-risk/add-on";
 import { serviceStates } from "@mark1russell7/stack-spend";
 import { spendAddOn } from "@mark1russell7/stack-spend/add-on";
 import { tofuAddOn } from "@mark1russell7/stack-tofu/add-on";
 import { checkStackLayers, readLayer, type Stack } from "@mark1russell7/system-stack";
 
-// The parts, with the layers `spend/1`, `risk/1` and `tofu/1`
+// The parts, with the layers `spend/1`, `risk/1`, `tofu/1` and `feed/1`
 declare const stack: Stack;
+// The newest names of each source, from the programs that read the sources
+declare const reads: readonly FeedRead[];
 
 const today = "2026-11-16";
 const spend = spendAddOn({ today });
@@ -56,11 +61,11 @@ const spend = spendAddOn({ today });
 const read = readLayer(stack, spend);
 const budgets = read?.ok === true ? serviceStates(read.layer) : [];
 
-const findings = checkStackLayers(stack, [spend, riskAddOn({ today }), tofuAddOn({ budgets })]);
+const findings = checkStackLayers(stack, [spend, riskAddOn({ today }), tofuAddOn({ budgets }), feedAddOn({ today, reads })]);
 const pass = !findings.some((finding) => finding.level === "error");
 ```
 
-The samples of the packages have faults that show the gates. With the three sample layers, the findings are these errors.
+The samples of the packages have faults that show the gates. With the four sample layers and the sample reads, the findings are these errors.
 
 | Layer | Code | Part | The fault |
 | --- | --- | --- | --- |
@@ -69,6 +74,7 @@ The samples of the packages have faults that show the gates. With the three samp
 | `spend/1` | `limit-alert` | `cloud-account` | The only limit of the cloud account is an alert. |
 | `spend/1` | `limit-recharge` | `call-account` | The prepaid balance of the call account gets money automatically. |
 | `tofu/1` | `limit-none` | `cloud-account` | The resources have a planned cost, and the account has no hard limit. |
+| `feed/1` | `feed-unknown` | `card-statement` | The statement of the card shows a seller with no record: a new paid service. |
 
 The last finding comes from two layers. The spend layer has no hard limit for the cloud account, so the OpenTofu gate refuses the cost of its resources.
 
