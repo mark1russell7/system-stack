@@ -191,6 +191,13 @@ describe("the chance within a limit of time", () => {
     expect(() => worksChance(timed([bad]), one, "a", { within: 10 })).toThrow("The delay point 1 of \"b\" is not after the point before it.");
     expect(exact(worksChance(timed([bad]), one, "a")).value).toBeCloseTo(0.9, 12);
   });
+
+  it("refuses a chance that is not from 0 to 1 also when the chance to end in time makes the product a chance", () => {
+    for (const works of [1.5, -0.1, Number.NaN]) {
+      const record: Chance = { part: "b", works, delay: [{ within: 0, chance: 0.5 }] };
+      expect(() => worksChance(timed([record]), one, "a", { within: 10 })).toThrow(`The chance ${String(works)} of "b" is not from 0 to 1.`);
+    }
+  });
 });
 
 describe("the chance of generated stacks", () => {

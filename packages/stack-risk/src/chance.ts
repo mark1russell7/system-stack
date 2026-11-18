@@ -1,6 +1,6 @@
 import { NUMBER_RING, pathSetReliability } from "@mark1russell7/collections/graph";
 import { pathSets, type PathOptions, type Stack } from "@mark1russell7/system-stack";
-import { chancesByPart, delayFault, inTimeChance, type RiskLayer } from "./layer.ts";
+import { chancesByPart, delayFault, inTimeChance, isChance, type RiskLayer } from "./layer.ts";
 
 // The chance that a part works, from the chance of each part of its paths. Each part works or fails alone.
 
@@ -76,6 +76,8 @@ export function worksChance(layer: RiskLayer, stack: Stack, part: string, option
   const chances = fixed.map((id) => {
     const record = records.get(id);
     if (within === undefined || record === undefined) return record?.works ?? 1;
+    // The product can hide a bad chance from the check of `pathSetReliability`, so this step examines it first.
+    if (!isChance(record.works)) throw new RangeError(`The chance ${String(record.works)} of "${id}" is not from 0 to 1.`);
     const fault = delayFault(record);
     if (fault !== undefined) throw new RangeError(fault);
     return record.works * inTimeChance(record, within);

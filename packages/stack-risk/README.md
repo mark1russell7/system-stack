@@ -197,7 +197,7 @@ worksChance(layer, stack, "send", { within: 90 });
 ```
 
 - The chance of each part is its chance to work, times `inTimeChance(record, within)`: the chance that its wait and its delay end in time.
-- Between two points of a delay, the chance is the chance of the lower point. Thus the result is a lower bound.
+- Between two points of a delay, the chance is the chance of the lower point. The chance of a part does not decrease when the chance of one of its parts increases. Thus the result is a lower bound, which fits a gate.
 - A part with no wait and no delay ends at once. With `within: Infinity`, each delay gives the chance of its last point.
 - The time of each part is independent of the others when its needs work. A path ends when its last part ends: the delays do not add. Thus give the time of each part from the event, for example the time of a copy to send.
 - Without `within`, the time has no effect, and the result is the chance at a moment.
