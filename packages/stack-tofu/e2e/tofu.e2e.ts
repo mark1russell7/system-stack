@@ -190,6 +190,16 @@ void test("a change of an attribute that the record ignores is not a change", ()
   assert.deepEqual(checkPlan(changed, plan, { noChange: true }), []);
 });
 
+void test("a change of a key of a map that the record ignores is not a change", () => {
+  // The value of `input` is an object, so a path with a key in quotes names one of its fields.
+  const resized = { input: { ...INPUT, size: 11 } };
+  const ignored: TofuLayer = { ...LAYER, resources: [{ ...BASE_RESOURCE, values: resized, ignore: ['input["size"]'] }, APP_RESOURCE, WATCH_RESOURCE] };
+  assert.deepEqual(checkPlan(ignored, planOf(ignored).plan, { noChange: true }), []);
+  // The same change with no ignore is a change of the resource.
+  const plain: TofuLayer = { ...LAYER, resources: [{ ...BASE_RESOURCE, values: resized }, APP_RESOURCE, WATCH_RESOURCE] };
+  assert.deepEqual(actions(planOf(plain).plan)[BASE], ["update"]);
+});
+
 void test("a delete of a resource needs its address in the option removes", () => {
   // The record of `watch` is gone, so the plan deletes its resource.
   const without: TofuLayer = { ...LAYER, resources: [BASE_RESOURCE, APP_RESOURCE] };
