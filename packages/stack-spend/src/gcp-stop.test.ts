@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fc from "fast-check";
@@ -248,7 +248,10 @@ describe("the script of the stop", () => {
     expect(script).toContain(`PROJECT="${PROJECT}"`);
     expect(script).toContain('NAME="billing-stop"');
     expect(script).toContain('DISPLAY="$NAME $AMOUNT $CURRENCY"');
-    expect(script).toContain('--role="roles/billing.projectManager"');
+    expect(script).toContain('grant "roles/billing.projectManager"');
+    expect(script).toContain('grant "roles/run.invoker"');
+    expect(script).toContain('grant "roles/serviceusage.serviceUsageConsumer"');
+    expect(script).toContain("try_again gcloud functions deploy");
     expect(script).toContain("--trigger-topic=\"$NAME\"");
     expect(script).toContain("--threshold-rule=percent=1.0");
     expect(script).toContain('ACCOUNT="${ACCOUNT#billingAccounts/}"');
@@ -275,6 +278,55 @@ describe("the script of the stop", () => {
     expect(check.stderr).toBe("");
     expect(check.status).toBe(0);
   });
+
+  /**
+   * This function runs the retry functions of the script in bash with a fake gcloud, then the given line. The fake counts
+   * each call in a file and gives the answers in order. A fake sleep makes each wait take no time.
+   */
+  function runRetry(line: string, answers: readonly { readonly code: number; readonly text: string }[]): { status: number | null; calls: number; stdout: string } {
+    const script = stopScript(options);
+    const start = script.indexOf("try_again() {");
+    const end = script.indexOf("\n}\n", script.indexOf("grant() {"));
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    const folder = mkdtempSync(join(tmpdir(), "gcp-retry-"));
+    const count = join(folder, "calls");
+    try {
+      const steps = answers.map((answer, index) => `  ${String(index + 1)}) echo ${JSON.stringify(answer.text)} >&2; exit ${String(answer.code)} ;;`);
+      // The body of the fake is a subshell, so its exit ends only the call, as the exit of a real program does.
+      const fake = ["gcloud() (", '  n=$(( $(cat "$CALLS" 2>/dev/null || echo 0) + 1 ))', '  echo "$n" > "$CALLS"', '  case "$n" in', ...steps, "  *) exit 9 ;;", "  esac", ")"];
+      const program = ["set -euo pipefail", `PROJECT="${PROJECT}"`, 'SA="billing-stop@x"', ...fake, "sleep() { :; }", script.slice(start, end + 2), line].join("\n");
+      const run = spawnSync("bash", ["-c", program], { encoding: "utf8", env: { ...process.env, CALLS: count } });
+      const calls = Number(readFileSync(count, "utf8").trim());
+      return { status: run.status, calls, stdout: run.stdout };
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  }
+
+  it.skipIf(!bash)("grants again while IAM does not see the new identity, and stops at each other error", () => {
+    const missing = { code: 1, text: "ERROR: (gcloud.projects.add-iam-policy-binding) INVALID_ARGUMENT: Service account billing-stop@x does not exist." };
+    const late = runRetry('grant "roles/run.invoker"', [missing, missing, { code: 0, text: "" }]);
+    expect(late).toMatchObject({ status: 0, calls: 3 });
+    expect(late.stdout).toContain("try 2 of 16");
+
+    const denied = runRetry('grant "roles/run.invoker"', [{ code: 1, text: "ERROR: PERMISSION_DENIED: The caller does not have permission." }]);
+    expect(denied).toMatchObject({ status: 1, calls: 1 });
+    expect(denied.stdout).toContain("PERMISSION_DENIED");
+
+    const never = runRetry('grant "roles/run.invoker"', Array.from({ length: 16 }, () => missing));
+    expect(never).toMatchObject({ status: 1, calls: 16 });
+    expect(never.stdout).toContain("does not exist");
+    // Git Bash on Windows starts each process slowly, and the bound of 16 tries starts about 80 of them.
+  }, 60_000);
+
+  it.skipIf(!bash)("deploys again while a new role of the trigger is not in force", () => {
+    const delay = { code: 1, text: "ERROR: (gcloud.functions.deploy) ResponseError: status=[403], message=[Validation failed for trigger: Caller does not have required permission to use project x. Propagation of the new permission may take a few minutes.]" };
+    const deploy = runRetry("try_again gcloud functions deploy f --quiet", [delay, { code: 0, text: "" }]);
+    expect(deploy).toMatchObject({ status: 0, calls: 2 });
+    const broken = runRetry("try_again gcloud functions deploy f --quiet", [{ code: 1, text: "ERROR: Build failed: npm ERR! 404" }]);
+    expect(broken).toMatchObject({ status: 1, calls: 1 });
+  }, 30_000);
 
   it("gives a function source with no fault of syntax", () => {
     const folder = mkdtempSync(join(tmpdir(), "gcp-stop-"));

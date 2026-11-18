@@ -364,10 +364,30 @@ gcloud services enable cloudfunctions.googleapis.com cloudbuild.googleapis.com a
 
 echo "3/7 Make the identity of the function."
 gcloud iam service-accounts describe "$SA" > /dev/null 2>&1 || gcloud iam service-accounts create "$NAME" --display-name="The stop of the cost"
+# A change of IAM comes into force after a delay. A new service account or a new role can be missing for some minutes.
+# Thus try_again runs a command again while its error is one of these delays, at most 16 times, 20 seconds apart.
+# Each other error stops the script.
+try_again() {
+  local try out
+  out="$(mktemp)"
+  for try in $(seq 1 16); do
+    if "$@" 2>&1 | tee "$out"; then rm -f "$out"; return 0; fi
+    if ! grep -qE "Service account [^ ]+ does not exist|does not have required permission|Propagation of the new permission" "$out"; then rm -f "$out"; return 1; fi
+    echo "A new identity or role is not in force yet. Wait 20 seconds (try $try of 16)."
+    sleep 20
+  done
+  rm -f "$out"
+  return 1
+}
+grant() {
+  try_again gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$1" --condition=None --format=none
+}
 # The role Project Billing Manager lets the function remove the billing account of this project only.
-gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="roles/billing.projectManager" --condition=None > /dev/null
+grant "roles/billing.projectManager"
 # The trigger calls the function with the same identity.
-gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="roles/run.invoker" --condition=None > /dev/null
+grant "roles/run.invoker"
+# Eventarc examines that the identity of the trigger can use the project (serviceusage.services.use).
+grant "roles/serviceusage.serviceUsageConsumer"
 
 echo "4/7 Make the topic."
 gcloud pubsub topics describe "$NAME" > /dev/null 2>&1 || gcloud pubsub topics create "$NAME"
@@ -380,7 +400,7 @@ JSON
 cat > "$SOURCE/index.js" <<'JS'
 ${source.indexJs}
 JS
-gcloud functions deploy "$NAME" --gen2 --runtime=${STOP_RUNTIME} --region="$REGION" --source="$SOURCE" --entry-point=${STOP_ENTRY_POINT} --trigger-topic="$NAME" --service-account="$SA" --trigger-service-account="$SA" --max-instances=1 --memory=256Mi --quiet
+try_again gcloud functions deploy "$NAME" --gen2 --runtime=${STOP_RUNTIME} --region="$REGION" --source="$SOURCE" --entry-point=${STOP_ENTRY_POINT} --trigger-topic="$NAME" --service-account="$SA" --trigger-service-account="$SA" --max-instances=1 --memory=256Mi --quiet
 
 echo "6/7 Make the budget."
 if [ -z "$(gcloud billing budgets list --billing-account="$ACCOUNT" --billing-project="$PROJECT" --filter="displayName='$DISPLAY'" --format='value(name)')" ]; then
