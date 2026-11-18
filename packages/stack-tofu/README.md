@@ -73,7 +73,7 @@ const layer: TofuLayer = {
 | `values` | The arguments of the resource. |
 | `cost` | The planned cost of the resource in a month. It is the standing price. The cost that grows with the use is not in it. |
 | `keep` | `true`: the resource holds data or a name that must stay. |
-| `ignore` | The attributes whose changes outside the files are permitted. |
+| `ignore` | The attributes whose changes outside the files are permitted. A path can name one key of a map in quotes, for example `metadata["ssh-keys"]`. |
 | `import` | The id of an object that exists at the provider. The files import the object as this resource. |
 
 | Field of a provider configuration | What it is |

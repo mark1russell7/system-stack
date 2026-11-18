@@ -237,6 +237,11 @@ describe("the blocks of a document", () => {
     expect(Object.keys(block ?? {})).toEqual(["//", "zeta", "alpha", "provider", "depends_on", "lifecycle"]);
   });
 
+  it("writes an ignored key of a map as it is, with no escape of its quotes", () => {
+    const block = at(documentOf(layer({ resources: [{ ...server, keep: false, ignore: ['metadata["ssh-keys"]', "labels"] }] })), "resource", "example_server", "host");
+    expect(block).toEqual({ "//": 'The part "host" of the stack.', lifecycle: { ignore_changes: ["labels", 'metadata["ssh-keys"]'] } });
+  });
+
   it("writes no lifecycle for a resource with keep false and no ignore", () => {
     expect(at(documentOf(layer({ resources: [{ ...server, keep: false, ignore: [] }] })), "resource", "example_server", "host")).toEqual({ "//": 'The part "host" of the stack.' });
   });

@@ -119,6 +119,12 @@ describe("the forms", () => {
     for (const path of ["", ".a", "a.", "a..b", "a[]", "a[x]", "a[0", "a[*]", "a b", "a,b", "a}"]) expect(PATH_FORM.test(path)).toBe(false);
   });
 
+  it("accepts a key of a map in quotes, with no template sequence and no quote in the key", () => {
+    for (const path of ['metadata["ssh-keys"]', 'labels["example.com/team"]', 'a["k"][0].b', 'a["x:y_z"]["w"]']) expect(PATH_FORM.test(path)).toBe(true);
+    const bad = ['a[""]', 'a["k"', 'a["k]', "a['k']", 'a["a b"]', 'a["${x}"]', 'a["%{x}"]', 'a["a\\"b"]', 'a["k"].', '["k"]', 'a["k"]x', 'a["k\n"]'];
+    for (const path of bad) expect(PATH_FORM.test(path)).toBe(false);
+  });
+
   it("accepts the source of a provider", () => {
     for (const source of ["example-org/example", "registry.example.com/example-org/example"]) expect(SOURCE_FORM.test(source)).toBe(true);
     for (const source of ["", "example", "/example", "example-org/", "a/b/c/d", "Example/x", "a/${b}"]) expect(SOURCE_FORM.test(source)).toBe(false);
@@ -134,6 +140,8 @@ describe("refParts", () => {
   it("gives the address and the path of attributes", () => {
     expect(refParts("example_server.web.id")).toEqual({ address: "example_server.web", attribute: "id" });
     expect(refParts("example_server.cloud-host.network[0].address")).toEqual({ address: "example_server.cloud-host", attribute: "network[0].address" });
+    // A point in a key in quotes stays in the path of attributes.
+    expect(refParts('example_server.web.labels["example.com/team"]')).toEqual({ address: "example_server.web", attribute: 'labels["example.com/team"]' });
   });
 
   it("refuses a text with a different form", () => {

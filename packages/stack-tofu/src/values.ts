@@ -12,8 +12,11 @@ export const PROVIDER_FORM: RegExp = /^[a-z][a-z0-9_-]*$/;
 /** The form of a name in the files: the name of a resource, of a variable, of an alias and of an argument. */
 export const NAME_FORM: RegExp = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-/** The form of a path of attributes, for example `network[0].address`. */
-export const PATH_FORM: RegExp = /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*|\[[0-9]+\])*$/;
+/**
+ * The form of a path of attributes, for example `network[0].address` or `metadata["ssh-keys"]`. A key of a map in quotes has
+ * letters, digits and the characters `_ . : / -` only. Thus a path holds no template sequence and no quote of its own.
+ */
+export const PATH_FORM: RegExp = /^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*|\[[0-9]+\]|\["[A-Za-z0-9_.:/-]+"\])*$/;
 
 /** The form of the address of a provider in a registry: two or three words with `/` between them. */
 export const SOURCE_FORM: RegExp = /^[a-z0-9][a-z0-9.-]*(\/[a-z0-9][a-z0-9_-]*){1,2}$/;
