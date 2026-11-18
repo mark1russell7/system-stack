@@ -9,6 +9,7 @@
 Accepted: build/layer.chunk.d.ts#Accepted
 Chance: build/layer.chunk.d.ts#Chance
 ChanceOptions: build/index.d.ts#ChanceOptions
+DelayPoint: build/layer.chunk.d.ts#DelayPoint
 Goal: build/layer.chunk.d.ts#Goal
 GoalState: build/index.d.ts#GoalState
 PartImportance: build/index.d.ts#PartImportance
@@ -23,8 +24,10 @@ SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
 WorksChance: build/index.d.ts#WorksChance
 chancesByPart: build/layer.chunk.d.ts#chancesByPart
 checkRisk: build/check.chunk.d.ts#checkRisk
+delayFault: build/layer.chunk.d.ts#delayFault
 firstGoals: build/layer.chunk.d.ts#firstGoals
 goalStates: build/index.d.ts#goalStates
+inTimeChance: build/layer.chunk.d.ts#inTimeChance
 isChance: build/layer.chunk.d.ts#isChance
 joinRisk: build/index.d.ts#joinRisk
 worksChance: build/index.d.ts#worksChance
@@ -45,7 +48,7 @@ riskAddOn: build/add-on.d.ts#riskAddOn
 export declare function riskAddOn(options: RiskOptions): StackJoiner<RiskLayer>;
 
 ### build/check.chunk.d.ts#RISK_CODES
-declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "chance-part", "chance-duplicate", "chance-range", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
+declare const RISK_CODES: readonly ["goal-part", "goal-duplicate", "goal-survives", "goal-chance", "goal-within", "chance-part", "chance-duplicate", "chance-range", "chance-delay", "accept-part", "accept-stop", "accept-date", "stopped", "stop-set", "accept-old", "accept-unused", "chance-none", "chance-low", "no-read"];
 
 ### build/check.chunk.d.ts#RiskCode
 type RiskCode = (typeof RISK_CODES)[number];
@@ -69,6 +72,7 @@ declare function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions)
 ### build/index.d.ts#ChanceOptions
 export interface ChanceOptions extends PathOptions {
   readonly maxSteps?: number | undefined;
+  readonly within?: number | undefined;
 }
 
 ### build/index.d.ts#GoalState
@@ -128,6 +132,14 @@ interface Chance {
   readonly part: string;
   readonly works: number;
   readonly source?: string | undefined;
+  readonly wait?: number | undefined;
+  readonly delay?: readonly DelayPoint[] | undefined;
+}
+
+### build/layer.chunk.d.ts#DelayPoint
+interface DelayPoint {
+  readonly within: number;
+  readonly chance: number;
 }
 
 ### build/layer.chunk.d.ts#Goal
@@ -135,6 +147,7 @@ interface Goal {
   readonly part: string;
   readonly survives: number;
   readonly chance?: number | undefined;
+  readonly within?: number | undefined;
 }
 
 ### build/layer.chunk.d.ts#RISK_SCHEMA
@@ -151,8 +164,14 @@ interface RiskLayer {
 ### build/layer.chunk.d.ts#chancesByPart
 declare function chancesByPart(layer: RiskLayer): Map<string, Chance>;
 
+### build/layer.chunk.d.ts#delayFault
+declare function delayFault(chance: Chance): string | undefined;
+
 ### build/layer.chunk.d.ts#firstGoals
 declare function firstGoals(layer: RiskLayer): readonly Goal[];
+
+### build/layer.chunk.d.ts#inTimeChance
+declare function inTimeChance(chance: Chance | undefined, within: number | undefined): number;
 
 ### build/layer.chunk.d.ts#isChance
 declare function isChance(value: number): boolean;

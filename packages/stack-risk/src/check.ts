@@ -1,6 +1,6 @@
 import { dayNumber, partsById, stopSets, works, type Fault, type Stack } from "@mark1russell7/system-stack";
 import { worksChance } from "./chance.ts";
-import { firstGoals, isChance, type Accepted, type RiskLayer } from "./layer.ts";
+import { delayFault, firstGoals, isChance, type Accepted, type RiskLayer } from "./layer.ts";
 
 // The gate of the risk layer. A gate that passes tells that each goal holds: no set of parts stops a part with fewer
 // failures than its goal permits, unless a record accepts the set, and each chance is not less than its goal.
@@ -11,9 +11,11 @@ export const RISK_CODES: readonly [
   "goal-duplicate",
   "goal-survives",
   "goal-chance",
+  "goal-within",
   "chance-part",
   "chance-duplicate",
   "chance-range",
+  "chance-delay",
   "accept-part",
   "accept-stop",
   "accept-date",
@@ -29,9 +31,11 @@ export const RISK_CODES: readonly [
   "goal-duplicate",
   "goal-survives",
   "goal-chance",
+  "goal-within",
   "chance-part",
   "chance-duplicate",
   "chance-range",
+  "chance-delay",
   "accept-part",
   "accept-stop",
   "accept-date",
@@ -83,9 +87,11 @@ function setKey(parts: readonly string[]): string {
  * - `goal-duplicate`: two goals name one part.
  * - `goal-survives`: the count of a goal is not a whole number from 0.
  * - `goal-chance`: the chance of a goal is not from 0 to 1.
+ * - `goal-within`: the limit of time of a goal is not a time of 0 or more, or the goal has no chance.
  * - `chance-part`: a chance record names no part of the stack.
  * - `chance-duplicate`: two chance records name one part.
  * - `chance-range`: the chance of a part is not from 0 to 1.
+ * - `chance-delay`: the wait of a part is not a time of 0 or more, or its delay points are not in order.
  * - `accept-part`: an accepted risk names a part with no goal.
  * - `accept-stop`: an accepted risk names no part, or a part that is not in the stack.
  * - `accept-date`: the last date of an accepted risk is not a date.
@@ -96,7 +102,8 @@ function setKey(parts: readonly string[]): string {
  * - `accept-old`: the acceptance of a stop set ended before `today`.
  * - `accept-unused`: an accepted risk names a set that is no stop set of its goal. Remove the record.
  * - `chance-none`: a goal has a chance, and a part of its paths has no chance record.
- * - `chance-low`: the chance that a part works is less than the chance of its goal.
+ * - `chance-low`: the chance that a part works is less than the chance of its goal. With a limit of time, the part
+ *   must also end its work in time.
  * - `no-read`: a search passed its limit. The gate has no result for the goal, so it does not pass.
  *
  * The faults are in the sequence of the chance records, the accepted risks and the goals. The function is pure.
@@ -125,6 +132,11 @@ export function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions):
     if (!parts.has(at)) add("chance-part", at, `A chance record names "${at}", which is no part of the stack.`);
     if (!isChance(chance.works)) {
       add("chance-range", at, `The chance ${String(chance.works)} of "${at}" is not from 0 to 1.`);
+      chancesValid = false;
+    }
+    const fault = delayFault(chance);
+    if (fault !== undefined) {
+      add("chance-delay", at, fault);
       chancesValid = false;
     }
   }
@@ -173,6 +185,10 @@ export function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions):
     const counted = Number.isInteger(goal.survives) && goal.survives >= 0;
     if (!counted) add("goal-survives", at, `The count ${String(goal.survives)} of the goal of "${at}" is not a whole number from 0.`);
     if (goal.chance !== undefined && !isChance(goal.chance)) add("goal-chance", at, `The chance ${String(goal.chance)} of the goal of "${at}" is not from 0 to 1.`);
+    const { within } = goal;
+    const timed = within === undefined || (within >= 0 && goal.chance !== undefined);
+    if (within !== undefined && !(within >= 0)) add("goal-within", at, `The limit of time ${String(within)} of the goal of "${at}" is not a time of 0 or more.`);
+    else if (within !== undefined && goal.chance === undefined) add("goal-within", at, `The goal of "${at}" has a limit of time and no chance.`);
     if (!works(stack, at)) {
       add("stopped", at, `The part "${at}" does not work, with each part of the stack in operation: one of its needs does not hold.`);
       continue;
@@ -196,13 +212,14 @@ export function checkRisk(layer: RiskLayer, stack: Stack, options: RiskOptions):
         }
       }
     }
-    if (goal.chance === undefined || !isChance(goal.chance) || !chancesValid) continue;
-    const chance = worksChance(layer, stack, at, limits);
+    if (goal.chance === undefined || !isChance(goal.chance) || !chancesValid || !timed) continue;
+    const chance = worksChance(layer, stack, at, within === undefined ? limits : { ...limits, within });
     if (chance.kind === "budget") add("no-read", at, `The calculation of the chance of "${at}" passed its limit. The gate has no result for this goal.`);
     else if (chance.assumed.length > 0) {
       add("chance-none", at, `The goal of "${at}" has a chance, and these parts of its paths have no chance record: ${setText(chance.assumed)}.`, { parts: chance.assumed });
     } else if (chance.value < goal.chance) {
-      add("chance-low", at, `The chance that "${at}" works is ${String(chance.value)}. The goal is ${String(goal.chance)}.`);
+      const what = within === undefined ? "works" : `works and ends within ${String(within)} seconds`;
+      add("chance-low", at, `The chance that "${at}" ${what} is ${String(chance.value)}. The goal is ${String(goal.chance)}.`);
     }
   }
 

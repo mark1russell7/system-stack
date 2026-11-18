@@ -15,6 +15,19 @@ export interface Goal {
   readonly survives: number;
   /** The smallest chance that the part works, from 0 to 1. The gate then needs the chance of each part of its paths. */
   readonly chance?: number | undefined;
+  /**
+   * The limit of time of the chance, in seconds from the event. With it, a part works only when it also ends its work
+   * within the limit. A goal with a limit of time needs a chance.
+   */
+  readonly within?: number | undefined;
+}
+
+/** A point of the distribution of a time: the chance that the time is `within` seconds or less. */
+export interface DelayPoint {
+  /** The time in seconds, from 0. */
+  readonly within: number;
+  /** The chance that the time is `within` seconds or less, from 0 to 1. */
+  readonly chance: number;
 }
 
 /** The chance that one part works. */
@@ -25,6 +38,13 @@ export interface Chance {
   readonly works: number;
   /** The source of the number, for example the service agreement of a provider or a measured period. */
   readonly source?: string | undefined;
+  /** The wait of the part before it starts, in seconds, for example the wait of the rank of a copy. The default is 0. */
+  readonly wait?: number | undefined;
+  /**
+   * The distribution of the time from the end of the wait to the end of the work of the part, when the part works. The
+   * times of the points increase, and their chances do not decrease. No points tell a time of 0.
+   */
+  readonly delay?: readonly DelayPoint[] | undefined;
 }
 
 /** An accepted risk: one set of parts whose failure stops a part, which the owner accepts for a reason. */
@@ -67,4 +87,41 @@ export function chancesByPart(layer: RiskLayer): Map<string, Chance> {
 /** This function tells if a value is a chance: a number from 0 to 1. */
 export function isChance(value: number): boolean {
   return value >= 0 && value <= 1;
+}
+
+/**
+ * This function gives the chance that a part ends its work within `within` seconds of the event, when the part works.
+ *
+ * - The part waits for its `wait`, then it ends after its delay.
+ * - Between two points of the delay, the chance is the chance of the lower point. Thus the chance is a lower bound.
+ * - With no record or no points, the delay is 0. With `Infinity`, the chance is the chance of the last point.
+ * - Without a limit of time, the chance is 1: the time has no effect.
+ */
+export function inTimeChance(chance: Chance | undefined, within: number | undefined): number {
+  if (within === undefined) return 1;
+  const left = within - (chance?.wait ?? 0);
+  if (left < 0) return 0;
+  const points = chance?.delay ?? [];
+  if (points.length === 0) return 1;
+  let found = 0;
+  for (const point of points) if (point.within <= left) found = point.chance;
+  return found;
+}
+
+/** This function gives the first fault of the wait and of the delay points of a chance record, or `undefined`. */
+export function delayFault(chance: Chance): string | undefined {
+  const { part, wait } = chance;
+  if (wait !== undefined && !(wait >= 0 && Number.isFinite(wait))) return `The wait ${String(wait)} of "${part}" is not a time of 0 or more.`;
+  let last = -1;
+  let lastChance = 0;
+  for (const [index, point] of (chance.delay ?? []).entries()) {
+    const what = `The delay point ${String(index)} of "${part}"`;
+    if (!(point.within >= 0 && Number.isFinite(point.within))) return `${what} has the time ${String(point.within)}, which is not a time of 0 or more.`;
+    if (point.within <= last) return `${what} is not after the point before it.`;
+    if (!isChance(point.chance)) return `${what} has the chance ${String(point.chance)}, which is not from 0 to 1.`;
+    if (point.chance < lastChance) return `${what} has a chance less than the chance of the point before it.`;
+    last = point.within;
+    lastChance = point.chance;
+  }
+  return undefined;
 }

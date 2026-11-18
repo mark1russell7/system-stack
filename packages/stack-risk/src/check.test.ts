@@ -40,7 +40,44 @@ describe("checkRisk", () => {
 
   it("has a code for each fault", () => {
     expect(new Set(RISK_CODES).size).toBe(RISK_CODES.length);
-    expect(RISK_CODES).toHaveLength(17);
+    expect(RISK_CODES).toHaveLength(19);
+  });
+
+  describe("the limit of time", () => {
+    const copies = (b: number, c: number): RiskLayer["chances"] => [
+      { part: "b", works: 0.9, delay: [{ within: 5, chance: b }] },
+      { part: "c", works: 0.9, wait: 30, delay: [{ within: 5, chance: c }] },
+      { part: "d", works: 1 },
+    ];
+
+    it("examines the chance that the part ends in time", () => {
+      const goal = { part: "a", survives: 0, chance: 0.95, within: 10 };
+      const faults = check(risk({ goals: [goal], chances: copies(0.99, 0.99) }), small);
+      expect(codes(faults)).toEqual(["chance-low"]);
+      expect(faults[0]?.message).toMatch(/^The chance that "a" works and ends within 10 seconds is 0\.89[0-9]*\. The goal is 0\.95\.$/);
+      expect(check(risk({ goals: [{ ...goal, within: 40 }], chances: copies(0.99, 0.99) }), small)).toEqual([]);
+      expect(check(risk({ goals: [{ ...goal, chance: 0.85 }], chances: copies(0.99, 0.99) }), small)).toEqual([]);
+    });
+
+    it("refuses a limit that is not a time, and a limit with no chance", () => {
+      for (const within of [-1, Number.NaN]) {
+        expect(codes(check(risk({ goals: [{ part: "a", survives: 0, chance: 0.5, within }], chances: copies(1, 1) }), small))).toEqual(["goal-within"]);
+      }
+      expect(check(risk({ goals: [{ part: "a", survives: 0, within: 10 }] }), small)).toEqual([
+        { level: "error", code: "goal-within", at: "a", message: `The goal of "a" has a limit of time and no chance.` },
+      ]);
+    });
+
+    it("refuses a bad wait or bad delay points, and then gives no chance fault", () => {
+      const bad = (fields: Partial<NonNullable<RiskLayer["chances"]>[number]>): RiskFault[] =>
+        check(risk({ goals: [{ part: "a", survives: 0, chance: 0.99 }], chances: [{ part: "b", works: 0.5, ...fields }] }), small);
+      expect(bad({ wait: -1 }).map((fault) => fault.message)).toEqual([`The wait -1 of "b" is not a time of 0 or more.`]);
+      expect(bad({ wait: Number.POSITIVE_INFINITY }).map((fault) => fault.code)).toEqual(["chance-delay"]);
+      expect(bad({ delay: [{ within: -1, chance: 0.5 }] }).map((fault) => fault.message)).toEqual([`The delay point 0 of "b" has the time -1, which is not a time of 0 or more.`]);
+      expect(bad({ delay: [{ within: 1, chance: 0.5 }, { within: 1, chance: 0.6 }] }).map((fault) => fault.message)).toEqual([`The delay point 1 of "b" is not after the point before it.`]);
+      expect(bad({ delay: [{ within: 1, chance: 1.5 }] }).map((fault) => fault.message)).toEqual([`The delay point 0 of "b" has the chance 1.5, which is not from 0 to 1.`]);
+      expect(bad({ delay: [{ within: 1, chance: 0.6 }, { within: 2, chance: 0.5 }] }).map((fault) => fault.message)).toEqual([`The delay point 1 of "b" has a chance less than the chance of the point before it.`]);
+    });
   });
 
   describe("the records", () => {

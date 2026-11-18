@@ -11,12 +11,20 @@ const goal = z.strictObject({
   part: id,
   survives: z.number(),
   chance: z.number().optional(),
+  within: z.number().optional(),
+});
+
+const point = z.strictObject({
+  within: z.number(),
+  chance: z.number(),
 });
 
 const chance = z.strictObject({
   part: id,
   works: z.number(),
   source: z.string().optional(),
+  wait: z.number().optional(),
+  delay: z.array(point).readonly().optional(),
 });
 
 const accepted = z.strictObject({

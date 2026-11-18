@@ -36,6 +36,15 @@ describe("parseRisk", () => {
     expect(parseRisk({ ...sample(), risks: [] }).ok).toBe(false);
   });
 
+  it("reads a limit of time, a wait and delay points, and refuses a point with a wrong form", () => {
+    const timed = { schema: "risk/1", goals: [{ part: "a", survives: 0, chance: 0.99, within: 60 }], chances: [{ part: "b", works: 0.9, wait: 30, delay: [{ within: 5, chance: 0.5 }] }] };
+    expect(parseRisk(timed)).toEqual({ ok: true, layer: timed });
+    expect(parseRisk({ ...timed, chances: [{ part: "b", works: 0.9, delay: [{ within: "5", chance: 0.5 }] }] }).ok).toBe(false);
+    expect(parseRisk({ ...timed, chances: [{ part: "b", works: 0.9, delay: [{ within: 5, chance: 0.5, unit: "s" }] }] }).ok).toBe(false);
+    expect(parseRisk({ ...timed, chances: [{ part: "b", works: 0.9, wait: "30" }] }).ok).toBe(false);
+    expect(parseRisk(goal({ within: "60" })).ok).toBe(false);
+  });
+
   it("refuses a value of the wrong type", () => {
     expect(parseRisk(goal({ survives: "1" })).ok).toBe(false);
     expect(parseRisk(goal({ part: "" })).ok).toBe(false);
