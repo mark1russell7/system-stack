@@ -96,6 +96,35 @@ spendSchema: build/schema.d.ts#spendSchema
 
 spendAddOn: build/add-on.d.ts#spendAddOn
 
+## ./gcp-stop (build/gcp-stop.d.ts): names
+
+BILLING_URL: build/gcp-stop.d.ts#BILLING_URL
+BudgetNotification: build/gcp-stop.d.ts#BudgetNotification
+FRAMEWORK_RANGE: build/gcp-stop.d.ts#FRAMEWORK_RANGE
+METADATA_URL: build/gcp-stop.d.ts#METADATA_URL
+NotificationRead: build/gcp-stop.d.ts#NotificationRead
+RESOURCE_MANAGER_URL: build/gcp-stop.d.ts#RESOURCE_MANAGER_URL
+STOP_ENTRY_POINT: build/gcp-stop.d.ts#STOP_ENTRY_POINT
+STOP_PERMISSION: build/gcp-stop.d.ts#STOP_PERMISSION
+STOP_RUNTIME: build/gcp-stop.d.ts#STOP_RUNTIME
+StopAnswer: build/gcp-stop.d.ts#StopAnswer
+StopDecision: build/gcp-stop.d.ts#StopDecision
+StopFetch: build/gcp-stop.d.ts#StopFetch
+StopOutcome: build/gcp-stop.d.ts#StopOutcome
+StopRequest: build/gcp-stop.d.ts#StopRequest
+StopScriptOptions: build/gcp-stop.d.ts#StopScriptOptions
+billingInfoRequest: build/gcp-stop.d.ts#billingInfoRequest
+decideStop: build/gcp-stop.d.ts#decideStop
+detachRequest: build/gcp-stop.d.ts#detachRequest
+isProjectId: build/gcp-stop.d.ts#isProjectId
+permissionRequest: build/gcp-stop.d.ts#permissionRequest
+projectRequest: build/gcp-stop.d.ts#projectRequest
+readNotification: build/gcp-stop.d.ts#readNotification
+stopBilling: build/gcp-stop.d.ts#stopBilling
+stopScript: build/gcp-stop.d.ts#stopScript
+stopSource: build/gcp-stop.d.ts#stopSource
+tokenRequest: build/gcp-stop.d.ts#tokenRequest
+
 ## Declarations
 
 ### build/add-on.d.ts#spendAddOn
@@ -119,6 +148,136 @@ interface SpendOptions {
 
 ### build/check.chunk.d.ts#checkSpend
 declare function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOptions): SpendFault[];
+
+### build/gcp-stop.d.ts#BILLING_URL
+export declare const BILLING_URL = "https://cloudbilling.googleapis.com/v1";
+
+### build/gcp-stop.d.ts#BudgetNotification
+export interface BudgetNotification {
+  readonly budgetDisplayName: string;
+  readonly costAmount: number;
+  readonly budgetAmount: number;
+  readonly currencyCode: string;
+  readonly costIntervalStart: string;
+}
+
+### build/gcp-stop.d.ts#FRAMEWORK_RANGE
+export declare const FRAMEWORK_RANGE = "^5.0.5";
+
+### build/gcp-stop.d.ts#METADATA_URL
+export declare const METADATA_URL = "http://metadata.google.internal/computeMetadata/v1";
+
+### build/gcp-stop.d.ts#NotificationRead
+export type NotificationRead = {
+  readonly ok: true;
+  readonly notification: BudgetNotification;
+} | {
+  readonly ok: false;
+  readonly error: string;
+};
+
+### build/gcp-stop.d.ts#RESOURCE_MANAGER_URL
+export declare const RESOURCE_MANAGER_URL = "https://cloudresourcemanager.googleapis.com/v1";
+
+### build/gcp-stop.d.ts#STOP_ENTRY_POINT
+export declare const STOP_ENTRY_POINT = "billingStop";
+
+### build/gcp-stop.d.ts#STOP_PERMISSION
+export declare const STOP_PERMISSION = "resourcemanager.projects.deleteBillingAssignment";
+
+### build/gcp-stop.d.ts#STOP_RUNTIME
+export declare const STOP_RUNTIME = "nodejs22";
+
+### build/gcp-stop.d.ts#StopAnswer
+export interface StopAnswer {
+  readonly status: number;
+  text(): Promise<string>;
+}
+
+### build/gcp-stop.d.ts#StopDecision
+export interface StopDecision {
+  readonly stop: boolean;
+  readonly reason: string;
+}
+
+### build/gcp-stop.d.ts#StopFetch
+export type StopFetch = (url: string, init: {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+}) => Promise<StopAnswer>;
+
+### build/gcp-stop.d.ts#StopOutcome
+export type StopOutcome = {
+  readonly action: "refused";
+  readonly reason: string;
+} | {
+  readonly action: "kept";
+  readonly reason: string;
+  readonly project: string;
+  readonly ready: boolean;
+} | {
+  readonly action: "stopped" | "already";
+  readonly reason: string;
+  readonly project: string;
+} | {
+  readonly action: "failed";
+  readonly reason: string;
+};
+
+### build/gcp-stop.d.ts#StopRequest
+export interface StopRequest {
+  readonly method: "GET" | "POST" | "PUT";
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
+
+### build/gcp-stop.d.ts#StopScriptOptions
+export interface StopScriptOptions {
+  readonly project: string;
+  readonly amount: number;
+  readonly currency: string;
+  readonly version: string;
+  readonly region?: string;
+  readonly name?: string;
+}
+
+### build/gcp-stop.d.ts#billingInfoRequest
+export declare function billingInfoRequest(project: string, token: string): StopRequest;
+
+### build/gcp-stop.d.ts#decideStop
+export declare function decideStop(notification: BudgetNotification): StopDecision;
+
+### build/gcp-stop.d.ts#detachRequest
+export declare function detachRequest(project: string, token: string): StopRequest;
+
+### build/gcp-stop.d.ts#isProjectId
+export declare function isProjectId(value: string): boolean;
+
+### build/gcp-stop.d.ts#permissionRequest
+export declare function permissionRequest(project: string, token: string): StopRequest;
+
+### build/gcp-stop.d.ts#projectRequest
+export declare function projectRequest(): StopRequest;
+
+### build/gcp-stop.d.ts#readNotification
+export declare function readNotification(data: unknown): NotificationRead;
+
+### build/gcp-stop.d.ts#stopBilling
+export declare function stopBilling(data: unknown, fetch: StopFetch): Promise<StopOutcome>;
+
+### build/gcp-stop.d.ts#stopScript
+export declare function stopScript(options: StopScriptOptions): string;
+
+### build/gcp-stop.d.ts#stopSource
+export declare function stopSource(version: string): {
+  readonly packageJson: string;
+  readonly indexJs: string;
+};
+
+### build/gcp-stop.d.ts#tokenRequest
+export declare function tokenRequest(): StopRequest;
 
 ### build/index.d.ts#BOUNDED_TOTAL
 export declare const BOUNDED_TOTAL: Expr;
