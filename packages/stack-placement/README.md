@@ -2,7 +2,9 @@
 
 The placement of the parts of a system stack as a query. A layer gives the candidates of each slot. The package finds the choices that no other choice beats on the expected cost and on the chance that a function works.
 
-It is the placement add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). The chance comes from [`@mark1russell7/stack-risk`](../stack-risk/README.md), and the bound of the cost from [`@mark1russell7/stack-spend`](../stack-spend/README.md). The search comes from `@mark1russell7/strategy-search`.
+It is the placement add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). The search comes from `@mark1russell7/strategy-search`.
+
+The add-on knows no other add-on. The caller gives the joiners and the measures of the chance and of the bound. A host, a site or a test makes them, for example from [`@mark1russell7/stack-risk`](../stack-risk/README.md) and [`@mark1russell7/stack-spend`](../stack-spend/README.md).
 
 Nobody picks a placement by hand. Each choice is a stack, and the front is a result of a query over the candidates. When a price or a chance changes, the front changes.
 
@@ -29,7 +31,13 @@ The root entry has no schema library. Thus a page that only shows a plan gets no
 ## Install
 
 ```sh
-npm install @mark1russell7/stack-placement @mark1russell7/stack-risk @mark1russell7/stack-spend @mark1russell7/system-stack
+npm install @mark1russell7/stack-placement @mark1russell7/system-stack
+```
+
+The examples of this file also use the add-ons of risk and spend for the measures:
+
+```sh
+npm install @mark1russell7/stack-risk @mark1russell7/stack-spend
 ```
 
 ## A layer
@@ -60,7 +68,7 @@ const layer: PlacementLayer = {
 | `currency` | The currency of each cost. |
 | `slots` | The slots. Each slot is one stage of the search. |
 | `shared` | The shared fragments. |
-| `limits` | The largest expected cost (`cost`), the largest cost from the spend layer (`bound`), and the smallest chance (`chance`). |
+| `limits` | The largest expected cost (`cost`), the largest bound of the cost (`bound`), and the smallest chance (`chance`). |
 
 | Field of a slot | What it is |
 | --- | --- |
@@ -94,14 +102,56 @@ const placed = placedStack(SAMPLE_PLACEMENT, SAMPLE_BASE, { "copy-a": "small-x",
 
 A fault of the choice gives no stack. The codes are `slot-unknown`, `slot-empty`, `candidate-unknown` and `shared-unknown`.
 
+## The measures
+
+The caller gives the measures in the options of a plan. Each measure gets a placed stack.
+
+| Option | What it gives |
+| --- | --- |
+| `chance` | The chance that the part of the layer works: a number, or a `ChanceReading` with the most important parts and the assumed parts. It is necessary. |
+| `bound` | A `BoundReading`: the largest cost of a month, and the part of each service with no bound. A layer with the limit `bound` needs it. |
+| `cost` | The expected cost of a month. The default is the sum of the costs of the chosen candidates and of their shared fragments. |
+
+- A chance of NaN tells that the measure cannot decide, for example at the end of a budget of steps. The search counts the choice as unread.
+- A measure that throws a `RangeError` refuses the placed stack. The choice gets the break `measure`.
+- A value out of its range also gets the break `measure`: a chance that is not from 0 to 1, or a negative cost.
+- An error that is not a `RangeError` goes to the caller.
+
+This example makes the measures from the add-ons of risk and spend:
+
+```ts
+import { RISK_SCHEMA, worksChance } from "@mark1russell7/stack-risk";
+import { monthTotal } from "@mark1russell7/stack-spend";
+import { readLayer, type Stack, type StackJoiner } from "@mark1russell7/system-stack";
+import type { BoundReading, ChanceReading } from "@mark1russell7/stack-placement";
+
+const [risk, spend] = joiners;
+
+function layerOf<Layer>(stack: Stack, addOn: StackJoiner<Layer>): Layer | undefined {
+  const read = readLayer(stack, addOn);
+  if (read !== undefined && !read.ok) throw new RangeError(read.errors.join(" "));
+  return read?.layer;
+}
+
+function chance(stack: Stack, part: string): ChanceReading {
+  const works = worksChance(layerOf(stack, risk) ?? { schema: RISK_SCHEMA, goals: [] }, stack, part);
+  return works.kind === "exact" ? { value: works.value, importance: works.importance, assumed: works.assumed } : { value: Number.NaN };
+}
+
+function bound(stack: Stack): BoundReading {
+  const layer = layerOf(stack, spend);
+  return layer === undefined ? { bounded: 0, open: [] } : monthTotal(layer);
+}
+```
+
 ## The plan
 
-`planPlacement(layer, stack, { joiners })` gives the front of the choices.
+`planPlacement(layer, stack, { joiners, chance, bound })` gives the front of the choices.
 
 ```ts
 import { planPlacement, SAMPLE_BASE, SAMPLE_PLACEMENT } from "@mark1russell7/stack-placement";
 
-const plan = planPlacement(SAMPLE_PLACEMENT, SAMPLE_BASE, { joiners });
+const plan = planPlacement(SAMPLE_PLACEMENT, SAMPLE_BASE, { joiners, chance, bound });
 plan.front.map((row) => [row.choice["copy-a"], row.choice["copy-b"], row.cost, row.chance.toFixed(6)]);
 // => [
 //   ["small-x", null, 5, "0.989010"],
@@ -114,11 +164,11 @@ plan.front.map((row) => [row.choice["copy-a"], row.choice["copy-b"], row.cost, r
 Two copies on the provider `provider-x` cost 10 and give 0.998900. A copy on each provider costs 11 and gives 0.999726. The shared provider is the difference.
 
 - A space with 2000 choices or less gets a grid of each choice. A larger space gets a seeded genetic search. The option `evaluations` sets the count.
-- A choice that breaks a limit is not on the front. `plan.breaks` counts the choices with each break: `join`, `layer`, `cost`, `bound` and `chance`.
-- Each row has the sources of its candidates and its shared fragments. It also has the bound from the spend layer and the most important parts for the chance.
+- A choice that breaks a limit is not on the front. `plan.breaks` counts the choices with each break: `join`, `measure`, `cost`, `bound` and `chance`.
+- Each row has the sources of its candidates and its shared fragments. It also has the reading of the bound measure and the most important parts for the chance.
 - The search compares a cost to 1e-9 and a chance to 1e-12 (`OBJECTIVE_STEPS`). Thus two choices with one true value tie, and the front keeps each.
 
-The result is deterministic: one layer, one stack and one set of options give one plan.
+The result is deterministic when each measure is deterministic: one layer, one stack and one set of options give one plan.
 
 ## The gate
 
@@ -138,9 +188,8 @@ The result is deterministic: one layer, one stack and one set of options give on
 | `shared-unknown` | A candidate uses a shared fragment that the layer does not have. |
 | `shared-unused` | No candidate uses a shared fragment. It is a warning. |
 | `limit-range` | A limit of cost is less than 0, or the limit of chance is not from 0 to 1. |
-| `currency` | The spend layer of the base stack has a different currency. |
 
-The gate does not examine the layers of a fragment. The gates of their add-ons examine each placed stack.
+The gate does not examine the layers of a fragment or of the base stack. The gates of their add-ons examine each placed stack. The gate does not compare the currency of the layer with a different layer. The measures of the caller do it when it is necessary.
 
 The base stack is not whole before a placement. A part of the base names each slot in a need, and the base has no part for a slot. Thus `checkStack` of the core gives the fault `need-part` for each slot of the base stack. A placed stack has the part of each slot with a candidate. An empty optional slot has no part, and the chance counts that part as down.
 

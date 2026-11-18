@@ -1,5 +1,3 @@
-import { RISK_SCHEMA, worksChance, type PartImportance, type RiskLayer } from "@mark1russell7/stack-risk";
-import { monthTotal, SPEND_SCHEMA, type MonthTotal, type SpendLayer } from "@mark1russell7/stack-spend";
 import { evolve, frontOf, sweep, type EvaluationRow, type Measure, type Objective, type SweepCounts } from "@mark1russell7/strategy-search";
 import { checkSpace, configId, spaceSize, STRATEGY_SPACE_SCHEMA, type StrategyConfig, type StrategySpace } from "@mark1russell7/strategy-space";
 import type { LayerJoiner, Stack } from "@mark1russell7/system-stack";
@@ -24,12 +22,12 @@ export const PLACEMENT_OBJECTIVES: readonly Objective[] = [
  * These are the names of the breaks of a choice. A choice with a break is not on the front.
  *
  * - `join`: the choice has a fault, or its fragments do not join into one stack.
- * - `layer`: the risk layer or the spend layer of the placed stack has a fault of its form. Or a chance is not from 0 to 1.
+ * - `measure`: a measure throws a `RangeError` for the placed stack. Or it gives a value out of its range.
  * - `cost`: the expected cost is more than the limit `cost`.
- * - `bound`: the cost of a month from the spend layer is more than the limit `bound`, or a service has no bound.
+ * - `bound`: the bound of the cost of a month is more than the limit `bound`, or a service has no bound.
  * - `chance`: the chance that the part works is less than the limit `chance`.
  */
-export const PLAN_BREAKS: readonly ["join", "layer", "cost", "bound", "chance"] = ["join", "layer", "cost", "bound", "chance"];
+export const PLAN_BREAKS: readonly ["join", "measure", "cost", "bound", "chance"] = ["join", "measure", "cost", "bound", "chance"];
 
 /** A name of `PLAN_BREAKS`. */
 export type PlanBreak = (typeof PLAN_BREAKS)[number];
@@ -47,16 +45,64 @@ export const LIMIT_TOLERANCE = 1e-9;
  */
 export const OBJECTIVE_STEPS: { readonly cost: 1e-9; readonly chance: 1e-12 } = { cost: 1e-9, chance: 1e-12 };
 
-/** The options of `planPlacement`. */
+/** The importance of one part for a chance, for example the Birnbaum importance of `stack-risk`. */
+export interface PartWeight {
+  /** The `id` of the part. */
+  readonly part: string;
+  /** The chance when the part works, minus the chance when the part fails. */
+  readonly importance: number;
+}
+
+/**
+ * The reading of a chance measure. The value NaN tells that the measure cannot decide, for example at the end of a budget of steps.
+ * The search counts such a choice as unread, and the front does not have it.
+ */
+export interface ChanceReading {
+  /** The chance that the part works, from 0 to 1, or NaN. */
+  readonly value: number;
+  /** The most important parts for the chance, from the largest importance. */
+  readonly importance?: readonly PartWeight[] | undefined;
+  /** The parts that the measure takes as parts that work, because it has no chance for them. */
+  readonly assumed?: readonly string[] | undefined;
+}
+
+/** The reading of a bound measure: the largest cost of a month, and the part of each service with no bound. */
+export interface BoundReading {
+  /** The sum of the largest costs of the services with a bound, in the currency of the layer. */
+  readonly bounded: number;
+  /** The part of each service with no bound. With one or more, the cost of the placed stack has no bound. */
+  readonly open: readonly string[];
+}
+
+/**
+ * The measure of the chance that the part `part` of a placed stack works. The caller makes it, for example from `worksChance` of `stack-risk`.
+ * A measure throws a `RangeError` for a stack that it refuses.
+ */
+export type ChanceMeasure = (stack: Stack, part: string) => number | ChanceReading;
+
+/** The measure of the bound of the cost of a month of a placed stack, for example from `monthTotal` of `stack-spend`. */
+export type BoundMeasure = (stack: Stack) => BoundReading;
+
+/** The measure of the expected cost of a month of a placed stack. */
+export type CostMeasure = (stack: Stack) => number;
+
+/**
+ * The options of `planPlacement`. The add-on knows no other add-on. Thus the caller gives the joiners and the measures.
+ * A host, a site or a test makes them, for example from the add-ons of risk and spend.
+ */
 export interface PlanOptions {
-  /** The add-ons that join the layers of the fragments. The list has the risk add-on and the spend add-on, and the add-on of each other layer of a fragment. */
+  /** The add-ons that join the layers of the fragments, one for each layer of a fragment. */
   readonly joiners: readonly LayerJoiner<unknown>[];
+  /** The measure of the chance. */
+  readonly chance: ChanceMeasure;
+  /** The measure of the bound of the cost. A layer with the limit `bound` needs it. Without it, each row has the bound `null`. */
+  readonly bound?: BoundMeasure | undefined;
+  /** The measure of the expected cost. The default is the sum of the costs of the chosen candidates and of their shared fragments. */
+  readonly cost?: CostMeasure | undefined;
   /** The most evaluations. A space with this count of choices or less gets a grid of each choice. A larger space gets a genetic search. The default is 2000. */
   readonly evaluations?: number | undefined;
   /** The seed of a genetic search: a whole number, or a name. The default is `stack-placement`. */
   readonly seed?: number | string | undefined;
-  /** The largest count of steps of the calculation of one chance. The default is the default of `worksChance`. */
-  readonly maxSteps?: number | undefined;
   /** The count of the most important parts in each row of the front. The default is 5. */
   readonly importance?: number | undefined;
 }
@@ -75,13 +121,11 @@ export interface PlacementRow {
   readonly cost: number;
   /** The chance that the part of the layer works. */
   readonly chance: number;
-  /** The largest cost of a month from the spend layer, or `null` when a service has no bound. */
-  readonly bound: number | null;
-  /** The part of each service with no bound. */
-  readonly open: readonly string[];
-  /** The most important parts for the chance, from the largest importance. */
-  readonly importance: readonly PartImportance[];
-  /** The parts of the paths with no chance record. The calculation uses the chance 1 for each. */
+  /** The reading of the bound measure, or `null` when the plan has no bound measure. */
+  readonly bound: BoundReading | null;
+  /** The most important parts for the chance, from the reading of the chance measure. */
+  readonly importance: readonly PartWeight[];
+  /** The parts that the chance measure takes as parts that work. */
   readonly assumed: readonly string[];
 }
 
@@ -143,24 +187,35 @@ function stepped(value: number, step: number): number {
   return Number.isFinite(value) ? Math.round(value / step) * step : value;
 }
 
+/** This function tells if a value is a finite number, 0 or more. */
+function isZeroOrMore(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
 /**
- * This function gives the problems of the options of a plan. A problem is a bad count, or joiners with no risk add-on or no spend add-on.
+ * This function gives the problems of the options of a plan for a layer. A problem is a bad count, a measure that is not a function,
+ * or the limit `bound` with no bound measure.
  *
  * @param options - The options of a plan
+ * @param layer - The placement layer, for the check of its limits
  * @returns The problems, or an empty list for good options
  */
-export function planProblems(options: PlanOptions): string[] {
+export function planProblems(options: PlanOptions, layer?: PlacementLayer): string[] {
   const problems: string[] = [];
   for (const [name, value] of [
     ["evaluations", options.evaluations],
-    ["maxSteps", options.maxSteps],
     ["importance", options.importance],
   ] as const) {
     if (value !== undefined && !isCount(value)) problems.push(`The option "${name}" is ${String(value)}. It must be a whole number of 1 or more.`);
   }
-  for (const schema of [RISK_SCHEMA, SPEND_SCHEMA]) {
-    if (!options.joiners.some((joiner) => joiner.schema === schema)) problems.push(`The list of joiners has no add-on of "${schema}".`);
+  for (const [name, value, needed] of [
+    ["chance", options.chance, true],
+    ["bound", options.bound, false],
+    ["cost", options.cost, false],
+  ] as const) {
+    if ((needed || value !== undefined) && typeof value !== "function") problems.push(`The measure "${name}" is not a function.`);
   }
+  if (layer?.limits?.bound !== undefined && options.bound === undefined) problems.push(`The layer has the limit "bound", and the options have no bound measure.`);
   return problems;
 }
 
@@ -170,38 +225,33 @@ interface Assessment {
   readonly row?: PlacementRow;
 }
 
-/** This function reads a layer of a placed stack with the `parse` of its add-on. A stack with no such layer gives `undefined`. */
-function readLayer<Layer>(stack: Stack, joiner: LayerJoiner<unknown>): { readonly ok: true; readonly layer: Layer | undefined } | { readonly ok: false } {
-  const value = stack.layers !== undefined && Object.hasOwn(stack.layers, joiner.schema) ? stack.layers[joiner.schema] : undefined;
-  if (value === undefined) return { ok: true, layer: undefined };
-  const read = joiner.parse(value);
-  return read.ok ? { ok: true, layer: read.layer as Layer } : { ok: false };
+/** The readings of the measures of one placed stack. */
+interface Readings {
+  readonly cost: number;
+  readonly chance: ChanceReading;
+  readonly bound: BoundReading | null;
 }
 
 /**
  * This function gives the plan of a placement: the front of the choices, with the expected cost against the chance that the part works.
  *
- * - Each choice gives one placed stack, from `placedStack`. `worksChance` of `stack-risk` gives the chance that the part works.
- * - `monthTotal` of `stack-spend` gives the largest cost of a month, for the limit `bound`.
+ * - Each choice gives one placed stack, from `placedStack`. The measures of the options give its cost, its chance and its bound.
  * - A space with the count `evaluations` of choices or less gets a grid of each choice. A larger space gets a seeded genetic search.
  * - A choice that breaks a limit, or whose stack has a fault, is not on the front. `breaks` counts each break.
  *
- * The result is deterministic: one layer, one stack and one set of options give one plan.
+ * The result is deterministic when each measure is deterministic: one layer, one stack and one set of options give one plan.
  *
  * @param layer - The placement layer
  * @param stack - The base stack
- * @param options - The joiners and the options of the search
+ * @param options - The joiners, the measures and the options of the search
  * @returns The plan
  * @throws RangeError when an option is bad, or when the space of the layer has a problem, for example a slot with no candidate
  */
 export function planPlacement(layer: PlacementLayer, stack: Stack, options: PlanOptions): PlacementPlan {
-  const problems = planProblems(options);
+  const problems = planProblems(options, layer);
   const space = placementSpace(layer);
   problems.push(...checkSpace(space).map((item) => item.detail));
   if (problems.length > 0) throw new RangeError(`The plan of the placement has problems: ${problems.join(" ")}`);
-  const risks = options.joiners.find((joiner) => joiner.schema === RISK_SCHEMA);
-  const spends = options.joiners.find((joiner) => joiner.schema === SPEND_SCHEMA);
-  if (risks === undefined || spends === undefined) throw new RangeError("The list of joiners has no risk add-on or no spend add-on.");
   const evaluations = options.evaluations ?? PLAN_DEFAULTS.evaluations;
   const importance = options.importance ?? PLAN_DEFAULTS.importance;
   const limits = layer.limits ?? {};
@@ -213,27 +263,35 @@ export function planPlacement(layer: PlacementLayer, stack: Stack, options: Plan
     }
     return found;
   };
+  // This function gives the readings of the measures of a placed stack, or `undefined` when a measure refuses the stack.
+  const read = (placed: Stack, layerCost: number): Readings | undefined => {
+    try {
+      const cost = options.cost === undefined ? layerCost : options.cost(placed);
+      const given = options.chance(placed, layer.part);
+      const chance: ChanceReading = typeof given === "number" ? { value: given } : given;
+      const bound = options.bound === undefined ? null : options.bound(placed);
+      if (!isZeroOrMore(cost)) return undefined;
+      if (typeof chance.value !== "number" || !(Number.isNaN(chance.value) || (chance.value >= 0 && chance.value <= 1))) return undefined;
+      if (bound !== null && !(isZeroOrMore(bound.bounded) && Array.isArray(bound.open))) return undefined;
+      return { cost, chance, bound };
+    } catch (error) {
+      if (error instanceof RangeError) return undefined;
+      throw error;
+    }
+  };
   const assess = (config: string, choice: Choice): Assessment => {
     const placed = placedStack(layer, stack, choice, options.joiners);
     if (!placed.ok) return { measure: { breaks: ["join"], values: {} } };
-    const risk = readLayer<RiskLayer>(placed.stack, risks);
-    const spend = readLayer<SpendLayer>(placed.stack, spends);
-    if (!risk.ok || !spend.ok) return { measure: { breaks: ["layer"], values: { cost: placed.cost } } };
-    let works: ReturnType<typeof worksChance>;
-    try {
-      works = worksChance(risk.layer ?? { schema: RISK_SCHEMA, goals: [] }, placed.stack, layer.part, options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps });
-    } catch (error) {
-      if (error instanceof RangeError) return { measure: { breaks: ["layer"], values: { cost: placed.cost } } };
-      throw error;
-    }
-    const total: MonthTotal = spend.layer === undefined ? { bounded: 0, open: [] } : monthTotal(spend.layer);
+    const readings = read(placed.stack, placed.cost);
+    if (readings === undefined) return { measure: { breaks: ["measure"], values: {} } };
+    const { cost, bound } = readings;
+    const chance = readings.chance.value;
     const breaks: PlanBreak[] = [];
-    if (limits.cost !== undefined && over(placed.cost, limits.cost)) breaks.push("cost");
-    if (limits.bound !== undefined && (total.open.length > 0 || over(total.bounded, limits.bound))) breaks.push("bound");
-    if (limits.chance !== undefined && works.kind === "exact" && over(limits.chance, works.value)) breaks.push("chance");
-    const chance = works.kind === "exact" ? works.value : Number.NaN;
-    const measure: Measure = { breaks, values: { cost: stepped(placed.cost, OBJECTIVE_STEPS.cost), chance: stepped(chance, OBJECTIVE_STEPS.chance) } };
-    if (works.kind !== "exact" || breaks.length > 0) return { measure };
+    if (limits.cost !== undefined && over(cost, limits.cost)) breaks.push("cost");
+    if (limits.bound !== undefined && bound !== null && (bound.open.length > 0 || over(bound.bounded, limits.bound))) breaks.push("bound");
+    if (limits.chance !== undefined && !Number.isNaN(chance) && over(limits.chance, chance)) breaks.push("chance");
+    const measure: Measure = { breaks, values: { cost: stepped(cost, OBJECTIVE_STEPS.cost), chance: stepped(chance, OBJECTIVE_STEPS.chance) } };
+    if (Number.isNaN(chance) || breaks.length > 0) return { measure };
     return {
       measure,
       row: {
@@ -241,12 +299,11 @@ export function planPlacement(layer: PlacementLayer, stack: Stack, options: Plan
         choice,
         sources: sources(choice),
         shared: placed.shared,
-        cost: placed.cost,
+        cost,
         chance,
-        bound: total.open.length > 0 ? null : total.bounded,
-        open: total.open,
-        importance: works.importance.slice(0, importance),
-        assumed: works.assumed,
+        bound,
+        importance: (readings.chance.importance ?? []).slice(0, importance),
+        assumed: readings.chance.assumed ?? [],
       },
     };
   };

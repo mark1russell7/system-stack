@@ -1,4 +1,3 @@
-import { SPEND_SCHEMA } from "@mark1russell7/stack-spend";
 import { partNeeds, type Fault, type Stack } from "@mark1russell7/system-stack";
 import type { PlacementLayer } from "./layer.ts";
 
@@ -19,7 +18,6 @@ import type { PlacementLayer } from "./layer.ts";
  * - `shared-unknown` (error): a candidate uses a shared fragment that the layer does not have.
  * - `shared-unused` (warning): no candidate uses a shared fragment.
  * - `limit-range` (error): a limit of cost is not a finite number of 0 or more. Or the limit of chance is not from 0 to 1.
- * - `currency` (error): the spend layer of the base stack has a different currency.
  */
 export const PLACEMENT_CODES: readonly [
   "part-unknown",
@@ -34,7 +32,6 @@ export const PLACEMENT_CODES: readonly [
   "shared-unknown",
   "shared-unused",
   "limit-range",
-  "currency",
 ] = [
   "part-unknown",
   "slot-twice",
@@ -48,7 +45,6 @@ export const PLACEMENT_CODES: readonly [
   "shared-unknown",
   "shared-unused",
   "limit-range",
-  "currency",
 ];
 
 /** A code of `PLACEMENT_CODES`. */
@@ -62,11 +58,6 @@ export interface PlacementFault extends Fault {
 /** This function tells if a value is a finite number, 0 or more. */
 function isZeroOrMore(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
-}
-
-/** This function gives the value of a field of a record, or `undefined` for a value that is not a record. */
-function fieldOf(value: unknown, field: string): unknown {
-  return typeof value === "object" && value !== null && Object.hasOwn(value, field) ? (value as Record<string, unknown>)[field] : undefined;
 }
 
 /** This function gives each `id` that two or more items of a list have, in the order of their first item. */
@@ -125,7 +116,5 @@ export function checkPlacement(layer: PlacementLayer, stack: Stack): PlacementFa
     if (value !== undefined && !isZeroOrMore(value)) add("error", "limit-range", name, `The limit "${name}" is ${String(value)}. It must be 0 or more.`);
   }
   if (limits.chance !== undefined && !(limits.chance >= 0 && limits.chance <= 1)) add("error", "limit-range", "chance", `The limit "chance" is ${String(limits.chance)}. It must be from 0 to 1.`);
-  const currency = fieldOf(stack.layers?.[SPEND_SCHEMA], "currency");
-  if (typeof currency === "string" && currency !== layer.currency) add("error", "currency", layer.part, `The placement has the currency "${layer.currency}", and the spend layer of the stack has "${currency}".`);
   return faults;
 }

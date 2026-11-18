@@ -7,10 +7,15 @@
 ## . (build/index.d.ts): names
 
 BASE_FRAGMENT: build/index.d.ts#BASE_FRAGMENT
+BoundMeasure: build/index.d.ts#BoundMeasure
+BoundReading: build/index.d.ts#BoundReading
 CHOICE_CODES: build/index.d.ts#CHOICE_CODES
 Candidate: build/layer.chunk.d.ts#Candidate
+ChanceMeasure: build/index.d.ts#ChanceMeasure
+ChanceReading: build/index.d.ts#ChanceReading
 Choice: build/layer.chunk.d.ts#Choice
 ChoiceCode: build/index.d.ts#ChoiceCode
+CostMeasure: build/index.d.ts#CostMeasure
 LIMIT_TOLERANCE: build/index.d.ts#LIMIT_TOLERANCE
 OBJECTIVE_STEPS: build/index.d.ts#OBJECTIVE_STEPS
 PLACEMENT_CODES: build/index.d.ts#PLACEMENT_CODES
@@ -20,6 +25,7 @@ PLACEMENT_OBJECTIVES: build/index.d.ts#PLACEMENT_OBJECTIVES
 PLACEMENT_SCHEMA: build/layer.chunk.d.ts#PLACEMENT_SCHEMA
 PLAN_BREAKS: build/index.d.ts#PLAN_BREAKS
 PLAN_DEFAULTS: build/index.d.ts#PLAN_DEFAULTS
+PartWeight: build/index.d.ts#PartWeight
 Placed: build/index.d.ts#Placed
 PlacementCode: build/index.d.ts#PlacementCode
 PlacementFault: build/index.d.ts#PlacementFault
@@ -63,11 +69,33 @@ export declare function placementAddOn(): StackJoiner<PlacementLayer>;
 ### build/index.d.ts#BASE_FRAGMENT
 export declare const BASE_FRAGMENT = "base";
 
+### build/index.d.ts#BoundMeasure
+export type BoundMeasure = (stack: Stack) => BoundReading;
+
+### build/index.d.ts#BoundReading
+export interface BoundReading {
+  readonly bounded: number;
+  readonly open: readonly string[];
+}
+
 ### build/index.d.ts#CHOICE_CODES
 export declare const CHOICE_CODES: readonly ["slot-unknown", "slot-empty", "candidate-unknown", "shared-unknown"];
 
+### build/index.d.ts#ChanceMeasure
+export type ChanceMeasure = (stack: Stack, part: string) => number | ChanceReading;
+
+### build/index.d.ts#ChanceReading
+export interface ChanceReading {
+  readonly value: number;
+  readonly importance?: readonly PartWeight[] | undefined;
+  readonly assumed?: readonly string[] | undefined;
+}
+
 ### build/index.d.ts#ChoiceCode
 export type ChoiceCode = (typeof CHOICE_CODES)[number];
+
+### build/index.d.ts#CostMeasure
+export type CostMeasure = (stack: Stack) => number;
 
 ### build/index.d.ts#LIMIT_TOLERANCE
 export declare const LIMIT_TOLERANCE = 1e-9;
@@ -79,7 +107,7 @@ export declare const OBJECTIVE_STEPS: {
 };
 
 ### build/index.d.ts#PLACEMENT_CODES
-export declare const PLACEMENT_CODES: readonly ["part-unknown", "slot-twice", "slot-part", "slot-unneeded", "slot-no-candidate", "candidate-twice", "candidate-part", "cost-range", "shared-twice", "shared-unknown", "shared-unused", "limit-range", "currency"];
+export declare const PLACEMENT_CODES: readonly ["part-unknown", "slot-twice", "slot-part", "slot-unneeded", "slot-no-candidate", "candidate-twice", "candidate-part", "cost-range", "shared-twice", "shared-unknown", "shared-unused", "limit-range"];
 
 ### build/index.d.ts#PLACEMENT_ENGINE
 export declare const PLACEMENT_ENGINE = "stack-placement";
@@ -91,7 +119,7 @@ export declare const PLACEMENT_EVALUATOR = "stack-placement/1";
 export declare const PLACEMENT_OBJECTIVES: readonly Objective[];
 
 ### build/index.d.ts#PLAN_BREAKS
-export declare const PLAN_BREAKS: readonly ["join", "layer", "cost", "bound", "chance"];
+export declare const PLAN_BREAKS: readonly ["join", "measure", "cost", "bound", "chance"];
 
 ### build/index.d.ts#PLAN_DEFAULTS
 export declare const PLAN_DEFAULTS: {
@@ -99,6 +127,12 @@ export declare const PLAN_DEFAULTS: {
   readonly seed: "stack-placement";
   readonly importance: 5;
 };
+
+### build/index.d.ts#PartWeight
+export interface PartWeight {
+  readonly part: string;
+  readonly importance: number;
+}
 
 ### build/index.d.ts#Placed
 export type Placed = {
@@ -138,9 +172,8 @@ export interface PlacementRow {
   readonly shared: readonly string[];
   readonly cost: number;
   readonly chance: number;
-  readonly bound: number | null;
-  readonly open: readonly string[];
-  readonly importance: readonly PartImportance[];
+  readonly bound: BoundReading | null;
+  readonly importance: readonly PartWeight[];
   readonly assumed: readonly string[];
 }
 
@@ -150,9 +183,11 @@ export type PlanBreak = (typeof PLAN_BREAKS)[number];
 ### build/index.d.ts#PlanOptions
 export interface PlanOptions {
   readonly joiners: readonly LayerJoiner<unknown>[];
+  readonly chance: ChanceMeasure;
+  readonly bound?: BoundMeasure | undefined;
+  readonly cost?: CostMeasure | undefined;
   readonly evaluations?: number | undefined;
   readonly seed?: number | string | undefined;
-  readonly maxSteps?: number | undefined;
   readonly importance?: number | undefined;
 }
 
@@ -187,7 +222,7 @@ export declare function placementSpace(layer: PlacementLayer): StrategySpace;
 export declare function planPlacement(layer: PlacementLayer, stack: Stack, options: PlanOptions): PlacementPlan;
 
 ### build/index.d.ts#planProblems
-export declare function planProblems(options: PlanOptions): string[];
+export declare function planProblems(options: PlanOptions, layer?: PlacementLayer): string[];
 
 ### build/index.d.ts#sharedFragment
 export declare function sharedFragment(id: string): string;

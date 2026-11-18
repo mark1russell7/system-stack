@@ -24,6 +24,16 @@ const config: Config = boundaries(import.meta.dirname, {
       from: { path: `${library}index\\.ts$` },
       to: { path: `${library}schema\\.ts$`, reachable: true },
     },
+    {
+      name: "add-on-imports-an-add-on",
+      severity: "error",
+      comment: "An add-on does not import a different add-on. A host, a site or a test joins them. The tests are not in the graph.",
+      from: { path: "^packages/stack-([^/]+)/src/" },
+      to: {
+        path: "^packages/stack-[^/]+/|node_modules/@mark1russell7/stack-[^/]+/",
+        pathNot: "^packages/stack-$1/|node_modules/@mark1russell7/stack-$1/",
+      },
+    },
   ],
 });
 export default config;

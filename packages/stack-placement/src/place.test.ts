@@ -1,6 +1,6 @@
 import { riskAddOn } from "@mark1russell7/stack-risk/add-on";
 import { spendAddOn } from "@mark1russell7/stack-spend/add-on";
-import { checkStackLayers, type Stack } from "@mark1russell7/system-stack";
+import { checkStackLayers } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { placementAddOn } from "./add-on.ts";
 import { checkPlacement, joinPlacement, PLACEMENT_SCHEMA, placedStack, SAMPLE_BASE, SAMPLE_PLACEMENT, SAMPLE_STACK, SAMPLE_TODAY, type PlacementLayer } from "./index.ts";
@@ -63,7 +63,6 @@ describe("checkPlacement", () => {
     const layer: PlacementLayer = {
       ...SAMPLE_PLACEMENT,
       part: "receive",
-      currency: "EUR",
       slots: [
         { id: "send", candidates: [] },
         { id: "copy-a", candidates: [x, { ...x, cost: -1, uses: ["provider-z"], stack: SAMPLE_BASE }] },
@@ -73,8 +72,7 @@ describe("checkPlacement", () => {
       shared: [...(SAMPLE_PLACEMENT.shared ?? []), { id: "provider-x", stack: SAMPLE_BASE, cost: Number.NaN }],
       limits: { cost: -1, chance: 2 },
     };
-    const base: Stack = { ...SAMPLE_BASE, layers: { "spend/1": { schema: "spend/1", currency: "USD", kinds: [], proofDays: 30, services: [] } } };
-    expect(codes(checkPlacement(layer, base))).toEqual([
+    expect(codes(checkPlacement(layer, SAMPLE_BASE))).toEqual([
       "part-unknown",
       "slot-twice",
       "slot-part",
@@ -90,7 +88,6 @@ describe("checkPlacement", () => {
       "cost-range",
       "limit-range",
       "limit-range",
-      "currency",
     ]);
   });
 });

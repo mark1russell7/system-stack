@@ -241,12 +241,6 @@ importers:
 
   packages/stack-placement:
     dependencies:
-      '@mark1russell7/stack-risk':
-        specifier: workspace:*
-        version: link:../stack-risk
-      '@mark1russell7/stack-spend':
-        specifier: workspace:*
-        version: link:../stack-spend
       '@mark1russell7/strategy-search':
         specifier: ^0.1.1
         version: 0.1.1
@@ -263,6 +257,12 @@ importers:
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
+      '@mark1russell7/stack-risk':
+        specifier: workspace:*
+        version: link:../stack-risk
+      '@mark1russell7/stack-spend':
+        specifier: workspace:*
+        version: link:../stack-spend
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

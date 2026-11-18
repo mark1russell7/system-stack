@@ -42,8 +42,6 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/stack-risk": "workspace:*",
-    "@mark1russell7/stack-spend": "workspace:*",
     "@mark1russell7/strategy-search": "^0.1.1",
     "@mark1russell7/strategy-space": "^0.1.1",
     "@mark1russell7/system-stack": "workspace:*",
@@ -51,6 +49,8 @@
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/stack-risk": "workspace:*",
+    "@mark1russell7/stack-spend": "workspace:*",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.3",
     "fast-check": "^4.10.2",
