@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { KNOWN_SCHEMA, type KnownFault, type KnownList } from "./known.ts";
 import { STACK_SCHEMA, type Need, type Part, type Stack } from "./stack.ts";
 
 // The zod schema of a stack document, and the read of its JSON. This module is the entry `/schema` of the package.
@@ -49,4 +50,29 @@ export function parseStack(value: unknown): StackParse {
   const read = stackSchema.safeParse(value);
   if (read.success) return { ok: true, stack: read.data };
   return { ok: false, errors: formErrors(STACK_SCHEMA, read.error.issues) };
+}
+
+/** The schema of a known fault. It refuses a field that the format does not have. */
+export const knownFaultSchema: z.ZodType<KnownFault> = z.strictObject({
+  code: z.string().min(1),
+  at: id,
+  other: id.optional(),
+  reason: z.string().min(1),
+  until: z.string(),
+});
+
+/** The schema of a list of known faults. `holdKnown` examines the dates and the matches. */
+export const knownListSchema: z.ZodType<KnownList> = z.strictObject({
+  schema: z.literal(KNOWN_SCHEMA),
+  known: z.array(knownFaultSchema).readonly(),
+});
+
+/** The result of the read of a list of known faults: the list, or the faults of its form. */
+export type KnownParse = { readonly ok: true; readonly list: KnownList } | { readonly ok: false; readonly errors: readonly string[] };
+
+/** This function reads the JSON of a list of known faults. It gives the list, or the faults of its form. */
+export function parseKnown(value: unknown): KnownParse {
+  const read = knownListSchema.safeParse(value);
+  if (read.success) return { ok: true, list: read.data };
+  return { ok: false, errors: formErrors(KNOWN_SCHEMA, read.error.issues) };
 }

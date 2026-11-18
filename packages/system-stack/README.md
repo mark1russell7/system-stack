@@ -2,7 +2,7 @@
 
 A system stack as data: the parts of a system, and what each part needs. The package has the format of a stack, the parts that work when some parts are down, and the checks of a stack. It also gives the paths of a part and the sets of parts whose failure stops it.
 
-The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md), [`@mark1russell7/stack-risk`](../stack-risk/README.md) and [`@mark1russell7/stack-tofu`](../stack-tofu/README.md).
+The package names no topic. A topic, for example cost, is an add-on package that keeps its records in a layer of the stack. The add-ons are [`@mark1russell7/stack-spend`](../stack-spend/README.md), [`@mark1russell7/stack-risk`](../stack-risk/README.md), [`@mark1russell7/stack-tofu`](../stack-tofu/README.md) and [`@mark1russell7/stack-feeds`](../stack-feeds/README.md).
 
 Each function is a plain function with no clock and no network.
 
@@ -10,8 +10,8 @@ Each function is a plain function with no clock and no network.
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers, the join of stacks and a sample stack. |
-| `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, and `formErrors` for the layers of add-ons. |
+| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers, the join of stacks, the hold of known faults and a sample stack. |
+| `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, `formErrors` for the layers of add-ons, and `parseKnown` for a list of known faults. |
 
 The root entry has no schema library. Thus a page that only asks which parts work gets no zod.
 
@@ -162,6 +162,33 @@ checkStack({
 A fault has a `level`, a `code`, the `id` of its part in `at`, and a `message` for a reader. The checks of the add-ons give faults of the same form.
 
 `dayNumber(date)` gives the count of days of a date `YYYY-MM-DD` from 1970-01-01. The gates of the add-ons compare dates with it, so they have no clock.
+
+## The known faults
+
+The gate of a real stack can have faults that the owner knows and cannot correct at once. For example, a limit waits for a step in an account. `holdKnown(faults, known, { today })` holds the faults of any check against a list of known faults.
+
+- A known fault has the `code`, the `at` and the `other` of its fault, a `reason` and a last date `until`.
+- A matched error becomes a warning until its last date. Its message tells the reason and the date.
+- An error with no match stays an error. Thus a new fault stops the gate.
+
+| Code | The fault |
+| --- | --- |
+| `known-date` | The last date of a known fault is not a date. The known fault has no effect. |
+| `known-twice` | Two known faults have one code, one `at` and one `other`. The first one has the effect. |
+| `known-unused` | A known fault matches no fault. Remove it, so that the gate holds the gain. |
+| `known-old` | The last date of a known fault is before the date of the check. The fault stays an error. |
+
+```ts
+import { holdKnown } from "@mark1russell7/system-stack";
+
+const faults = [{ level: "error" as const, code: "limit-none", at: "meter:a", message: "The cost has no limit." }];
+const known = [{ code: "limit-none", at: "meter:a", reason: "The plan comes back in December.", until: "2026-12-31" }];
+
+holdKnown(faults, known, { today: "2026-11-18" });
+// => [{ level: "warning", code: "limit-none", at: "meter:a", message: "The cost has no limit. The owner knows this fault until 2026-12-31: The plan comes back in December." }]
+```
+
+A file of known faults has the format `known/1`: `{ "schema": "known/1", "known": [...] }`. `parseKnown` of the entry `/schema` reads it.
 
 ## The layers of the add-ons
 
