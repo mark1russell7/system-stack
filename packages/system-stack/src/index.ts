@@ -5,4 +5,5 @@ export * from "./check.ts";
 export * from "./layers.ts";
 export * from "./join.ts";
 export * from "./dates.ts";
+export * from "./known.ts";
 export * from "./sample.ts";

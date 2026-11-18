@@ -23,13 +23,19 @@ describe("the root entry", () => {
     expect(entry.joinSetting).toBe(layers.joinSetting);
   });
 
+  it("has the hold of known faults", () => {
+    expect(entry.KNOWN_SCHEMA).toBe("known/1");
+    expect(entry.holdKnown).toBeTypeOf("function");
+    expect(entry.KNOWN_CODES).toEqual(["known-date", "known-twice", "known-old", "known-unused"]);
+  });
+
   it("has no schema", () => {
-    for (const name of ["stackSchema", "parseStack", "formErrors"]) expect(entry).not.toHaveProperty(name);
+    for (const name of ["stackSchema", "parseStack", "formErrors", "knownListSchema", "parseKnown"]) expect(entry).not.toHaveProperty(name);
   });
 });
 
 describe("the entry /schema", () => {
-  it("has the schemas and the read of a stack", () => {
-    expect(Object.keys(schema).sort()).toEqual(["formErrors", "needSchema", "parseStack", "partSchema", "stackSchema"]);
+  it("has the schemas and the reads of a stack and of a list of known faults", () => {
+    expect(Object.keys(schema).sort()).toEqual(["formErrors", "knownFaultSchema", "knownListSchema", "needSchema", "parseKnown", "parseStack", "partSchema", "stackSchema"]);
   });
 });

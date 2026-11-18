@@ -7,52 +7,59 @@
 ## . (build/index.d.ts): names
 
 type AddOn: @mark1russell7/coeval/layers#AddOn (external)
-AllOf: build/stack.chunk.d.ts#AllOf
-AnyOf: build/stack.chunk.d.ts#AnyOf
+AllOf: build/known.chunk.d.ts#AllOf
+AnyOf: build/known.chunk.d.ts#AnyOf
 DEFAULT_MAX_SETS: build/index.d.ts#DEFAULT_MAX_SETS
-FAULT_LEVELS: build/index.d.ts#FAULT_LEVELS
-Fault: build/index.d.ts#Fault
-FaultLevel: build/index.d.ts#FaultLevel
+FAULT_LEVELS: build/known.chunk.d.ts#FAULT_LEVELS
+Fault: build/known.chunk.d.ts#Fault
+FaultLevel: build/known.chunk.d.ts#FaultLevel
+KNOWN_CODES: build/known.chunk.d.ts#KNOWN_CODES
+KNOWN_SCHEMA: build/known.chunk.d.ts#KNOWN_SCHEMA
+KnownCode: build/known.chunk.d.ts#KnownCode
+KnownFault: build/known.chunk.d.ts#KnownFault
+KnownList: build/known.chunk.d.ts#KnownList
+KnownOptions: build/known.chunk.d.ts#KnownOptions
 type LayerFault: @mark1russell7/coeval/layers#LayerFault (external)
 type LayerFinding: @mark1russell7/coeval/layers#LayerFinding (external)
 type LayerJoiner: @mark1russell7/coeval/layers#LayerJoiner (external)
 type LayerParse: @mark1russell7/coeval/layers#LayerParse (external)
 type LayerPiece: @mark1russell7/coeval/layers#LayerPiece (external)
-Need: build/stack.chunk.d.ts#Need
-Part: build/stack.chunk.d.ts#Part
+Need: build/known.chunk.d.ts#Need
+Part: build/known.chunk.d.ts#Part
 PartSets: build/index.d.ts#PartSets
 PathOptions: build/index.d.ts#PathOptions
 type RecordTwice: @mark1russell7/coeval/layers#RecordTwice (external)
 type RecordsJoin: @mark1russell7/coeval/layers#RecordsJoin (external)
 SAMPLE_STACK: build/index.d.ts#SAMPLE_STACK
-STACK_CODES: build/index.d.ts#STACK_CODES
+STACK_CODES: build/known.chunk.d.ts#STACK_CODES
 STACK_JOIN_CODES: build/index.d.ts#STACK_JOIN_CODES
-STACK_SCHEMA: build/stack.chunk.d.ts#STACK_SCHEMA
+STACK_SCHEMA: build/known.chunk.d.ts#STACK_SCHEMA
 type SettingJoin: @mark1russell7/coeval/layers#SettingJoin (external)
 SmallestStop: build/index.d.ts#SmallestStop
-Stack: build/stack.chunk.d.ts#Stack
+Stack: build/known.chunk.d.ts#Stack
 StackAddOn: build/index.d.ts#StackAddOn
-StackCode: build/index.d.ts#StackCode
-StackFault: build/index.d.ts#StackFault
+StackCode: build/known.chunk.d.ts#StackCode
+StackFault: build/known.chunk.d.ts#StackFault
 StackFragment: build/index.d.ts#StackFragment
 StackJoin: build/index.d.ts#StackJoin
 StackJoinCode: build/index.d.ts#StackJoinCode
 StackJoinFinding: build/index.d.ts#StackJoinFinding
 StackJoiner: build/index.d.ts#StackJoiner
 StopOptions: build/index.d.ts#StopOptions
-anyCount: build/stack.chunk.d.ts#anyCount
-checkStack: build/index.d.ts#checkStack
+anyCount: build/known.chunk.d.ts#anyCount
+checkStack: build/known.chunk.d.ts#checkStack
 checkStackLayers: build/index.d.ts#checkStackLayers
 dayNumber: build/index.d.ts#dayNumber
-isAllOf: build/stack.chunk.d.ts#isAllOf
+holdKnown: build/known.chunk.d.ts#holdKnown
+isAllOf: build/known.chunk.d.ts#isAllOf
 isLayerName: @mark1russell7/coeval/layers#isLayerName (external)
 joinRecords: @mark1russell7/coeval/layers#joinRecords (external)
 joinSetting: @mark1russell7/coeval/layers#joinSetting (external)
 joinStacks: build/index.d.ts#joinStacks
 needHolds: build/index.d.ts#needHolds
-needParts: build/stack.chunk.d.ts#needParts
-partNeeds: build/stack.chunk.d.ts#partNeeds
-partsById: build/stack.chunk.d.ts#partsById
+needParts: build/known.chunk.d.ts#needParts
+partNeeds: build/known.chunk.d.ts#partNeeds
+partsById: build/known.chunk.d.ts#partsById
 pathSets: build/index.d.ts#pathSets
 readLayer: @mark1russell7/coeval/layers#readLayer (external)
 smallestStop: build/index.d.ts#smallestStop
@@ -63,9 +70,13 @@ works: build/index.d.ts#works
 
 ## ./schema (build/schema.d.ts): names
 
+KnownParse: build/schema.d.ts#KnownParse
 StackParse: build/schema.d.ts#StackParse
 formErrors: build/schema.d.ts#formErrors
+knownFaultSchema: build/schema.d.ts#knownFaultSchema
+knownListSchema: build/schema.d.ts#knownListSchema
 needSchema: build/schema.d.ts#needSchema
+parseKnown: build/schema.d.ts#parseKnown
 parseStack: build/schema.d.ts#parseStack
 partSchema: build/schema.d.ts#partSchema
 stackSchema: build/schema.d.ts#stackSchema
@@ -74,21 +85,6 @@ stackSchema: build/schema.d.ts#stackSchema
 
 ### build/index.d.ts#DEFAULT_MAX_SETS
 export declare const DEFAULT_MAX_SETS = 4096;
-
-### build/index.d.ts#FAULT_LEVELS
-export declare const FAULT_LEVELS: readonly ["error", "warning"];
-
-### build/index.d.ts#Fault
-export interface Fault {
-  readonly level: FaultLevel;
-  readonly code: string;
-  readonly at: string;
-  readonly message: string;
-  readonly other?: string | undefined;
-}
-
-### build/index.d.ts#FaultLevel
-export type FaultLevel = (typeof FAULT_LEVELS)[number];
 
 ### build/index.d.ts#PartSets
 export type PartSets = {
@@ -107,9 +103,6 @@ export interface PathOptions {
 ### build/index.d.ts#SAMPLE_STACK
 export declare const SAMPLE_STACK: Stack;
 
-### build/index.d.ts#STACK_CODES
-export declare const STACK_CODES: readonly ["id-duplicate", "need-part", "need-count", "need-cycle", "owner-part"];
-
 ### build/index.d.ts#STACK_JOIN_CODES
 export declare const STACK_JOIN_CODES: readonly ["fragment-name", "part-twice"];
 
@@ -125,14 +118,6 @@ export type SmallestStop = {
 
 ### build/index.d.ts#StackAddOn
 export type StackAddOn<Layer> = AddOn$1<Layer, Stack>;
-
-### build/index.d.ts#StackCode
-export type StackCode = (typeof STACK_CODES)[number];
-
-### build/index.d.ts#StackFault
-export interface StackFault extends Fault {
-  readonly code: StackCode;
-}
 
 ### build/index.d.ts#StackFragment
 export interface StackFragment {
@@ -165,9 +150,6 @@ export interface StopOptions extends PathOptions {
   readonly size?: number | undefined;
 }
 
-### build/index.d.ts#checkStack
-export declare function checkStack(stack: Stack): StackFault[];
-
 ### build/index.d.ts#checkStackLayers
 export declare function checkStackLayers(stack: Stack, addOns: readonly StackAddOn<unknown>[]): LayerFinding$1[];
 
@@ -198,6 +180,124 @@ export declare function working(stack: Stack, down?: Iterable<string>): Set<stri
 ### build/index.d.ts#works
 export declare function works(stack: Stack, part: string, down?: Iterable<string>): boolean;
 
+### build/known.chunk.d.ts#AllOf
+interface AllOf {
+  readonly all: readonly Need[];
+}
+
+### build/known.chunk.d.ts#AnyOf
+interface AnyOf {
+  readonly any: readonly Need[];
+  readonly count?: number | undefined;
+}
+
+### build/known.chunk.d.ts#FAULT_LEVELS
+declare const FAULT_LEVELS: readonly ["error", "warning"];
+
+### build/known.chunk.d.ts#Fault
+interface Fault {
+  readonly level: FaultLevel;
+  readonly code: string;
+  readonly at: string;
+  readonly message: string;
+  readonly other?: string | undefined;
+}
+
+### build/known.chunk.d.ts#FaultLevel
+type FaultLevel = (typeof FAULT_LEVELS)[number];
+
+### build/known.chunk.d.ts#KNOWN_CODES
+declare const KNOWN_CODES: readonly ["known-date", "known-twice", "known-old", "known-unused"];
+
+### build/known.chunk.d.ts#KNOWN_SCHEMA
+declare const KNOWN_SCHEMA = "known/1";
+
+### build/known.chunk.d.ts#KnownCode
+type KnownCode = (typeof KNOWN_CODES)[number];
+
+### build/known.chunk.d.ts#KnownFault
+interface KnownFault {
+  readonly code: string;
+  readonly at: string;
+  readonly other?: string | undefined;
+  readonly reason: string;
+  readonly until: string;
+}
+
+### build/known.chunk.d.ts#KnownList
+interface KnownList {
+  readonly schema: typeof KNOWN_SCHEMA;
+  readonly known: readonly KnownFault[];
+}
+
+### build/known.chunk.d.ts#KnownOptions
+interface KnownOptions {
+  readonly today: string;
+}
+
+### build/known.chunk.d.ts#Need
+type Need = string | AllOf | AnyOf;
+
+### build/known.chunk.d.ts#Part
+interface Part {
+  readonly id: string;
+  readonly kind: string;
+  readonly name?: string | undefined;
+  readonly needs?: readonly Need[] | undefined;
+  readonly owner?: string | undefined;
+}
+
+### build/known.chunk.d.ts#STACK_CODES
+declare const STACK_CODES: readonly ["id-duplicate", "need-part", "need-count", "need-cycle", "owner-part"];
+
+### build/known.chunk.d.ts#STACK_SCHEMA
+declare const STACK_SCHEMA = "stack/1";
+
+### build/known.chunk.d.ts#Stack
+interface Stack {
+  readonly schema: typeof STACK_SCHEMA;
+  readonly parts: readonly Part[];
+  readonly layers?: Readonly<Record<string, unknown>> | undefined;
+}
+
+### build/known.chunk.d.ts#StackCode
+type StackCode = (typeof STACK_CODES)[number];
+
+### build/known.chunk.d.ts#StackFault
+interface StackFault extends Fault {
+  readonly code: StackCode;
+}
+
+### build/known.chunk.d.ts#anyCount
+declare function anyCount(need: AnyOf): number;
+
+### build/known.chunk.d.ts#checkStack
+declare function checkStack(stack: Stack): StackFault[];
+
+### build/known.chunk.d.ts#holdKnown
+declare function holdKnown(faults: readonly Fault[], known: readonly KnownFault[], options: KnownOptions): Fault[];
+
+### build/known.chunk.d.ts#isAllOf
+declare function isAllOf(need: Need): need is AllOf;
+
+### build/known.chunk.d.ts#needParts
+declare function needParts(need: Need): string[];
+
+### build/known.chunk.d.ts#partNeeds
+declare function partNeeds(part: Part): string[];
+
+### build/known.chunk.d.ts#partsById
+declare function partsById(stack: Stack): Map<string, Part>;
+
+### build/schema.d.ts#KnownParse
+export type KnownParse = {
+  readonly ok: true;
+  readonly list: KnownList;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
 ### build/schema.d.ts#StackParse
 export type StackParse = {
   readonly ok: true;
@@ -213,8 +313,17 @@ export declare function formErrors(name: string, issues: readonly {
   readonly message: string;
 }[]): string[];
 
+### build/schema.d.ts#knownFaultSchema
+export declare const knownFaultSchema: z.ZodType<KnownFault>;
+
+### build/schema.d.ts#knownListSchema
+export declare const knownListSchema: z.ZodType<KnownList>;
+
 ### build/schema.d.ts#needSchema
 export declare const needSchema: z.ZodType<Need>;
+
+### build/schema.d.ts#parseKnown
+export declare function parseKnown(value: unknown): KnownParse;
 
 ### build/schema.d.ts#parseStack
 export declare function parseStack(value: unknown): StackParse;
@@ -224,51 +333,3 @@ export declare const partSchema: z.ZodType<Part>;
 
 ### build/schema.d.ts#stackSchema
 export declare const stackSchema: z.ZodType<Stack>;
-
-### build/stack.chunk.d.ts#AllOf
-interface AllOf {
-  readonly all: readonly Need[];
-}
-
-### build/stack.chunk.d.ts#AnyOf
-interface AnyOf {
-  readonly any: readonly Need[];
-  readonly count?: number | undefined;
-}
-
-### build/stack.chunk.d.ts#Need
-type Need = string | AllOf | AnyOf;
-
-### build/stack.chunk.d.ts#Part
-interface Part {
-  readonly id: string;
-  readonly kind: string;
-  readonly name?: string | undefined;
-  readonly needs?: readonly Need[] | undefined;
-  readonly owner?: string | undefined;
-}
-
-### build/stack.chunk.d.ts#STACK_SCHEMA
-declare const STACK_SCHEMA = "stack/1";
-
-### build/stack.chunk.d.ts#Stack
-interface Stack {
-  readonly schema: typeof STACK_SCHEMA;
-  readonly parts: readonly Part[];
-  readonly layers?: Readonly<Record<string, unknown>> | undefined;
-}
-
-### build/stack.chunk.d.ts#anyCount
-declare function anyCount(need: AnyOf): number;
-
-### build/stack.chunk.d.ts#isAllOf
-declare function isAllOf(need: Need): need is AllOf;
-
-### build/stack.chunk.d.ts#needParts
-declare function needParts(need: Need): string[];
-
-### build/stack.chunk.d.ts#partNeeds
-declare function partNeeds(part: Part): string[];
-
-### build/stack.chunk.d.ts#partsById
-declare function partsById(stack: Stack): Map<string, Part>;
