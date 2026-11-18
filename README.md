@@ -14,6 +14,7 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 | [`@mark1russell7/stack-spend`](packages/stack-spend/README.md) | The spend add-on: the cost of each part, the hard limits of its cost in a month, the used amount of a month, and a gate for each. The gate gives a warning before a plan ends. |
 | [`@mark1russell7/stack-risk`](packages/stack-risk/README.md) | The risk add-on: the failures that a part must survive, the chance that it works, accepted risks, and a gate. |
 | [`@mark1russell7/stack-tofu`](packages/stack-tofu/README.md) | The OpenTofu add-on: the resources of each part, a generator of the files, the planned cost of each account against its hard limit, and a gate of a plan. |
+| [`@mark1russell7/stack-placement`](packages/stack-placement/README.md) | The placement add-on: a candidate for each slot, and the front of the expected cost against the chance that a function works. |
 | [`@mark1russell7/stack-feeds`](packages/stack-feeds/README.md) | The feed add-on: the live lists of the parts from each source, and a gate that fails when a record or a list is old. |
 
 The core names no topic. Each topic is an add-on package. An add-on keeps its records in a layer of the stack, and it has its own checks and formulas. The add-ons do not know each other.

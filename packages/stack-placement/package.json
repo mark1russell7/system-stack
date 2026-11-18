@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "@mark1russell7/stack-placement",
+  "version": "0.1.0",
+  "description": "The placement of the parts of a system stack as a query: a candidate for each slot, the chance that a function works, the cost, and the front of the two. An add-on of system-stack.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark1russell7/system-stack.git",
+    "directory": "packages/stack-placement"
+  },
+  "homepage": "https://mark1russell7.github.io/system-stack/",
+  "bugs": {
+    "url": "https://github.com/mark1russell7/system-stack/issues"
+  },
+  "keywords": [
+    "placement",
+    "reliability",
+    "redundancy",
+    "pareto-front",
+    "cost",
+    "path-set",
+    "strategy-search",
+    "system-stack"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./add-on": "./src/add-on.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@mark1russell7/strategy-search": "^0.1.1",
+    "@mark1russell7/strategy-space": "^0.1.1",
+    "@mark1russell7/system-stack": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/stack-risk": "workspace:*",
+    "@mark1russell7/stack-spend": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.3",
+    "fast-check": "^4.10.2",
+    "tsdown": "^0.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "import": "./build/index.js",
+        "default": "./build/index.js"
+      },
+      "./schema": {
+        "types": "./build/schema.d.ts",
+        "import": "./build/schema.js",
+        "default": "./build/schema.js"
+      },
+      "./add-on": {
+        "types": "./build/add-on.d.ts",
+        "import": "./build/add-on.js",
+        "default": "./build/add-on.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}
