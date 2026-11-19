@@ -177,13 +177,13 @@ importers:
     devDependencies:
       '@mark1russell7/api-report':
         specifier: ^0.5.8
-        version: 0.5.14
+        version: 0.5.16
       '@mark1russell7/boundaries':
         specifier: ^0.3.0
         version: 0.3.2(@swc/core@1.16.22)(dependency-cruiser@18.7.2)
       '@mark1russell7/conventions':
-        specifier: ^0.47.0
-        version: 0.47.0
+        specifier: ^0.48.1
+        version: 0.48.1
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -222,7 +222,7 @@ importers:
         version: 2.1.4
       '@mark1russell7/site-pages':
         specifier: ^0.8.0
-        version: 0.8.0
+        version: 0.8.1
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
@@ -685,8 +685,8 @@ packages:
       zod:
         optional: true
 
-  '@mark1russell7/api-report@0.5.14':
-    resolution: {integrity: sha512-W3b1cEF9x+j6VMEUvPi/Lo2DEj7vBUW9pN+smJhY0FrM3sNDVMcXGeMe/cSk+ehoAF+SUgNrCPW53ksww1PSzQ==}
+  '@mark1russell7/api-report@0.5.16':
+    resolution: {integrity: sha512-SG45xcND7JPg9npmXIvQxp1xyFRuFeYQ8ZOoKxU8jIorKnUw+l0sCyj76JKTfsAPgAha6LCrNt6YAjoqtfTyTA==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -716,8 +716,8 @@ packages:
     resolution: {integrity: sha512-6JXrfvg2vMGITbc11C3POvDwbbCU7PMkFWSYdYjshJj5o0LSAMnpPsVSQySfA5G4mdYeAdJ/VfN5Yc3foJkdCQ==}
     engines: {node: '>=22.12'}
 
-  '@mark1russell7/conventions@0.47.0':
-    resolution: {integrity: sha512-voho9dFecG7KVpGyg2FwRT6O5r0S76EDegmIzZsk9+B/llM4xW3idGd0xLvMPOC+w+lRV6K1zlyXsqIxhbmU0A==}
+  '@mark1russell7/conventions@0.48.1':
+    resolution: {integrity: sha512-W/p/evPiTwMbe2sieLgVDlW6vr3AhQMuwedof9j5sLAki01J/4gCoLZxdInBLuSoFst6skukOFVSjDmZV3cOGg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -776,8 +776,8 @@ packages:
     resolution: {integrity: sha512-9u9u2imcLpkiwSu1FGeB57Z+/Fr7byplVNMoR8G9OELjhSwOdzNbTiPieHqFM6phVVyMWrGlgoEQyBaxKqwvtQ==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.0':
-    resolution: {integrity: sha512-OlqsZfj5yNovI1ysfPJEIVsRnON3KgEP9ELMIH5CO+kP9FY5Vu873oCY+Zja5dKB8wTVgU3YewEcTqH9ncDurg==}
+  '@mark1russell7/site-pages@0.8.1':
+    resolution: {integrity: sha512-R8lPPyDNAbemR2YBrivAIYkXNfQgJDUhggKiUGWHNEZTKwUpLtVGvl/lqD/bkhoSh9IluAhnz5c/5R/A/uFeVA==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -798,10 +798,6 @@ packages:
     resolution: {integrity: sha512-7ebtLlCmT6KYhbpoI2SZHXCQC6/7Rc660SvKwQvfslseSQrXMRlmBj+1/F5KOCep6aB+LtvGWg+HmTKi6uZjyQ==}
     engines: {node: '>=22.12'}
     hasBin: true
-
-  '@mark1russell7/text@0.0.15':
-    resolution: {integrity: sha512-aNOINmlpbbHIO1VOVfZkMZf8Ts346sz7Y+iQOsclQPet4etHNjKm0KM1EW9K0UuxpbZEkUW2+qjrVFcoL1Juyw==}
-    engines: {node: '>=22.12'}
 
   '@mark1russell7/text@0.0.16':
     resolution: {integrity: sha512-hq2AWdtbKtXlibTTcVA/6GQAxgPj+6U3Hdmkh1I4sRMQZn/SiKh1k78UtcMgtcLJxwHHG9GVs2O2VNQxJP7R1Q==}
@@ -2086,9 +2082,9 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  '@mark1russell7/api-report@0.5.14':
+  '@mark1russell7/api-report@0.5.16':
     dependencies:
-      '@mark1russell7/conventions': 0.47.0
+      '@mark1russell7/conventions': 0.48.1
 
   '@mark1russell7/boundaries@0.3.2(@swc/core@1.16.22)(dependency-cruiser@18.7.2)':
     optionalDependencies:
@@ -2125,9 +2121,9 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  '@mark1russell7/conventions@0.47.0':
+  '@mark1russell7/conventions@0.48.1':
     dependencies:
-      '@mark1russell7/text': 0.0.15
+      '@mark1russell7/text': 0.0.16
       yaml: 2.9.1
 
   '@mark1russell7/cue@2.1.4': {}
@@ -2166,9 +2162,9 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.2.0
 
-  '@mark1russell7/site-pages@0.8.0':
+  '@mark1russell7/site-pages@0.8.1':
     dependencies:
-      '@mark1russell7/rigor-statistics': 0.2.9
+      '@mark1russell7/rigor-statistics': 0.2.13
 
   '@mark1russell7/ste-lint@0.4.0':
     dependencies:
@@ -2188,8 +2184,6 @@ snapshots:
   '@mark1russell7/template-cli@0.1.9':
     dependencies:
       '@clack/prompts': 1.9.0
-
-  '@mark1russell7/text@0.0.15': {}
 
   '@mark1russell7/text@0.0.16': {}
 
