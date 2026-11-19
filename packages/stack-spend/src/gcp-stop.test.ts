@@ -328,6 +328,30 @@ describe("the script of the stop", () => {
     expect(broken).toMatchObject({ status: 1, calls: 1 });
   }, 30_000);
 
+  /** This function runs step 7 of the script in bash with a fake gcloud that gives `answer` for each read of the log. */
+  function runVerdict(answer: string): { status: number | null; stdout: string } {
+    const script = stopScript(options);
+    const start = script.indexOf('SENT="');
+    const end = script.indexOf("\nesac\n", start);
+    expect(start).toBeGreaterThan(0);
+    expect(end).toBeGreaterThan(start);
+    const fake = ["gcloud() {", '  if [ "$1" = "logging" ]; then printf "%b" "$ANSWER"; fi', "}", "sleep() { :; }"];
+    const program = ["set -euo pipefail", 'NAME="billing-stop"', 'REGION="r"', 'DISPLAY="d"', 'AMOUNT="5"', 'CURRENCY="USD"', ...fake, script.slice(start, end + 6)].join("\n");
+    const run = spawnSync("bash", ["-c", program], { encoding: "utf8", env: { ...process.env, ANSWER: answer } });
+    return { status: run.status, stdout: run.stdout };
+  }
+
+  it.skipIf(!bash)("tells from the JSON result of the test if the stop is live", () => {
+    const live = runVerdict("kept\\tTrue");
+    expect(live).toMatchObject({ status: 0 });
+    expect(live.stdout).toContain("The stop is live.");
+    expect(runVerdict("kept\\tFalse").status).toBe(1);
+    expect(runVerdict("refused\\t").status).toBe(1);
+    const none = runVerdict("");
+    expect(none.status).toBe(1);
+    expect(none.stdout).toContain("no result");
+  }, 30_000);
+
   it("gives a function source with no fault of syntax", () => {
     const folder = mkdtempSync(join(tmpdir(), "gcp-stop-"));
     try {

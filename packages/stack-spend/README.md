@@ -445,6 +445,7 @@ The rules of the stop:
 - A request that fails gives the result `failed` and an error in the log. The next notification tries again.
 - The result of the function holds no token.
 - The identity also has the role Service Usage Consumer, because Eventarc examines that the identity of a trigger can use the project.
+- The last step of the script reads the JSON result of a test with a cost of 0. It tells "The stop is live." only for `kept` with `ready`, and else it stops with an error.
 - A change of IAM comes into force after a delay. The script tries each grant and the deploy again while the error is such a delay, at most 16 times, 20 seconds apart. Each other error stops the script.
 
 The limits of the stop:
