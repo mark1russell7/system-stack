@@ -11,10 +11,14 @@ BUILTIN_PROVIDER: build/layer.chunk.d.ts#BUILTIN_PROVIDER
 Backend: build/layer.chunk.d.ts#Backend
 Budget: build/check.chunk.d.ts#Budget
 COST_LAYER_KEY: build/check.chunk.d.ts#COST_LAYER_KEY
+Copy: build/layer.chunk.d.ts#Copy
 DOCUMENT_COMMENT: build/index.d.ts#DOCUMENT_COMMENT
 DOCUMENT_FILE: build/index.d.ts#DOCUMENT_FILE
 FormUse: build/index.d.ts#FormUse
 Generated: build/index.d.ts#Generated
+Group: build/layer.chunk.d.ts#Group
+GroupParam: build/layer.chunk.d.ts#GroupParam
+GroupResource: build/layer.chunk.d.ts#GroupResource
 NAME_FORM: build/index.d.ts#NAME_FORM
 NumberUse: build/index.d.ts#NumberUse
 PATH_FORM: build/index.d.ts#PATH_FORM
@@ -60,6 +64,9 @@ accountStates: build/check.chunk.d.ts#accountStates
 budgetsByPart: build/check.chunk.d.ts#budgetsByPart
 checkPlan: build/plan.chunk.d.ts#checkPlan
 checkTofu: build/check.chunk.d.ts#checkTofu
+copyName: build/layer.chunk.d.ts#copyName
+copyResourceName: build/index.d.ts#copyResourceName
+copyResources: build/index.d.ts#copyResources
 costSpace: build/check.chunk.d.ts#costSpace
 dependsOn: build/index.d.ts#dependsOn
 documentText: build/index.d.ts#documentText
@@ -67,13 +74,18 @@ escapeTemplate: build/index.d.ts#escapeTemplate
 evaluateCost: build/check.chunk.d.ts#evaluateCost
 firstResources: build/index.d.ts#firstResources
 generateTofu: build/index.d.ts#generateTofu
+groupFaults: build/index.d.ts#groupFaults
 isBuiltin: build/layer.chunk.d.ts#isBuiltin
 isForm: build/index.d.ts#isForm
 isList: build/index.d.ts#isList
 isObject: build/index.d.ts#isObject
 isZeroOrMore: build/check.chunk.d.ts#isZeroOrMore
 joinTofu: build/index.d.ts#joinTofu
+layerResources: build/index.d.ts#layerResources
+localAddress: build/index.d.ts#localAddress
 neededParts: build/index.d.ts#neededParts
+paramOf: build/index.d.ts#paramOf
+partName: build/layer.chunk.d.ts#partName
 pathText: build/index.d.ts#pathText
 plannedTotal: build/check.chunk.d.ts#plannedTotal
 providerAddress: build/layer.chunk.d.ts#providerAddress
@@ -148,7 +160,7 @@ declare const PROVIDER_META: readonly string[];
 declare const RESOURCE_META: readonly string[];
 
 ### build/check.chunk.d.ts#TOFU_CODES
-declare const TOFU_CODES: readonly ["version", "backend", "variable-form", "variable-duplicate", "provider-form", "provider-duplicate", "provider-source", "provider-part", "provider-value", "resource-form", "resource-duplicate", "resource-part", "provider-none", "ignore-form", "value-name", "value-meta", "value-form", "value-number", "ref-none", "var-none", "cycle", "cost-amount", "cost-none", "cost-builtin", "budget-duplicate", "budget-amount", "budget-none", "limit-none", "cost-over", "provider-need", "variable-unused"];
+declare const TOFU_CODES: readonly ["version", "backend", "variable-form", "variable-duplicate", "provider-form", "provider-duplicate", "provider-source", "provider-part", "provider-value", "resource-form", "resource-duplicate", "resource-part", "provider-none", "ignore-form", "value-name", "value-meta", "value-form", "value-number", "ref-none", "var-none", "cycle", "cost-amount", "cost-none", "cost-builtin", "budget-duplicate", "budget-amount", "budget-none", "limit-none", "cost-over", "provider-need", "variable-unused", "group-form", "group-duplicate", "group-shadow", "group-none", "param-none", "param-missing", "param-unknown", "copy-provider", "group-unused", "param-unused"];
 
 ### build/check.chunk.d.ts#TofuCode
 type TofuCode = (typeof TOFU_CODES)[number];
@@ -269,6 +281,12 @@ export interface ValueUses {
   readonly numbers: readonly NumberUse[];
 }
 
+### build/index.d.ts#copyResourceName
+export declare function copyResourceName(copy: Copy, resource: GroupResource): string;
+
+### build/index.d.ts#copyResources
+export declare function copyResources(layer: TofuLayer): Resource[];
+
 ### build/index.d.ts#dependsOn
 export declare function dependsOn(layer: TofuLayer, stack: Stack): Map<string, string[]>;
 
@@ -284,6 +302,9 @@ export declare function firstResources(layer: TofuLayer): readonly Resource[];
 ### build/index.d.ts#generateTofu
 export declare function generateTofu(layer: TofuLayer, stack: Stack, options?: TofuOptions): Generated;
 
+### build/index.d.ts#groupFaults
+export declare function groupFaults(layer: TofuLayer): TofuFault[];
+
 ### build/index.d.ts#isForm
 export declare function isForm(value: TofuObject): boolean;
 
@@ -296,8 +317,17 @@ export declare function isObject(value: TofuValue): value is TofuObject;
 ### build/index.d.ts#joinTofu
 export declare function joinTofu(pieces: readonly LayerPiece<TofuLayer>[]): LayerParse<TofuLayer>;
 
+### build/index.d.ts#layerResources
+export declare function layerResources(layer: TofuLayer): readonly Resource[];
+
+### build/index.d.ts#localAddress
+export declare function localAddress(resource: GroupResource): string;
+
 ### build/index.d.ts#neededParts
 export declare function neededParts(stack: Stack, part: string): Set<string>;
+
+### build/index.d.ts#paramOf
+export declare function paramOf(value: TofuObject): string | undefined;
 
 ### build/index.d.ts#pathText
 export declare function pathText(path: ValuePath): string;
@@ -335,6 +365,40 @@ interface Backend {
   readonly values?: TofuObject | undefined;
 }
 
+### build/layer.chunk.d.ts#Copy
+interface Copy {
+  readonly part: string;
+  readonly group: string;
+  readonly name?: string | undefined;
+  readonly values?: TofuObject | undefined;
+  readonly providers?: readonly string[] | undefined;
+}
+
+### build/layer.chunk.d.ts#Group
+interface Group {
+  readonly name: string;
+  readonly params?: readonly GroupParam[] | undefined;
+  readonly resources: readonly GroupResource[];
+}
+
+### build/layer.chunk.d.ts#GroupParam
+interface GroupParam {
+  readonly name: string;
+  readonly default?: TofuValue | undefined;
+  readonly description?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#GroupResource
+interface GroupResource {
+  readonly name: string;
+  readonly type: string;
+  readonly provider?: string | undefined;
+  readonly values?: TofuObject | undefined;
+  readonly cost?: number | undefined;
+  readonly keep?: boolean | undefined;
+  readonly ignore?: readonly string[] | undefined;
+}
+
 ### build/layer.chunk.d.ts#Provider
 interface Provider {
   readonly name: string;
@@ -369,6 +433,8 @@ interface TofuLayer {
   readonly providers?: readonly Provider[] | undefined;
   readonly variables?: readonly Variable[] | undefined;
   readonly resources: readonly Resource[];
+  readonly groups?: readonly Group[] | undefined;
+  readonly copies?: readonly Copy[] | undefined;
 }
 
 ### build/layer.chunk.d.ts#TofuObject
@@ -393,8 +459,14 @@ interface Variable {
 ### build/layer.chunk.d.ts#VariableType
 type VariableType = (typeof VARIABLE_TYPES)[number];
 
+### build/layer.chunk.d.ts#copyName
+declare function copyName(copy: Copy): string;
+
 ### build/layer.chunk.d.ts#isBuiltin
 declare function isBuiltin(resource: Resource): boolean;
+
+### build/layer.chunk.d.ts#partName
+declare function partName(part: string): string;
 
 ### build/layer.chunk.d.ts#providerAddress
 declare function providerAddress(provider: Provider): string;

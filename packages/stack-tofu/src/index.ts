@@ -1,5 +1,6 @@
 export * from "./layer.ts";
 export * from "./values.ts";
+export * from "./groups.ts";
 export * from "./queries.ts";
 export * from "./cost.ts";
 export * from "./check.ts";

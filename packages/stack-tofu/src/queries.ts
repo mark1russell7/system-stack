@@ -1,15 +1,16 @@
 import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
 import { partNeeds, partsById, type Part, type Stack } from "@mark1russell7/system-stack";
+import { layerResources } from "./groups.ts";
 import { resourceAddress, type Resource, type TofuLayer } from "./layer.ts";
 import { refParts, valueUses } from "./values.ts";
 
 // The queries over the records. The sequence of the resources in the files comes from the needs of the stack,
 // so a person writes each dependence one time: in the stack.
 
-/** This function gives the first resource of each address of a layer, in the sequence of the records. */
+/** This function gives the first resource of each address of a layer, in the sequence of the records. The resources of the copies come last. */
 export function firstResources(layer: TofuLayer): readonly Resource[] {
   const seen = new Set<string>();
-  return layer.resources.filter((resource) => {
+  return layerResources(layer).filter((resource) => {
     const address = resourceAddress(resource);
     if (seen.has(address)) return false;
     seen.add(address);
