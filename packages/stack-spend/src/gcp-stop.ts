@@ -408,9 +408,25 @@ if [ -z "$(gcloud billing budgets list --billing-account="$ACCOUNT" --billing-pr
 fi
 
 echo "7/7 Test the function with a cost of 0. This test does not stop the project."
+SENT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 gcloud pubsub topics publish "$NAME" --message="{\\"budgetDisplayName\\":\\"$DISPLAY test\\",\\"costAmount\\":0,\\"budgetAmount\\":$AMOUNT,\\"currencyCode\\":\\"$CURRENCY\\",\\"costIntervalStart\\":\\"$(date -u +%Y-%m-01T00:00:00Z)\\"}"
-sleep 90
-gcloud functions logs read "$NAME" --gen2 --region="$REGION" --limit=10
-echo "The stop is live when a line of the log has \\"action\\":\\"kept\\" and \\"ready\\":true."
+# The function writes its result as a JSON line. "gcloud functions logs read" does not show such a line, so the script reads it with "gcloud logging read".
+# The result can come to the log some minutes late. Thus the script reads the log at most 15 times, 20 seconds apart.
+FILTER="resource.type=\\"cloud_run_revision\\" AND resource.labels.service_name=\\"$NAME\\" AND jsonPayload.action:* AND timestamp>=\\"$SENT\\""
+RESULT=""
+for try in $(seq 1 15); do
+  sleep 20
+  RESULT="$(gcloud logging read "$FILTER" --limit=1 --format='value(jsonPayload.action,jsonPayload.ready)')"
+  if [ -n "$RESULT" ]; then break; fi
+done
+if [ -z "$RESULT" ]; then RESULT="no result"; fi
+echo "The result of the test: $RESULT"
+case "$RESULT" in
+  kept*True)
+    echo "The stop is live." ;;
+  *)
+    echo "The stop is not live. The log of the function: gcloud functions logs read $NAME --gen2 --region=$REGION --limit=20" >&2
+    exit 1 ;;
+esac
 `;
 }
