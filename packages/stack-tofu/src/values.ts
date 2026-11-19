@@ -77,6 +77,12 @@ export function varOf(value: TofuObject): string | undefined {
   return text !== undefined && NAME_FORM.test(text) ? text : undefined;
 }
 
+/** This function gives the name of a correct parameter form, `{ "$param": "name" }`. Only a resource of a group can have one. */
+export function paramOf(value: TofuObject): string | undefined {
+  const text = formText(value, "$param");
+  return text !== undefined && NAME_FORM.test(text) ? text : undefined;
+}
+
 /**
  * This function escapes the template sequences of a text. OpenTofu then reads the text as it is in the record.
  * `$${` is the escape of `${`, and `%%{` is the escape of `%{`.

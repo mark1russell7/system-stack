@@ -2,7 +2,7 @@ import { SAMPLE_STACK, STACK_SCHEMA, type Need, type Part, type Stack } from "@m
 import { describe, expect, it } from "vitest";
 import { checkTofu, PROVIDER_META, RESOURCE_META, TOFU_CODES, type TofuCode, type TofuFault, type TofuOptions } from "./check.ts";
 import type { Budget } from "./cost.ts";
-import { TOFU_SCHEMA, type Provider, type Resource, type TofuLayer } from "./layer.ts";
+import { TOFU_SCHEMA, type Copy, type Group, type Provider, type Resource, type TofuLayer } from "./layer.ts";
 import { SAMPLE_BUDGETS, SAMPLE_TOFU } from "./sample.ts";
 
 const part = (id: string, ...needs: Need[]): Part => ({ id, kind: "part", needs });
@@ -15,7 +15,12 @@ const one = (more: Partial<Resource>): TofuLayer => layer({ resources: [{ ...ser
 const faults = (of: TofuLayer, options: TofuOptions = { budgets }): TofuFault[] => checkTofu(of, stack, options);
 const codes = (of: TofuLayer, options: TofuOptions = { budgets }): TofuCode[] => faults(of, options).map((fault) => fault.code);
 
-const WARNINGS: readonly TofuCode[] = ["provider-need", "variable-unused"];
+// A group of one disk, and its copy for the part `program`. The copy makes the resource `example_disk.program_disk`.
+const disk: Group = { name: "disk", params: [{ name: "size" }], resources: [{ name: "disk", type: "example_disk", cost: 1, values: { size: { $param: "size" } } }] };
+const copy: Copy = { part: "program", group: "disk", values: { size: 10 } };
+const grouped = (more: Partial<TofuLayer> = {}): TofuLayer => layer({ groups: [disk], copies: [copy], ...more });
+
+const WARNINGS: readonly TofuCode[] = ["provider-need", "variable-unused", "group-unused", "param-unused"];
 
 /** A layer with one planted record for a code. `codes` is each code that the gate gives for it, when the planted record has a second effect. */
 interface Planted {
@@ -58,6 +63,21 @@ const PLANTED: Record<TofuCode, Planted> = {
   "cost-over": { layer: one({ cost: 10.01 }), at: "account" },
   "provider-need": { layer: one({ part: "lonely" }), at: "example_server.lonely" },
   "variable-unused": { layer: layer({ variables: [{ name: "token" }] }), at: "var.token" },
+  "group-form": { layer: grouped({ groups: [{ ...disk, name: "1a" }], copies: [{ ...copy, group: "1a" }] }), at: "group.1a" },
+  "group-duplicate": { layer: grouped({ groups: [disk, disk] }), at: "group.disk" },
+  "group-shadow": { layer: grouped({ resources: [server, { part: "host", type: "example_disk", name: "disk", cost: 1 }] }), at: "group.disk" },
+  "group-none": { layer: grouped({ copies: [{ ...copy, group: "missing" }] }), at: "copy.program", codes: ["group-none", "group-unused"] },
+  // The copy keeps the parameter form that the group does not have, so its resource also has a value that is not correct.
+  "param-none": {
+    layer: grouped({ groups: [{ ...disk, resources: [{ name: "disk", type: "example_disk", cost: 1, values: { size: { $param: "size" }, zone: { $param: "zone" } } }] }] }),
+    at: "group.disk",
+    codes: ["value-form", "param-none"],
+  },
+  "param-missing": { layer: grouped({ copies: [{ part: "program", group: "disk" }] }), at: "copy.program" },
+  "param-unknown": { layer: grouped({ copies: [{ ...copy, values: { size: 10, zone: "east" } }] }), at: "copy.program" },
+  "copy-provider": { layer: grouped({ copies: [{ ...copy, providers: ["other.east"] }] }), at: "copy.program" },
+  "group-unused": { layer: grouped({ copies: [] }), at: "group.disk" },
+  "param-unused": { layer: grouped({ groups: [{ ...disk, params: [{ name: "size" }, { name: "zone", default: "east" }] }] }), at: "group.disk" },
 };
 
 describe("the codes", () => {

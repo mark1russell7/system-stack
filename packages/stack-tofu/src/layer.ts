@@ -94,6 +94,60 @@ export interface Resource {
   readonly import?: string | undefined;
 }
 
+/** A parameter of a group. Each copy of the group gives its value. */
+export interface GroupParam {
+  readonly name: string;
+  /** The value for a copy that does not give one. Without a default, each copy must give a value. */
+  readonly default?: TofuValue | undefined;
+  readonly description?: string | undefined;
+}
+
+/**
+ * A resource of a group. It has no part, because each copy of the group gives the part.
+ * Its name is local to the group: the name in the files is the name of the copy, `_` and this name.
+ *
+ * Its values can have the form `{ "$param": "name" }`: the value of a parameter, from the copy.
+ * A reference to the local address of a resource of the group reads the resource of the same copy.
+ * The resource has no import id, because one object at the provider cannot be the resource of each copy.
+ */
+export interface GroupResource {
+  /** The local name of the resource in the group. */
+  readonly name: string;
+  readonly type: string;
+  readonly provider?: string | undefined;
+  readonly values?: TofuObject | undefined;
+  readonly cost?: number | undefined;
+  readonly keep?: boolean | undefined;
+  readonly ignore?: readonly string[] | undefined;
+}
+
+/**
+ * A group of resources as one record, for example the server, the disk and the address of a host.
+ * Each copy of the group makes the resources of one part. Thus a new copy of a host is one record.
+ */
+export interface Group {
+  readonly name: string;
+  readonly params?: readonly GroupParam[] | undefined;
+  readonly resources: readonly GroupResource[];
+}
+
+/** A copy of a group: the resources of the group for one part of the stack. */
+export interface Copy {
+  /** The `id` of the part of the stack that the resources of the copy make. */
+  readonly part: string;
+  /** The name of the group. */
+  readonly group: string;
+  /** The first word of the names of the resources of the copy. The default comes from the `id` of the part. */
+  readonly name?: string | undefined;
+  /** The value of each parameter of the group, by the name of the parameter. */
+  readonly values?: TofuObject | undefined;
+  /**
+   * The provider configurations of the copy, for example `example.east`. Each one replaces the configuration of the same
+   * provider name in each resource of the group. Thus a copy in a different region or account is one record.
+   */
+  readonly providers?: readonly string[] | undefined;
+}
+
 /** An OpenTofu layer: the resources of the parts of a stack, with their providers. */
 export interface TofuLayer {
   readonly schema: typeof TOFU_SCHEMA;
@@ -103,6 +157,10 @@ export interface TofuLayer {
   readonly providers?: readonly Provider[] | undefined;
   readonly variables?: readonly Variable[] | undefined;
   readonly resources: readonly Resource[];
+  /** The groups of resources. A group makes no resource until a copy names it. */
+  readonly groups?: readonly Group[] | undefined;
+  /** The copies of the groups. `layerResources` gives their resources after the resources of the field `resources`. */
+  readonly copies?: readonly Copy[] | undefined;
 }
 
 /**
@@ -116,9 +174,18 @@ export const BUILTIN_PROVIDER = "terraform";
  * In a name from an `id`, `_` replaces each character that a name cannot have, and a name does not start with a digit.
  */
 export function resourceName(resource: Resource): string {
-  if (resource.name !== undefined) return resource.name;
-  const name = resource.part.replace(/[^A-Za-z0-9_-]/g, "_");
+  return resource.name ?? partName(resource.part);
+}
+
+/** This function gives a name from the `id` of a part. `_` replaces each character that a name cannot have, and a name does not start with a digit. */
+export function partName(part: string): string {
+  const name = part.replace(/[^A-Za-z0-9_-]/g, "_");
   return /^[A-Za-z_]/.test(name) ? name : `_${name}`;
+}
+
+/** This function gives the name of a copy: its field `name`, or a name from the `id` of its part. */
+export function copyName(copy: Copy): string {
+  return copy.name ?? partName(copy.part);
 }
 
 /** This function gives the address of a resource in the files: its type, a point and its name. */

@@ -1,6 +1,6 @@
 import { formErrors } from "@mark1russell7/system-stack/schema";
 import { z } from "zod";
-import { TOFU_SCHEMA, VARIABLE_TYPES, type TofuLayer, type TofuObject } from "./layer.ts";
+import { TOFU_SCHEMA, VARIABLE_TYPES, type TofuLayer, type TofuObject, type TofuValue } from "./layer.ts";
 import type { TofuPlan } from "./plan.ts";
 
 // The zod schema of an OpenTofu layer and of a plan, and the read of their JSON. This module is the entry `/schema` of the package.
@@ -30,6 +30,13 @@ const values = z.custom<TofuObject>().superRefine((input, context) => {
     context.addIssue({ code: "custom", message: "The arguments are not an object." });
     return;
   }
+  for (const path of wrongPlaces(input)) {
+    context.addIssue({ code: "custom", path, message: "The value is not a value of JSON: a text, a finite number, a boolean, null, a list or an object." });
+  }
+});
+
+// One value of JSON of each depth, for example the default of a parameter.
+const anyValue = z.custom<TofuValue>((input) => input !== undefined).superRefine((input, context) => {
   for (const path of wrongPlaces(input)) {
     context.addIssue({ code: "custom", path, message: "The value is not a value of JSON: a text, a finite number, a boolean, null, a list or an object." });
   }
@@ -68,6 +75,36 @@ const resource = z.strictObject({
   import: z.string().optional(),
 });
 
+const groupParam = z.strictObject({
+  name: id,
+  default: anyValue.optional(),
+  description: z.string().optional(),
+});
+
+const groupResource = z.strictObject({
+  name: id,
+  type: id,
+  provider: id.optional(),
+  values: values.optional(),
+  cost: z.number().optional(),
+  keep: z.boolean().optional(),
+  ignore: z.array(id).readonly().optional(),
+});
+
+const group = z.strictObject({
+  name: id,
+  params: z.array(groupParam).readonly().optional(),
+  resources: z.array(groupResource).readonly(),
+});
+
+const copy = z.strictObject({
+  part: id,
+  group: id,
+  name: id.optional(),
+  values: values.optional(),
+  providers: z.array(id).readonly().optional(),
+});
+
 /**
  * The schema of an OpenTofu layer. It examines the form of the record: the fields, their types and the finite numbers.
  * It refuses a field that the format does not have. `checkTofu` examines the meaning of a layer with a correct form.
@@ -79,6 +116,8 @@ export const tofuSchema: z.ZodType<TofuLayer> = z.strictObject({
   providers: z.array(provider).readonly().optional(),
   variables: z.array(variable).readonly().optional(),
   resources: z.array(resource).readonly(),
+  groups: z.array(group).readonly().optional(),
+  copies: z.array(copy).readonly().optional(),
 });
 
 /** The result of the read of an OpenTofu layer: the layer, or the faults of its form. */

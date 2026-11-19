@@ -1,6 +1,7 @@
 import { partsById, type Fault, type FaultLevel, type Stack } from "@mark1russell7/system-stack";
 import { accountStates, isZeroOrMore, type Budget } from "./cost.ts";
 import { BUILTIN_PROVIDER, isBuiltin, providerAddress, resourceAddress, resourceName, resourceProvider, typeProvider, type Provider, type TofuLayer, type TofuObject } from "./layer.ts";
+import { groupFaults, layerResources } from "./groups.ts";
 import { firstResources, neededParts, resourceCycles } from "./queries.ts";
 import { isForm, NAME_FORM, PATH_FORM, pathText, PROVIDER_FORM, refParts, SOURCE_FORM, TYPE_FORM, valueUses, VERSION_FORM } from "./values.ts";
 
@@ -40,6 +41,16 @@ export const TOFU_CODES: readonly [
   "cost-over",
   "provider-need",
   "variable-unused",
+  "group-form",
+  "group-duplicate",
+  "group-shadow",
+  "group-none",
+  "param-none",
+  "param-missing",
+  "param-unknown",
+  "copy-provider",
+  "group-unused",
+  "param-unused",
 ] = [
   "version",
   "backend",
@@ -72,6 +83,16 @@ export const TOFU_CODES: readonly [
   "cost-over",
   "provider-need",
   "variable-unused",
+  "group-form",
+  "group-duplicate",
+  "group-shadow",
+  "group-none",
+  "param-none",
+  "param-missing",
+  "param-unknown",
+  "copy-provider",
+  "group-unused",
+  "param-unused",
 ];
 
 /** A code of a fault of an OpenTofu layer. */
@@ -157,9 +178,15 @@ function names(items: readonly string[]): string {
  * - `limit-none`: the resources of an account have a planned cost above 0, and the account has no hard limit.
  * - `cost-over`: the planned cost of an account is more than its hard limit.
  *
+ * The groups and the copies, as errors: `group-form`, `group-duplicate`, `group-shadow`, `group-none`, `param-none`,
+ * `param-missing`, `param-unknown` and `copy-provider`. `groupFaults` tells each one. The gate also examines each resource of
+ * each copy as a resource, so a fault of a resource of a group comes at each copy.
+ *
  * The warnings:
  * - `provider-need`: the part of a resource does not need the part of its provider configuration. The stack does not show that dependence.
  * - `variable-unused`: no value reads a variable.
+ * - `group-unused`: no copy names a group.
+ * - `param-unused`: no resource of a group reads a parameter.
  *
  * The gate does not examine the stack: `checkStack` of the core does. The function is pure.
  */
@@ -255,7 +282,7 @@ export function checkTofu(layer: TofuLayer, stack: Stack, options: TofuOptions =
   }
 
   const seen = new Set<string>();
-  for (const resource of layer.resources) {
+  for (const resource of layerResources(layer)) {
     const at = resourceAddress(resource);
     const more = { part: resource.part };
     if (seen.has(at)) {
@@ -297,6 +324,7 @@ export function checkTofu(layer: TofuLayer, stack: Stack, options: TofuOptions =
       );
     }
   }
+  faults.push(...groupFaults(layer));
 
   for (const cycle of resourceCycles(layer, stack)) {
     const [first = "", second] = cycle;

@@ -117,7 +117,62 @@ renderValue({ name: "a ${literal} text", disk: { $ref: "example_disk.cloud-host.
 // => { name: "a $${literal} text", disk: "${example_disk.cloud-host.id}", token: "${var.example_token}" }
 ```
 
-A key that starts with `$` has no other use. The gate refuses an object with such a key that is not one of the two forms.
+A key that starts with `$` has no other use. The gate refuses an object with such a key that is not one of the two forms. A resource of a group also has the parameter form, `{ "$param": "zone" }`.
+
+## Groups of resources
+
+A group is one record for some resources that go together, for example a server, its disk and its firewall. A copy makes the resources of a group for one part. Thus a second host is one copy, not a second list of resources.
+
+```ts
+import type { TofuLayer } from "@mark1russell7/stack-tofu";
+
+const hosts: TofuLayer = {
+  schema: "tofu/1",
+  providers: [
+    { name: "example", source: "example-org/example", part: "cloud-account" },
+    { name: "example", alias: "east", source: "example-org/example", part: "cloud-account" },
+  ],
+  resources: [],
+  groups: [
+    {
+      name: "host",
+      params: [{ name: "zone" }, { name: "size", default: "small" }],
+      resources: [
+        { name: "disk", type: "example_disk", values: { zone: { $param: "zone" } }, cost: 1, keep: true },
+        { name: "server", type: "example_server", values: { size: { $param: "size" }, disk: { $ref: "example_disk.disk.id" } }, cost: 6 },
+      ],
+    },
+  ],
+  copies: [
+    { part: "cloud-host", group: "host", name: "west", values: { zone: "west" } },
+    { part: "cloud-host-2", group: "host", name: "east", values: { zone: "east", size: "large" }, providers: ["example.east"] },
+  ],
+};
+// The copy "west" makes example_disk.west_disk and example_server.west_server. Its server reads example_disk.west_disk.id.
+```
+
+| Field of a group | What it is |
+| --- | --- |
+| `name` | The name of the group. |
+| `params` | The parameters. Each one has a `name`, and it can have a `default` and a `description`. |
+| `resources` | The resources. Each one has a local `name` and a `type`. It has the other fields of a resource, but not `part` and `import`. |
+
+| Field of a copy | What it is |
+| --- | --- |
+| `part` | The `id` of the part that the resources of the copy make. |
+| `group` | The name of the group. |
+| `name` | The name of the copy. The default comes from the `id` of the part. |
+| `values` | The value of each parameter. A parameter with a default can have no value here. |
+| `providers` | Provider configurations, for example `example.east`. Each one replaces the configuration of the group with the same provider name. |
+
+- The name of a resource of a copy is the name of the copy, `_` and the local name.
+- A parameter form becomes the value of the copy, or the default of the parameter. The value itself does not change.
+- A reference to a local address of the group, for example `example_disk.disk.id`, reads the resource of the same copy.
+- A reference to a different address reads a resource of the layer, for example a network for each copy.
+
+`layerResources(layer)` gives the resources of the layer and then the resources of each copy. The gate, the cost of each account, the queries and the generator read the resources through it. Thus a copy counts against the hard limit of its account, and its resources wait for the needs of its part.
+
+A group with no copy makes no resource. Thus a group can hold a host for a later day, with no cost.
 
 ## The sequence of the resources
 
@@ -184,8 +239,18 @@ checkTofu(SAMPLE_TOFU, SAMPLE_STACK).map((fault) => fault.code);
 | `cost-over` | The planned cost of an account is more than its hard limit. |
 | `provider-need` | A warning: the part of a resource does not need the part of its provider configuration. |
 | `variable-unused` | A warning: no value reads a variable. |
+| `group-form` | The name of a group, of a parameter or of a copy does not have the form of a name, or a group has no resource. |
+| `group-duplicate` | Two groups, two parameters of a group, two local addresses of a group or two copies have one name. |
+| `group-shadow` | A local address of a group is the address of a resource of the layer. |
+| `group-none` | A copy names a group that the layer does not have. |
+| `param-none` | A parameter form names a parameter that its group does not have. |
+| `param-missing` | A copy gives no value for a parameter with no default. |
+| `param-unknown` | A copy gives a value for a parameter that its group does not have. |
+| `copy-provider` | A configuration of a copy replaces no configuration of its group, or two of them have one provider name. |
+| `group-unused` | A warning: no copy names a group. |
+| `param-unused` | A warning: no resource of a group reads a parameter. |
 
-A fault has the address of its record in the field `at`, and the `id` of the part of the stack in the field `part`.
+A fault has the address of its record in the field `at`, and the `id` of the part of the stack in the field `part`. The address of a group is `group.<name>`, and that of a copy is `copy.<name>`. A fault of a resource of a copy has the address of that resource.
 
 The gate does not examine the stack. `checkStack` of the core does, and the generator uses the two functions.
 
@@ -361,6 +426,8 @@ The format `tofu/1` has resources, provider configurations, variables, one backe
 - The meta-arguments `count` and `for_each`, and provisioners.
 - A default value of a variable.
 
+A group and its copies do the work of a module and of `for_each` in the records. The files have each resource of each copy, so a plan and a state name each one.
+
 A plan with a data source or a module gives the fault `plan-unknown`.
 
 ## The resources of some owners
@@ -369,11 +436,11 @@ A plan with a data source or a module gives the fault `plan-unknown`.
 
 - The resources, the provider configurations and the variables are in the order of the fragments.
 - A resource address in two or more fragments is a fault. Equal resources give the fault too.
-- The same rule holds for the address of a provider configuration and for the name of a variable.
+- The same rule holds for the address of a provider configuration and for the name of a variable, a group or a copy.
 - The layer has one `version`. A fragment with a different value is a fault.
 - The state has one place. Thus a `backend` in two or more fragments is a fault.
 
-A resource of one fragment can use a provider configuration or a variable of a different fragment.
+A resource of one fragment can use a provider configuration or a variable of a different fragment. A copy can name a group of a different fragment.
 
 ```ts
 import { joinTofu } from "@mark1russell7/stack-tofu";
