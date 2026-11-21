@@ -25,21 +25,30 @@ Each function is a plain function with no clock, no network and no file. The uni
 - A draw takes from the stores only when the case stops its supply part.
 - The draws take the resources in the order of their level, then of the codes of their needs.
 - A draw takes from its direct uses first, then from its converters.
-- The days of a draw are the largest `T` at which the stores give `T` days of its demand. Each higher draw takes its demand first, for `T` days or for its own days when they are fewer.
+- The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
+- Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
+- The take order is a rule, not the best share. The days are the days of this order. `takes` gives the amount of each resource that a draw takes.
 - A store gives nothing on its due date and after it. A store or a converter whose part stops gives nothing.
 
 With a base stack, a cut also stops each part that cannot work without the cut part. Thus a pump that needs the grid stops with the grid.
 
 ## The rule of shortfall
 
-- For one draw in one case, the shortfall is `E[max(0, D - T)] * users`. `T` is the endurance of the draw. `D` is the duration of the cut of its supply part.
+- For one draw in one case, the shortfall is `E[max(0, D - T)] * users`. `T` is the endurance of the draw. `D` is the duration of the stop of its supply.
+- A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack. A need of `any` parts stops only when enough of them are cut.
 - `E[max(0, D - T)]` is the area under the survival curve from `T` on. The curve is linear between its points, so the area is exact.
-- For one year, the shortfall is the sum over the cases of `(1 - exp(-perYear * reach))` times the shortfall of the case.
+- For one year, the shortfall is the sum over the cases of `perYear * reach` times the shortfall of the case. Thus it is the expected user-days of one year.
 - The query adds the draws of one level. It does not add two levels.
 
 With the option `horizon` of `h` days, the shortfall counts only the first `h` days of each cut: `E[max(0, min(D, h) - T)] * users`. A draw that holds `h` days has no shortfall. Thus a buy plan can aim at a target, for example 14 days and then 90 days.
 
-A draw whose supply stops only through the stack has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
+A draw that only the parts of `down` stop has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
+
+The cuts of one case come from one event. `levels` takes each cut longer together with the event (`eventStop`). Then a stop with two cuts lasts as long as the longer cut. A stop through a need of `any` of two parts ends with the shorter cut. `levels` is not a limit: when the cuts are independent, the true stop can be longer or shorter.
+
+`upper` is an upper limit for each dependence of the cuts (`upperStop`). At each time, its chance is the sum over the minimal sets of cuts of the smallest chance of the set, to 1 or less. A gate of a high level can use `upper`.
+
+Only the cuts of the supply, and of the parts that it needs through the stack, count. Past 12 such cuts, `upper` is the sum of their curves, and `coarse` names the need.
 
 ## The entries
 
@@ -65,13 +74,13 @@ import { enduranceOf, SAMPLE_ENDURANCE, yearShortfall } from "@mark1russell7/sta
 const storm = SAMPLE_ENDURANCE.cases?.find((item) => item.case === "storm");
 if (storm !== undefined) {
   const held = enduranceOf(SAMPLE_ENDURANCE, storm, { at: "2026-12-01" });
-  // held.needs["food.energy"] is { days: 5.459, binding: ["food.ready", "water.stored"] }.
+  // held.needs["food.energy"] is { days: 0.889, binding: ["food.ready", "water.stored"] }.
 }
 const year = yearShortfall(SAMPLE_ENDURANCE, "home", { at: "2026-12-01" });
-// year.levels is { life: 0.0055, health: 0.4866, comfort: 0.2594 }, in user-days.
+// year.levels is { life: 0.008, health: 3.766, comfort: 0.377 }, in user-days.
 ```
 
-In the sample, the rice needs 2 L of water for each kg, and the drinking water comes first. So the food holds 5.459 days, not 6.889 days.
+In the sample, the rice needs 2 L of water for each kg. The drinking water holds 6.667 days, and it keeps back all the water for these days. So the rice gives nothing, and the food holds 0.889 days on the cans.
 
 ## The gate
 

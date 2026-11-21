@@ -1,7 +1,7 @@
 import { STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { caseStopped, enduranceOf, storeAmounts } from "./endurance.ts";
+import { caseStopped, drawDemand, enduranceOf, storeAmounts } from "./endurance.ts";
 import type { CaseCuts, EnduranceLayer } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 
@@ -36,8 +36,8 @@ describe("enduranceOf", () => {
     expect(Object.keys(result.needs)).toEqual(["hydration.drink", "food.energy", "power.electric"]);
     expect(result.needs["hydration.drink"]?.days).toBeCloseTo(6.6667, 3);
     expect(result.needs["hydration.drink"]?.binding).toEqual(["water.stored"]);
-    // The rice needs water, and the drinking water comes first: 4800 + 3600 (75.7 - 11.355 T) / 2 = 5400 T gives T = 5.459 days.
-    expect(result.needs["food.energy"]?.days).toBeCloseTo(5.4592, 3);
+    // The drinking water keeps back 6.667 days x 11.355 L, which is all the water. So the rice gives nothing, and the cans feed 4800 / 5400 days.
+    expect(result.needs["food.energy"]?.days).toBeCloseTo(4800 / 5400, 9);
     expect(result.needs["food.energy"]?.binding).toEqual(["food.ready", "water.stored"]);
     expect(result.needs["power.electric"]?.days).toBeCloseTo(6.6667, 3);
     expect(result.needs["power.electric"]?.binding).toEqual(["energy.battery"]);
@@ -67,13 +67,12 @@ describe("enduranceOf", () => {
   it("gives 0 days and each input as binding when the stores are empty", () => {
     const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: [] };
     const result = enduranceOf(layer, storm, { at: AT });
-    expect(result.needs["hydration.drink"]).toEqual({ days: 0, binding: ["water.stored"] });
-    expect(result.needs["food.energy"]).toEqual({ days: 0, binding: ["food.grain-dry", "food.ready", "fuel.propane", "water.stored"] });
+    expect(result.needs["hydration.drink"]).toMatchObject({ days: 0, binding: ["water.stored"] });
+    expect(result.needs["food.energy"]).toMatchObject({ days: 0, binding: ["food.grain-dry", "food.ready", "fuel.propane", "water.stored"] });
   });
 
-  it("gives a lower draw what a higher draw leaves after the same days", () => {
-    // The draw "net" takes x first, then w: 4 + 10 = 14 Wh at 2 Wh a day is 7 days.
-    // In T days of "host", "net" takes 2 T: 4 from x and 2 T - 4 from w. So "host" holds while 10 - (2 T - 4) >= T, to T = 14 / 3.
+  it("gives a lower draw only what each higher draw leaves after its own days", () => {
+    // The draw "net" takes x first, then w: 4 + 10 = 14 Wh at 2 Wh a day is 7 days. It keeps back all of x and w, so "host" holds 0 days.
     const layer: EnduranceLayer = {
       schema: SAMPLE_ENDURANCE.schema,
       levels: ["critical", "normal"],
@@ -87,9 +86,12 @@ describe("enduranceOf", () => {
     };
     const cut: CaseCuts = { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] };
     const result = enduranceOf(layer, cut, { at: AT });
-    expect(result.needs["net"]).toEqual({ days: expect.closeTo(7, 9), binding: ["w", "x"] });
-    expect(result.needs["host"]).toEqual({ days: expect.closeTo(14 / 3, 9), binding: ["w"] });
-    // With no use of w for "net", "net" holds 2 days. Its short take does not stop "host", which holds 10 days.
+    expect(result.needs["net"]).toMatchObject({ days: expect.closeTo(7, 9), binding: ["w", "x"] });
+    expect(result.needs["host"]).toMatchObject({ days: 0, binding: ["w"] });
+    expect(result.needs["net"]?.takes["x"]).toBeCloseTo(4, 9);
+    expect(result.needs["net"]?.takes["w"]).toBeCloseTo(10, 9);
+    expect(result.needs["host"]?.takes).toEqual({});
+    // With no use of w for "net", "net" holds 2 days on x. Then "host" has all of w, 10 days.
     const apart = enduranceOf({ ...layer, direct: layer.direct?.slice(0, 2) }, cut, { at: AT });
     expect(apart.needs["net"]?.days).toBeCloseTo(2, 9);
     expect(apart.needs["host"]?.days).toBeCloseTo(10, 9);
@@ -125,13 +127,76 @@ describe("the laws of enduranceOf", () => {
     );
   });
 
-  it("never gives a draw less when a store is larger", () => {
+  it("never gives the first draw less when a store is larger", () => {
+    // A lower draw can get less: a higher draw that holds longer keeps back more of a shared input.
     fc.assert(
       fc.property(fc.integer({ min: 0, max: SAMPLE_ENDURANCE.stores.length - 1 }), fc.double({ min: 0, max: 100, noNaN: true }), (index, more) => {
         const larger: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => (at === index ? { ...store, amount: store.amount + more } : store)) };
         const base = enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT });
         const got = enduranceOf(larger, storm, { at: AT });
-        for (const [need, held] of Object.entries(base.needs)) expect(got.needs[need]?.days ?? 0).toBeGreaterThanOrEqual(held.days - 1e-6);
+        const [need, held] = Object.entries(base.needs)[0] ?? ["", { days: 0 }];
+        expect(got.needs[need]?.days ?? 0).toBeGreaterThanOrEqual(held.days - 1e-6);
+      }),
+    );
+  });
+});
+
+describe("the takes of a case", () => {
+  /**
+   * This function gives the need that the takes of a draw give: the direct takes times their amount, and the runs of each converter times its gift.
+   * Each resource of the takes is in one way of the need only, so the takes tell the runs of each converter.
+   */
+  function given(layer: EnduranceLayer, need: string, takes: Readonly<Record<string, number>>): number {
+    const direct = (layer.direct ?? []).filter((use) => use.need === need);
+    const converters = (layer.converters ?? []).filter((converter) => converter.gives.need === need);
+    let total = direct.reduce((sum, use) => sum + (takes[use.resource] ?? 0) * use.amount, 0);
+    for (const converter of converters) {
+      const runs = converter.takes.map((input) => (takes[input.resource] ?? 0) / input.amount);
+      for (const run of runs) expect(run, converter.id).toBeCloseTo(runs[0] ?? 0, 6);
+      total += (runs[0] ?? 0) * converter.gives.amount;
+    }
+    return total;
+  }
+
+  /** This function tells if the takes of all the draws of a case are not more than the stores, and if each draw gets its days times its demand. */
+  function takesFit(layer: EnduranceLayer, caseCuts: CaseCuts, options: { stack?: Stack } = {}): void {
+    const result = enduranceOf(layer, caseCuts, { at: AT, ...options });
+    const stores = storeAmounts(layer, AT, caseStopped(caseCuts, options));
+    const total = new Map<string, number>();
+    for (const held of Object.values(result.needs)) for (const [resource, amount] of Object.entries(held.takes)) total.set(resource, (total.get(resource) ?? 0) + amount);
+    for (const [resource, taken] of total) expect(taken, resource).toBeLessThanOrEqual((stores.get(resource) ?? 0) * (1 + 1e-9) + 1e-9);
+    for (const draw of layer.draws) {
+      const held = result.needs[draw.need];
+      if (held === undefined) continue;
+      const want = held.days * drawDemand(draw, caseCuts);
+      expect(Math.abs(given(layer, draw.need, held.takes) - want), draw.need).toBeLessThanOrEqual(1e-6 * Math.max(1, want));
+    }
+  }
+
+  it("never takes more than the stores in the storm, also when each store is smaller", () => {
+    fc.assert(
+      fc.property(fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { minLength: SAMPLE_ENDURANCE.stores.length, maxLength: SAMPLE_ENDURANCE.stores.length }), (parts) => {
+        takesFit({ ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => ({ ...store, amount: store.amount * (parts[at] ?? 1) })) }, storm);
+      }),
+    );
+  });
+
+  it("never takes more than the stores with draws out of level order, a shared converter input and a store on a cut part", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 20, noNaN: true }), fc.double({ min: 0, max: 20, noNaN: true }), fc.double({ min: 0, max: 20, noNaN: true }), (w, x, y) => {
+        const layer: EnduranceLayer = {
+          schema: SAMPLE_ENDURANCE.schema,
+          levels: ["critical", "normal"],
+          resources: [{ code: "w", unit: "Wh" }, { code: "x", unit: "Wh" }],
+          stores: [{ id: "a", resource: "w", amount: w }, { id: "b", resource: "x", amount: x }, { id: "c", resource: "w", amount: y, part: "grid" }],
+          draws: [
+            { need: "host", level: "normal", perDay: 1, supply: "grid" },
+            { need: "net", level: "critical", perDay: 2, supply: "grid" },
+          ],
+          direct: [{ resource: "w", need: "host", amount: 1 }],
+          converters: [{ id: "mix", takes: [{ resource: "x", amount: 1 }, { resource: "w", amount: 1 }], gives: { need: "net", amount: 1 } }],
+        };
+        takesFit(layer, { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] });
       }),
     );
   });

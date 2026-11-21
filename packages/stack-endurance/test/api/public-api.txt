@@ -20,12 +20,14 @@ EnduranceCode: build/index.d.ts#EnduranceCode
 EnduranceFault: build/index.d.ts#EnduranceFault
 EnduranceLayer: build/layer.chunk.d.ts#EnduranceLayer
 IsoDate: build/layer.chunk.d.ts#IsoDate
+MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
 Prior: build/layer.chunk.d.ts#Prior
 Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
 SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
 Shortfall: build/index.d.ts#Shortfall
 ShortfallOptions: build/index.d.ts#ShortfallOptions
+StopCurves: build/index.d.ts#StopCurves
 Store: build/layer.chunk.d.ts#Store
 Survival: build/layer.chunk.d.ts#Survival
 YearShortfall: build/index.d.ts#YearShortfall
@@ -36,13 +38,19 @@ checkEndurance: build/index.d.ts#checkEndurance
 curveFault: build/index.d.ts#curveFault
 drawDemand: build/index.d.ts#drawDemand
 enduranceOf: build/index.d.ts#enduranceOf
+eventStop: build/index.d.ts#eventStop
 hasEnduranceError: build/index.d.ts#hasEnduranceError
 joinEndurance: build/index.d.ts#joinEndurance
+longestStop: build/index.d.ts#longestStop
+minimalStops: build/index.d.ts#minimalStops
+stopCurves: build/index.d.ts#stopCurves
 storeAmounts: build/index.d.ts#storeAmounts
 survivalAt: build/index.d.ts#survivalAt
 survivalQuantile: build/index.d.ts#survivalQuantile
 tailDays: build/index.d.ts#tailDays
+upperStop: build/index.d.ts#upperStop
 yearChance: build/index.d.ts#yearChance
+yearRate: build/index.d.ts#yearRate
 yearShortfall: build/index.d.ts#yearShortfall
 
 ## ./schema (build/schema.d.ts): names
@@ -78,6 +86,9 @@ export interface EnduranceFault extends Fault {
   readonly code: EnduranceCode;
 }
 
+### build/index.d.ts#MINIMAL_STOP_CUTS
+export declare const MINIMAL_STOP_CUTS = 12;
+
 ### build/index.d.ts#SAMPLE_ENDURANCE
 export declare const SAMPLE_ENDURANCE: EnduranceLayer;
 
@@ -87,7 +98,9 @@ export declare const SAMPLE_ENDURANCE_STACK: Stack;
 ### build/index.d.ts#Shortfall
 export interface Shortfall {
   readonly levels: Readonly<Record<string, number>>;
+  readonly upper: Readonly<Record<string, number>>;
   readonly unread: readonly string[];
+  readonly coarse: readonly string[];
 }
 
 ### build/index.d.ts#ShortfallOptions
@@ -95,12 +108,19 @@ export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
   readonly horizon?: number | undefined;
 }
 
+### build/index.d.ts#StopCurves
+export interface StopCurves {
+  readonly event: Survival;
+  readonly upper: Survival;
+  readonly coarse: boolean;
+}
+
 ### build/index.d.ts#YearShortfall
 export interface YearShortfall extends Shortfall {
   readonly place: string;
   readonly cases: readonly {
     readonly case: string;
-    readonly chance: number;
+    readonly rate: number;
     readonly endurance: Endurance;
     readonly shortfall: Shortfall;
   }[];
@@ -127,11 +147,23 @@ export declare function drawDemand(draw: Draw, caseCuts: CaseCuts): number;
 ### build/index.d.ts#enduranceOf
 export declare function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions): Endurance;
 
+### build/index.d.ts#eventStop
+export declare function eventStop(curves: readonly Survival[], stops: (cuts: readonly number[]) => boolean): Survival;
+
 ### build/index.d.ts#hasEnduranceError
 export declare function hasEnduranceError(faults: readonly EnduranceFault[]): boolean;
 
 ### build/index.d.ts#joinEndurance
 export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;
+
+### build/index.d.ts#longestStop
+export declare function longestStop(curves: readonly Survival[]): Survival;
+
+### build/index.d.ts#minimalStops
+export declare function minimalStops(count: number, stops: (cuts: readonly number[]) => boolean): number[][] | undefined;
+
+### build/index.d.ts#stopCurves
+export declare function stopCurves(caseCuts: CaseCuts, draw: Draw, options?: Pick<CaseOptions, "stack" | "down">): StopCurves | undefined;
 
 ### build/index.d.ts#storeAmounts
 export declare function storeAmounts(layer: EnduranceLayer, at: IsoDate, stoppedParts?: ReadonlySet<string>): Map<string, number>;
@@ -145,8 +177,14 @@ export declare function survivalQuantile(curve: Survival, chance: number): numbe
 ### build/index.d.ts#tailDays
 export declare function tailDays(curve: Survival, from: number, to?: number): number;
 
+### build/index.d.ts#upperStop
+export declare function upperStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival;
+
 ### build/index.d.ts#yearChance
 export declare function yearChance(prior: Prior): number;
+
+### build/index.d.ts#yearRate
+export declare function yearRate(prior: Prior): number;
 
 ### build/index.d.ts#yearShortfall
 export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall;
@@ -202,6 +240,7 @@ interface Draw {
 interface DrawEndurance {
   readonly days: number;
   readonly binding: readonly string[];
+  readonly takes: Readonly<Record<string, number>>;
 }
 
 ### build/layer.chunk.d.ts#ENDURANCE_SCHEMA

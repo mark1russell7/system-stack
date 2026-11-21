@@ -19,7 +19,7 @@ export const SAMPLE_ENDURANCE_STACK: Stack = {
  * The endurance layer of the sample.
  *
  * - The drinking water holds 75.7 L / 11.355 L a day = 6.667 days.
- * - The food holds 5.459 days. The rice needs 2 L of water for each kg, and the drinking water comes first. So the water and the cans are used up together.
+ * - The food holds 4800 / 5400 = 0.889 days. The rice needs 2 L of water for each kg, and the drinking water keeps back all the water.
  * - The power holds 1000 Wh / 150 Wh a day = 6.667 days.
  * - The filled bottles are past their due date, so they give nothing.
  */
