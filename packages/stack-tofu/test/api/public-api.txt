@@ -83,7 +83,7 @@ isZeroOrMore: build/check.chunk.d.ts#isZeroOrMore
 joinTofu: build/index.d.ts#joinTofu
 layerResources: build/index.d.ts#layerResources
 localAddress: build/index.d.ts#localAddress
-neededParts: build/index.d.ts#neededParts
+neededParts: @mark1russell7/system-stack#neededParts (external)
 paramOf: build/index.d.ts#paramOf
 partName: build/layer.chunk.d.ts#partName
 pathText: build/index.d.ts#pathText
@@ -322,9 +322,6 @@ export declare function layerResources(layer: TofuLayer): readonly Resource[];
 
 ### build/index.d.ts#localAddress
 export declare function localAddress(resource: GroupResource): string;
-
-### build/index.d.ts#neededParts
-export declare function neededParts(stack: Stack, part: string): Set<string>;
 
 ### build/index.d.ts#paramOf
 export declare function paramOf(value: TofuObject): string | undefined;

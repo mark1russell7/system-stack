@@ -58,6 +58,7 @@ joinSetting: @mark1russell7/coeval/layers#joinSetting (external)
 joinStacks: build/index.d.ts#joinStacks
 needHolds: build/index.d.ts#needHolds
 needParts: build/known.chunk.d.ts#needParts
+neededParts: build/known.chunk.d.ts#neededParts
 partNeeds: build/known.chunk.d.ts#partNeeds
 partsById: build/known.chunk.d.ts#partsById
 pathSets: build/index.d.ts#pathSets
@@ -282,6 +283,9 @@ declare function isAllOf(need: Need): need is AllOf;
 
 ### build/known.chunk.d.ts#needParts
 declare function needParts(need: Need): string[];
+
+### build/known.chunk.d.ts#neededParts
+declare function neededParts(stack: Stack, part: string): Set<string>;
 
 ### build/known.chunk.d.ts#partNeeds
 declare function partNeeds(part: Part): string[];

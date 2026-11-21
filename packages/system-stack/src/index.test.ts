@@ -9,7 +9,7 @@ import * as schema from "./schema.ts";
 describe("the root entry", () => {
   it("has the format, the question of what works, the check and the sample", () => {
     expect(entry.STACK_SCHEMA).toBe("stack/1");
-    for (const name of ["needParts", "partNeeds", "partsById", "needHolds", "working", "works", "stopped", "checkStack"] as const) {
+    for (const name of ["needParts", "partNeeds", "partsById", "neededParts", "needHolds", "working", "works", "stopped", "checkStack"] as const) {
       expect(entry[name]).toBeTypeOf("function");
     }
     expect(entry.SAMPLE_STACK.schema).toBe(entry.STACK_SCHEMA);

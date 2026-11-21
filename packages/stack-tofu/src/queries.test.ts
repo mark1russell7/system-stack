@@ -1,4 +1,4 @@
-import { SAMPLE_STACK, STACK_SCHEMA, type Need, type Part, type Stack } from "@mark1russell7/system-stack";
+import { neededParts as coreNeededParts, SAMPLE_STACK, STACK_SCHEMA, type Need, type Part, type Stack } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { TOFU_SCHEMA, type Resource, type TofuLayer, type TofuObject } from "./layer.ts";
 import { dependsOn, firstResources, neededParts, resourceCycles, resourceRefs, resourcesByPart } from "./queries.ts";
@@ -44,23 +44,8 @@ describe("resourceRefs", () => {
 });
 
 describe("neededParts", () => {
-  const needs = stack(part("a", "b", { any: ["c", { all: ["d"] }] }), part("b", "e"), part("c"), part("d"), part("e", "a"), part("f", "a"));
-
-  it("gives each part that a part needs, directly or through other parts", () => {
-    expect([...neededParts(needs, "f")].sort()).toEqual(["a", "b", "c", "d", "e"]);
-  });
-
-  it("does not give the part itself, also in a cycle of needs", () => {
-    expect([...neededParts(needs, "a")].sort()).toEqual(["b", "c", "d", "e"]);
-  });
-
-  it("gives a need that names no part of the stack", () => {
-    expect([...neededParts(stack(part("a", "missing")), "a")]).toEqual(["missing"]);
-  });
-
-  it("gives no part for a part with no needs, and for no part of the stack", () => {
-    expect(neededParts(needs, "c").size).toBe(0);
-    expect(neededParts(needs, "missing").size).toBe(0);
+  it("is the function of the core, so the API of the package does not change", () => {
+    expect(neededParts).toBe(coreNeededParts);
   });
 });
 

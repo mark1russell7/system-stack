@@ -69,13 +69,8 @@ function walkNeeds(parts: ReadonlyMap<string, Part>, from: string, stop: (id: st
   return found;
 }
 
-/**
- * This function gives the `id` of each part that a part needs, directly or through other parts.
- * The part itself is not in the result. A need that names no part of the stack is in the result.
- */
-export function neededParts(stack: Stack, part: string): Set<string> {
-  return new Set(walkNeeds(partsById(stack), part, () => false));
-}
+// The core has `neededParts` since system-stack 0.1.6. This entry gives it again, so the API of the package does not change.
+export { neededParts } from "@mark1russell7/system-stack";
 
 /**
  * This function gives the dependencies of each resource that come from the needs of the stack, by the address of the resource.
