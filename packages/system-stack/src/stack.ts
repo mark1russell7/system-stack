@@ -1,5 +1,6 @@
 // The records of a system stack. A stack is one JSON document: a list of parts, and the layers of the add-ons.
 // The core names no topic. A cost, a chance of failure and a cloud resource are records of an add-on layer.
+import { createNode, getAncestors, type DAGNode } from "@mark1russell7/collections/dag";
 
 /** The name of the format of a stack document. */
 export const STACK_SCHEMA = "stack/1";
@@ -78,4 +79,28 @@ export function partsById(stack: Stack): Map<string, Part> {
   const parts = new Map<string, Part>();
   for (const part of stack.parts) if (!parts.has(part.id)) parts.set(part.id, part);
   return parts;
+}
+
+/**
+ * This function gives the `id` of each part that a part needs, directly or through other parts.
+ *
+ * - The part itself is not in the result, also when a cycle of needs comes back to it.
+ * - A need that names no part of the stack is in the result.
+ * - For an `id` that two parts have, the needs of the first part count.
+ *
+ * The reachability comes from `getAncestors` of `@mark1russell7/collections/dag`. An add-on uses this function to put its records in the order of the needs.
+ *
+ * @param stack - The stack.
+ * @param part - The `id` of the part. An `id` that no part has gives an empty set.
+ * @returns The `id` of each needed part.
+ */
+export function neededParts(stack: Stack, part: string): Set<string> {
+  const graph = new Map<string, DAGNode>();
+  for (const [id, record] of partsById(stack)) graph.set(id, createNode(id, partNeeds(record)));
+  for (const node of [...graph.values()]) {
+    for (const id of node.dependencies) if (!graph.has(id)) graph.set(id, createNode(id));
+  }
+  const found = getAncestors(graph, part);
+  found.delete(part);
+  return found;
 }

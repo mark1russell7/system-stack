@@ -1,8 +1,8 @@
-import { partsById, type Fault, type FaultLevel, type Stack } from "@mark1russell7/system-stack";
+import { neededParts, partsById, type Fault, type FaultLevel, type Stack } from "@mark1russell7/system-stack";
 import { accountStates, isZeroOrMore, type Budget } from "./cost.ts";
 import { BUILTIN_PROVIDER, isBuiltin, providerAddress, resourceAddress, resourceName, resourceProvider, typeProvider, type Provider, type TofuLayer, type TofuObject } from "./layer.ts";
 import { groupFaults, layerResources } from "./groups.ts";
-import { firstResources, neededParts, resourceCycles } from "./queries.ts";
+import { firstResources, resourceCycles } from "./queries.ts";
 import { isForm, NAME_FORM, PATH_FORM, pathText, PROVIDER_FORM, refParts, SOURCE_FORM, TYPE_FORM, valueUses, VERSION_FORM } from "./values.ts";
 
 // The gate of the OpenTofu layer. A gate that passes tells that the files are safe to write:

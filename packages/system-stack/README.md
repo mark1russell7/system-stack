@@ -226,6 +226,8 @@ checkStackLayers({ schema: "stack/1", parts: [{ id: "a", kind: "host" }], layers
 
 `readLayer(stack, addOn)` gives the layer of one add-on, for a query of a host. A stack without the layer gives `undefined`.
 
+`neededParts(stack, part)` gives the `id` of each part that a part needs, directly or through other parts. An add-on uses it to put its records in the order of the needs. The part itself is not in the result, also in a cycle of needs.
+
 The contract of the layers is the entry `@mark1russell7/coeval/layers`. The core gives its names again: `AddOn`, `LayerFault`, `LayerFinding`, `LayerParse`, `readLayer` and `isLayerName`.
 
 ## One stack from the documents of some owners

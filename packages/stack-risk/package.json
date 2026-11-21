@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-risk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The risks of a system stack as queries: the parts whose failure stops a function, the failures that a function survives, the chance that it works, and a gate. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
