@@ -113,7 +113,7 @@ export interface Prior {
 /** The days that one draw holds, and the resources that are used up at that time. */
 export interface DrawEndurance {
   readonly days: number;
-  /** The resources that are used up at `days`, in the order of their codes. One more unit of each of them gives more days. */
+  /** The inputs of the draw that are used up at `days`, in the order of their codes. A higher draw can use up an input first. */
   readonly binding: readonly string[];
 }
 

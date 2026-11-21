@@ -16,6 +16,18 @@ describe("checkEndurance", () => {
     expect(checkEndurance(layer, SAMPLE_ENDURANCE_STACK).filter((fault) => fault.code === "endurance-twice").map((fault) => fault.at)).toEqual(["life", "jugs"]);
   });
 
+  it("finds a resource twice in the takes of a converter, and a part twice in the cuts of a case", () => {
+    const converter = SAMPLE_ENDURANCE.converters?.[0];
+    const storm = SAMPLE_ENDURANCE.cases?.[0];
+    if (converter === undefined || storm === undefined) throw new Error("The sample has no converter or no case.");
+    const layer: EnduranceLayer = {
+      ...SAMPLE_ENDURANCE,
+      converters: [{ ...converter, takes: [...converter.takes, { resource: "water.stored", amount: 1 }] }],
+      cases: [{ ...storm, cuts: [...storm.cuts, { ...storm.cuts[0], part: "grid", title: "Again", duration: [[0, 1], [1, 0]], source: "s" }] }, ...(SAMPLE_ENDURANCE.cases?.slice(1) ?? [])],
+    };
+    expect(codes(layer).filter((code) => code === "endurance-twice")).toHaveLength(2);
+  });
+
   it("finds an unknown level, resource and part", () => {
     const layer: EnduranceLayer = {
       ...SAMPLE_ENDURANCE,

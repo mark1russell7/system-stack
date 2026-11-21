@@ -4,11 +4,15 @@ import { describe, expect, it } from "vitest";
 import { enduranceOf } from "./endurance.ts";
 import type { CaseCuts, Survival } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
-import { caseShortfall, survivalAt, survivalQuantile, tailDays, yearChance, yearShortfall } from "./shortfall.ts";
+import { curveFault } from "./check.ts";
+import { caseShortfall, longestStop, stopCurve, survivalAt, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
 
 const AT = "2026-12-01";
 const ROAD: Survival = [[0, 1], [1, 0.6], [3, 0.2], [10, 0]];
 const storm = SAMPLE_ENDURANCE.cases?.find((item) => item.case === "storm") as CaseCuts;
+const GRID: Survival = storm.cuts.find((cut) => cut.part === "grid")?.duration ?? [];
+const MAIN: Survival = storm.cuts.find((cut) => cut.part === "water-main")?.duration ?? [];
+const MAIN_NEEDS_GRID: Stack = { ...SAMPLE_ENDURANCE_STACK, parts: SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: ["grid"] } : part)) };
 
 describe("the survival curve", () => {
   it("is linear between its points, 1 before the start and 0 after the end", () => {
@@ -75,17 +79,65 @@ describe("caseShortfall", () => {
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }));
     expect(shortfall.unread).toEqual([]);
     expect(Object.keys(shortfall.levels)).toEqual(["life", "health", "comfort"]);
-    // The water main stops for 6.667 days or more with a chance of 0.3 (7 - 6.667) / 5: the tail is 0.0033 days, for 3 users.
-    expect(shortfall.levels["life"]).toBeCloseTo(3 * tailDays([[0, 1], [2, 0.3], [7, 0]], 75.7 / 11.355), 9);
+    // The water holds 20/3 days. The main stops longer with a chance of 0.3 (7 - 20/3) / 5 = 0.02. The tail is 0.02 / 2 x 1/3 = 1/300 days, for 3 users.
+    expect(shortfall.levels["life"]).toBeCloseTo(0.01, 9);
   });
 
-  it("gives a draw whose supply stops only through the stack as no read", () => {
-    const stack: Stack = { ...SAMPLE_ENDURANCE_STACK, parts: SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: ["grid"] } : part)) };
+  it("uses the curve of a cut that stops the supply through the stack", () => {
     const gridOnly: CaseCuts = { ...storm, cuts: storm.cuts.filter((cut) => cut.part === "grid") };
-    const shortfall = caseShortfall(SAMPLE_ENDURANCE, gridOnly, enduranceOf(SAMPLE_ENDURANCE, gridOnly, { at: AT, stack }), { stack });
+    const endurance = enduranceOf(SAMPLE_ENDURANCE, gridOnly, { at: AT, stack: MAIN_NEEDS_GRID });
+    const shortfall = caseShortfall(SAMPLE_ENDURANCE, gridOnly, endurance, { stack: MAIN_NEEDS_GRID });
+    expect(shortfall.unread).toEqual([]);
+    // The grid curve at 20/3 days is 0.36 - 0.347 x 17/18 = 0.03228. The tail is 0.00755 to 7 days and 0.1495 after 7 days: 0.15705 days, for 3 users.
+    expect(shortfall.levels["life"]).toBeCloseTo(0.4711, 4);
+  });
+
+  it("uses the longest cut when two cuts stop the supply", () => {
+    const drink = SAMPLE_ENDURANCE.draws.find((item) => item.need === "hydration.drink");
+    if (drink === undefined) throw new Error("The sample has no drink draw.");
+    expect(stopCurve(storm, drink, { stack: MAIN_NEEDS_GRID })).toEqual(longestStop([GRID, MAIN]));
+    expect(stopCurve(storm, drink)).toEqual(MAIN);
+    // Without the stack, the grid cut does not stop the water main.
+    expect(stopCurve({ ...storm, cuts: storm.cuts.filter((cut) => cut.part === "grid") }, drink)).toBeUndefined();
+  });
+
+  it("gives a draw that only a part of down stops as no read", () => {
+    const none: CaseCuts = { case: "none", title: "None", cuts: [] };
+    const shortfall = caseShortfall(SAMPLE_ENDURANCE, none, enduranceOf(SAMPLE_ENDURANCE, none, { at: AT, down: ["water-main"] }), { down: ["water-main"] });
     expect(shortfall.unread).toEqual(["hydration.drink"]);
     expect(shortfall.levels["life"]).toBe(0);
-    expect(shortfall.levels["comfort"]).toBeGreaterThan(0);
+  });
+});
+
+describe("longestStop", () => {
+  const curve = fc
+    .array(fc.tuple(fc.double({ min: 0.01, max: 5, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true })), { minLength: 1, maxLength: 5 })
+    .map((steps): Survival => {
+      let t = 0;
+      let p = 1;
+      const out: [number, number][] = [[0, 1]];
+      for (const [dt, keep] of steps) {
+        t += dt;
+        p *= keep;
+        out.push([t, p]);
+      }
+      out.push([t + 1, 0]);
+      return out;
+    });
+
+  it("gives at each time the largest chance of the curves, and a curve that the gate passes", () => {
+    fc.assert(
+      fc.property(fc.array(curve, { minLength: 1, maxLength: 4 }), fc.double({ min: 0, max: 30, noNaN: true }), (curves, days) => {
+        const longest = longestStop(curves);
+        expect(survivalAt(longest, days)).toBeCloseTo(Math.max(...curves.map((item) => survivalAt(item, days))), 9);
+        expect(curveFault(longest)).toBeUndefined();
+        for (const item of curves) expect(tailDays(longest, days)).toBeGreaterThanOrEqual(tailDays(item, days) - 1e-9);
+      }),
+    );
+  });
+
+  it("refuses an empty list", () => {
+    expect(() => longestStop([])).toThrow(RangeError);
   });
 });
 
@@ -94,9 +146,12 @@ describe("yearShortfall", () => {
     const year = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT });
     expect(year.place).toBe("home");
     expect(year.unread).toEqual([]);
-    expect(year.levels["life"]).toBeCloseTo(0.0055, 3);
-    expect(year.levels["health"]).toBeCloseTo(0.4866, 3);
-    expect(year.levels["comfort"]).toBeCloseTo(0.2594, 3);
+    // The storm comes 0.8 times a year. The food holds only 0.889 days, because the drinking water keeps back all the water.
+    expect(year.levels["life"]).toBeCloseTo(0.008, 3);
+    expect(year.levels["health"]).toBeCloseTo(3.7659, 3);
+    expect(year.levels["comfort"]).toBeCloseTo(0.3769, 3);
+    expect(year.cases.map((item) => item.rate)).toEqual([0.8, 0.003]);
+    expect(yearRate({ case: "storm", place: "home", perYear: 0.8, reach: 0.5, source: "s", asOf: "2026-01-01" })).toBeCloseTo(0.4, 12);
     expect(year.cases.map((item) => item.case)).toEqual(["storm", "fire"]);
     expect(year.cases[1]?.shortfall.levels).toEqual({ life: 0, health: 0, comfort: 0 });
   });

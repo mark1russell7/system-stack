@@ -36,8 +36,8 @@ describe("enduranceOf", () => {
     expect(Object.keys(result.needs)).toEqual(["hydration.drink", "food.energy", "power.electric"]);
     expect(result.needs["hydration.drink"]?.days).toBeCloseTo(6.6667, 3);
     expect(result.needs["hydration.drink"]?.binding).toEqual(["water.stored"]);
-    // The rice needs water, and the drinking water comes first: 4800 + 3600 (75.7 - 11.355 T) / 2 = 5400 T gives T = 5.459 days.
-    expect(result.needs["food.energy"]?.days).toBeCloseTo(5.4592, 3);
+    // The drinking water keeps back 6.667 days x 11.355 L, which is all the water. So the rice gives nothing, and the cans feed 4800 / 5400 days.
+    expect(result.needs["food.energy"]?.days).toBeCloseTo(4800 / 5400, 9);
     expect(result.needs["food.energy"]?.binding).toEqual(["food.ready", "water.stored"]);
     expect(result.needs["power.electric"]?.days).toBeCloseTo(6.6667, 3);
     expect(result.needs["power.electric"]?.binding).toEqual(["energy.battery"]);
@@ -71,9 +71,8 @@ describe("enduranceOf", () => {
     expect(result.needs["food.energy"]).toEqual({ days: 0, binding: ["food.grain-dry", "food.ready", "fuel.propane", "water.stored"] });
   });
 
-  it("gives a lower draw what a higher draw leaves after the same days", () => {
-    // The draw "net" takes x first, then w: 4 + 10 = 14 Wh at 2 Wh a day is 7 days.
-    // In T days of "host", "net" takes 2 T: 4 from x and 2 T - 4 from w. So "host" holds while 10 - (2 T - 4) >= T, to T = 14 / 3.
+  it("gives a lower draw only what each higher draw leaves after its own days", () => {
+    // The draw "net" takes x first, then w: 4 + 10 = 14 Wh at 2 Wh a day is 7 days. It keeps back all of x and w, so "host" holds 0 days.
     const layer: EnduranceLayer = {
       schema: SAMPLE_ENDURANCE.schema,
       levels: ["critical", "normal"],
@@ -88,8 +87,8 @@ describe("enduranceOf", () => {
     const cut: CaseCuts = { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] };
     const result = enduranceOf(layer, cut, { at: AT });
     expect(result.needs["net"]).toEqual({ days: expect.closeTo(7, 9), binding: ["w", "x"] });
-    expect(result.needs["host"]).toEqual({ days: expect.closeTo(14 / 3, 9), binding: ["w"] });
-    // With no use of w for "net", "net" holds 2 days. Its short take does not stop "host", which holds 10 days.
+    expect(result.needs["host"]).toEqual({ days: 0, binding: ["w"] });
+    // With no use of w for "net", "net" holds 2 days on x. Then "host" has all of w, 10 days.
     const apart = enduranceOf({ ...layer, direct: layer.direct?.slice(0, 2) }, cut, { at: AT });
     expect(apart.needs["net"]?.days).toBeCloseTo(2, 9);
     expect(apart.needs["host"]?.days).toBeCloseTo(10, 9);
@@ -125,13 +124,52 @@ describe("the laws of enduranceOf", () => {
     );
   });
 
-  it("never gives a draw less when a store is larger", () => {
+  it("never gives the first draw less when a store is larger", () => {
+    // A lower draw can get less: a higher draw that holds longer keeps back more of a shared input.
     fc.assert(
       fc.property(fc.integer({ min: 0, max: SAMPLE_ENDURANCE.stores.length - 1 }), fc.double({ min: 0, max: 100, noNaN: true }), (index, more) => {
         const larger: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => (at === index ? { ...store, amount: store.amount + more } : store)) };
         const base = enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT });
         const got = enduranceOf(larger, storm, { at: AT });
-        for (const [need, held] of Object.entries(base.needs)) expect(got.needs[need]?.days ?? 0).toBeGreaterThanOrEqual(held.days - 1e-6);
+        const [need, held] = Object.entries(base.needs)[0] ?? ["", { days: 0 }];
+        expect(got.needs[need]?.days ?? 0).toBeGreaterThanOrEqual(held.days - 1e-6);
+      }),
+    );
+  });
+});
+
+describe("the takes of a case", () => {
+  /** This function replays the takes of the draws at their days, in the order of `enduranceOf`, and gives the take of each resource. */
+  function totalTakes(layer: EnduranceLayer, caseCuts: CaseCuts): Map<string, number> {
+    const result = enduranceOf(layer, caseCuts, { at: AT });
+    const left = storeAmounts(layer, AT);
+    const start = new Map(left);
+    for (const draw of layer.draws) {
+      const held = result.needs[draw.need];
+      if (held === undefined) continue;
+      let rest = held.days * draw.perDay * (caseCuts.factors?.[draw.need] ?? 1);
+      for (const use of (layer.direct ?? []).filter((item) => item.need === draw.need)) {
+        const got = Math.min(rest, (left.get(use.resource) ?? 0) * use.amount);
+        left.set(use.resource, (left.get(use.resource) ?? 0) - got / use.amount);
+        rest -= got;
+      }
+      for (const converter of (layer.converters ?? []).filter((item) => item.gives.need === draw.need)) {
+        let runs = rest / converter.gives.amount;
+        for (const input of converter.takes) runs = Math.min(runs, (left.get(input.resource) ?? 0) / input.amount);
+        for (const input of converter.takes) left.set(input.resource, (left.get(input.resource) ?? 0) - runs * input.amount);
+        rest -= runs * converter.gives.amount;
+      }
+      expect(rest, draw.need).toBeLessThanOrEqual(1e-6 * Math.max(1, held.days * draw.perDay));
+    }
+    return new Map([...start].map(([resource, amount]) => [resource, amount - (left.get(resource) ?? 0)]));
+  }
+
+  it("never takes more than the stores in the storm, also when each store is smaller", () => {
+    fc.assert(
+      fc.property(fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { minLength: SAMPLE_ENDURANCE.stores.length, maxLength: SAMPLE_ENDURANCE.stores.length }), (parts) => {
+        const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => ({ ...store, amount: store.amount * (parts[at] ?? 1) })) };
+        const stores = storeAmounts(layer, AT);
+        for (const [resource, taken] of totalTakes(layer, storm)) expect(taken).toBeLessThanOrEqual((stores.get(resource) ?? 0) * (1 + 1e-6) + 1e-9);
       }),
     );
   });

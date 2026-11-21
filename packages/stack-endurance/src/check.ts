@@ -7,7 +7,7 @@ import type { EnduranceLayer, Survival } from "./layer.ts";
  * These are the codes of the gate. Each code is an error, except `endurance-no-way`, which is a warning.
  *
  * - `endurance-twice`: two or more records of one list have one key. A key is a level, a resource, a store, a need, a converter or a case.
- *   The key of a prior is its case and its place.
+ *   The key of a prior is its case and its place. A converter takes each resource on one line, and a case cuts each part one time.
  * - `endurance-level-unknown`: the level of a draw is not a level of the layer.
  * - `endurance-resource-unknown`: a store, a use or a converter names a resource that the layer does not have.
  * - `endurance-part-unknown`: a supply, a device, the part of a store or a cut is not a part of the base stack.
@@ -134,6 +134,7 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     range(at, "amount", use.amount);
   }
   for (const converter of converters) {
+    once(`resources of the converter "${converter.id}"`, converter.takes.map((input) => input.resource));
     for (const input of converter.takes) {
       resource(converter.id, input.resource);
       range(converter.id, "amount", input.amount);
@@ -144,6 +145,7 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
   }
   const caseCodes = new Set(cases.map((item) => item.case));
   for (const item of cases) {
+    once(`cuts of the case "${item.case}"`, item.cuts.map((cut) => cut.part));
     for (const cut of item.cuts) {
       const at = `${item.case}/${cut.part}`;
       part(at, "cut", cut.part);

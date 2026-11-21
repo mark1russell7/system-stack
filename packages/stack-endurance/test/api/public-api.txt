@@ -38,11 +38,14 @@ drawDemand: build/index.d.ts#drawDemand
 enduranceOf: build/index.d.ts#enduranceOf
 hasEnduranceError: build/index.d.ts#hasEnduranceError
 joinEndurance: build/index.d.ts#joinEndurance
+longestStop: build/index.d.ts#longestStop
+stopCurve: build/index.d.ts#stopCurve
 storeAmounts: build/index.d.ts#storeAmounts
 survivalAt: build/index.d.ts#survivalAt
 survivalQuantile: build/index.d.ts#survivalQuantile
 tailDays: build/index.d.ts#tailDays
 yearChance: build/index.d.ts#yearChance
+yearRate: build/index.d.ts#yearRate
 yearShortfall: build/index.d.ts#yearShortfall
 
 ## ./schema (build/schema.d.ts): names
@@ -100,7 +103,7 @@ export interface YearShortfall extends Shortfall {
   readonly place: string;
   readonly cases: readonly {
     readonly case: string;
-    readonly chance: number;
+    readonly rate: number;
     readonly endurance: Endurance;
     readonly shortfall: Shortfall;
   }[];
@@ -133,6 +136,12 @@ export declare function hasEnduranceError(faults: readonly EnduranceFault[]): bo
 ### build/index.d.ts#joinEndurance
 export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;
 
+### build/index.d.ts#longestStop
+export declare function longestStop(curves: readonly Survival[]): Survival;
+
+### build/index.d.ts#stopCurve
+export declare function stopCurve(caseCuts: CaseCuts, draw: Draw, options?: Pick<CaseOptions, "stack" | "down">): Survival | undefined;
+
 ### build/index.d.ts#storeAmounts
 export declare function storeAmounts(layer: EnduranceLayer, at: IsoDate, stoppedParts?: ReadonlySet<string>): Map<string, number>;
 
@@ -147,6 +156,9 @@ export declare function tailDays(curve: Survival, from: number, to?: number): nu
 
 ### build/index.d.ts#yearChance
 export declare function yearChance(prior: Prior): number;
+
+### build/index.d.ts#yearRate
+export declare function yearRate(prior: Prior): number;
 
 ### build/index.d.ts#yearShortfall
 export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall;

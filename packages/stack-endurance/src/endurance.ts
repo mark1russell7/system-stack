@@ -82,6 +82,13 @@ function waysOf(layer: EnduranceLayer, need: string, stoppedParts: ReadonlySet<s
   };
 }
 
+/** This function gives the amount of each resource that one run of a converter takes. Two lines of one resource add. */
+function inputsOf(converter: Converter): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const input of converter.takes) if (input.amount > 0) out.set(input.resource, (out.get(input.resource) ?? 0) + input.amount);
+  return out;
+}
+
 /**
  * This function takes an amount of a need from the resources in `left`: the direct uses first, then the converters.
  * It changes `left`, and it gives the amount that it could not take.
@@ -97,10 +104,11 @@ function take(left: Map<string, number>, ways: Ways, amount: number): number {
   }
   for (const converter of ways.converters) {
     if (rest <= 0) break;
-    if (!converter.takes.some((input) => input.amount > 0)) continue;
+    const inputs = inputsOf(converter);
+    if (inputs.size === 0) continue;
     let runs = rest / converter.gives.amount;
-    for (const input of converter.takes) if (input.amount > 0) runs = Math.min(runs, (left.get(input.resource) ?? 0) / input.amount);
-    for (const input of converter.takes) left.set(input.resource, (left.get(input.resource) ?? 0) - runs * input.amount);
+    for (const [resource, each] of inputs) runs = Math.min(runs, (left.get(resource) ?? 0) / each);
+    for (const [resource, each] of inputs) left.set(resource, (left.get(resource) ?? 0) - runs * each);
     rest -= runs * converter.gives.amount;
   }
   return Math.max(0, rest);
@@ -118,8 +126,8 @@ const USED_UP = 1e-9;
  * - A draw takes from the stores only when the case stops its supply part. Each other draw holds without end, and the result leaves it out.
  * - The demand of a draw for each day is its rate times the factor of the case.
  * - The draws take the resources in the order of their level, then of their codes. A draw takes from its direct uses first, then from its converters.
- * - The days of a draw are the largest `T` at which the stores give `T` days of its demand. Each higher draw takes its demand first, for `T` days or for its own days when they are fewer.
- * - A higher draw takes what it can in the days of a lower draw. Its own days are fixed, so a short take does not stop the lower draw.
+ * - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
+ * - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
  * - A converter whose device stops gives nothing. A store whose part stops gives nothing.
  *
  * The function is pure. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
@@ -139,7 +147,7 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
     const demand = drawDemand(draw, caseCuts);
     const after = (days: number): { left: Map<string, number>; short: number } => {
       const left = new Map(start);
-      for (const higher of done) take(left, higher.ways, Math.min(days, higher.days) * higher.demand);
+      for (const higher of done) take(left, higher.ways, higher.days * higher.demand);
       return { left, short: take(left, ways, days * demand) };
     };
     const fits = (days: number): boolean => after(days).short <= TOLERANCE * days * demand;
@@ -168,7 +176,7 @@ function capacity(start: ReadonlyMap<string, number>, ways: Ways): number {
   for (const use of ways.direct) total += (start.get(use.resource) ?? 0) * use.amount;
   for (const converter of ways.converters) {
     let runs = Infinity;
-    for (const input of converter.takes) if (input.amount > 0) runs = Math.min(runs, (start.get(input.resource) ?? 0) / input.amount);
+    for (const [resource, each] of inputsOf(converter)) runs = Math.min(runs, (start.get(resource) ?? 0) / each);
     if (Number.isFinite(runs)) total += runs * converter.gives.amount;
   }
   return total;

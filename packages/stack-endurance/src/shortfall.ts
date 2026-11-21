@@ -1,5 +1,5 @@
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
-import type { CaseCuts, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
+import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 
 // The shortfall: the user-days in which a draw does not get its need, for one case and for one year.
 
@@ -66,12 +66,67 @@ export function yearChance(prior: Prior): number {
   return 1 - Math.exp(-prior.perYear * prior.reach);
 }
 
+/** This function gives the expected count of the events of a case at its place in one year: `perYear * reach`. */
+export function yearRate(prior: Prior): number {
+  return prior.perYear * prior.reach;
+}
+
+/**
+ * This function gives the curve of the longest of some stops: at each time, the largest chance of the curves.
+ * The stops of one case come from one event, so the longest stop ends last. The result is a survival curve.
+ *
+ * @param curves - The curves, each one good for `checkEndurance`
+ * @throws RangeError when there is no curve
+ */
+export function longestStop(curves: readonly Survival[]): Survival {
+  const first = curves[0];
+  if (first === undefined) throw new RangeError("longestStop needs one or more curves.");
+  if (curves.length === 1) return first;
+  const times = [...new Set(curves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
+  const points = new Set(times);
+  // Two lines can cross between two times. Each crossing is a point of the result.
+  for (let index = 1; index < times.length; index += 1) {
+    const t0 = times[index - 1] ?? 0;
+    const t1 = times[index] ?? 0;
+    for (const [i, a] of curves.entries()) {
+      for (const b of curves.slice(i + 1)) {
+        const d0 = survivalAt(a, t0) - survivalAt(b, t0);
+        const d1 = survivalAt(a, t1) - survivalAt(b, t1);
+        if (d0 * d1 < 0) points.add(t0 + ((t1 - t0) * d0) / (d0 - d1));
+      }
+    }
+  }
+  const out: [number, number][] = [];
+  for (const days of [...points].sort((x, y) => x - y)) {
+    // The largest of curves that do not increase does not increase. The limit only removes an error of rounding.
+    const chance = Math.min(out[out.length - 1]?.[1] ?? 1, Math.max(...curves.map((curve) => survivalAt(curve, days))));
+    // The first point with a chance of 0 ends the curve.
+    out.push([days, chance]);
+    if (chance === 0) break;
+  }
+  return out;
+}
+
+/**
+ * This function gives the curve of the duration of the stop of a draw, or `undefined` when the query has no curve.
+ *
+ * - A cut stops the supply when it cuts the supply part, or when the supply needs the cut part through the stack.
+ * - The stop lasts as long as its longest cut (`longestStop`).
+ * - When only the parts of `down` stop the supply, or when no cut stops it, the query has no curve.
+ */
+export function stopCurve(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): Survival | undefined {
+  if ((options.down ?? []).length > 0 && caseStopped({ ...caseCuts, cuts: [] }, options).has(draw.supply)) return undefined;
+  const alone = options.stack === undefined ? {} : { stack: options.stack };
+  const causes = caseCuts.cuts.filter((cut) => caseStopped({ ...caseCuts, cuts: [cut] }, alone).has(draw.supply));
+  return causes.length === 0 ? undefined : longestStop(causes.map((cut) => cut.duration));
+}
+
 /** The shortfall of each level, in user-days, and the draws that the query cannot read. */
 export interface Shortfall {
   /** The user-days of each level of the layer. The query adds the draws of one level. It does not add two levels. */
   readonly levels: Readonly<Record<string, number>>;
   /**
-   * The needs of the draws whose supply stops through the stack, with no cut on the supply part itself.
+   * The needs of the draws whose stop has no curve (`stopCurve`).
    * The query has no curve of their duration, so their shortfall is not in `levels`. A gate shows them as no read.
    */
   readonly unread: readonly string[];
@@ -83,7 +138,7 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
 
 /**
  * This function gives the shortfall of one event of a case: for each draw, `E[max(0, min(D, h) - T)] * users`.
- * `T` is the endurance of the draw, `D` is the duration of the cut of its supply part, and `h` is the horizon.
+ * `T` is the endurance of the draw, `D` is the duration of the stop of its supply (`stopCurve`), and `h` is the horizon.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
@@ -97,12 +152,12 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
   const unread: string[] = [];
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
     const held = endurance.needs[draw.need];
-    const cut = caseCuts.cuts.find((item) => item.part === draw.supply);
-    if (held === undefined || cut === undefined) {
+    const curve = stopCurve(caseCuts, draw, options);
+    if (held === undefined || curve === undefined) {
       unread.push(draw.need);
       continue;
     }
-    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(cut.duration, held.days, horizon) * (draw.users ?? 1);
+    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curve, held.days, horizon) * (draw.users ?? 1);
   }
   return { levels, unread };
 }
@@ -110,14 +165,15 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
 /** The shortfall of one year at one place, with the part of each case. */
 export interface YearShortfall extends Shortfall {
   readonly place: string;
-  readonly cases: readonly { readonly case: string; readonly chance: number; readonly endurance: Endurance; readonly shortfall: Shortfall }[];
+  /** The part of each case. `rate` is the expected count of its events in one year. */
+  readonly cases: readonly { readonly case: string; readonly rate: number; readonly endurance: Endurance; readonly shortfall: Shortfall }[];
 }
 
 /**
  * This function gives the shortfall of one year at one place.
- * It is the sum over the cases of the layer of the year chance of each case times its shortfall.
+ * It is the sum over the cases of the layer of the expected count of the events of each case times its shortfall.
  *
- * - The year chance of a case is `1 - exp(-perYear * reach)`, from the first prior of the case at the place.
+ * - The expected count of a case is `perYear * reach`, from the first prior of the case at the place. Thus the result is the expected user-days of one year.
  * - A case with no prior at the place is not in the sum.
  * - `unread` is the union of the needs that a case cannot read, in the order of the cases.
  *
@@ -134,12 +190,12 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
   for (const caseCuts of layer.cases ?? []) {
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
     if (prior === undefined) continue;
-    const chance = yearChance(prior);
+    const rate = yearRate(prior);
     const endurance = enduranceOf(layer, caseCuts, options);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
-    for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + chance * days;
+    for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
-    cases.push({ case: caseCuts.case, chance, endurance, shortfall });
+    cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
   return { place, levels, unread, cases };
 }
