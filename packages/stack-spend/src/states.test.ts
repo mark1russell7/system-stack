@@ -3,6 +3,7 @@ import { HARD_COUNT, IS_HARD, MONTH_MAX, NODE_KINDS, PLAN_MAX } from "./formulas
 import { SPEND_SCHEMA, type Limit, type NextPlan, type Service, type SpendLayer } from "./layer.ts";
 import { SAMPLE_ENDS, SAMPLE_SPEND } from "./sample.ts";
 import { evaluateNext, evaluateService, firstServices, monthTotal, nextKey, serviceKey, serviceStates, spendSpace } from "./states.ts";
+import { SAMPLE_STACK, STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import { evaluate, ref, type Expr } from "@mark1russell7/vex";
 import { BoolDomain, NumDomain, TextDomain } from "@mark1russell7/vex-domains";
 
@@ -163,5 +164,53 @@ describe("spendSpace", () => {
 
   it("gives the key of a service", () => {
     expect(serviceKey("a")).toBe("service:a");
+  });
+});
+
+describe("the limits with parts down", () => {
+  const stack: Stack = {
+    schema: STACK_SCHEMA,
+    parts: [
+      { id: "power", kind: "power" },
+      { id: "program", kind: "service", needs: ["power"] },
+      { id: "a", kind: "account" },
+    ],
+  };
+  const stopBy = (stop?: string): Service => metered("a", { kind: "alert", amount: 1 }, { kind: "code", amount: 10, ...(stop === undefined ? {} : { stop }) });
+
+  it("keeps a stop by code while its part works", () => {
+    for (const down of [[], ["a"]]) {
+      expect(serviceStates(layer(stopBy("program")), { stack, down })).toEqual([{ part: "a", billing: "metered", hardLimit: 10, monthMax: 10 }]);
+    }
+  });
+
+  it("removes a stop by code when its part is down, or when a need of its part is down", () => {
+    for (const down of [["program"], ["power"]]) {
+      expect(serviceStates(layer(stopBy("program")), { stack, down })).toEqual([{ part: "a", billing: "metered" }]);
+      expect(monthTotal(layer(stopBy("program")), { stack, down })).toEqual({ bounded: 0, open: ["a"] });
+    }
+  });
+
+  it("removes a stop by code with no part, or with a part that is not in the stack", () => {
+    expect(serviceStates(layer(stopBy()), { stack, down: [] })).toEqual([{ part: "a", billing: "metered" }]);
+    expect(serviceStates(layer(stopBy("x")), { stack, down: [] })).toEqual([{ part: "a", billing: "metered" }]);
+  });
+
+  it("keeps the other kinds of limit, and the key of each limit", () => {
+    const service = metered("a", { kind: "code", amount: 5, stop: "program" }, { kind: "provider", amount: 30 });
+    expect(serviceStates(layer(service), { stack, down: ["power"] })).toEqual([{ part: "a", billing: "metered", hardLimit: 30, monthMax: 30 }]);
+    const tree = spendSpace(layer(service), { stack, down: ["power"] });
+    expect(evaluate(ref("amount"), { space: tree, origin: "limit:a:1", domains: [NumDomain] })).toEqual({ ok: true, value: 30 });
+  });
+
+  it("removes a stop by code of the plan after the end", () => {
+    const service: Service = { part: "a", billing: "free", ends: { date: "2026-12-01", next: { billing: "metered", limits: [{ kind: "code", amount: 8, stop: "program" }] } } };
+    expect(serviceStates(layer(service), { stack, down: [] })).toEqual([{ part: "a", billing: "free", nextLimit: 8, monthMax: 8 }]);
+    expect(serviceStates(layer(service), { stack, down: ["program"] })).toEqual([{ part: "a", billing: "free" }]);
+  });
+
+  it("gives the sample: with the power of the home down, the cost of the call account has no bound", () => {
+    expect(monthTotal(SAMPLE_SPEND, { stack: SAMPLE_STACK, down: ["home-power"] })).toEqual({ bounded: 0, open: ["cloud-account", "call-account"] });
+    expect(monthTotal(SAMPLE_SPEND, { stack: SAMPLE_STACK, down: ["program-cloud"] })).toEqual(monthTotal(SAMPLE_SPEND));
   });
 });

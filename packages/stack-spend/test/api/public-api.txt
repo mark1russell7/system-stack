@@ -10,6 +10,7 @@ BILLINGS: build/layer.chunk.d.ts#BILLINGS
 BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
 Billing: build/layer.chunk.d.ts#Billing
 COUNT_USED: build/index.d.ts#COUNT_USED
+DownOptions: build/index.d.ts#DownOptions
 END_DAYS: build/layer.chunk.d.ts#END_DAYS
 EndDecision: build/layer.chunk.d.ts#EndDecision
 EndOptions: build/index.d.ts#EndOptions
@@ -285,6 +286,12 @@ export declare const BOUNDED_TOTAL: Expr;
 ### build/index.d.ts#COUNT_USED
 export declare const COUNT_USED: Expr;
 
+### build/index.d.ts#DownOptions
+export interface DownOptions {
+  readonly stack: Stack;
+  readonly down: Iterable<string>;
+}
+
 ### build/index.d.ts#EndOptions
 export interface EndOptions extends SpendOptions {
   readonly days?: number | undefined;
@@ -448,7 +455,7 @@ export declare function firstServices(layer: SpendLayer): readonly Service[];
 export declare function joinSpend(pieces: readonly LayerPiece<SpendLayer>[]): LayerParse<SpendLayer>;
 
 ### build/index.d.ts#monthTotal
-export declare function monthTotal(layer: SpendLayer): MonthTotal;
+export declare function monthTotal(layer: SpendLayer, options?: DownOptions): MonthTotal;
 
 ### build/index.d.ts#nextKey
 export declare function nextKey(part: string): string;
@@ -463,10 +470,10 @@ export declare function planEnds(layer: SpendLayer, options: SpendOptions): Plan
 export declare function serviceKey(part: string): string;
 
 ### build/index.d.ts#serviceStates
-export declare function serviceStates(layer: SpendLayer): ServiceState[];
+export declare function serviceStates(layer: SpendLayer, options?: DownOptions): ServiceState[];
 
 ### build/index.d.ts#spendSpace
-export declare function spendSpace(layer: SpendLayer): Space;
+export declare function spendSpace(layer: SpendLayer, options?: DownOptions): Space;
 
 ### build/index.d.ts#useSpace
 export declare function useSpace(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): Space;

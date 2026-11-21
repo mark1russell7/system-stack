@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-spend",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "The cost of each part of a system stack as data: plans, prices and hard monthly limits, a gate, and the largest cost of a month as Vex programs. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
