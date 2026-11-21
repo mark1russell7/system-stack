@@ -1,0 +1,267 @@
+# The public API of @mark1russell7/stack-setup
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+CommandStep: build/layer.chunk.d.ts#CommandStep
+DownloadStep: build/layer.chunk.d.ts#DownloadStep
+FileStep: build/layer.chunk.d.ts#FileStep
+PackageStep: build/layer.chunk.d.ts#PackageStep
+Profile: build/layer.chunk.d.ts#Profile
+ProfileOrder: build/index.d.ts#ProfileOrder
+SAMPLE_SETUP: build/index.d.ts#SAMPLE_SETUP
+SETUP_CODES: build/index.d.ts#SETUP_CODES
+SETUP_EXIT: build/index.d.ts#SETUP_EXIT
+SETUP_MODES: build/index.d.ts#SETUP_MODES
+SETUP_SCHEMA: build/layer.chunk.d.ts#SETUP_SCHEMA
+STEP_KINDS: build/layer.chunk.d.ts#STEP_KINDS
+ServiceStep: build/layer.chunk.d.ts#ServiceStep
+SetupCode: build/index.d.ts#SetupCode
+SetupFault: build/index.d.ts#SetupFault
+SetupLayer: build/layer.chunk.d.ts#SetupLayer
+SetupScript: build/index.d.ts#SetupScript
+SetupText: build/layer.chunk.d.ts#SetupText
+Step: build/layer.chunk.d.ts#Step
+StepKind: build/layer.chunk.d.ts#StepKind
+SwapStep: build/layer.chunk.d.ts#SwapStep
+UserStep: build/layer.chunk.d.ts#UserStep
+Variable: build/layer.chunk.d.ts#Variable
+VariableRead: build/layer.chunk.d.ts#VariableRead
+checkSetup: build/index.d.ts#checkSetup
+hasSetupError: build/index.d.ts#hasSetupError
+hostProfiles: build/index.d.ts#hostProfiles
+isVariableRead: build/layer.chunk.d.ts#isVariableRead
+joinSetup: build/index.d.ts#joinSetup
+profileOrder: build/index.d.ts#profileOrder
+profilesBefore: build/index.d.ts#profilesBefore
+setupHosts: build/index.d.ts#setupHosts
+setupScript: build/index.d.ts#setupScript
+shellWord: build/index.d.ts#shellWord
+stepAddress: build/layer.chunk.d.ts#stepAddress
+stepPaths: build/layer.chunk.d.ts#stepPaths
+stepTexts: build/layer.chunk.d.ts#stepTexts
+textParts: build/layer.chunk.d.ts#textParts
+textVariables: build/layer.chunk.d.ts#textVariables
+unitPath: build/layer.chunk.d.ts#unitPath
+
+## ./schema (build/schema.d.ts): names
+
+SetupParse: build/schema.d.ts#SetupParse
+parseSetup: build/schema.d.ts#parseSetup
+setupSchema: build/schema.d.ts#setupSchema
+
+## ./add-on (build/add-on.d.ts): names
+
+setupAddOn: build/add-on.d.ts#setupAddOn
+
+## Declarations
+
+### build/add-on.d.ts#setupAddOn
+export declare function setupAddOn(): StackJoiner<SetupLayer>;
+
+### build/index.d.ts#ProfileOrder
+export interface ProfileOrder {
+  readonly profiles: readonly Profile[];
+  readonly cycles: readonly (readonly string[])[];
+}
+
+### build/index.d.ts#SAMPLE_SETUP
+export declare const SAMPLE_SETUP: SetupLayer;
+
+### build/index.d.ts#SETUP_CODES
+export declare const SETUP_CODES: readonly ["setup-name", "setup-variable-twice", "setup-profile-twice", "setup-step-twice", "setup-part", "setup-host", "setup-variable", "setup-variable-unused", "setup-secret-exposed", "setup-text", "setup-path", "setup-path-twice", "setup-user-twice", "setup-mode", "setup-url", "setup-sha256", "setup-swap-size", "setup-program", "setup-empty", "setup-cycle"];
+
+### build/index.d.ts#SETUP_EXIT
+export declare const SETUP_EXIT: {
+  readonly ok: 0;
+  readonly failed: 1;
+  readonly changes: 2;
+  readonly usage: 64;
+};
+
+### build/index.d.ts#SETUP_MODES
+export declare const SETUP_MODES: readonly ["apply", "check"];
+
+### build/index.d.ts#SetupCode
+export type SetupCode = (typeof SETUP_CODES)[number];
+
+### build/index.d.ts#SetupFault
+export interface SetupFault extends Fault {
+  readonly code: SetupCode;
+  readonly host?: string | undefined;
+}
+
+### build/index.d.ts#SetupScript
+export type SetupScript = {
+  readonly ok: true;
+  readonly script: string;
+} | {
+  readonly ok: false;
+  readonly faults: readonly SetupFault[];
+};
+
+### build/index.d.ts#checkSetup
+export declare function checkSetup(layer: SetupLayer, stack: Stack): SetupFault[];
+
+### build/index.d.ts#hasSetupError
+export declare function hasSetupError(faults: readonly SetupFault[]): boolean;
+
+### build/index.d.ts#hostProfiles
+export declare function hostProfiles(layer: SetupLayer, host: string): Profile[];
+
+### build/index.d.ts#joinSetup
+export declare function joinSetup(pieces: readonly LayerPiece<SetupLayer>[]): LayerParse<SetupLayer>;
+
+### build/index.d.ts#profileOrder
+export declare function profileOrder(layer: SetupLayer, stack: Stack, host: string): ProfileOrder;
+
+### build/index.d.ts#profilesBefore
+export declare function profilesBefore(profiles: readonly Profile[], stack: Stack): number[][];
+
+### build/index.d.ts#setupHosts
+export declare function setupHosts(layer: SetupLayer): string[];
+
+### build/index.d.ts#setupScript
+export declare function setupScript(layer: SetupLayer, stack: Stack, host: string): SetupScript;
+
+### build/index.d.ts#shellWord
+export declare function shellWord(text: SetupText): string;
+
+### build/layer.chunk.d.ts#CommandStep
+interface CommandStep extends StepBase {
+  readonly kind: "command";
+  readonly run: readonly SetupText[];
+  readonly check: readonly SetupText[];
+  readonly as?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#DownloadStep
+interface DownloadStep extends StepBase {
+  readonly kind: "download";
+  readonly url: string;
+  readonly sha256: string;
+  readonly path: string;
+  readonly mode?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#FileStep
+interface FileStep extends StepBase {
+  readonly kind: "file";
+  readonly path: string;
+  readonly text: SetupText;
+  readonly mode?: string | undefined;
+  readonly owner?: string | undefined;
+  readonly group?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#PackageStep
+interface PackageStep extends StepBase {
+  readonly kind: "package";
+  readonly manager: "apt";
+  readonly names: readonly string[];
+}
+
+### build/layer.chunk.d.ts#Profile
+interface Profile {
+  readonly name: string;
+  readonly part: string;
+  readonly hosts: readonly string[];
+  readonly steps: readonly Step[];
+}
+
+### build/layer.chunk.d.ts#SETUP_SCHEMA
+declare const SETUP_SCHEMA = "setup/1";
+
+### build/layer.chunk.d.ts#STEP_KINDS
+declare const STEP_KINDS: readonly ["package", "user", "file", "download", "swap", "service", "command"];
+
+### build/layer.chunk.d.ts#ServiceStep
+interface ServiceStep extends StepBase {
+  readonly kind: "service";
+  readonly name: string;
+  readonly unit: SetupText;
+  readonly enable?: boolean | undefined;
+}
+
+### build/layer.chunk.d.ts#SetupLayer
+interface SetupLayer {
+  readonly schema: typeof SETUP_SCHEMA;
+  readonly variables?: readonly Variable[] | undefined;
+  readonly profiles: readonly Profile[];
+}
+
+### build/layer.chunk.d.ts#SetupText
+type SetupText = string | VariableRead | readonly (string | VariableRead)[];
+
+### build/layer.chunk.d.ts#Step
+type Step = PackageStep | UserStep | FileStep | DownloadStep | SwapStep | ServiceStep | CommandStep;
+
+### build/layer.chunk.d.ts#StepKind
+type StepKind = Step["kind"];
+
+### build/layer.chunk.d.ts#SwapStep
+interface SwapStep extends StepBase {
+  readonly kind: "swap";
+  readonly path: string;
+  readonly mib: number;
+}
+
+### build/layer.chunk.d.ts#UserStep
+interface UserStep extends StepBase {
+  readonly kind: "user";
+  readonly name: string;
+  readonly groups?: readonly string[] | undefined;
+  readonly shell?: string | undefined;
+  readonly keys?: readonly string[] | undefined;
+}
+
+### build/layer.chunk.d.ts#Variable
+interface Variable {
+  readonly name: string;
+  readonly sensitive?: boolean | undefined;
+  readonly description?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#VariableRead
+interface VariableRead {
+  readonly $var: string;
+}
+
+### build/layer.chunk.d.ts#isVariableRead
+declare function isVariableRead(value: unknown): value is VariableRead;
+
+### build/layer.chunk.d.ts#stepAddress
+declare function stepAddress(profile: Profile, step: Step): string;
+
+### build/layer.chunk.d.ts#stepPaths
+declare function stepPaths(step: Step): string[];
+
+### build/layer.chunk.d.ts#stepTexts
+declare function stepTexts(step: Step): readonly SetupText[];
+
+### build/layer.chunk.d.ts#textParts
+declare function textParts(text: SetupText): readonly (string | VariableRead)[];
+
+### build/layer.chunk.d.ts#textVariables
+declare function textVariables(text: SetupText): string[];
+
+### build/layer.chunk.d.ts#unitPath
+declare function unitPath(name: string): string;
+
+### build/schema.d.ts#SetupParse
+export type SetupParse = {
+  readonly ok: true;
+  readonly layer: SetupLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#parseSetup
+export declare function parseSetup(input: unknown): SetupParse;
+
+### build/schema.d.ts#setupSchema
+export declare const setupSchema: z.ZodType<SetupLayer>;

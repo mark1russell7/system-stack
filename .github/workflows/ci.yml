@@ -195,13 +195,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mark1russell7/stack-tofu run test:tofu
 
+  # The package stack-setup on a real host (packages/stack-setup/e2e). The test writes a setup script, examines it with
+  # shellcheck, and starts it as root two times: the first run makes the changes, and the second run shows no change.
+  # A runner is a new machine for each job, so the changes of the test stay on that machine. The job needs no secret.
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The runner image has shellcheck. The test fails when it is not there.
+      - run: shellcheck --version
+      - run: pnpm --filter @mark1russell7/stack-setup run test:setup
+
   # The one check of the ruleset of main (CI.md, "The check of the ruleset"). It passes only when
   # each job of needs passed, or was skipped by its own if and ALLOW_SKIP names it. A new job of this
   # file goes in needs, so the ruleset never has to change, and gh pr merge --auto waits for the whole gate.
   ci-ok:
     name: CI OK
     if: ${{ !cancelled() }}
-    needs: [ci, presets, renovate-presets, stamp, site, tofu]
+    needs: [ci, presets, renovate-presets, stamp, site, tofu, setup]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
