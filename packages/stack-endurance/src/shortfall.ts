@@ -1,3 +1,4 @@
+import { neededParts } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 
@@ -89,16 +90,19 @@ function bendTimes(curves: readonly Survival[]): number[] {
   return [...out].sort((x, y) => x - y);
 }
 
-/** This function makes a survival curve from a chance at each time. It stops at the first chance of 0, and it removes an increase of rounding. */
+/**
+ * This function makes a survival curve from a chance at each time. It stops at the first chance of 0, and it removes an increase of rounding.
+ *
+ * @throws RangeError when the chance at the last time is more than 0, as for curves that do not end at a chance of 0
+ */
 function curveFrom(times: readonly number[], chanceAt: (days: number) => number): Survival {
   const out: [number, number][] = [];
   for (const days of times) {
     const chance = Math.min(out[out.length - 1]?.[1] ?? 1, chanceAt(days));
     out.push([days, chance]);
-    if (chance === 0) break;
+    if (chance === 0) return out;
   }
-  if ((out[out.length - 1]?.[1] ?? 0) > 0) out.push([(out[out.length - 1]?.[0] ?? 0) + 1, 0]);
-  return out;
+  throw new RangeError("The curves do not fall to a chance of 0 at their last point.");
 }
 
 /**
@@ -108,6 +112,9 @@ function curveFrom(times: readonly number[], chanceAt: (days: number) => number)
  * - When any one cut stops the supply, the result is the largest chance of the curves (`longestStop`).
  * - When the supply needs `any` of two parts, the stop ends with the shorter of the two cuts.
  * - Between two times of `bendTimes` the order of the curves does not change. So the result is linear between its points.
+ * - When no set of cuts stops the supply, the result is `[[0, 0]]`. This curve does not start at `[0, 1]`, so `checkEndurance` refuses it.
+ *
+ * The result is not a limit. When the cuts are independent, a stop of two cuts in series can be longer. A stop through a need of `any` can be shorter.
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
  * @param stops - This function tells if the cuts of a list of indexes stop the supply. A larger list stops it when a smaller list does.
@@ -135,7 +142,10 @@ export function longestStop(curves: readonly Survival[]): Survival {
   return curves.length === 1 ? first : eventStop(curves, (cuts) => cuts.length > 0);
 }
 
-/** The largest count of cuts for which `minimalStops` examines each set. */
+/**
+ * The largest count of cuts for which `minimalStops` examines each set.
+ * `stopCurves` counts only the cuts that can reach the supply. Past this count, its `upper` is coarse.
+ */
 export const MINIMAL_STOP_CUTS = 12;
 
 /**
@@ -191,27 +201,63 @@ export function upperStop(curves: readonly Survival[], sets: readonly (readonly 
 export interface StopCurves {
   readonly event: Survival;
   readonly upper: Survival;
+  /** This is true when `upper` is the sum of the curves of the cuts that can reach the supply, because there are more than `MINIMAL_STOP_CUTS`. */
+  readonly coarse: boolean;
+}
+
+/** This function gives the parts of the stack that are down for a list of cut indexes. A case uses one memo for each of its draws. */
+type StoppedOf = (cuts: readonly number[]) => ReadonlySet<string>;
+
+function stoppedMemo(caseCuts: CaseCuts, options: Pick<CaseOptions, "stack" | "down">): StoppedOf {
+  const memo = new Map<string, ReadonlySet<string>>();
+  return (cuts) => {
+    const key = cuts.join(",");
+    let found = memo.get(key);
+    if (found === undefined) {
+      found = caseStopped({ ...caseCuts, cuts: cuts.flatMap((index) => caseCuts.cuts[index] ?? []) }, options);
+      memo.set(key, found);
+    }
+    return found;
+  };
+}
+
+/** This function gives the parts whose cut can stop a supply: the supply, and each part that it needs through the stack. */
+function supplyReach(supply: string, options: Pick<CaseOptions, "stack">): Set<string> {
+  const reach = options.stack === undefined ? new Set<string>() : neededParts(options.stack, supply);
+  reach.add(supply);
+  return reach;
+}
+
+function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down">, stoppedOf: StoppedOf): StopCurves | undefined {
+  const reach = supplyReach(draw.supply, options);
+  const relevant = caseCuts.cuts.flatMap((cut, index) => (reach.has(cut.part) ? [index] : []));
+  const stops = (cuts: readonly number[]): boolean => stoppedOf(cuts.map((index) => relevant[index] ?? -1)).has(draw.supply);
+  if (stops([])) return undefined;
+  if (!stops(relevant.map((_, index) => index))) return undefined;
+  const curves = relevant.map((index) => caseCuts.cuts[index]?.duration ?? []);
+  const sets = minimalStops(curves.length, stops);
+  return { event: eventStop(curves, stops), upper: upperStop(curves, sets), coarse: sets === undefined };
 }
 
 /**
  * This function gives the curves of the duration of the stop of a draw, or `undefined` when the query has no curve.
  *
  * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
+ * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
- * - `event` is `eventStop`. `upper` is `upperStop` over the minimal sets of cuts.
+ * - `event` is `eventStop`. `upper` is `upperStop` over the minimal sets of the cuts that count.
+ * - Past `MINIMAL_STOP_CUTS` cuts that count, `upper` is the sum of their curves, and `coarse` is true.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): StopCurves | undefined {
-  const stops = (cuts: readonly number[]): boolean => caseStopped({ ...caseCuts, cuts: cuts.flatMap((index) => caseCuts.cuts[index] ?? []) }, options).has(draw.supply);
-  if (stops([])) return undefined;
-  const all = caseCuts.cuts.map((_, index) => index);
-  if (!stops(all)) return undefined;
-  const curves = caseCuts.cuts.map((cut) => cut.duration);
-  return { event: eventStop(curves, stops), upper: upperStop(curves, minimalStops(curves.length, stops)) };
+  return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
 }
 
 /** The shortfall of each level, in user-days, and the draws that the query cannot read. */
 export interface Shortfall {
-  /** The user-days of each level of the layer, when one event makes each cut longer together. The query does not add two levels. */
+  /**
+   * The user-days of each level of the layer, when one event makes each cut longer together. The query does not add two levels.
+   * This value is not a limit. The true value can be more or less. `upper` is the limit.
+   */
   readonly levels: Readonly<Record<string, number>>;
   /** The upper limit of the user-days of each level, for each dependence of the cuts. A gate of a high level can use it. */
   readonly upper: Readonly<Record<string, number>>;
@@ -220,6 +266,8 @@ export interface Shortfall {
    * The query has no curve of their duration, so their shortfall is not in `levels`. A gate shows them as no read.
    */
   readonly unread: readonly string[];
+  /** The needs of the draws whose `upper` is coarse (`StopCurves.coarse`). A gate on `upper` shows them. */
+  readonly coarse: readonly string[];
 }
 
 function zeroLevels(layer: EnduranceLayer): Record<string, number> {
@@ -228,7 +276,7 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
 
 /**
  * This function gives the shortfall of one event of a case: for each draw, `E[max(0, min(D, h) - T)] * users`.
- * `T` is the endurance of the draw, `D` is the duration of the stop of its supply (`stopCurve`), and `h` is the horizon.
+ * `T` is the endurance of the draw, `D` is the duration of the stop of its supply (`stopCurves`), and `h` is the horizon.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
@@ -241,18 +289,21 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
   const levels = zeroLevels(layer);
   const upper = zeroLevels(layer);
   const unread: string[] = [];
+  const coarse: string[] = [];
+  const stoppedOf = stoppedMemo(caseCuts, options);
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
     const held = endurance.needs[draw.need];
-    const curves = stopCurves(caseCuts, draw, options);
+    const curves = stopCurvesWith(caseCuts, draw, options, stoppedOf);
     if (held === undefined || curves === undefined) {
       unread.push(draw.need);
       continue;
     }
+    if (curves.coarse) coarse.push(draw.need);
     const users = draw.users ?? 1;
     levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curves.event, held.days, horizon) * users;
     upper[draw.level] = (upper[draw.level] ?? 0) + tailDays(curves.upper, held.days, horizon) * users;
   }
-  return { levels, upper, unread };
+  return { levels, upper, unread, coarse };
 }
 
 /** The shortfall of one year at one place, with the part of each case. */
@@ -268,7 +319,7 @@ export interface YearShortfall extends Shortfall {
  *
  * - The expected count of a case is `perYear * reach`, from the first prior of the case at the place. Thus the result is the expected user-days of one year.
  * - A case with no prior at the place is not in the sum.
- * - `unread` is the union of the needs that a case cannot read, in the order of the cases.
+ * - `unread` is the union of the needs that a case cannot read, in the order of the cases. `coarse` is the union of the coarse needs.
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
@@ -280,6 +331,7 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
   const levels = zeroLevels(layer);
   const upper = zeroLevels(layer);
   const unread: string[] = [];
+  const coarse: string[] = [];
   const cases: YearShortfall["cases"][number][] = [];
   for (const caseCuts of layer.cases ?? []) {
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
@@ -290,7 +342,8 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
     for (const [level, days] of Object.entries(shortfall.upper)) upper[level] = (upper[level] ?? 0) + rate * days;
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
+    for (const need of shortfall.coarse) if (!coarse.includes(need)) coarse.push(need);
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
-  return { place, levels, upper, unread, cases };
+  return { place, levels, upper, unread, coarse, cases };
 }

@@ -100,6 +100,7 @@ export interface Shortfall {
   readonly levels: Readonly<Record<string, number>>;
   readonly upper: Readonly<Record<string, number>>;
   readonly unread: readonly string[];
+  readonly coarse: readonly string[];
 }
 
 ### build/index.d.ts#ShortfallOptions
@@ -111,6 +112,7 @@ export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
 export interface StopCurves {
   readonly event: Survival;
   readonly upper: Survival;
+  readonly coarse: boolean;
 }
 
 ### build/index.d.ts#YearShortfall

@@ -130,6 +130,26 @@ describe("caseShortfall", () => {
     expect(shortfall.unread).toEqual(["hydration.drink"]);
     expect(shortfall.levels["life"]).toBe(0);
   });
+
+  it("counts only the cuts that can reach the supply, and names a coarse upper limit", () => {
+    // Thirteen cuts of parts that the water main does not need do not change its curves.
+    const others = Array.from({ length: 13 }, (_, index) => ({ part: `other-${String(index)}`, title: "Other", duration: GRID, source: "s" }));
+    const wide: CaseCuts = { ...storm, cuts: [...storm.cuts, ...others] };
+    expect(stopCurves(wide, DRINK, { stack: MAIN_NEEDS_GRID })).toEqual(stopCurves(storm, DRINK, { stack: MAIN_NEEDS_GRID }));
+    expect(stopCurves(wide, DRINK, { stack: MAIN_NEEDS_GRID })?.coarse).toBe(false);
+    expect(caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT }), {}).coarse).toEqual([]);
+    // When the water main needs each of 13 feeds, 14 cuts count. Then upper is the sum of their curves.
+    const feeds = others.map((cut) => cut.part);
+    const stack: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: feeds } : part)), ...feeds.map((id) => ({ id, kind: "feed", name: id }))],
+    };
+    const curves = stopCurves(wide, DRINK, { stack });
+    expect(curves?.coarse).toBe(true);
+    for (const days of TIMES) expect(survivalAt(curves?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 13 * survivalAt(GRID, days)), 9);
+    const shortfall = caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT, stack }), { stack });
+    expect(shortfall.coarse).toEqual(["hydration.drink"]);
+  });
 });
 
 describe("minimalStops", () => {
@@ -219,6 +239,6 @@ describe("yearShortfall", () => {
   });
 
   it("gives 0 at a place with no prior", () => {
-    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], cases: [] });
+    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], cases: [] });
   });
 });

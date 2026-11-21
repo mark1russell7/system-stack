@@ -1,7 +1,7 @@
 import { STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { caseStopped, enduranceOf, storeAmounts } from "./endurance.ts";
+import { caseStopped, drawDemand, enduranceOf, storeAmounts } from "./endurance.ts";
 import type { CaseCuts, EnduranceLayer } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 
@@ -142,13 +142,35 @@ describe("the laws of enduranceOf", () => {
 });
 
 describe("the takes of a case", () => {
-  /** This function tells if the takes of all the draws of a case are not more than the stores of the case. */
+  /**
+   * This function gives the need that the takes of a draw give: the direct takes times their amount, and the runs of each converter times its gift.
+   * Each resource of the takes is in one way of the need only, so the takes tell the runs of each converter.
+   */
+  function given(layer: EnduranceLayer, need: string, takes: Readonly<Record<string, number>>): number {
+    const direct = (layer.direct ?? []).filter((use) => use.need === need);
+    const converters = (layer.converters ?? []).filter((converter) => converter.gives.need === need);
+    let total = direct.reduce((sum, use) => sum + (takes[use.resource] ?? 0) * use.amount, 0);
+    for (const converter of converters) {
+      const runs = converter.takes.map((input) => (takes[input.resource] ?? 0) / input.amount);
+      for (const run of runs) expect(run, converter.id).toBeCloseTo(runs[0] ?? 0, 6);
+      total += (runs[0] ?? 0) * converter.gives.amount;
+    }
+    return total;
+  }
+
+  /** This function tells if the takes of all the draws of a case are not more than the stores, and if each draw gets its days times its demand. */
   function takesFit(layer: EnduranceLayer, caseCuts: CaseCuts, options: { stack?: Stack } = {}): void {
     const result = enduranceOf(layer, caseCuts, { at: AT, ...options });
     const stores = storeAmounts(layer, AT, caseStopped(caseCuts, options));
     const total = new Map<string, number>();
     for (const held of Object.values(result.needs)) for (const [resource, amount] of Object.entries(held.takes)) total.set(resource, (total.get(resource) ?? 0) + amount);
     for (const [resource, taken] of total) expect(taken, resource).toBeLessThanOrEqual((stores.get(resource) ?? 0) * (1 + 1e-9) + 1e-9);
+    for (const draw of layer.draws) {
+      const held = result.needs[draw.need];
+      if (held === undefined) continue;
+      const want = held.days * drawDemand(draw, caseCuts);
+      expect(Math.abs(given(layer, draw.need, held.takes) - want), draw.need).toBeLessThanOrEqual(1e-6 * Math.max(1, want));
+    }
   }
 
   it("never takes more than the stores in the storm, also when each store is smaller", () => {
