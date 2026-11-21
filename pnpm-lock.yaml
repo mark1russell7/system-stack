@@ -216,6 +216,19 @@ importers:
         version: 7.0.2
 
   packages/site:
+    dependencies:
+      '@mark1russell7/stack-risk':
+        specifier: workspace:*
+        version: link:../stack-risk
+      '@mark1russell7/stack-spend':
+        specifier: workspace:*
+        version: link:../stack-spend
+      '@mark1russell7/system-stack':
+        specifier: workspace:*
+        version: link:../system-stack
+      ireko:
+        specifier: ^0.2.5
+        version: 0.2.5
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -1559,6 +1572,18 @@ packages:
     resolution: {integrity: sha512-6xwYfHbajpoF0xLW+iwLkhwgvLoZDfjYfoFNu8ftMoXINzwuymNLd9u/KmwtdT2GbR+/Cz66otEGEVVUHX9QLQ==}
     engines: {node: '>=10.13.0'}
 
+  ireko@0.2.5:
+    resolution: {integrity: sha512-NwwoYEJHCL8Tp1bjzCJvNyeUIKVSXo3H9mLPQLgE3CAX+/N8CTeYV+gFrvCRFCYQ9aYWX/ylh6Huo00B5igczg==}
+    engines: {node: '>=22.12'}
+    peerDependencies:
+      '@xyflow/react': ^12.0.0
+      react: '>=18'
+    peerDependenciesMeta:
+      '@xyflow/react':
+        optional: true
+      react:
+        optional: true
+
   is-core-module@2.18.0:
     resolution: {integrity: sha512-qyax9fgaKOEC4qK8WZn7Q4IcoZC9RC1O1fFxRcRTq/oMMkWT/uXpqpXa12kzWR409zAt1drYN9N9BO26UmBCmw==}
     engines: {node: '>= 0.4'}
@@ -2741,6 +2766,8 @@ snapshots:
   ini@4.1.1: {}
 
   interpret@3.1.1: {}
+
+  ireko@0.2.5: {}
 
   is-core-module@2.18.0:
     dependencies:

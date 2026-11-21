@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>system-stack</title>
-<meta name="description" content="The whole system stack as data: each part is a record, and each risk and each cost limit is a query over the records.">
+<meta name="description" content="The whole system stack as data: each part is a record, and each risk and each cost limit is a query over the records. Stop a part and see what still works.">
 <!-- The icon of the site. Without an icon link, the browser asks for /favicon.ico and logs a 404 error. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%232346c4%22%2F%3E%3Cpath%20d%3D%22M10%207h8l5%205v13H10z%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M18%207v5h5z%22%20fill%3D%22%23e7ecfd%22%2F%3E%3C%2Fsvg%3E">
 <script>
@@ -26,15 +26,71 @@
 </header>
 
 <main>
-  <h1>system-stack</h1>
-  <p class="lead">The whole system stack as data: each part is a record, and each risk and each cost limit is a query over the records.</p>
-
-  <h2>Install</h2>
-  <div class="command">
-    <code id="install">pnpm add @mark1russell7/system-stack</code>
-    <button id="copy" type="button">Copy</button>
+  <div class="prose">
+    <h1>system-stack</h1>
+    <p class="lead">The whole system stack as data: each part is a record, and each risk and each cost limit is a query over the records.</p>
   </div>
-  <p class="note">This package has no release on npm yet. <a href="./releases/">Releases</a> shows each version, and <a href="./status/">Status</a> shows the open work.</p>
+
+  <section class="demo" aria-labelledby="demo-title">
+    <h2 id="demo-title">Stop a part, and see what still works</h2>
+    <p class="intro">This is the sample stack of the package: an alert gets to its reader through one of two copies of a program and one of two message services. Select a part to stop it, or select a scenario. Each answer on this page comes from a query of the packages.</p>
+
+    <div class="scenarios" id="scenarios" role="group" aria-label="Scenarios"></div>
+
+    <div class="board">
+      <figure class="graph-frame">
+        <svg id="graph" class="graph" role="group" aria-label="The parts of the sample stack. A line goes from a need to the part that needs it."></svg>
+        <figcaption>
+          <ul class="legend" aria-label="Legend">
+            <li><svg viewBox="0 0 28 18" aria-hidden="true"><rect class="key-box" x="2" y="2" width="24" height="14" rx="4"/></svg>Works</li>
+            <li><svg viewBox="0 0 28 18" aria-hidden="true"><rect class="key-box ring" x="1" y="1" width="26" height="16" rx="5"/><rect class="key-box" x="4" y="4" width="20" height="10" rx="3"/></svg>Its failure alone stops the alert</li>
+            <li><svg viewBox="0 0 28 18" aria-hidden="true"><rect class="key-box down" x="2" y="2" width="24" height="14" rx="4"/><rect class="key-hatch" x="2" y="2" width="24" height="14" rx="4"/></svg>Stopped by you</li>
+            <li><svg viewBox="0 0 28 18" aria-hidden="true"><rect class="key-box stopped" x="2" y="2" width="24" height="14" rx="4"/></svg>Does not work: a need does not hold</li>
+          </ul>
+          <p class="detail" id="detail" aria-live="polite">Select a part to stop it. Select it again to start it.</p>
+        </figcaption>
+      </figure>
+
+      <aside class="goal" aria-labelledby="goal-name" aria-live="polite">
+        <p class="goal-name" id="goal-name">An alert gets to its reader</p>
+        <p class="status" id="goal-status"></p>
+        <p id="goal-margin"></p>
+        <div id="goal-points"></div>
+        <div class="chance">
+          <p class="figure" id="chance"></p>
+          <p class="figure-note" id="chance-note"></p>
+        </div>
+      </aside>
+    </div>
+
+    <section class="spend" aria-labelledby="spend-title">
+      <h3 id="spend-title">The cost limit of each account</h3>
+      <p class="total"><span class="figure" id="total"></span> <span class="figure-note" id="total-note"></span></p>
+      <table class="spend-table">
+        <thead><tr><th scope="col">Account</th><th scope="col">Billing</th><th scope="col">Hard limit</th><th scope="col">Most in a month</th></tr></thead>
+        <tbody id="spend-rows"></tbody>
+      </table>
+      <p class="stops-intro">A stop by code holds only while the part that stops the use works.</p>
+      <ul class="stops" id="stops"></ul>
+    </section>
+
+    <details class="parts">
+      <summary>The parts as a table</summary>
+      <table class="parts-table">
+        <thead><tr><th scope="col">Part</th><th scope="col">Needs</th><th scope="col">State</th></tr></thead>
+        <tbody id="part-rows"></tbody>
+      </table>
+    </details>
+  </section>
+
+  <div class="prose">
+    <h2>Install</h2>
+    <div class="command">
+      <code id="install">pnpm add @mark1russell7/system-stack</code>
+      <button id="copy" type="button">Copy</button>
+    </div>
+    <p class="note">The add-ons <code>@mark1russell7/stack-risk</code> and <code>@mark1russell7/stack-spend</code> give the risks and the cost limits of this page. <a href="./releases/">Releases</a> shows each version, and <a href="./status/">Status</a> shows the open work.</p>
+  </div>
 </main>
 
 <script type="module" src="./src/index.ts"></script>

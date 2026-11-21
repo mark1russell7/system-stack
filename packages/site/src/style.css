@@ -1,31 +1,56 @@
 :root {
-  --page: #fbfbfa;
-  --panel: #f0f0ed;
-  --ink: #1c1c1a;
-  --quiet: #5c5c57;
-  --line: #d6d6d0;
+  --page: #f4f6f9;
+  --panel: #e9edf2;
+  --ink: #172030;
+  --quiet: #4d5868;
+  --line: #c6ced9;
+  --line-strong: #7f8c9e;
+  --edge: #8592a4;
   --link: #1f5fbf;
+  --critical: #b42318;
+  --critical-tint: #fbe5e1;
+  --warning: #8f5408;
+  --warning-tint: #fcefd8;
+  --good: #17703d;
+  --good-tint: #def1e5;
+  --label: "Bahnschrift", "DIN Alternate", "DIN Next", "Barlow", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --page: #161615;
-    --panel: #232321;
-    --ink: #ececea;
-    --quiet: #a9a9a3;
-    --line: #3b3b38;
+    --page: #10151c;
+    --panel: #19212b;
+    --ink: #e4e9f0;
+    --quiet: #9ca8b7;
+    --line: #2f3a48;
+    --line-strong: #64728a;
+    --edge: #6c7a90;
     --link: #8ab8ff;
+    --critical: #ff8e7e;
+    --critical-tint: #3b1d1a;
+    --warning: #f1b657;
+    --warning-tint: #382a12;
+    --good: #66d397;
+    --good-tint: #14301f;
   }
 }
 
 :root[data-theme="dark"] {
-  --page: #161615;
-  --panel: #232321;
-  --ink: #ececea;
-  --quiet: #a9a9a3;
-  --line: #3b3b38;
+  --page: #10151c;
+  --panel: #19212b;
+  --ink: #e4e9f0;
+  --quiet: #9ca8b7;
+  --line: #2f3a48;
+  --line-strong: #64728a;
+  --edge: #6c7a90;
   --link: #8ab8ff;
+  --critical: #ff8e7e;
+  --critical-tint: #3b1d1a;
+  --warning: #f1b657;
+  --warning-tint: #382a12;
+  --good: #66d397;
+  --good-tint: #14301f;
   color-scheme: dark;
 }
 
@@ -48,20 +73,25 @@ a {
   color: var(--link);
 }
 
+:focus-visible {
+  outline: 3px solid var(--link);
+  outline-offset: 2px;
+}
+
 .top {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
-  max-width: 44rem;
+  max-width: 72rem;
   margin: 0 auto;
   padding: 1rem;
 }
 
 .brand {
   color: var(--ink);
-  font-weight: 650;
+  font: 650 1.05rem/1.2 var(--label);
   text-decoration: none;
 }
 
@@ -73,25 +103,471 @@ nav {
 }
 
 main {
-  max-width: 44rem;
+  max-width: 72rem;
   margin: 0 auto;
   padding: 1rem 1rem 3rem;
 }
 
-h1 {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 2.25rem;
+.prose {
+  max-width: 44rem;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--label);
   line-height: 1.2;
 }
 
+h1 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
 h2 {
-  margin: 2.25rem 0 0.5rem;
-  font-size: 1.15rem;
+  margin: 2.5rem 0 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 650;
+}
+
+h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 650;
 }
 
 .lead {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.intro {
+  max-width: 44rem;
+  margin: 0;
+}
+
+/* The scenarios: a row of buttons. The button of the state on the page is pressed. */
+.scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0 1rem;
+}
+
+.scenario {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  font: 600 0.95rem/1.2 var(--label);
+}
+
+.scenario[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--page);
+}
+
+/* The board: the graph, and the state of the goal beside it on a wide screen. */
+.board {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 68rem) {
+  .board {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    align-items: start;
+  }
+}
+
+.graph-frame {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--panel);
+}
+
+.graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.graph text {
+  fill: var(--ink);
+  font: 600 12.5px var(--label);
+  pointer-events: none;
+}
+
+.graph.narrow text {
+  font-size: 11px;
+}
+
+.node {
+  cursor: pointer;
+  outline: none;
+}
+
+.node .box,
+.node .ring,
+.node .hatch,
+.node text,
+.edge {
+  transition:
+    fill 0.25s,
+    stroke 0.25s,
+    opacity 0.25s;
+  /* The one motion of the page: a stop moves along the layers of the needs. */
+  transition-delay: calc(var(--rank, 0) * 90ms);
+}
+
+.node .box {
+  fill: var(--page);
+  stroke: var(--line-strong);
+  stroke-width: 1.25;
+}
+
+.node .ring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2;
+}
+
+.node .hatch {
+  fill: url(#hatch);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.node.goal-node .box {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.node.goal-node text {
+  font-weight: 750;
+}
+
+.node[data-mark="point"] .ring {
+  stroke: var(--warning);
+}
+
+.node[data-mark="down"] .box {
+  fill: var(--critical-tint);
+  stroke: var(--critical);
+  stroke-width: 2;
+}
+
+.node[data-mark="down"] .hatch {
+  opacity: 1;
+}
+
+/* A halo keeps the label of a stopped box clear of its hatch. */
+.node[data-mark="down"] text {
+  paint-order: stroke;
+  stroke: var(--critical-tint);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.node[data-mark="stopped"] .box {
+  fill: transparent;
+  stroke: var(--quiet);
+  stroke-dasharray: 4 3;
+}
+
+.node[data-mark="stopped"] text {
+  fill: var(--quiet);
+}
+
+.node:hover .box {
+  stroke: var(--ink);
+}
+
+.node:focus-visible .ring {
+  stroke: var(--link);
+  stroke-width: 3;
+}
+
+.hatch-line {
+  stroke: var(--critical);
+  stroke-width: 1.5;
+  opacity: 0.5;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1.25;
+}
+
+.edge.off {
+  stroke-dasharray: 3 3;
+  opacity: 0.45;
+}
+
+.arrow {
+  fill: var(--edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .graph * {
+    transition: none !important;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  color: var(--quiet);
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legend svg {
+  flex: none;
+  width: 28px;
+  height: 18px;
+}
+
+.key-box {
+  fill: var(--page);
+  stroke: var(--line-strong);
+  stroke-width: 1.25;
+}
+
+.key-box.ring {
+  fill: none;
+  stroke: var(--warning);
+  stroke-width: 2;
+}
+
+.key-box.down {
+  fill: var(--critical-tint);
+  stroke: var(--critical);
+  stroke-width: 2;
+}
+
+.key-hatch {
+  fill: url(#hatch);
+}
+
+.key-box.stopped {
+  fill: none;
+  stroke: var(--quiet);
+  stroke-dasharray: 4 3;
+}
+
+.detail {
+  min-height: 3.2em;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+/* The state of the goal. */
+.goal {
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+.goal p {
+  margin: 0;
+}
+
+.goal-name {
+  font: 650 1.05rem/1.3 var(--label);
+}
+
+.goal .status {
+  margin: 0.5rem 0;
+}
+
+.flag {
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.375rem;
+  font-weight: 650;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.flag.good {
+  background: var(--good-tint);
+  color: var(--good);
+}
+
+.flag.critical {
+  background: var(--critical-tint);
+  color: var(--critical);
+}
+
+.flag.warning {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
+.status .flag {
+  display: inline-block;
+  padding: 0.15rem 0.7rem;
+  font: 700 1.5rem/1.25 var(--label);
+}
+
+.goal .small {
+  margin: 0.75rem 0 0;
+  color: var(--quiet);
+  font-size: 0.875rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0.375rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: 0.05rem 0.5rem;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 0.375rem;
+  font: 600 0.875rem/1.5 var(--label);
+}
+
+.chip.point {
+  border: 2px solid var(--warning);
+}
+
+.chip.down {
+  border: 2px solid var(--critical);
+  background: repeating-linear-gradient(45deg, var(--critical-tint) 0 4px, transparent 4px 7px);
+}
+
+.chance {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.figure {
+  margin: 0;
+  font: 700 2rem/1.1 var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+.figure-note {
+  margin: 0.375rem 0 0;
+  color: var(--quiet);
+  font-size: 0.875rem;
+}
+
+.chance .flag {
+  display: inline-block;
+  margin-top: 0.25rem;
+  white-space: nowrap;
+}
+
+/* The cost limits. */
+.spend {
+  max-width: 52rem;
+  margin-top: 2.25rem;
+}
+
+.total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.total .figure-note {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+th,
+td {
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+thead th {
+  color: var(--quiet);
+  font: 600 0.85rem/1.3 var(--label);
+}
+
+tbody th {
+  font-weight: 600;
+}
+
+.stops-intro {
+  margin: 1rem 0 0.25rem;
+  color: var(--quiet);
+  font-size: 0.9rem;
+}
+
+.stops {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stops li {
+  margin: 0.25rem 0;
+}
+
+/* The table view of the parts. */
+.parts {
+  max-width: 52rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.parts summary {
+  font: 600 1rem/1.5 var(--label);
+  cursor: pointer;
+}
+
+.parts-table {
+  margin-top: 0.75rem;
+}
+
+.parts-table th:nth-child(1) {
+  width: 30%;
+}
+
+.parts-table th:nth-child(3) {
+  width: 26%;
+}
+
+.kind {
+  display: block;
+  color: var(--quiet);
+  font-size: 0.8rem;
+  font-weight: 400;
 }
 
 .command {
@@ -124,4 +600,33 @@ button {
   color: var(--ink);
   font: inherit;
   cursor: pointer;
+}
+
+/* A phone: less space around the graph, so that its text keeps its size. */
+@media (max-width: 46rem) {
+  main {
+    padding: 0.75rem 0.75rem 3rem;
+  }
+
+  .top {
+    padding: 0.75rem;
+  }
+
+  h1 {
+    font-size: 2.1rem;
+  }
+
+  .graph-frame {
+    padding: 0.375rem;
+  }
+
+  .legend,
+  .detail {
+    padding: 0 0.375rem;
+  }
+
+  th,
+  td {
+    padding: 0.5rem 0.375rem;
+  }
 }
