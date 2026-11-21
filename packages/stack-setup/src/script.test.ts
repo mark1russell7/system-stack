@@ -70,12 +70,12 @@ describe("setupScript", () => {
 
   it("checks each step before its change, and the check again after the change", () => {
     expect(script).toContain('if check_1 >/dev/null 2>&1; then\n  ok base.packages\nelif [ "$mode" = check ]; then\n  change base.packages\nelse');
-    expect(script).toContain('  apply_1 >&2 || fail base.packages "the change failed"\n  check_1 >/dev/null 2>&1 || fail base.packages "the check fails after the change"');
+    expect(script).toContain('  apply_1 >&2 || fail base.packages "the change failed"\n  check_1 >/dev/null 2>&1 || fail base.packages "the condition $? of the check fails after the change"');
     expect(script).toContain(`echo "changes: $changes"\nif [ "$mode" = check ] && [ "$changes" -gt 0 ]; then\n  exit ${String(SETUP_EXIT.changes)}\nfi\n`);
   });
 
   it("writes the code of each kind of step", () => {
-    expect(script).toContain("check_1() {\n  installed ca-certificates &&\n    installed curl\n}");
+    expect(script).toContain("check_1() {\n  installed ca-certificates || return 1\n  installed curl || return 2\n}");
     expect(script).toContain("apt_install ca-certificates curl || return 1");
     expect(script).toContain("dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none || return 1");
     expect(script).toContain("[ \"$(stat -c '%s %a %U' /swapfile)\" = '1073741824 600 root' ]");
@@ -85,7 +85,7 @@ describe("setupScript", () => {
     expect(script).toContain('install -D -m 755 -o root -g root "$tmp" /opt/alerts/alerts || return 1');
     expect(script).toContain("file_is /etc/alerts/env 600 root root");
     expect(script).toContain("env install -d -o alerts -g alerts /var/lib/alerts || return 1");
-    expect(script).toContain("check_6() {\n  env test -d /var/lib/alerts\n}");
+    expect(script).toContain("check_6() {\n  env test -d /var/lib/alerts || return 1\n}");
     expect(script).toContain("systemctl enable --quiet alerts || return 1");
     expect(script).toContain("systemctl is-active --quiet alerts");
   });
@@ -112,7 +112,12 @@ describe("setupScript", () => {
     expect(keys).toContain("user_home() {");
     expect(keys).toContain(`printf '%s\\n' 'ssh-ed25519 AAAA one' >"$tmp" || return 1`);
     expect(keys).toContain("[ \"$(stat -c '%a %U' \"$home/.ssh\")\" = '700 app' ]");
-    expect(keys).toContain('file_is "$home/.ssh/authorized_keys" 600 app "$(id -gn app)"');
+    expect(keys).toContain('file_is "$home/.ssh/authorized_keys" 600 app "$(id -gn app)" || return 7');
+    // The group is explicit, so no `chown` reads `app:` with no group.
+    expect(keys).toContain('group=$(id -gn app) || return 1');
+    expect(keys).toContain('chown app:"$group" "$home/.ssh" || return 1');
+    expect(keys).toContain('install -m 600 -o app -g "$group" "$tmp" "$home/.ssh/authorized_keys" || return 1');
+    expect(keys).not.toMatch(/chown app: /);
     expect(scriptOf([{ kind: "user", id: "u", name: "app", keys: [] }])).toContain(': >"$tmp" || return 1');
     // With no field keys, the step does not change the file.
     expect(scriptOf([{ kind: "user", id: "u", name: "app" }])).not.toContain("authorized_keys");

@@ -203,5 +203,5 @@ test("the script repairs a file that changed, and only that file", () => {
 test("a step whose check fails after the change stops the script", () => {
   const run = setup(failing, "apply", {});
   assert.equal(run.status, SETUP_EXIT.failed, run.stdout + run.stderr);
-  assert.match(run.stderr, /^failed: fail\.never: the check fails after the change$/m);
+  assert.match(run.stderr, /^failed: fail\.never: the condition 1 of the check fails after the change$/m);
 });

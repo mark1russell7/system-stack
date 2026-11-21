@@ -12,7 +12,7 @@ Each function is a plain function with no clock, no network and no file. Only th
 
 Each step checks before it changes. A step whose check passes changes nothing. Thus a second run of the script shows no change.
 
-After a change, the check of the step must pass. If it does not pass, the script stops with a fault.
+After a change, the check of the step must pass. If it does not pass, the script stops with a fault. The fault gives the number of the condition that fails, and no value.
 
 The script holds no secret. A text reads a variable with `{ $var: "NAME" }`, and the script reads the value from its environment.
 

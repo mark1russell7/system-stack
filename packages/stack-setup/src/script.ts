@@ -183,15 +183,16 @@ function userCode(step: UserStep): StepCode {
   // An empty list of keys gives an empty file. A printf with no argument writes one line break.
   const write = keys.length === 0 ? ': >"$tmp"' : `printf '%s\\n' ${keys.map(q).join(" ")} >"$tmp"`;
   check.push(write, `home=$(user_home ${name})`, '[ -n "$home" ]', `[ "$(stat -c '%a %U' "$home/.ssh")" = ${q(`700 ${step.name}`)} ]`, `file_is "$home/.ssh/authorized_keys" 600 ${name} "$(id -gn ${name})"`);
+  // The group is explicit: `chown user:` with no group does not set the login group with each `chown`, for example the Rust coreutils.
   apply.push(
     `home=$(user_home ${name}) || return 1`,
     '[ -n "$home" ] || return 1',
+    `group=$(id -gn ${name}) || return 1`,
     'mkdir -p "$home/.ssh" || return 1',
     'chmod 700 "$home/.ssh" || return 1',
-    `chown ${name}: "$home/.ssh" || return 1`,
+    `chown ${name}:"$group" "$home/.ssh" || return 1`,
     `${write} || return 1`,
-    'install -m 600 "$tmp" "$home/.ssh/authorized_keys" || return 1',
-    `chown ${name}: "$home/.ssh/authorized_keys" || return 1`,
+    `install -m 600 -o ${name} -g "$group" "$tmp" "$home/.ssh/authorized_keys" || return 1`,
   );
   return { helpers, check, apply, tmp: true };
 }
@@ -318,12 +319,15 @@ function stepCode(step: Step): StepCode {
   }
 }
 
-/** This function gives the lines of one step: its two functions and the report. */
+/**
+ * This function gives the lines of one step: its two functions and the report.
+ * The exit code of the check is the number of its first condition that fails. Thus a fault after the change names the condition, and it prints no value.
+ */
 function stepLines(number: number, address: string, code: StepCode): string[] {
   const check = `check_${String(number)}`;
   const apply = `apply_${String(number)}`;
   const at = q(address);
-  const conditions = code.check.map((condition, index) => `  ${index > 0 ? "  " : ""}${condition}${index < code.check.length - 1 ? " &&" : ""}`);
+  const conditions = code.check.map((condition, index) => `  ${condition} || return ${String(index + 1)}`);
   return [
     `# The step ${address}`,
     `${check}() {`,
@@ -338,7 +342,7 @@ function stepLines(number: number, address: string, code: StepCode): string[] {
     `  change ${at}`,
     "else",
     `  ${apply} >&2 || fail ${at} "the change failed"`,
-    `  ${check} >/dev/null 2>&1 || fail ${at} "the check fails after the change"`,
+    `  ${check} >/dev/null 2>&1 || fail ${at} "the condition $? of the check fails after the change"`,
     `  changed ${at}`,
     "fi",
   ];
