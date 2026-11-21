@@ -1,0 +1,268 @@
+# The public API of @mark1russell7/stack-endurance
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+CaseCuts: build/layer.chunk.d.ts#CaseCuts
+CaseOptions: build/index.d.ts#CaseOptions
+Converter: build/layer.chunk.d.ts#Converter
+Cut: build/layer.chunk.d.ts#Cut
+DirectUse: build/layer.chunk.d.ts#DirectUse
+Draw: build/layer.chunk.d.ts#Draw
+DrawEndurance: build/layer.chunk.d.ts#DrawEndurance
+ENDURANCE_CODES: build/index.d.ts#ENDURANCE_CODES
+ENDURANCE_SCHEMA: build/layer.chunk.d.ts#ENDURANCE_SCHEMA
+Endurance: build/layer.chunk.d.ts#Endurance
+EnduranceCode: build/index.d.ts#EnduranceCode
+EnduranceFault: build/index.d.ts#EnduranceFault
+EnduranceLayer: build/layer.chunk.d.ts#EnduranceLayer
+IsoDate: build/layer.chunk.d.ts#IsoDate
+Prior: build/layer.chunk.d.ts#Prior
+Resource: build/layer.chunk.d.ts#Resource
+SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
+SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
+Shortfall: build/index.d.ts#Shortfall
+Store: build/layer.chunk.d.ts#Store
+Survival: build/layer.chunk.d.ts#Survival
+YearShortfall: build/index.d.ts#YearShortfall
+caseDraws: build/index.d.ts#caseDraws
+caseShortfall: build/index.d.ts#caseShortfall
+caseStopped: build/index.d.ts#caseStopped
+checkEndurance: build/index.d.ts#checkEndurance
+curveFault: build/index.d.ts#curveFault
+drawDemand: build/index.d.ts#drawDemand
+enduranceOf: build/index.d.ts#enduranceOf
+hasEnduranceError: build/index.d.ts#hasEnduranceError
+joinEndurance: build/index.d.ts#joinEndurance
+storeAmounts: build/index.d.ts#storeAmounts
+survivalAt: build/index.d.ts#survivalAt
+survivalQuantile: build/index.d.ts#survivalQuantile
+tailDays: build/index.d.ts#tailDays
+yearChance: build/index.d.ts#yearChance
+yearShortfall: build/index.d.ts#yearShortfall
+
+## ./schema (build/schema.d.ts): names
+
+EnduranceParse: build/schema.d.ts#EnduranceParse
+enduranceSchema: build/schema.d.ts#enduranceSchema
+parseEndurance: build/schema.d.ts#parseEndurance
+
+## ./add-on (build/add-on.d.ts): names
+
+enduranceAddOn: build/add-on.d.ts#enduranceAddOn
+
+## Declarations
+
+### build/add-on.d.ts#enduranceAddOn
+export declare function enduranceAddOn(): StackJoiner<EnduranceLayer>;
+
+### build/index.d.ts#CaseOptions
+export interface CaseOptions {
+  readonly at: IsoDate;
+  readonly stack?: Stack | undefined;
+  readonly down?: readonly string[] | undefined;
+}
+
+### build/index.d.ts#ENDURANCE_CODES
+export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-no-way"];
+
+### build/index.d.ts#EnduranceCode
+export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
+
+### build/index.d.ts#EnduranceFault
+export interface EnduranceFault extends Fault {
+  readonly code: EnduranceCode;
+}
+
+### build/index.d.ts#SAMPLE_ENDURANCE
+export declare const SAMPLE_ENDURANCE: EnduranceLayer;
+
+### build/index.d.ts#SAMPLE_ENDURANCE_STACK
+export declare const SAMPLE_ENDURANCE_STACK: Stack;
+
+### build/index.d.ts#Shortfall
+export interface Shortfall {
+  readonly levels: Readonly<Record<string, number>>;
+  readonly unread: readonly string[];
+}
+
+### build/index.d.ts#YearShortfall
+export interface YearShortfall extends Shortfall {
+  readonly place: string;
+  readonly cases: readonly {
+    readonly case: string;
+    readonly chance: number;
+    readonly endurance: Endurance;
+    readonly shortfall: Shortfall;
+  }[];
+}
+
+### build/index.d.ts#caseDraws
+export declare function caseDraws(layer: EnduranceLayer, caseCuts: CaseCuts, stoppedParts: ReadonlySet<string>): Draw[];
+
+### build/index.d.ts#caseShortfall
+export declare function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options?: Pick<CaseOptions, "stack" | "down">): Shortfall;
+
+### build/index.d.ts#caseStopped
+export declare function caseStopped(caseCuts: CaseCuts, options: Pick<CaseOptions, "stack" | "down">): Set<string>;
+
+### build/index.d.ts#checkEndurance
+export declare function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceFault[];
+
+### build/index.d.ts#curveFault
+export declare function curveFault(curve: Survival): string | undefined;
+
+### build/index.d.ts#drawDemand
+export declare function drawDemand(draw: Draw, caseCuts: CaseCuts): number;
+
+### build/index.d.ts#enduranceOf
+export declare function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions): Endurance;
+
+### build/index.d.ts#hasEnduranceError
+export declare function hasEnduranceError(faults: readonly EnduranceFault[]): boolean;
+
+### build/index.d.ts#joinEndurance
+export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;
+
+### build/index.d.ts#storeAmounts
+export declare function storeAmounts(layer: EnduranceLayer, at: IsoDate, stoppedParts?: ReadonlySet<string>): Map<string, number>;
+
+### build/index.d.ts#survivalAt
+export declare function survivalAt(curve: Survival, days: number): number;
+
+### build/index.d.ts#survivalQuantile
+export declare function survivalQuantile(curve: Survival, chance: number): number;
+
+### build/index.d.ts#tailDays
+export declare function tailDays(curve: Survival, from: number): number;
+
+### build/index.d.ts#yearChance
+export declare function yearChance(prior: Prior): number;
+
+### build/index.d.ts#yearShortfall
+export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions): YearShortfall;
+
+### build/layer.chunk.d.ts#CaseCuts
+interface CaseCuts {
+  readonly case: string;
+  readonly title: string;
+  readonly cuts: readonly Cut[];
+  readonly factors?: Readonly<Record<string, number>> | undefined;
+  readonly leadSeconds?: number | undefined;
+}
+
+### build/layer.chunk.d.ts#Converter
+interface Converter {
+  readonly id: string;
+  readonly device?: string | undefined;
+  readonly takes: readonly {
+    readonly resource: string;
+    readonly amount: number;
+  }[];
+  readonly gives: {
+    readonly need: string;
+    readonly amount: number;
+  };
+}
+
+### build/layer.chunk.d.ts#Cut
+interface Cut {
+  readonly part: string;
+  readonly title: string;
+  readonly duration: Survival;
+  readonly source: string;
+}
+
+### build/layer.chunk.d.ts#DirectUse
+interface DirectUse {
+  readonly resource: string;
+  readonly need: string;
+  readonly amount: number;
+}
+
+### build/layer.chunk.d.ts#Draw
+interface Draw {
+  readonly need: string;
+  readonly level: string;
+  readonly perDay: number;
+  readonly users?: number | undefined;
+  readonly supply: string;
+}
+
+### build/layer.chunk.d.ts#DrawEndurance
+interface DrawEndurance {
+  readonly days: number;
+  readonly binding: readonly string[];
+}
+
+### build/layer.chunk.d.ts#ENDURANCE_SCHEMA
+declare const ENDURANCE_SCHEMA = "endurance/1";
+
+### build/layer.chunk.d.ts#Endurance
+interface Endurance {
+  readonly case: string;
+  readonly at: IsoDate;
+  readonly needs: Readonly<Record<string, DrawEndurance>>;
+}
+
+### build/layer.chunk.d.ts#EnduranceLayer
+interface EnduranceLayer {
+  readonly schema: typeof ENDURANCE_SCHEMA;
+  readonly levels: readonly string[];
+  readonly resources: readonly Resource[];
+  readonly stores: readonly Store[];
+  readonly draws: readonly Draw[];
+  readonly direct?: readonly DirectUse[] | undefined;
+  readonly converters?: readonly Converter[] | undefined;
+  readonly cases?: readonly CaseCuts[] | undefined;
+  readonly priors?: readonly Prior[] | undefined;
+}
+
+### build/layer.chunk.d.ts#IsoDate
+type IsoDate = string;
+
+### build/layer.chunk.d.ts#Prior
+interface Prior {
+  readonly case: string;
+  readonly place: string;
+  readonly perYear: number;
+  readonly reach: number;
+  readonly source: string;
+  readonly asOf: IsoDate;
+}
+
+### build/layer.chunk.d.ts#Resource
+interface Resource {
+  readonly code: string;
+  readonly unit: string;
+}
+
+### build/layer.chunk.d.ts#Store
+interface Store {
+  readonly id: string;
+  readonly resource: string;
+  readonly amount: number;
+  readonly due?: IsoDate | undefined;
+  readonly part?: string | undefined;
+}
+
+### build/layer.chunk.d.ts#Survival
+type Survival = readonly (readonly [days: number, chance: number])[];
+
+### build/schema.d.ts#EnduranceParse
+export type EnduranceParse = {
+  readonly ok: true;
+  readonly layer: EnduranceLayer;
+} | {
+  readonly ok: false;
+  readonly errors: readonly string[];
+};
+
+### build/schema.d.ts#enduranceSchema
+export declare const enduranceSchema: z.ZodType<EnduranceLayer>;
+
+### build/schema.d.ts#parseEndurance
+export declare function parseEndurance(input: unknown): EnduranceParse;
