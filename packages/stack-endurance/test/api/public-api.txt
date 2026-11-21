@@ -25,6 +25,7 @@ Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
 SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
 Shortfall: build/index.d.ts#Shortfall
+ShortfallOptions: build/index.d.ts#ShortfallOptions
 Store: build/layer.chunk.d.ts#Store
 Survival: build/layer.chunk.d.ts#Survival
 YearShortfall: build/index.d.ts#YearShortfall
@@ -89,6 +90,11 @@ export interface Shortfall {
   readonly unread: readonly string[];
 }
 
+### build/index.d.ts#ShortfallOptions
+export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
+  readonly horizon?: number | undefined;
+}
+
 ### build/index.d.ts#YearShortfall
 export interface YearShortfall extends Shortfall {
   readonly place: string;
@@ -104,7 +110,7 @@ export interface YearShortfall extends Shortfall {
 export declare function caseDraws(layer: EnduranceLayer, caseCuts: CaseCuts, stoppedParts: ReadonlySet<string>): Draw[];
 
 ### build/index.d.ts#caseShortfall
-export declare function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options?: Pick<CaseOptions, "stack" | "down">): Shortfall;
+export declare function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options?: ShortfallOptions): Shortfall;
 
 ### build/index.d.ts#caseStopped
 export declare function caseStopped(caseCuts: CaseCuts, options: Pick<CaseOptions, "stack" | "down">): Set<string>;
@@ -137,13 +143,13 @@ export declare function survivalAt(curve: Survival, days: number): number;
 export declare function survivalQuantile(curve: Survival, chance: number): number;
 
 ### build/index.d.ts#tailDays
-export declare function tailDays(curve: Survival, from: number): number;
+export declare function tailDays(curve: Survival, from: number, to?: number): number;
 
 ### build/index.d.ts#yearChance
 export declare function yearChance(prior: Prior): number;
 
 ### build/index.d.ts#yearShortfall
-export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions): YearShortfall;
+export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall;
 
 ### build/layer.chunk.d.ts#CaseCuts
 interface CaseCuts {

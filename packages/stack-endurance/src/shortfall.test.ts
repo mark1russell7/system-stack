@@ -26,6 +26,25 @@ describe("the survival curve", () => {
     expect(tailDays(ROAD, 10)).toBe(0);
   });
 
+  it("stops the tail at a horizon", () => {
+    // From 0 to 2: 0.8 + 0.5 = 1.3 days. From 1 to 5: 0.8 + the area from 3 to 5 (0.2 to 0.143) = 1.143 days.
+    expect(tailDays(ROAD, 0, 2)).toBeCloseTo(1.3, 12);
+    expect(tailDays(ROAD, 1, 5)).toBeCloseTo(0.8 + ((0.2 + 0.2 * (5 / 7)) / 2) * 2, 12);
+    expect(tailDays(ROAD, 4, 4)).toBe(0);
+    expect(tailDays(ROAD, 5, 3)).toBe(0);
+    expect(tailDays(ROAD, 0, 100)).toBeCloseTo(tailDays(ROAD, 0), 12);
+  });
+
+  it("adds the tail of two intervals to the tail of their union", () => {
+    const time = fc.double({ min: 0, max: 12, noNaN: true });
+    fc.assert(
+      fc.property(time, time, time, (a, b, c) => {
+        const [x, y, z] = [a, b, c].sort((p, q) => p - q) as [number, number, number];
+        expect(tailDays(ROAD, x, y) + tailDays(ROAD, y, z)).toBeCloseTo(tailDays(ROAD, x, z), 10);
+      }),
+    );
+  });
+
   it("gives the 90th percentile and the median", () => {
     expect(survivalQuantile(ROAD, 0.1)).toBeCloseTo(6.5, 12);
     expect(survivalQuantile(ROAD, 0.5)).toBeCloseTo(1.5, 12);
@@ -80,6 +99,28 @@ describe("yearShortfall", () => {
     expect(year.levels["comfort"]).toBeCloseTo(0.2594, 3);
     expect(year.cases.map((item) => item.case)).toEqual(["storm", "fire"]);
     expect(year.cases[1]?.shortfall.levels).toEqual({ life: 0, health: 0, comfort: 0 });
+  });
+
+  it("counts only the days up to the horizon", () => {
+    const full = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT });
+    // Each cut of the sample ends at 30 days or before, so a horizon of 30 days changes nothing.
+    const month = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 30 });
+    for (const level of SAMPLE_ENDURANCE.levels) expect(month.levels[level]).toBeCloseTo(full.levels[level] ?? 0, 12);
+    // The power outage lasts up to 30 days. With 14 days, the power counts less, and the water and the food do not change.
+    const short = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 14 });
+    expect(short.levels["comfort"] ?? 0).toBeLessThan(full.levels["comfort"] ?? 0);
+    expect(short.levels["life"]).toBeCloseTo(full.levels["life"] ?? 0, 12);
+    expect(short.levels["health"]).toBeCloseTo(full.levels["health"] ?? 0, 12);
+    // A horizon at the endurance of the water gives no shortfall for the water.
+    const water = enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }).needs["hydration.drink"]?.days ?? 0;
+    expect(caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }), { horizon: water }).levels["life"]).toBe(0);
+    const two = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 2 });
+    for (const level of SAMPLE_ENDURANCE.levels) expect(two.levels[level] ?? 0).toBeLessThanOrEqual(full.levels[level] ?? 0);
+  });
+
+  it("refuses a horizon that is not more than 0", () => {
+    expect(() => yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 0 })).toThrow(RangeError);
+    expect(() => caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }), { horizon: Number.NaN })).toThrow(RangeError);
   });
 
   it("gives 0 at a place with no prior", () => {

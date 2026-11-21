@@ -37,6 +37,8 @@ With a base stack, a cut also stops each part that cannot work without the cut p
 - For one year, the shortfall is the sum over the cases of `(1 - exp(-perYear * reach))` times the shortfall of the case.
 - The query adds the draws of one level. It does not add two levels.
 
+With the option `horizon` of `h` days, the shortfall counts only the first `h` days of each cut: `E[max(0, min(D, h) - T)] * users`. A draw that holds `h` days has no shortfall. Thus a buy plan can aim at a target, for example 14 days and then 90 days.
+
 A draw whose supply stops only through the stack has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
 
 ## The entries
