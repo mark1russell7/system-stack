@@ -15,18 +15,36 @@ export function survivalAt(curve: Survival, days: number): number {
 }
 
 /**
- * This function gives the expected days of a cut after a time: `E[max(0, D - from)]`, the area under the curve from `from` on.
- * The curve is linear between its points, so the area is exact.
+ * This function gives the expected days of a cut after a time, up to a horizon: `E[max(0, min(D, to) - from)]`.
+ * It is the area under the curve from `from` to `to`. The curve is linear between its points, so the area is exact.
+ * With no horizon, the area goes to the end of the curve.
  */
-export function tailDays(curve: Survival, from: number): number {
+export function tailDays(curve: Survival, from: number, to: number = Infinity): number {
   let area = 0;
   for (let index = 1; index < curve.length; index += 1) {
     const [t0] = curve[index - 1] ?? [0, 1];
     const [t1] = curve[index] ?? [0, 0];
     const start = Math.max(t0, from);
-    if (start < t1) area += ((survivalAt(curve, start) + survivalAt(curve, t1)) / 2) * (t1 - start);
+    const end = Math.min(t1, to);
+    if (start < end) area += ((survivalAt(curve, start) + survivalAt(curve, end)) / 2) * (end - start);
   }
   return area;
+}
+
+/**
+ * The options of a shortfall: the stack or the parts that are also down, as for `enduranceOf`, and a horizon.
+ * With a horizon of `h` days, the shortfall counts only the first `h` days of each cut. A draw that holds `h` days has no shortfall.
+ * Thus a plan can aim at a target, for example 14 days and then 90 days.
+ */
+export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
+  /** The horizon in days, more than 0. The default is no horizon. */
+  readonly horizon?: number | undefined;
+}
+
+function horizonOf(options: ShortfallOptions): number {
+  const horizon = options.horizon ?? Infinity;
+  if (!(horizon > 0)) throw new RangeError(`The horizon ${String(options.horizon)} is not a number of days more than 0.`);
+  return horizon;
 }
 
 /**
@@ -64,15 +82,17 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
 }
 
 /**
- * This function gives the shortfall of one event of a case: for each draw, `E[max(0, D - T)] * users`.
- * `T` is the endurance of the draw, and `D` is the duration of the cut of its supply part.
+ * This function gives the shortfall of one event of a case: for each draw, `E[max(0, min(D, h) - T)] * users`.
+ * `T` is the endurance of the draw, `D` is the duration of the cut of its supply part, and `h` is the horizon.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
  * @param endurance - The endurance of the case, from `enduranceOf`
- * @param options - The stack or the parts that are also down, as for `enduranceOf`
+ * @param options - The stack or the parts that are also down, as for `enduranceOf`, and the horizon
+ * @throws RangeError when the horizon is not a number more than 0
  */
-export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: Pick<CaseOptions, "stack" | "down"> = {}): Shortfall {
+export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: ShortfallOptions = {}): Shortfall {
+  const horizon = horizonOf(options);
   const levels = zeroLevels(layer);
   const unread: string[] = [];
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
@@ -82,7 +102,7 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
       unread.push(draw.need);
       continue;
     }
-    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(cut.duration, held.days) * (draw.users ?? 1);
+    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(cut.duration, held.days, horizon) * (draw.users ?? 1);
   }
   return { levels, unread };
 }
@@ -103,9 +123,11 @@ export interface YearShortfall extends Shortfall {
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
- * @param options - The date, and the stack or the parts that are also down
+ * @param options - The date, the stack or the parts that are also down, and the horizon
+ * @throws RangeError when the date is not `YYYY-MM-DD`, or when the horizon is not a number more than 0
  */
-export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions): YearShortfall {
+export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
+  horizonOf(options);
   const levels = zeroLevels(layer);
   const unread: string[] = [];
   const cases: YearShortfall["cases"][number][] = [];
