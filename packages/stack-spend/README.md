@@ -264,6 +264,24 @@ monthTotal(SAMPLE_SPEND);
 
 The cost of the layer has a bound only when `open` is empty. Then `bounded` is that bound.
 
+### The limits when parts are down
+
+A stop by code holds only while its part `stop` works. The option of `serviceStates`, `monthTotal` and `spendSpace` gives the stack and the parts that do not work at this time. Then a stop by code whose part does not work is not in force.
+
+```ts
+import { monthTotal, SAMPLE_SPEND } from "@mark1russell7/stack-spend";
+import { SAMPLE_STACK } from "@mark1russell7/system-stack";
+
+monthTotal(SAMPLE_SPEND, { stack: SAMPLE_STACK, down: ["home-power"] });
+// => { bounded: 0, open: ["cloud-account", "call-account"] }
+```
+
+With the power of the home down, the alert program at home does not work, so it cannot stop the calls. The prepaid balance gets money automatically, so the cost of the call account has no bound. The alert still works through the copy in the cloud.
+
+- The part `stop` does not work when it is in `down`, or when one of its needs does not hold. `working` of the core gives the answer.
+- A stop by code with no part `stop`, or with a part that is not in the stack, is not in force.
+- The other kinds of limit do not change.
+
 ## The steps of the owner
 
 A program cannot change the settings of an account. `ownerSteps(layer, stack, { today })` gives the work of the owner of the accounts, from the faults of the gate.

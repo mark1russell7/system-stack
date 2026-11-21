@@ -1,5 +1,6 @@
 import { evaluate, space, type Expr, type Result, type Space } from "@mark1russell7/vex";
 import { BoolDomain, NumDomain, TextDomain } from "@mark1russell7/vex-domains";
+import { working, type Stack } from "@mark1russell7/system-stack";
 import { BOUNDED_TOTAL, HARD_LIMIT, MONTH_MAX, OPEN_SERVICES } from "./formulas.ts";
 import type { Billing, Limit, Service, SpendLayer } from "./layer.ts";
 import { numberOf } from "./values.ts";
@@ -37,6 +38,27 @@ function limitRecord(limit: Limit): Readonly<Record<string, unknown>> {
   };
 }
 
+/**
+ * The parts that do not work at this time, for the limits of a layer. A stop by code holds only while its part `stop` works.
+ * Thus with these options, a stop by code whose part does not work is not in force.
+ */
+export interface DownOptions {
+  /** This field is the stack of the layer. */
+  readonly stack: Stack;
+  /** This field has the parts of the stack that do not work, for example from the monitors of the system. */
+  readonly down: Iterable<string>;
+}
+
+/**
+ * This function gives a test that tells if a limit is in force. Without options, each limit is in force.
+ * With options, a stop by code is in force only when its part `stop` works. A stop by code with no part `stop` is not in force.
+ */
+function inForce(options: DownOptions | undefined): (limit: Limit) => boolean {
+  if (options === undefined) return () => true;
+  const up = working(options.stack, options.down);
+  return (limit) => limit.kind !== "code" || (limit.stop !== undefined && up.has(limit.stop));
+}
+
 /** This function gives the first record of each part of a layer, in the sequence of the records. */
 export function firstServices(layer: SpendLayer): readonly Service[] {
   const seen = new Set<string>();
@@ -57,8 +79,11 @@ export function firstServices(layer: SpendLayer): readonly Service[] {
  * - A limit of the plan after the end is a child of that `next` node.
  *
  * A wanted limit is not in the tree, because it is not in force. The first record of a part is used.
+ * With `options`, a stop by code whose part `stop` does not work is not in the tree either. The key of a limit keeps
+ * the position of the limit in its record.
  */
-export function spendSpace(layer: SpendLayer): Space {
+export function spendSpace(layer: SpendLayer, options?: DownOptions): Space {
+  const held = inForce(options);
   const records: Record<string, Readonly<Record<string, unknown>>> = { [LAYER_KEY]: { kind: "layer" } };
   const parents: Record<string, string | null> = { [LAYER_KEY]: null };
   for (const service of firstServices(layer)) {
@@ -66,6 +91,7 @@ export function spendSpace(layer: SpendLayer): Space {
     records[key] = { kind: "service", billing: service.billing, ...(service.price === undefined ? {} : { price: service.price }) };
     parents[key] = LAYER_KEY;
     (service.limits ?? []).forEach((limit, index) => {
+      if (!held(limit)) return;
       const child = `limit:${service.part}:${String(index)}`;
       records[child] = limitRecord(limit);
       parents[child] = key;
@@ -76,6 +102,7 @@ export function spendSpace(layer: SpendLayer): Space {
     records[after] = { kind: "next", billing: next.billing, ...(next.price === undefined ? {} : { price: next.price }) };
     parents[after] = key;
     (next.limits ?? []).forEach((limit, index) => {
+      if (!held(limit)) return;
       const child = `next-limit:${service.part}:${String(index)}`;
       records[child] = limitRecord(limit);
       parents[child] = after;
@@ -121,9 +148,12 @@ export interface ServiceState {
   readonly monthMax?: number | undefined;
 }
 
-/** This function gives the state of the cost of each service of a layer, in the sequence of the services. */
-export function serviceStates(layer: SpendLayer): ServiceState[] {
-  const tree = spendSpace(layer);
+/**
+ * This function gives the state of the cost of each service of a layer, in the sequence of the services.
+ * With `options`, a stop by code whose part `stop` does not work is not in force.
+ */
+export function serviceStates(layer: SpendLayer, options?: DownOptions): ServiceState[] {
+  const tree = spendSpace(layer, options);
   return firstServices(layer).map((service) => {
     const hardLimit = numberOf(evaluateService(HARD_LIMIT, tree, service.part));
     const nextLimit = service.ends?.next === undefined ? undefined : numberOf(evaluateNext(HARD_LIMIT, tree, service.part));
@@ -149,9 +179,10 @@ export interface MonthTotal {
 /**
  * This function gives the largest cost of a layer in a month.
  * The cost of the layer has a bound only when `open` is empty. Then `bounded` is that bound.
+ * With `options`, a stop by code whose part `stop` does not work is not in force.
  */
-export function monthTotal(layer: SpendLayer): MonthTotal {
-  const tree = spendSpace(layer);
+export function monthTotal(layer: SpendLayer, options?: DownOptions): MonthTotal {
+  const tree = spendSpace(layer, options);
   const keys = run(OPEN_SERVICES, tree, LAYER_KEY);
   const open = keys.ok && Array.isArray(keys.value) ? keys.value.filter((key): key is string => typeof key === "string").map((key) => key.slice(SERVICE_PREFIX.length)) : [];
   return { bounded: numberOf(run(BOUNDED_TOTAL, tree, LAYER_KEY)) ?? 0, open };
