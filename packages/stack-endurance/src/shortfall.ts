@@ -118,6 +118,7 @@ function curveFrom(times: readonly number[], chanceAt: (days: number) => number)
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
  * @param stops - This function tells if the cuts of a list of indexes stop the supply. A larger list stops it when a smaller list does.
+ * @throws RangeError when a curve does not end at a chance of 0
  */
 export function eventStop(curves: readonly Survival[], stops: (cuts: readonly number[]) => boolean): Survival {
   return curveFrom(bendTimes(curves), (days) => {
@@ -134,7 +135,7 @@ export function eventStop(curves: readonly Survival[], stops: (cuts: readonly nu
  * It is `eventStop` when any one cut stops the supply.
  *
  * @param curves - The curves, each one good for `checkEndurance`
- * @throws RangeError when there is no curve
+ * @throws RangeError when there is no curve, or when a curve does not end at a chance of 0
  */
 export function longestStop(curves: readonly Survival[]): Survival {
   const first = curves[0];
@@ -180,6 +181,7 @@ function popCount(mask: number): number {
  *
  * @param curves - The curves of the cuts
  * @param sets - The minimal sets of `minimalStops`, or `undefined`
+ * @throws RangeError when a curve does not end at a chance of 0
  */
 export function upperStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival {
   const groups = sets ?? curves.map((_, index) => [index]);
