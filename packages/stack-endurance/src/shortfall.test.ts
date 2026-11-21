@@ -5,13 +5,15 @@ import { enduranceOf } from "./endurance.ts";
 import type { CaseCuts, Survival } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 import { curveFault } from "./check.ts";
-import { caseShortfall, longestStop, stopCurve, survivalAt, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
+import { caseShortfall, eventStop, longestStop, minimalStops, stopCurves, survivalAt, upperStop, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
 
 const AT = "2026-12-01";
 const ROAD: Survival = [[0, 1], [1, 0.6], [3, 0.2], [10, 0]];
 const storm = SAMPLE_ENDURANCE.cases?.find((item) => item.case === "storm") as CaseCuts;
 const GRID: Survival = storm.cuts.find((cut) => cut.part === "grid")?.duration ?? [];
 const MAIN: Survival = storm.cuts.find((cut) => cut.part === "water-main")?.duration ?? [];
+const DRINK = SAMPLE_ENDURANCE.draws.find((item) => item.need === "hydration.drink") as (typeof SAMPLE_ENDURANCE.draws)[number];
+const TIMES = [0, 0.25, 0.5, 0.8, 1, 1.7, 2, 3, 4.5, 6.9, 7, 8, 12, 29, 31];
 const MAIN_NEEDS_GRID: Stack = { ...SAMPLE_ENDURANCE_STACK, parts: SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: ["grid"] } : part)) };
 
 describe("the survival curve", () => {
@@ -92,13 +94,34 @@ describe("caseShortfall", () => {
     expect(shortfall.levels["life"]).toBeCloseTo(0.4711, 4);
   });
 
-  it("uses the longest cut when two cuts stop the supply", () => {
-    const drink = SAMPLE_ENDURANCE.draws.find((item) => item.need === "hydration.drink");
-    if (drink === undefined) throw new Error("The sample has no drink draw.");
-    expect(stopCurve(storm, drink, { stack: MAIN_NEEDS_GRID })).toEqual(longestStop([GRID, MAIN]));
-    expect(stopCurve(storm, drink)).toEqual(MAIN);
+  it("uses the longest cut when two cuts stop the supply, and their sum as the upper limit", () => {
+    const curves = stopCurves(storm, DRINK, { stack: MAIN_NEEDS_GRID });
+    for (const days of TIMES) {
+      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(GRID, days), survivalAt(MAIN, days)), 9);
+      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(GRID, days) + survivalAt(MAIN, days)), 9);
+    }
+    const alone = stopCurves(storm, DRINK);
+    for (const days of TIMES) expect(survivalAt(alone?.event ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
+    for (const days of TIMES) expect(survivalAt(alone?.upper ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
     // Without the stack, the grid cut does not stop the water main.
-    expect(stopCurve({ ...storm, cuts: storm.cuts.filter((cut) => cut.part === "grid") }, drink)).toBeUndefined();
+    expect(stopCurves({ ...storm, cuts: storm.cuts.filter((cut) => cut.part === "grid") }, DRINK)).toBeUndefined();
+  });
+
+  it("ends a stop through a need of any of two parts with the shorter of their cuts", () => {
+    // The water main needs the grid or the road. The minimal sets are {main} and {grid, road}.
+    const stack: Stack = { ...SAMPLE_ENDURANCE_STACK, parts: SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: [{ any: ["grid", "road"] }] } : part)) };
+    const curves = stopCurves(storm, DRINK, { stack });
+    const road = storm.cuts.find((cut) => cut.part === "road")?.duration ?? [];
+    for (const days of TIMES) {
+      const pair = Math.min(survivalAt(GRID, days), survivalAt(road, days));
+      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(MAIN, days), pair), 9);
+      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + pair), 9);
+    }
+    // The road ends at 10 days, so the pair ends then: the grid cut alone does not stop the water after 10 days.
+    expect(survivalAt(curves?.event ?? [], 12)).toBe(0);
+    const shortfall = caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT, stack }), { stack });
+    expect(shortfall.upper["life"] ?? 0).toBeGreaterThanOrEqual(shortfall.levels["life"] ?? 0);
+    expect(shortfall.levels["life"] ?? 0).toBeGreaterThan(0.01);
   });
 
   it("gives a draw that only a part of down stops as no read", () => {
@@ -106,6 +129,23 @@ describe("caseShortfall", () => {
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, none, enduranceOf(SAMPLE_ENDURANCE, none, { at: AT, down: ["water-main"] }), { down: ["water-main"] });
     expect(shortfall.unread).toEqual(["hydration.drink"]);
     expect(shortfall.levels["life"]).toBe(0);
+  });
+});
+
+describe("minimalStops", () => {
+  it("gives each minimal set that stops, and nothing for too many cuts", () => {
+    // Cut 0 stops alone. Cuts 1 and 2 stop together. Cut 3 does nothing.
+    const stops = (cuts: readonly number[]): boolean => cuts.includes(0) || (cuts.includes(1) && cuts.includes(2));
+    expect(minimalStops(4, stops)).toEqual([[0], [1, 2]]);
+    expect(minimalStops(13, stops)).toBeUndefined();
+  });
+});
+
+describe("eventStop and upperStop", () => {
+  it("give 0 at each time when no set stops, and a sum of all curves with no sets", () => {
+    expect(eventStop([GRID, MAIN], () => false)).toEqual([[0, 0]]);
+    const upper = upperStop([GRID, MAIN], undefined);
+    for (const days of TIMES) expect(survivalAt(upper, days)).toBeCloseTo(Math.min(1, survivalAt(GRID, days) + survivalAt(MAIN, days)), 9);
   });
 });
 
@@ -179,6 +219,6 @@ describe("yearShortfall", () => {
   });
 
   it("gives 0 at a place with no prior", () => {
-    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, unread: [], cases: [] });
+    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], cases: [] });
   });
 });

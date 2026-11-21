@@ -115,6 +115,8 @@ export interface DrawEndurance {
   readonly days: number;
   /** The inputs of the draw that are used up at `days`, in the order of their codes. A higher draw can use up an input first. */
   readonly binding: readonly string[];
+  /** The amount of each resource that the draw takes in its days, by the code of the resource. A resource with no take is not in the record. */
+  readonly takes: Readonly<Record<string, number>>;
 }
 
 /** The days that each draw holds when a case stops its supply. A draw whose supply works is not in `needs`. */

@@ -128,6 +128,7 @@ const USED_UP = 1e-9;
  * - The draws take the resources in the order of their level, then of their codes. A draw takes from its direct uses first, then from its converters.
  * - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
  * - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
+ * - The take order is a rule, not the best share: the direct uses in the order of the list, then the converters. The days are the days of this order.
  * - A converter whose device stops gives nothing. A store whose part stops gives nothing.
  *
  * The function is pure. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
@@ -141,13 +142,14 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
   const stoppedParts = caseStopped(caseCuts, options);
   const start = storeAmounts(layer, options.at, stoppedParts);
   const done: { readonly ways: Ways; readonly demand: number; readonly days: number }[] = [];
-  const needs: Record<string, { days: number; binding: string[] }> = {};
+  const needs: Record<string, { days: number; binding: string[]; takes: Record<string, number> }> = {};
   for (const draw of caseDraws(layer, caseCuts, stoppedParts)) {
     const ways = waysOf(layer, draw.need, stoppedParts);
     const demand = drawDemand(draw, caseCuts);
+    const before = new Map(start);
+    for (const higher of done) take(before, higher.ways, higher.days * higher.demand);
     const after = (days: number): { left: Map<string, number>; short: number } => {
-      const left = new Map(start);
-      for (const higher of done) take(left, higher.ways, higher.days * higher.demand);
+      const left = new Map(before);
       return { left, short: take(left, ways, days * demand) };
     };
     const fits = (days: number): boolean => after(days).short <= TOLERANCE * days * demand;
@@ -164,7 +166,12 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
     const { left } = after(low);
     const inputs = new Set([...ways.direct.map((use) => use.resource), ...ways.converters.flatMap((converter) => converter.takes.map((input) => input.resource))]);
     const binding = [...inputs].filter((resource) => (left.get(resource) ?? 0) <= USED_UP * Math.max(1, start.get(resource) ?? 0)).sort();
-    needs[draw.need] = { days: low, binding };
+    const takes: Record<string, number> = {};
+    for (const [resource, amount] of before) {
+      const taken = amount - (left.get(resource) ?? 0);
+      if (taken > 0) takes[resource] = taken;
+    }
+    needs[draw.need] = { days: low, binding, takes };
     done.push({ ways, demand, days: low });
   }
   return { case: caseCuts.case, at: options.at, needs };

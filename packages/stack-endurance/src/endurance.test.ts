@@ -67,8 +67,8 @@ describe("enduranceOf", () => {
   it("gives 0 days and each input as binding when the stores are empty", () => {
     const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: [] };
     const result = enduranceOf(layer, storm, { at: AT });
-    expect(result.needs["hydration.drink"]).toEqual({ days: 0, binding: ["water.stored"] });
-    expect(result.needs["food.energy"]).toEqual({ days: 0, binding: ["food.grain-dry", "food.ready", "fuel.propane", "water.stored"] });
+    expect(result.needs["hydration.drink"]).toMatchObject({ days: 0, binding: ["water.stored"] });
+    expect(result.needs["food.energy"]).toMatchObject({ days: 0, binding: ["food.grain-dry", "food.ready", "fuel.propane", "water.stored"] });
   });
 
   it("gives a lower draw only what each higher draw leaves after its own days", () => {
@@ -86,8 +86,11 @@ describe("enduranceOf", () => {
     };
     const cut: CaseCuts = { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] };
     const result = enduranceOf(layer, cut, { at: AT });
-    expect(result.needs["net"]).toEqual({ days: expect.closeTo(7, 9), binding: ["w", "x"] });
-    expect(result.needs["host"]).toEqual({ days: 0, binding: ["w"] });
+    expect(result.needs["net"]).toMatchObject({ days: expect.closeTo(7, 9), binding: ["w", "x"] });
+    expect(result.needs["host"]).toMatchObject({ days: 0, binding: ["w"] });
+    expect(result.needs["net"]?.takes["x"]).toBeCloseTo(4, 9);
+    expect(result.needs["net"]?.takes["w"]).toBeCloseTo(10, 9);
+    expect(result.needs["host"]?.takes).toEqual({});
     // With no use of w for "net", "net" holds 2 days on x. Then "host" has all of w, 10 days.
     const apart = enduranceOf({ ...layer, direct: layer.direct?.slice(0, 2) }, cut, { at: AT });
     expect(apart.needs["net"]?.days).toBeCloseTo(2, 9);
@@ -139,37 +142,39 @@ describe("the laws of enduranceOf", () => {
 });
 
 describe("the takes of a case", () => {
-  /** This function replays the takes of the draws at their days, in the order of `enduranceOf`, and gives the take of each resource. */
-  function totalTakes(layer: EnduranceLayer, caseCuts: CaseCuts): Map<string, number> {
-    const result = enduranceOf(layer, caseCuts, { at: AT });
-    const left = storeAmounts(layer, AT);
-    const start = new Map(left);
-    for (const draw of layer.draws) {
-      const held = result.needs[draw.need];
-      if (held === undefined) continue;
-      let rest = held.days * draw.perDay * (caseCuts.factors?.[draw.need] ?? 1);
-      for (const use of (layer.direct ?? []).filter((item) => item.need === draw.need)) {
-        const got = Math.min(rest, (left.get(use.resource) ?? 0) * use.amount);
-        left.set(use.resource, (left.get(use.resource) ?? 0) - got / use.amount);
-        rest -= got;
-      }
-      for (const converter of (layer.converters ?? []).filter((item) => item.gives.need === draw.need)) {
-        let runs = rest / converter.gives.amount;
-        for (const input of converter.takes) runs = Math.min(runs, (left.get(input.resource) ?? 0) / input.amount);
-        for (const input of converter.takes) left.set(input.resource, (left.get(input.resource) ?? 0) - runs * input.amount);
-        rest -= runs * converter.gives.amount;
-      }
-      expect(rest, draw.need).toBeLessThanOrEqual(1e-6 * Math.max(1, held.days * draw.perDay));
-    }
-    return new Map([...start].map(([resource, amount]) => [resource, amount - (left.get(resource) ?? 0)]));
+  /** This function tells if the takes of all the draws of a case are not more than the stores of the case. */
+  function takesFit(layer: EnduranceLayer, caseCuts: CaseCuts, options: { stack?: Stack } = {}): void {
+    const result = enduranceOf(layer, caseCuts, { at: AT, ...options });
+    const stores = storeAmounts(layer, AT, caseStopped(caseCuts, options));
+    const total = new Map<string, number>();
+    for (const held of Object.values(result.needs)) for (const [resource, amount] of Object.entries(held.takes)) total.set(resource, (total.get(resource) ?? 0) + amount);
+    for (const [resource, taken] of total) expect(taken, resource).toBeLessThanOrEqual((stores.get(resource) ?? 0) * (1 + 1e-9) + 1e-9);
   }
 
   it("never takes more than the stores in the storm, also when each store is smaller", () => {
     fc.assert(
       fc.property(fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { minLength: SAMPLE_ENDURANCE.stores.length, maxLength: SAMPLE_ENDURANCE.stores.length }), (parts) => {
-        const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => ({ ...store, amount: store.amount * (parts[at] ?? 1) })) };
-        const stores = storeAmounts(layer, AT);
-        for (const [resource, taken] of totalTakes(layer, storm)) expect(taken).toBeLessThanOrEqual((stores.get(resource) ?? 0) * (1 + 1e-6) + 1e-9);
+        takesFit({ ...SAMPLE_ENDURANCE, stores: SAMPLE_ENDURANCE.stores.map((store, at) => ({ ...store, amount: store.amount * (parts[at] ?? 1) })) }, storm);
+      }),
+    );
+  });
+
+  it("never takes more than the stores with draws out of level order, a shared converter input and a store on a cut part", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 20, noNaN: true }), fc.double({ min: 0, max: 20, noNaN: true }), fc.double({ min: 0, max: 20, noNaN: true }), (w, x, y) => {
+        const layer: EnduranceLayer = {
+          schema: SAMPLE_ENDURANCE.schema,
+          levels: ["critical", "normal"],
+          resources: [{ code: "w", unit: "Wh" }, { code: "x", unit: "Wh" }],
+          stores: [{ id: "a", resource: "w", amount: w }, { id: "b", resource: "x", amount: x }, { id: "c", resource: "w", amount: y, part: "grid" }],
+          draws: [
+            { need: "host", level: "normal", perDay: 1, supply: "grid" },
+            { need: "net", level: "critical", perDay: 2, supply: "grid" },
+          ],
+          direct: [{ resource: "w", need: "host", amount: 1 }],
+          converters: [{ id: "mix", takes: [{ resource: "x", amount: 1 }, { resource: "w", amount: 1 }], gives: { need: "net", amount: 1 } }],
+        };
+        takesFit(layer, { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] });
       }),
     );
   });

@@ -27,6 +27,7 @@ Each function is a plain function with no clock, no network and no file. The uni
 - A draw takes from its direct uses first, then from its converters.
 - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
 - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
+- The take order is a rule, not the best share. The days are the days of this order. `takes` gives the amount of each resource that a draw takes.
 - A store gives nothing on its due date and after it. A store or a converter whose part stops gives nothing.
 
 With a base stack, a cut also stops each part that cannot work without the cut part. Thus a pump that needs the grid stops with the grid.
@@ -34,7 +35,7 @@ With a base stack, a cut also stops each part that cannot work without the cut p
 ## The rule of shortfall
 
 - For one draw in one case, the shortfall is `E[max(0, D - T)] * users`. `T` is the endurance of the draw. `D` is the duration of the stop of its supply.
-- A cut stops the supply when it cuts the supply part, or a part that the supply needs through the stack. The stop lasts as long as its longest cut.
+- A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack. A need of `any` parts stops only when enough of them are cut.
 - `E[max(0, D - T)]` is the area under the survival curve from `T` on. The curve is linear between its points, so the area is exact.
 - For one year, the shortfall is the sum over the cases of `perYear * reach` times the shortfall of the case. Thus it is the expected user-days of one year.
 - The query adds the draws of one level. It does not add two levels.
@@ -43,7 +44,9 @@ With the option `horizon` of `h` days, the shortfall counts only the first `h` d
 
 A draw that only the parts of `down` stop has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
 
-The cuts of one case come from one event. So the curve of a stop with two cuts is the largest chance of the two curves at each time (`longestStop`). This is exact when a longer event makes each cut longer. When the cuts are independent, the true stop can be longer.
+The cuts of one case come from one event. `levels` takes each cut longer together with the event (`eventStop`). Then a stop with two cuts lasts as long as the longer cut. A stop through a need of `any` of two parts ends with the shorter cut.
+
+`upper` is an upper limit for each dependence of the cuts (`upperStop`). At each time, its chance is the sum over the minimal sets of cuts of the smallest chance of the set, to 1 or less. A gate of a high level can use `upper`.
 
 ## The entries
 

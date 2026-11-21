@@ -71,20 +71,10 @@ export function yearRate(prior: Prior): number {
   return prior.perYear * prior.reach;
 }
 
-/**
- * This function gives the curve of the longest of some stops: at each time, the largest chance of the curves.
- * The stops of one case come from one event, so the longest stop ends last. The result is a survival curve.
- *
- * @param curves - The curves, each one good for `checkEndurance`
- * @throws RangeError when there is no curve
- */
-export function longestStop(curves: readonly Survival[]): Survival {
-  const first = curves[0];
-  if (first === undefined) throw new RangeError("longestStop needs one or more curves.");
-  if (curves.length === 1) return first;
+/** This function gives the times at which a curve of the result can bend: each point of each curve, and each crossing of two curves. */
+function bendTimes(curves: readonly Survival[]): number[] {
   const times = [...new Set(curves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
-  const points = new Set(times);
-  // Two lines can cross between two times. Each crossing is a point of the result.
+  const out = new Set(times);
   for (let index = 1; index < times.length; index += 1) {
     const t0 = times[index - 1] ?? 0;
     const t1 = times[index] ?? 0;
@@ -92,41 +82,141 @@ export function longestStop(curves: readonly Survival[]): Survival {
       for (const b of curves.slice(i + 1)) {
         const d0 = survivalAt(a, t0) - survivalAt(b, t0);
         const d1 = survivalAt(a, t1) - survivalAt(b, t1);
-        if (d0 * d1 < 0) points.add(t0 + ((t1 - t0) * d0) / (d0 - d1));
+        if (d0 * d1 < 0) out.add(t0 + ((t1 - t0) * d0) / (d0 - d1));
       }
     }
   }
+  return [...out].sort((x, y) => x - y);
+}
+
+/** This function makes a survival curve from a chance at each time. It stops at the first chance of 0, and it removes an increase of rounding. */
+function curveFrom(times: readonly number[], chanceAt: (days: number) => number): Survival {
   const out: [number, number][] = [];
-  for (const days of [...points].sort((x, y) => x - y)) {
-    // The largest of curves that do not increase does not increase. The limit only removes an error of rounding.
-    const chance = Math.min(out[out.length - 1]?.[1] ?? 1, Math.max(...curves.map((curve) => survivalAt(curve, days))));
-    // The first point with a chance of 0 ends the curve.
+  for (const days of times) {
+    const chance = Math.min(out[out.length - 1]?.[1] ?? 1, chanceAt(days));
     out.push([days, chance]);
     if (chance === 0) break;
   }
+  if ((out[out.length - 1]?.[1] ?? 0) > 0) out.push([(out[out.length - 1]?.[0] ?? 0) + 1, 0]);
   return out;
 }
 
 /**
- * This function gives the curve of the duration of the stop of a draw, or `undefined` when the query has no curve.
+ * This function gives the curve of a stop of some cuts when one event makes each cut longer together.
+ * At each time, the chance is the largest `s` at which the cuts with a chance of `s` or more stop the supply.
  *
- * - A cut stops the supply when it cuts the supply part, or when the supply needs the cut part through the stack.
- * - The stop lasts as long as its longest cut (`longestStop`).
- * - When only the parts of `down` stop the supply, or when no cut stops it, the query has no curve.
+ * - When any one cut stops the supply, the result is the largest chance of the curves (`longestStop`).
+ * - When the supply needs `any` of two parts, the stop ends with the shorter of the two cuts.
+ * - Between two times of `bendTimes` the order of the curves does not change. So the result is linear between its points.
+ *
+ * @param curves - The curves of the cuts, each one good for `checkEndurance`
+ * @param stops - This function tells if the cuts of a list of indexes stop the supply. A larger list stops it when a smaller list does.
  */
-export function stopCurve(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): Survival | undefined {
-  if ((options.down ?? []).length > 0 && caseStopped({ ...caseCuts, cuts: [] }, options).has(draw.supply)) return undefined;
-  const alone = options.stack === undefined ? {} : { stack: options.stack };
-  const causes = caseCuts.cuts.filter((cut) => caseStopped({ ...caseCuts, cuts: [cut] }, alone).has(draw.supply));
-  return causes.length === 0 ? undefined : longestStop(causes.map((cut) => cut.duration));
+export function eventStop(curves: readonly Survival[], stops: (cuts: readonly number[]) => boolean): Survival {
+  return curveFrom(bendTimes(curves), (days) => {
+    const chances = curves.map((curve) => survivalAt(curve, days));
+    for (const level of [...new Set(chances)].sort((x, y) => y - x)) {
+      if (stops(chances.flatMap((chance, index) => (chance >= level ? [index] : [])))) return level;
+    }
+    return 0;
+  });
+}
+
+/**
+ * This function gives the curve of the longest of some stops: at each time, the largest chance of the curves.
+ * It is `eventStop` when any one cut stops the supply.
+ *
+ * @param curves - The curves, each one good for `checkEndurance`
+ * @throws RangeError when there is no curve
+ */
+export function longestStop(curves: readonly Survival[]): Survival {
+  const first = curves[0];
+  if (first === undefined) throw new RangeError("longestStop needs one or more curves.");
+  return curves.length === 1 ? first : eventStop(curves, (cuts) => cuts.length > 0);
+}
+
+/** The largest count of cuts for which `minimalStops` examines each set. */
+export const MINIMAL_STOP_CUTS = 12;
+
+/**
+ * This function gives the minimal sets of cuts that stop the supply: each set stops it, and no smaller part of a set stops it.
+ * With more than `MINIMAL_STOP_CUTS` cuts, the result is `undefined`.
+ */
+export function minimalStops(count: number, stops: (cuts: readonly number[]) => boolean): number[][] | undefined {
+  if (count > MINIMAL_STOP_CUTS) return undefined;
+  const found: number[][] = [];
+  const masks: number[] = [];
+  const all = Array.from({ length: 1 << count }, (_, mask) => mask).sort((x, y) => popCount(x) - popCount(y) || x - y);
+  for (const mask of all) {
+    if (mask === 0 || masks.some((other) => (other & mask) === other)) continue;
+    const cuts = Array.from({ length: count }, (_, index) => index).filter((index) => (mask >> index) & 1);
+    if (!stops(cuts)) continue;
+    masks.push(mask);
+    found.push(cuts);
+  }
+  return found;
+}
+
+function popCount(mask: number): number {
+  let total = 0;
+  for (let rest = mask; rest > 0; rest &= rest - 1) total += 1;
+  return total;
+}
+
+/**
+ * This function gives an upper limit of the curve of a stop for each dependence of the cuts.
+ * At each time it is `min(1, sum over the minimal sets of the smallest chance of the set)`.
+ * With no minimal sets, as for too many cuts, it is `min(1, sum of the chances)`.
+ *
+ * @param curves - The curves of the cuts
+ * @param sets - The minimal sets of `minimalStops`, or `undefined`
+ */
+export function upperStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival {
+  const groups = sets ?? curves.map((_, index) => [index]);
+  const sum = (days: number): number => groups.reduce((total, set) => total + Math.min(...set.map((index) => survivalAt(curves[index] ?? [], days))), 0);
+  // The sum is linear between two times of bendTimes. A point where it falls through 1 is a bend of min(1, sum).
+  const times = bendTimes(curves);
+  const bends = new Set(times);
+  for (let index = 1; index < times.length; index += 1) {
+    const t0 = times[index - 1] ?? 0;
+    const t1 = times[index] ?? 0;
+    const s0 = sum(t0) - 1;
+    const s1 = sum(t1) - 1;
+    if (s0 * s1 < 0) bends.add(t0 + ((t1 - t0) * s0) / (s0 - s1));
+  }
+  return curveFrom([...bends].sort((x, y) => x - y), (days) => Math.min(1, sum(days)));
+}
+
+/** The curves of the stop of a draw: when one event makes each cut longer together, and an upper limit for each dependence. */
+export interface StopCurves {
+  readonly event: Survival;
+  readonly upper: Survival;
+}
+
+/**
+ * This function gives the curves of the duration of the stop of a draw, or `undefined` when the query has no curve.
+ *
+ * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
+ * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
+ * - `event` is `eventStop`. `upper` is `upperStop` over the minimal sets of cuts.
+ */
+export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): StopCurves | undefined {
+  const stops = (cuts: readonly number[]): boolean => caseStopped({ ...caseCuts, cuts: cuts.flatMap((index) => caseCuts.cuts[index] ?? []) }, options).has(draw.supply);
+  if (stops([])) return undefined;
+  const all = caseCuts.cuts.map((_, index) => index);
+  if (!stops(all)) return undefined;
+  const curves = caseCuts.cuts.map((cut) => cut.duration);
+  return { event: eventStop(curves, stops), upper: upperStop(curves, minimalStops(curves.length, stops)) };
 }
 
 /** The shortfall of each level, in user-days, and the draws that the query cannot read. */
 export interface Shortfall {
-  /** The user-days of each level of the layer. The query adds the draws of one level. It does not add two levels. */
+  /** The user-days of each level of the layer, when one event makes each cut longer together. The query does not add two levels. */
   readonly levels: Readonly<Record<string, number>>;
+  /** The upper limit of the user-days of each level, for each dependence of the cuts. A gate of a high level can use it. */
+  readonly upper: Readonly<Record<string, number>>;
   /**
-   * The needs of the draws whose stop has no curve (`stopCurve`).
+   * The needs of the draws whose stop has no curve (`stopCurves`).
    * The query has no curve of their duration, so their shortfall is not in `levels`. A gate shows them as no read.
    */
   readonly unread: readonly string[];
@@ -149,17 +239,20 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
 export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: ShortfallOptions = {}): Shortfall {
   const horizon = horizonOf(options);
   const levels = zeroLevels(layer);
+  const upper = zeroLevels(layer);
   const unread: string[] = [];
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
     const held = endurance.needs[draw.need];
-    const curve = stopCurve(caseCuts, draw, options);
-    if (held === undefined || curve === undefined) {
+    const curves = stopCurves(caseCuts, draw, options);
+    if (held === undefined || curves === undefined) {
       unread.push(draw.need);
       continue;
     }
-    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curve, held.days, horizon) * (draw.users ?? 1);
+    const users = draw.users ?? 1;
+    levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curves.event, held.days, horizon) * users;
+    upper[draw.level] = (upper[draw.level] ?? 0) + tailDays(curves.upper, held.days, horizon) * users;
   }
-  return { levels, unread };
+  return { levels, upper, unread };
 }
 
 /** The shortfall of one year at one place, with the part of each case. */
@@ -185,6 +278,7 @@ export interface YearShortfall extends Shortfall {
 export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
   horizonOf(options);
   const levels = zeroLevels(layer);
+  const upper = zeroLevels(layer);
   const unread: string[] = [];
   const cases: YearShortfall["cases"][number][] = [];
   for (const caseCuts of layer.cases ?? []) {
@@ -194,8 +288,9 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     const endurance = enduranceOf(layer, caseCuts, options);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
     for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
+    for (const [level, days] of Object.entries(shortfall.upper)) upper[level] = (upper[level] ?? 0) + rate * days;
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
-  return { place, levels, unread, cases };
+  return { place, levels, upper, unread, cases };
 }
