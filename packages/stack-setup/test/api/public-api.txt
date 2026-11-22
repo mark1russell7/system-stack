@@ -6,6 +6,9 @@
 
 ## . (build/index.d.ts): names
 
+APT_SOURCE_FOLDERS: build/layer.chunk.d.ts#APT_SOURCE_FOLDERS
+ArchiveMark: build/layer.chunk.d.ts#ArchiveMark
+ArchiveStep: build/layer.chunk.d.ts#ArchiveStep
 CommandStep: build/layer.chunk.d.ts#CommandStep
 DownloadStep: build/layer.chunk.d.ts#DownloadStep
 FileStep: build/layer.chunk.d.ts#FileStep
@@ -30,9 +33,11 @@ SwapStep: build/layer.chunk.d.ts#SwapStep
 UserStep: build/layer.chunk.d.ts#UserStep
 Variable: build/layer.chunk.d.ts#Variable
 VariableRead: build/layer.chunk.d.ts#VariableRead
+changesAptSources: build/layer.chunk.d.ts#changesAptSources
 checkSetup: build/index.d.ts#checkSetup
 hasSetupError: build/index.d.ts#hasSetupError
 hostProfiles: build/index.d.ts#hostProfiles
+isArchiveFolder: build/index.d.ts#isArchiveFolder
 isVariableRead: build/layer.chunk.d.ts#isVariableRead
 joinSetup: build/index.d.ts#joinSetup
 profileOrder: build/index.d.ts#profileOrder
@@ -72,7 +77,7 @@ export interface ProfileOrder {
 export declare const SAMPLE_SETUP: SetupLayer;
 
 ### build/index.d.ts#SETUP_CODES
-export declare const SETUP_CODES: readonly ["setup-name", "setup-variable-twice", "setup-profile-twice", "setup-step-twice", "setup-part", "setup-host", "setup-variable", "setup-variable-unused", "setup-secret-exposed", "setup-text", "setup-path", "setup-path-twice", "setup-user-twice", "setup-mode", "setup-url", "setup-sha256", "setup-swap-size", "setup-program", "setup-empty", "setup-cycle"];
+export declare const SETUP_CODES: readonly ["setup-name", "setup-variable-twice", "setup-profile-twice", "setup-step-twice", "setup-part", "setup-host", "setup-variable", "setup-variable-unused", "setup-secret-exposed", "setup-text", "setup-path", "setup-path-twice", "setup-user-twice", "setup-mode", "setup-url", "setup-sha256", "setup-swap-size", "setup-archive", "setup-program", "setup-empty", "setup-cycle"];
 
 ### build/index.d.ts#SETUP_EXIT
 export declare const SETUP_EXIT: {
@@ -112,6 +117,9 @@ export declare function hasSetupError(faults: readonly SetupFault[]): boolean;
 ### build/index.d.ts#hostProfiles
 export declare function hostProfiles(layer: SetupLayer, host: string): Profile[];
 
+### build/index.d.ts#isArchiveFolder
+export declare function isArchiveFolder(path: string): boolean;
+
 ### build/index.d.ts#joinSetup
 export declare function joinSetup(pieces: readonly LayerPiece<SetupLayer>[]): LayerParse<SetupLayer>;
 
@@ -130,12 +138,32 @@ export declare function setupScript(layer: SetupLayer, stack: Stack, host: strin
 ### build/index.d.ts#shellWord
 export declare function shellWord(text: SetupText): string;
 
+### build/layer.chunk.d.ts#APT_SOURCE_FOLDERS
+declare const APT_SOURCE_FOLDERS: readonly ["/etc/apt/", "/usr/share/keyrings/"];
+
+### build/layer.chunk.d.ts#ArchiveMark
+interface ArchiveMark {
+  readonly path: string;
+  readonly sha256: string;
+}
+
+### build/layer.chunk.d.ts#ArchiveStep
+interface ArchiveStep extends StepBase {
+  readonly kind: "archive";
+  readonly url: string;
+  readonly sha256: string;
+  readonly into: string;
+  readonly strip?: number | undefined;
+  readonly mark: ArchiveMark;
+}
+
 ### build/layer.chunk.d.ts#CommandStep
 interface CommandStep extends StepBase {
   readonly kind: "command";
   readonly run: readonly SetupText[];
   readonly check: readonly SetupText[];
   readonly as?: string | undefined;
+  readonly input?: SetupText | undefined;
 }
 
 ### build/layer.chunk.d.ts#DownloadStep
@@ -176,7 +204,7 @@ interface Profile {
 declare const SETUP_SCHEMA = "setup/1";
 
 ### build/layer.chunk.d.ts#STEP_KINDS
-declare const STEP_KINDS: readonly ["package", "user", "file", "download", "swap", "service", "command"];
+declare const STEP_KINDS: readonly ["package", "user", "file", "download", "archive", "swap", "service", "command"];
 
 ### build/layer.chunk.d.ts#ServiceStep
 interface ServiceStep extends StepBase {
@@ -197,7 +225,7 @@ interface SetupLayer {
 type SetupText = string | VariableRead | readonly (string | VariableRead)[];
 
 ### build/layer.chunk.d.ts#Step
-type Step = PackageStep | UserStep | FileStep | DownloadStep | SwapStep | ServiceStep | CommandStep;
+type Step = PackageStep | UserStep | FileStep | DownloadStep | ArchiveStep | SwapStep | ServiceStep | CommandStep;
 
 ### build/layer.chunk.d.ts#StepKind
 type StepKind = Step["kind"];
@@ -229,6 +257,9 @@ interface Variable {
 interface VariableRead {
   readonly $var: string;
 }
+
+### build/layer.chunk.d.ts#changesAptSources
+declare function changesAptSources(step: Step): boolean;
 
 ### build/layer.chunk.d.ts#isVariableRead
 declare function isVariableRead(value: unknown): value is VariableRead;
