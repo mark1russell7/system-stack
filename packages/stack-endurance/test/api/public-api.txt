@@ -275,9 +275,11 @@ interface EnduranceLayer {
 ### build/layer.chunk.d.ts#Gift
 type Gift = {
   readonly need: string;
+  readonly resource?: never;
   readonly amount: number;
 } | {
   readonly resource: string;
+  readonly need?: never;
   readonly amount: number;
 };
 

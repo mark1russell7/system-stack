@@ -256,6 +256,7 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
   const stoppedParts = caseStopped(caseCuts, options);
   const start = storeAmounts(layer, options.at, stoppedParts);
   const makers = makersOf(layer, stoppedParts);
+  const stocked = new Set(layer.stores.map((store) => store.resource));
   const done: { readonly ways: Ways; readonly demand: number; readonly days: number }[] = [];
   const needs: Record<string, { days: number; binding: string[]; takes: Record<string, number> }> = {};
   for (const draw of caseDraws(layer, caseCuts, stoppedParts)) {
@@ -279,7 +280,10 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
         else high = mid;
       }
     const { left } = after(low);
-    const binding = [...inputClosure(ways)].filter((resource) => mostResource(left, makers, resource, NO_PATH) <= USED_UP * Math.max(1, start.get(resource) ?? 0)).sort();
+    const binding = [...inputClosure(ways)]
+      .filter((resource) => !makers.has(resource) || stocked.has(resource))
+      .filter((resource) => mostResource(left, makers, resource, NO_PATH) <= USED_UP * Math.max(1, start.get(resource) ?? 0))
+      .sort();
     const takes: Record<string, number> = {};
     for (const [resource, amount] of before) {
       const taken = amount - (left.get(resource) ?? 0);

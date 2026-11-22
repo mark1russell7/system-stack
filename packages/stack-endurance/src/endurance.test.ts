@@ -2,7 +2,7 @@ import { STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { caseStopped, drawDemand, enduranceOf, giftNeed, storeAmounts } from "./endurance.ts";
-import type { CaseCuts, EnduranceLayer } from "./layer.ts";
+import type { CaseCuts, EnduranceLayer, Gift } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 
 const AT = "2026-12-01";
@@ -260,6 +260,33 @@ describe("a converter that gives a resource", () => {
     const result = enduranceOf(layer, GRID_CUT, { at: AT });
     expect(result.needs["kit"]?.days).toBeCloseTo(5, 6);
     expect(result.needs["kit"]?.takes["fuel"]).toBeCloseTo(10, 6);
+    // a and b are made only by converters, with no store, so they are not binding.
+    expect(result.needs["kit"]?.binding).toEqual(["fuel"]);
+  });
+
+  it("has a gift of a need or of a resource, not of the two", () => {
+    // @ts-expect-error A gift has a need or a resource, not the two.
+    const both: Gift = { need: "a", resource: "b", amount: 1 };
+    expect(both.amount).toBe(1);
+  });
+
+  it("takes the makers in the order of the layer, which is a rule and not the best share", () => {
+    // a comes from fuel first, then from wood. b comes only from fuel. The best share makes a from wood and gives 10 kits.
+    // The order takes the fuel for a first, so a kit takes 2 L of fuel, and 10 L give 5 kits.
+    const layer: EnduranceLayer = {
+      schema: SAMPLE_ENDURANCE.schema,
+      levels: ["critical"],
+      resources: [{ code: "fuel", unit: "L" }, { code: "wood", unit: "kg" }, { code: "a", unit: "u" }, { code: "b", unit: "u" }],
+      stores: [{ id: "can", resource: "fuel", amount: 10 }, { id: "pile", resource: "wood", amount: 10 }],
+      draws: [{ need: "kit", level: "critical", perDay: 1, supply: "grid" }],
+      converters: [
+        { id: "a-from-fuel", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "a-from-wood", takes: [{ resource: "wood", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "b-from-fuel", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "b", amount: 1 } },
+        { id: "kit", takes: [{ resource: "a", amount: 1 }, { resource: "b", amount: 1 }], gives: { need: "kit", amount: 1 } },
+      ],
+    };
+    expect(enduranceOf(layer, GRID_CUT, { at: AT }).needs["kit"]?.days).toBeCloseTo(5, 6);
   });
 
   it("gives each draw its days times its demand, and takes no more than the stores, for each amount", () => {
