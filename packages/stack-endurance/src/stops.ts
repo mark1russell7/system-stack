@@ -17,7 +17,7 @@ import { DEFAULT_MAX_SETS, stopSets, type Stack } from "@mark1russell7/system-st
  * @param down - The parts that are down for the full event
  * @param maxSets - The largest count of sets in one step of the search, and of the sets of cuts (`maxSets` of `stopSets`)
  */
-export function stackStops(stack: Stack, supply: string, parts: readonly string[], down: readonly string[] = [], maxSets = DEFAULT_MAX_SETS): number[][] | undefined {
+export function stackStops(stack: Stack, supply: string, parts: readonly string[], down: readonly string[] = [], maxSets: number = DEFAULT_MAX_SETS): number[][] | undefined {
   const cutsOf = new Map<string, number[]>();
   for (const [index, part] of parts.entries()) cutsOf.set(part, [...(cutsOf.get(part) ?? []), index]);
   const own = (cutsOf.get(supply) ?? []).map((index) => [index]);
