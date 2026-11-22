@@ -10,7 +10,12 @@ export function survivalAt(curve: Survival, days: number): number {
   for (let index = 1; index < curve.length; index += 1) {
     const [t0, p0] = curve[index - 1] ?? [0, 1];
     const [t1, p1] = curve[index] ?? [0, 0];
-    if (days <= t1) return p0 + ((p1 - p0) * (days - t0)) / (t1 - t0);
+    if (days < t1) {
+      // The chance stays between the chances of the two points, so a rounding does not go below the lower one.
+      const chance = p0 + (p1 - p0) * ((days - t0) / (t1 - t0));
+      return Math.min(Math.max(p0, p1), Math.max(Math.min(p0, p1), chance));
+    }
+    if (days === t1) return p1;
   }
   return 0;
 }
@@ -199,9 +204,84 @@ export function upperStop(curves: readonly Survival[], sets: readonly (readonly 
   return curveFrom([...bends].sort((x, y) => x - y), (days) => Math.min(1, sum(days)));
 }
 
-/** The curves of the stop of a draw: when one event makes each cut longer together, and an upper limit for each dependence. */
+/** The largest difference between `independentStop` and the true chance of a stop of independent cuts, at each time. */
+export const INDEPENDENT_TOLERANCE = 1e-6;
+
+/**
+ * This function gives the curve of a stop of some cuts when the cuts are independent.
+ * At each time `t`, the supply is stopped when the cuts that are still on contain a minimal set.
+ * Its chance is a sum over each set of cuts that stops the supply.
+ * Each term is the product of `s(t)` for the cuts that are on, and of `1 - s(t)` for the other cuts.
+ *
+ * - When any one cut stops the supply, the result is `1 - prod(1 - s)`. It is not less than the longest cut (`eventStop`).
+ * - When the supply needs `any` of two parts, the stop of the two is `s1 * s2`. It is not more than the shorter cut.
+ * - The result is not more than `upperStop` of the same sets, because `upperStop` is a limit for each dependence.
+ * - Between two points of the curves the chance is a polynomial, not a line. The function splits each such segment into equal pieces.
+ *   The chance is linear in each `s`, and each mixed second derivative is between -1 and 1.
+ *   Thus `|f''| <= (sum |s'|)^2 - sum s'^2`, and the line of a piece of length `h` is within `h^2 |f''| / 8` of the chance.
+ *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. With a margin of 10 %, the count of points is less than `n / sqrt(7.2 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
+ *
+ * @param curves - The curves of the cuts, each one good for `checkEndurance`
+ * @param sets - The minimal sets of `minimalStops`. With `undefined`, as for too many cuts, the result is `undefined`. With no sets, it is `[[0, 0]]`
+ * @throws RangeError when a curve does not end at a chance of 0
+ */
+export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined {
+  if (sets === undefined) return undefined;
+  // With no set, no cuts stop the supply, as for `eventStop` and `upperStop`.
+  if (sets.length === 0) return [[0, 0]];
+  // Only the cuts of a set change the chance. Their place in `used` is their bit in a state.
+  const used = [...new Set(sets.flat())].sort((x, y) => x - y);
+  const usedCurves = used.map((index) => curves[index] ?? []);
+  const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << used.indexOf(index)), 0));
+  const stopping = Array.from({ length: 1 << used.length }, (_, mask) => setMasks.some((set) => (set & mask) === set));
+  const states = new Float64Array(1 << used.length);
+  const chanceAt = (days: number): number => {
+    // The chance of each state of the cuts, one cut at a time. Bit k of a state is 1 when cut k is on.
+    states[0] = 1;
+    let length = 1;
+    for (const curve of usedCurves) {
+      const on = survivalAt(curve, days);
+      for (let mask = 0; mask < length; mask += 1) {
+        const chance = states[mask] ?? 0;
+        states[mask + length] = chance * on;
+        states[mask] = chance * (1 - on);
+      }
+      length *= 2;
+    }
+    let total = 0;
+    for (let mask = 0; mask < length; mask += 1) if (stopping[mask]) total += states[mask] ?? 0;
+    return Math.min(1, Math.max(0, total));
+  };
+  const times = [...new Set(usedCurves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
+  const points: number[] = [];
+  for (const [index, t1] of times.entries()) {
+    const t0 = times[index - 1];
+    if (t0 !== undefined) {
+      const h = t1 - t0;
+      const slopes = usedCurves.map((curve) => Math.abs(survivalAt(curve, t1) - survivalAt(curve, t0)) / h);
+      const sum = slopes.reduce((total, slope) => total + slope, 0);
+      const bound = Math.max(0, sum * sum - slopes.reduce((total, slope) => total + slope * slope, 0));
+      // A margin of 10 % keeps the rounding of the chance under the tolerance.
+      const pieces = Math.ceil(h * Math.sqrt(bound / (8 * 0.9 * INDEPENDENT_TOLERANCE)));
+      for (let piece = 1; piece < pieces; piece += 1) {
+        const days = t0 + (h * piece) / pieces;
+        // Two times that are next to each other as floats have no time between them.
+        if (days > (points[points.length - 1] ?? t0) && days < t1) points.push(days);
+      }
+    }
+    points.push(t1);
+  }
+  return curveFrom(points, chanceAt);
+}
+
+/**
+ * The curves of the stop of a draw. `event` is for one event that makes each cut longer together, and `independent` is for independent cuts.
+ * `upper` is an upper limit for each dependence.
+ */
 export interface StopCurves {
   readonly event: Survival;
+  /** The stop when the cuts are independent (`independentStop`). When `coarse` is true, it is `upper`. */
+  readonly independent: Survival;
   readonly upper: Survival;
   /** This is true when `upper` is the sum of the curves of the cuts that can reach the supply, because there are more than `MINIMAL_STOP_CUTS`. */
   readonly coarse: boolean;
@@ -238,7 +318,8 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   if (!stops(relevant.map((_, index) => index))) return undefined;
   const curves = relevant.map((index) => caseCuts.cuts[index]?.duration ?? []);
   const sets = minimalStops(curves.length, stops);
-  return { event: eventStop(curves, stops), upper: upperStop(curves, sets), coarse: sets === undefined };
+  const upper = upperStop(curves, sets);
+  return { event: eventStop(curves, stops), independent: independentStop(curves, sets) ?? upper, upper, coarse: sets === undefined };
 }
 
 /**
@@ -247,8 +328,8 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
  * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
  * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
- * - `event` is `eventStop`. `upper` is `upperStop` over the minimal sets of the cuts that count.
- * - Past `MINIMAL_STOP_CUTS` cuts that count, `upper` is the sum of their curves, and `coarse` is true.
+ * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
+ * - Past `MINIMAL_STOP_CUTS` cuts that count, `upper` is the sum of their curves, `independent` is `upper`, and `coarse` is true.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): StopCurves | undefined {
   return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
@@ -261,6 +342,8 @@ export interface Shortfall {
    * This value is not a limit. The true value can be more or less. `upper` is the limit.
    */
   readonly levels: Readonly<Record<string, number>>;
+  /** The user-days of each level when the cuts are independent (`StopCurves.independent`). This value is not more than `upper`. */
+  readonly independent: Readonly<Record<string, number>>;
   /** The upper limit of the user-days of each level, for each dependence of the cuts. A gate of a high level can use it. */
   readonly upper: Readonly<Record<string, number>>;
   /**
@@ -289,6 +372,7 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
 export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: ShortfallOptions = {}): Shortfall {
   const horizon = horizonOf(options);
   const levels = zeroLevels(layer);
+  const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
   const unread: string[] = [];
   const coarse: string[] = [];
@@ -303,9 +387,10 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
     if (curves.coarse) coarse.push(draw.need);
     const users = draw.users ?? 1;
     levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curves.event, held.days, horizon) * users;
+    independent[draw.level] = (independent[draw.level] ?? 0) + tailDays(curves.independent, held.days, horizon) * users;
     upper[draw.level] = (upper[draw.level] ?? 0) + tailDays(curves.upper, held.days, horizon) * users;
   }
-  return { levels, upper, unread, coarse };
+  return { levels, independent, upper, unread, coarse };
 }
 
 /** The shortfall of one year at one place, with the part of each case. */
@@ -331,6 +416,7 @@ export interface YearShortfall extends Shortfall {
 export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
   horizonOf(options);
   const levels = zeroLevels(layer);
+  const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
   const unread: string[] = [];
   const coarse: string[] = [];
@@ -342,10 +428,11 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     const endurance = enduranceOf(layer, caseCuts, options);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
     for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
+    for (const [level, days] of Object.entries(shortfall.independent)) independent[level] = (independent[level] ?? 0) + rate * days;
     for (const [level, days] of Object.entries(shortfall.upper)) upper[level] = (upper[level] ?? 0) + rate * days;
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
     for (const need of shortfall.coarse) if (!coarse.includes(need)) coarse.push(need);
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
-  return { place, levels, upper, unread, coarse, cases };
+  return { place, levels, independent, upper, unread, coarse, cases };
 }
