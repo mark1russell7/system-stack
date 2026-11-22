@@ -118,7 +118,8 @@ describe("the gate of the reference data", () => {
     // The two kinds of gap: sources that name no cut, or no source read yet.
     const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
     expect(examined("health.outbreak.pandemic")).toEqual(["ready.pandemic", "ready.financial-preparedness", "cdc.community-mitigation"]);
-    expect([examined("security.civil-unrest"), examined("security.armed-conflict")]).toEqual([[], []]);
+    expect(examined("security.civil-unrest")).toEqual(["ready.mass-gatherings", "cisa.physical-security", "fema.cpg-201"]);
+    expect(examined("security.armed-conflict")).toEqual([]);
   });
 
   it("gives a long collapse of the grid the cuts of a power outage, with no law of EAGLE-I", () => {

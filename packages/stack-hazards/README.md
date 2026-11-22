@@ -65,12 +65,12 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 | `cyber.infrastructure-attack` | Cyberattack on the infrastructure | The Ready.gov page on cybersecurity |
 | `infra.supply-chain.food` | Failure of the food supply | The definition |
 | `civic.economy.collapse` | Financial collapse | The definition, and the Ready.gov page on financial preparedness |
-| `security.civil-unrest` | Civil unrest | No cut: no source read yet |
+| `security.civil-unrest` | Civil unrest | No cut: 3 sources read, none names a cut |
 | `security.armed-conflict` | War | No cut: no source read yet |
 | `cbrne.emp` | Electromagnetic pulse | The CISA page on the electromagnetic pulse |
 | `geo.space-weather.geomagnetic-storm` | Solar storm | The Ready.gov page on space weather |
 
-- A case with no cut is a gap, and each of its supplies is no read. There are two kinds of gap. For the severe pandemic, the dataset read sources, and none of them names a cut. The guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not public supplies. For civil unrest and for war, the dataset has read no source yet, so the list `examined` is empty.
+- A case with no cut is a gap, and each of its supplies is no read. There are two kinds of gap. For the severe pandemic, the dataset read sources, and none of them names a cut. The guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not public supplies. For civil unrest, Ready.gov has no page, and the pages on mass gatherings and on physical security name no cut. The text of FEMA CPG 201 does not have the words civil, riot or unrest. For war, the dataset has read no source yet, so the list `examined` is empty.
 - No cut of these cases has a law of its duration. The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid.
 
 ## The laws from outage records
