@@ -177,24 +177,89 @@ describe("caseShortfall", () => {
     expect(shortfall.levels["life"]).toBe(0);
   });
 
-  it("counts only the cuts that can reach the supply, and names a coarse upper limit", () => {
+  it("counts only the cuts that can reach the supply, and names an independent stop that is the upper limit", () => {
     // Thirteen cuts of parts that the water main does not need do not change its curves.
     const others = Array.from({ length: 13 }, (_, index) => ({ part: `other-${String(index)}`, title: "Other", duration: GRID, source: "s" }));
     const wide: CaseCuts = { ...storm, cuts: [...storm.cuts, ...others] };
     expect(stopCurves(wide, DRINK, { stack: MAIN_NEEDS_GRID })).toEqual(stopCurves(storm, DRINK, { stack: MAIN_NEEDS_GRID }));
     expect(stopCurves(wide, DRINK, { stack: MAIN_NEEDS_GRID })?.coarse).toBe(false);
     expect(caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT }), {}).coarse).toEqual([]);
-    // When the water main needs each of 13 feeds, 14 cuts count. Then upper is the sum of their curves.
+    // When the water main needs each of 13 feeds, 14 cuts count. Each cut stops it alone, so upper is the sum of their curves.
+    // The 14 cuts are more than MINIMAL_STOP_CUTS, so independent is upper. Before 0.5.0, upper was coarse here.
     const feeds = others.map((cut) => cut.part);
     const stack: Stack = {
       ...SAMPLE_ENDURANCE_STACK,
       parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: feeds } : part)), ...feeds.map((id) => ({ id, kind: "feed", name: id }))],
     };
     const curves = stopCurves(wide, DRINK, { stack });
-    expect(curves?.coarse).toBe(true);
+    expect(curves?.coarse).toBe(false);
+    expect(curves?.independentUpper).toBe(true);
+    expect(curves?.independent).toEqual(curves?.upper);
     for (const days of TIMES) expect(survivalAt(curves?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 13 * survivalAt(GRID, days)), 9);
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT, stack }), { stack });
-    expect(shortfall.coarse).toEqual(["hydration.drink"]);
+    expect(shortfall.coarse).toEqual([]);
+    expect(shortfall.independentUpper).toEqual(["hydration.drink"]);
+  });
+
+  it("gives exact curves from the needs of the stack past 12 cuts that count", () => {
+    // The water main needs the grid, and 1 of 13 feeds or the road. The case does not cut the road.
+    // Thus 15 cuts count, and the minimal sets are {water main} and {grid}. Before 0.5.0, upper was the sum of the 15 curves.
+    const feeds = Array.from({ length: 13 }, (_, index) => `feed-${String(index)}`);
+    const stack: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: ["grid", { any: [...feeds, "road"] }] } : part)), ...feeds.map((id) => ({ id, kind: "feed" }))],
+    };
+    const cuts = [...storm.cuts.filter((cut) => cut.part !== "road"), ...feeds.map((part) => ({ part, title: "Feed", duration: ROAD, source: "s" }))];
+    const curves = stopCurves({ ...storm, cuts }, DRINK, { stack });
+    expect(curves?.coarse).toBe(false);
+    expect(curves?.independentUpper).toBe(false);
+    for (const days of [...TIMES, 0.37, 2.5, 6.1]) {
+      const [grid, main] = [survivalAt(GRID, days), survivalAt(MAIN, days)];
+      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(grid, main), 9);
+      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, grid + main), 9);
+      expect(Math.abs(survivalAt(curves?.independent ?? [], days) - (1 - (1 - grid) * (1 - main))), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
+  });
+
+  it("gives an exact upper limit for 7 pairs of feeds, and the upper limit as the independent stop", () => {
+    // The water main needs 7 stages, and each stage needs 1 of 2 feeds. A stop needs the main, or the two feeds of a stage.
+    const stages = Array.from({ length: 7 }, (_, index) => [`a-${String(index)}`, `b-${String(index)}`]);
+    const stack: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: stages.map((any) => ({ any })) } : part)), ...stages.flat().map((id) => ({ id, kind: "feed" }))],
+    };
+    const cuts = [
+      ...storm.cuts.filter((cut) => cut.part === "water-main"),
+      ...stages.flatMap(([a, b]) => [
+        { part: a ?? "", title: "Feed", duration: GRID, source: "s" },
+        { part: b ?? "", title: "Feed", duration: ROAD, source: "s" },
+      ]),
+    ];
+    const curves = stopCurves({ ...storm, cuts }, DRINK, { stack });
+    expect(curves?.coarse).toBe(false);
+    expect(curves?.independentUpper).toBe(true);
+    for (const days of TIMES) {
+      const pair = Math.min(survivalAt(GRID, days), survivalAt(ROAD, days));
+      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 7 * pair), 9);
+      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(MAIN, days), pair), 9);
+    }
+  });
+
+  it("keeps a coarse upper limit when the search of the needs passes its budget", () => {
+    // 13 stages of 2 feeds have 2 to the power 13 path sets, more than the budget. The 27 cuts are more than MINIMAL_STOP_CUTS.
+    const stages = Array.from({ length: 13 }, (_, index) => [`a-${String(index)}`, `b-${String(index)}`]);
+    const stack: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: stages.map((any) => ({ any })) } : part)), ...stages.flat().map((id) => ({ id, kind: "feed" }))],
+    };
+    const cuts = [...storm.cuts.filter((cut) => cut.part === "water-main"), ...stages.flat().map((part) => ({ part, title: "Feed", duration: GRID, source: "s" }))];
+    const curves = stopCurves({ ...storm, cuts }, DRINK, { stack });
+    expect(curves?.coarse).toBe(true);
+    expect(curves?.independentUpper).toBe(true);
+    for (const days of TIMES) expect(survivalAt(curves?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 26 * survivalAt(GRID, days)), 9);
+    // A feed with no curve can be part of the stop, and the query cannot tell. The water is no read.
+    const bare = cuts.map((cut, index) => (index === 1 ? { part: cut.part, title: cut.title, source: cut.source } : cut));
+    expect(stopCurves({ ...storm, cuts: bare }, DRINK, { stack })).toBeUndefined();
   });
 });
 
@@ -285,8 +350,11 @@ describe("independentStop", () => {
     expect(worst).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
   });
 
-  it("gives nothing with no sets for too many cuts, and a chance of 0 with an empty list of sets", () => {
+  it("gives nothing with no sets or past 12 cuts in the sets, and a chance of 0 with an empty list of sets", () => {
     expect(independentStop([GRID, MAIN], undefined)).toBeUndefined();
+    const thirteen = Array.from({ length: 13 }, () => GRID);
+    expect(independentStop(thirteen, [thirteen.map((_, index) => index)])).toBeUndefined();
+    expect(curveFault(independentStop(thirteen, [[0], [12]]) ?? [])).toBeUndefined();
     expect(independentStop([GRID, MAIN], [])).toEqual(eventStop([GRID, MAIN], () => false));
   });
 });
@@ -361,6 +429,6 @@ describe("yearShortfall", () => {
   });
 
   it("gives 0 at a place with no prior", () => {
-    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, independent: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], cases: [] });
+    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, independent: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], independentUpper: [], cases: [] });
   });
 });

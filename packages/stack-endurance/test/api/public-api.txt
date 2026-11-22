@@ -110,6 +110,7 @@ export interface Shortfall {
   readonly upper: Readonly<Record<string, number>>;
   readonly unread: readonly string[];
   readonly coarse: readonly string[];
+  readonly independentUpper: readonly string[];
 }
 
 ### build/index.d.ts#ShortfallOptions
@@ -123,6 +124,7 @@ export interface StopCurves {
   readonly independent: Survival;
   readonly upper: Survival;
   readonly coarse: boolean;
+  readonly independentUpper: boolean;
 }
 
 ### build/index.d.ts#YearShortfall
