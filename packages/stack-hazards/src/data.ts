@@ -60,6 +60,13 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   },
   "ready.mass-gatherings": ready("Mass gathering incidents", "public-spaces", "2026-05-13", READ_CASES),
   "cisa.physical-security": cisa("Physical security", "topics/physical-security"),
+  "fema.cpg-201": {
+    name: "Threat and hazard identification and risk assessment (THIRA) and stakeholder preparedness review (SPR) guide, CPG 201, 3rd edition",
+    url: "https://www.fema.gov/sites/default/files/2020-04/CPG201Final20180525.pdf",
+    publisher: "FEMA",
+    license: FEDERAL_WORK,
+    read: READ_CASES,
+  },
   "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
   "dhs.ai-framework": dhs(
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
@@ -323,9 +330,9 @@ export const HAZARD_LIST: HazardList = {
       case: "security.civil-unrest",
       title: "Civil unrest",
       // Ready.gov has no page on civil unrest. Its page on mass gatherings names fights and fires, and no stop of a
-      // supply. The page of CISA names public demonstrations, and no stop of a supply. FEMA CPG 201 (2018) has no
-      // civil disturbance in its text.
-      examined: ["ready.mass-gatherings", "cisa.physical-security"],
+      // supply. The page of CISA names public demonstrations, and no stop of a supply. The text of FEMA CPG 201 (2018)
+      // does not have the words civil, riot or unrest.
+      examined: ["ready.mass-gatherings", "cisa.physical-security", "fema.cpg-201"],
       cuts: [],
     },
     { case: "security.armed-conflict", title: "War", examined: [], cuts: [] },
