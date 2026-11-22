@@ -1,3 +1,4 @@
+import { unknownKinds } from "@mark1russell7/alerts";
 import { describe, expect, it } from "vitest";
 import { checkHazards, hasHazardError } from "./check.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, NO_LAW } from "./data.ts";
@@ -127,6 +128,10 @@ describe("the gate of the reference data", () => {
     expect(grid?.claims.every((claim) => claim.definition === true)).toBe(true);
     expect(grid?.duration).toBe(NO_LAW);
     expect(effects).toEqual(cutsOf("infra.power.outage").slice(1));
+  });
+
+  it("has a code of the alert taxonomy for each case, so that an alert can reach each case", () => {
+    expect(unknownKinds(HAZARD_LIST.hazards.map((hazard) => hazard.case))).toEqual([]);
   });
 
   it("has each source of a claim in the list examined of its case", () => {
