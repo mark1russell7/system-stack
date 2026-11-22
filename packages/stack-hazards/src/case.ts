@@ -12,6 +12,11 @@ export interface HazardCaseOptions {
    * A reference part with an empty list is not in the stack, so the case has no cut of it. The default is the reference id.
    */
   readonly parts?: Readonly<Record<string, readonly string[]>> | undefined;
+  /**
+   * What to do with the claims that a source assesses as a risk. With `keep` (the default), the case has each cut.
+   * With `drop`, the case uses only the claims of told effects and of the definition. A cut with no other claim is not in the case.
+   */
+  readonly assessed?: "keep" | "drop" | undefined;
 }
 
 /** The state of a supply in a case: the cut, or no read when no source that the dataset read names the cut. */
@@ -31,10 +36,13 @@ export function supplyState(hazard: Hazard, part: string): SupplyState {
 /**
  * This function gives a hazard case as the values of `CaseCuts` of stack-endurance. Each cut gets the curve of the region of the user.
  * A cut with no law, or with no curve for the region, has no `duration`. Then the shortfall gives no read for its draws.
- * The source of each cut is the URL of the source of its law, or the URLs of its claims. The function is pure.
+ * The source of each cut is the URL of the source of its law, or the URLs of its claims.
+ *
+ * The option `assessed` can drop the claims of assessed risks, and the cuts with no other claim. The function is pure.
  */
 export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCaseOptions = {}): CaseCuts {
-  const cuts = hazard.cuts.flatMap((item): Cut[] => {
+  const kept = options.assessed === "drop" ? hazard.cuts.flatMap((item) => dropAssessed(item)) : hazard.cuts;
+  const cuts = kept.flatMap((item): Cut[] => {
     const ids = options.parts?.[item.part] ?? [item.part];
     const law = item.duration.read ? item.duration : undefined;
     const curve = law !== undefined && options.region !== undefined && options.region.scheme === law.scheme ? law.curves[options.region.code] : undefined;
@@ -42,6 +50,13 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
     return ids.map((part) => ({ part, title: item.title, ...(curve === undefined ? {} : { duration: curve }), source }));
   });
   return { case: hazard.case, title: hazard.title, cuts };
+}
+
+/** This function gives a cut with only the claims that are not assessed, or no cut when each claim is assessed. */
+function dropAssessed(cut: HazardCut): HazardCut[] {
+  const claims = cut.claims.filter((claim) => claim.basis !== "assessed");
+  if (claims.length === 0) return [];
+  return [claims.length === cut.claims.length ? cut : { ...cut, claims }];
 }
 
 /** This function gives the URL of a source, or its id when the table does not have it. */

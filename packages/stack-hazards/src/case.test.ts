@@ -73,6 +73,60 @@ describe("a hazard case as the values of CaseCuts", () => {
     expect(hazardCase(list, hazard).cuts[0]?.duration).toBeUndefined();
   });
 
+  it("keeps each cut with no option, and the option keep gives the same output", () => {
+    for (const hazard of HAZARD_LIST.hazards) {
+      const cuts = hazardCase(HAZARD_LIST, hazard);
+      expect(cuts.cuts.map((cut) => cut.part), hazard.case).toEqual(hazard.cuts.map((cut) => cut.part));
+      expect(hazardCase(HAZARD_LIST, hazard, { assessed: "keep" }), hazard.case).toEqual(cuts);
+    }
+    const war = hazardCase(HAZARD_LIST, hazardOf(HAZARD_LIST, "security.armed-conflict")!);
+    expect(war.cuts.map((cut) => cut.source)).toEqual(Array(5).fill("https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a"));
+  });
+
+  it("drops the assessed claims with the option drop, and each cut with no other claim", () => {
+    const drop = (code: string): string[] => hazardCase(HAZARD_LIST, hazardOf(HAZARD_LIST, code)!, { assessed: "drop" }).cuts.map((cut) => cut.part);
+    expect(drop("security.armed-conflict")).toEqual([]);
+    expect(drop("civic.ai-collapse")).toEqual([]);
+    expect(drop("cbrne.emp")).toEqual([]);
+    expect(drop("security.nuclear-war")).toEqual(["home.dwelling"]);
+    expect(drop("cyber.infrastructure-attack")).toEqual(["power.grid", "road.local"]);
+  });
+
+  it("drops only the assessed claims of a cut, and keeps the source of its other claims", () => {
+    const told = { source: "page", basis: "told", says: "A page tells it." } as const;
+    const risk = { source: "advisory", basis: "assessed", says: "An advisory assesses it." } as const;
+    const terms = { name: "Public domain", url: "https://data.example.net/terms" };
+    const list: HazardList = {
+      schema: HAZARDS_SCHEMA,
+      sources: {
+        page: { name: "A page", url: "https://data.example.net/page", publisher: "An agency", license: terms, read: "2026-11-22" },
+        advisory: { name: "An advisory", url: "https://data.example.net/advisory", publisher: "An agency", license: terms, read: "2026-11-22" },
+      },
+      hazards: [
+        {
+          case: "infra.power.outage",
+          title: "Power outage",
+          examined: ["page", "advisory"],
+          cuts: [
+            { part: "power.grid", title: "No power", claims: [told, risk], duration: { read: false, reason: "none" } },
+            { part: "water.main", title: "No water", claims: [risk], duration: { read: false, reason: "none" } },
+            { part: "road.local", title: "No roads", claims: [{ definition: true, says: "The case closes the roads." }], duration: { read: false, reason: "none" } },
+          ],
+        },
+      ],
+    };
+    const hazard = list.hazards[0]!;
+    expect(hazardCase(list, hazard).cuts.map((cut) => [cut.part, cut.source])).toEqual([
+      ["power.grid", "https://data.example.net/page https://data.example.net/advisory"],
+      ["water.main", "https://data.example.net/advisory"],
+      ["road.local", "definition"],
+    ]);
+    expect(hazardCase(list, hazard, { assessed: "drop" }).cuts.map((cut) => [cut.part, cut.source])).toEqual([
+      ["power.grid", "https://data.example.net/page"],
+      ["road.local", "definition"],
+    ]);
+  });
+
   it("goes into an endurance layer: the gate passes, and a draw that the case can stop is no read", () => {
     const storm = hazardCase(HAZARD_LIST, STORM, { parts: SAMPLE_PARTS });
     const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, cases: [storm], priors: [] };
