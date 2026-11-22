@@ -57,10 +57,14 @@ export interface Source {
 }
 
 /**
- * The bases of a claim of a source, in a fixed order.
+ * The bases of a claim of a source, in a fixed order. The axis is the object of the claim: the effect of the event, or the threat.
  *
- * - `told`: the source tells the effect as a fact of past events or of physics. For example, a flood washes bridges away.
- * - `assessed`: the source assesses a risk or a threat. For example, an advisory assesses that state actors can disrupt a sector in a conflict.
+ * - `told`: the source tells what the event does when it happens, as a fact of past events or of physics.
+ *   For example, a flood washes bridges away.
+ * - `assessed`: the source gives a judgment about the threat itself: the intent of an actor, a prepositioning, or a chance.
+ *   For example, an advisory assesses that state actors prepare to disrupt a sector in a conflict.
+ *
+ * A source that hedges an effect, for example with the word "potential", is assessed. The record does not make a hedge into a fact.
  */
 export const CLAIM_BASES: readonly ["told", "assessed"] = ["told", "assessed"];
 

@@ -13,7 +13,7 @@ Each function is a plain function with no clock, no network and no file.
 | `SUPPLY_PARTS` | The reference parts: the public supplies that a case can stop, for example `power.grid` and `water.main`. Each one is a failure domain of many stacks. |
 | `Source` | A public page or dataset: its URL, its publisher, its license, the date of its last change and the date of the read. |
 | `Claim` | The reason for a cut: a source that tells that the case can stop the part, or the definition of the case. The text is in own words, not a quote. A claim of a source has a basis. |
-| `ClaimBasis` | The basis of a claim of a source. `told`: the source tells the effect as a fact of past events or of physics. `assessed`: the source assesses a risk or a threat. |
+| `ClaimBasis` | The basis of a claim of a source. `told`: what the event does when it happens. `assessed`: a judgment about the threat itself. |
 | `DurationLaw` | A survival curve of the duration for each region of its source, with its fit. |
 | `NoLaw` | No law is read yet. The cut has no curve, so its draws are no read. |
 | `Hazard` | A case: its code, its name, its cuts and the sources that the dataset examined for it. |
@@ -49,17 +49,27 @@ A part of a stack that needs a public supply names a reference id in its needs. 
 
 ## Told effects and assessed risks
 
-A told claim and an assessed claim are not equal. A flood washes bridges away: the page on floods tells this as a fact. The advisory AA24-038A assesses a threat: state actors can disrupt four sectors in a conflict.
+A told claim and an assessed claim are not equal. The axis is the object of the claim: the effect of the event, or the threat.
 
-With the option `assessed: "drop"`, `hazardCase` uses only the told claims and the claims of the definition. A cut with no other claim is not in the output. With no option, or with `assessed: "keep"`, the output has each cut.
+- `told`: the source tells what the event does when it happens, as a fact of past events or of physics. A flood washes bridges away.
+- `assessed`: the source gives a judgment about the threat itself: the intent of an actor, a prepositioning, or a chance. The advisory AA24-038A assesses that state actors prepare to disrupt four sectors in a conflict.
+
+A source that hedges an effect, for example with the word "potential", is assessed. The record does not make a hedge into a fact.
+
+With the option `assessed: "drop"`, a cut keeps its told claims, its claims of the definition and its law. Its source drops the URLs of the assessed claims.
+
+A cut with only assessed claims stays in the case with no `duration` and with the sources of its claims. Thus its draws are no read in the shortfall, not 0 user-days. A case with no cut stops no supply, and that is a false pass. `supplyState` takes the same option and gives the same cut.
 
 ```ts
 const war = hazardOf(HAZARD_LIST, "security.armed-conflict");
 if (war !== undefined) {
-  console.log(hazardCase(HAZARD_LIST, war).cuts.length); // 5
-  console.log(hazardCase(HAZARD_LIST, war, { assessed: "drop" }).cuts.length); // 0
+  const cuts = hazardCase(HAZARD_LIST, war, { assessed: "drop" }).cuts;
+  console.log(cuts.length); // 5
+  console.log(cuts.filter((cut) => cut.duration === undefined).length); // 5: each cut is no read
 }
 ```
+
+With no option, or with `assessed: "keep"`, the output is the same as before the option.
 
 Only three sources have assessed claims: the DHS framework for AI, the CISA page on the electromagnetic pulse and the advisory AA24-038A. The CISA page tells only a potential of damage from an attack. Each other claim of a source is told.
 
