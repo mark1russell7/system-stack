@@ -434,6 +434,19 @@ describe("independentStop", () => {
     }
   });
 
+  it("multiplies a group past 12 cuts with small groups", () => {
+    // Two feeds of 7 cuts give one group of 14 cuts. 3 stages of 2 feeds give 3 groups of 2 cuts.
+    const curves = [...Array.from({ length: 7 }, () => GRID), ...Array.from({ length: 7 }, () => ROAD), ...Array.from({ length: 6 }, (_, index) => (index % 2 === 0 ? GRID : ROAD))];
+    const sets = [...Array.from({ length: 49 }, (_, index) => [Math.floor(index / 7), 7 + (index % 7)]), ...Array.from({ length: 3 }, (_, index) => [14 + 2 * index, 15 + 2 * index])];
+    const mixed = independentStop(curves, sets) ?? [];
+    expect(curveFault(mixed)).toBeUndefined();
+    for (const days of [...TIMES, 0.37, 2.5, 6.1]) {
+      const [grid, road] = [survivalAt(GRID, days), survivalAt(ROAD, days)];
+      const pairs = (1 - (1 - grid) ** 7) * (1 - (1 - road) ** 7);
+      expect(Math.abs(survivalAt(mixed, days) - (1 - (1 - pairs) * (1 - grid * road) ** 3)), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
+  });
+
   it("gives nothing when the expansion of a group past 12 cuts passes the budget maxWork, and refuses a bad budget", () => {
     const feeds = [...Array.from({ length: 7 }, () => GRID), ...Array.from({ length: 7 }, () => ROAD)];
     const pairs = Array.from({ length: 49 }, (_, index) => [Math.floor(index / 7), 7 + (index % 7)]);
@@ -443,6 +456,35 @@ describe("independentStop", () => {
     const stages = Array.from({ length: 7 }, (_, index) => [2 * index, 2 * index + 1]);
     expect(independentStop(feeds, stages, 1)).toBeDefined();
     for (const maxWork of [0, 1.5, Number.NaN]) expect(() => independentStop(feeds, pairs, maxWork)).toThrow(RangeError);
+  });
+
+  it("gives the budget maxWork of stopCurves to the independent stop, and refuses a bad budget", () => {
+    // The water main needs 7 stages of 2 feeds: 15 cuts in 8 groups. A budget of 1 is enough, because no group is past 12 cuts.
+    const stages = Array.from({ length: 7 }, (_, index) => [`a-${String(index)}`, `b-${String(index)}`]);
+    const stack: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: stages.map((any) => ({ any })) } : part)), ...stages.flat().map((id) => ({ id, kind: "feed" }))],
+    };
+    const cuts = [...storm.cuts.filter((cut) => cut.part === "water-main"), ...stages.flat().map((part) => ({ part, title: "Feed", duration: GRID, source: "s" }))];
+    expect(stopCurves({ ...storm, cuts }, DRINK, { stack, maxWork: 1 })?.independentUpper).toBe(false);
+    // The water main needs 1 of 13 feeds. The one stop set has the 13 feeds, so its group is past 12 cuts.
+    const feeds = Array.from({ length: 13 }, (_, index) => `f-${String(index)}`);
+    const any: Stack = {
+      ...SAMPLE_ENDURANCE_STACK,
+      parts: [...SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: [{ any: feeds }] } : part)), ...feeds.map((id) => ({ id, kind: "feed" }))],
+    };
+    const anyCuts = [...storm.cuts.filter((cut) => cut.part === "water-main"), ...feeds.map((part) => ({ part, title: "Feed", duration: GRID, source: "s" }))];
+    const exact = stopCurves({ ...storm, cuts: anyCuts }, DRINK, { stack: any });
+    expect(exact?.independentUpper).toBe(false);
+    for (const days of TIMES) {
+      const [grid, main] = [survivalAt(GRID, days), survivalAt(MAIN, days)];
+      expect(Math.abs(survivalAt(exact?.independent ?? [], days) - (1 - (1 - main) * (1 - grid ** 13))), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
+    expect(stopCurves({ ...storm, cuts: anyCuts }, DRINK, { stack: any, maxWork: 1 })?.independentUpper).toBe(true);
+    for (const maxWork of [0, 1.5, Number.NaN]) {
+      expect(() => stopCurves(storm, DRINK, { maxWork })).toThrow(RangeError);
+      expect(() => yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT, maxWork })).toThrow(RangeError);
+    }
   });
 });
 

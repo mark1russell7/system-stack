@@ -124,7 +124,9 @@ export interface ShortfallOptions extends StopCurveOptions {
 }
 
 ### build/index.d.ts#StopCurveOptions
-export interface StopCurveOptions extends Pick<CaseOptions, "stack" | "down">, Pick<PathOptions, "maxSets"> {}
+export interface StopCurveOptions extends Pick<CaseOptions, "stack" | "down">, Pick<PathOptions, "maxSets"> {
+  readonly maxWork?: number | undefined;
+}
 
 ### build/index.d.ts#StopCurves
 export interface StopCurves {

@@ -48,7 +48,10 @@ export function tailDays(curve: Survival, from: number, to: number = Infinity): 
  * The options of `stopCurves`. With a stack, `maxSets` is the budget of the search of the needs (`stopSets` of the core).
  * When the search passes it, `minimalStops` gives the sets.
  */
-export interface StopCurveOptions extends Pick<CaseOptions, "stack" | "down">, Pick<PathOptions, "maxSets"> {}
+export interface StopCurveOptions extends Pick<CaseOptions, "stack" | "down">, Pick<PathOptions, "maxSets"> {
+  /** The budget of `independentStop` for the curve of each draw, a whole number from 1. The default is `INDEPENDENT_MAX_WORK`. */
+  readonly maxWork?: number | undefined;
+}
 
 export interface ShortfallOptions extends StopCurveOptions {
   /** The horizon in days, more than 0. The default is no horizon. */
@@ -61,10 +64,12 @@ function horizonOf(options: ShortfallOptions): number {
   return horizon;
 }
 
-function maxSetsOf(options: StopCurveOptions): number {
+function budgetsOf(options: StopCurveOptions): { readonly maxSets: number; readonly maxWork: number } {
   const maxSets = options.maxSets ?? DEFAULT_MAX_SETS;
   if (!Number.isInteger(maxSets) || maxSets < 1) throw new RangeError(`The option maxSets is ${String(options.maxSets)}: it is not a whole number from 1.`);
-  return maxSets;
+  const maxWork = options.maxWork ?? INDEPENDENT_MAX_WORK;
+  if (!Number.isInteger(maxWork) || maxWork < 1) throw new RangeError(`The option maxWork is ${String(options.maxWork)}: it is not a whole number from 1.`);
+  return { maxSets, maxWork };
 }
 
 /**
@@ -222,7 +227,7 @@ export function upperStop(curves: readonly Survival[], sets: readonly (readonly 
 export const INDEPENDENT_TOLERANCE = 1e-6;
 
 /**
- * The default budget of `independentStop` for a group of more than `MINIMAL_STOP_CUTS` cuts.
+ * The default budget of `independentStop` for its groups of more than `MINIMAL_STOP_CUTS` cuts.
  * The budget counts the steps of the expansion times the count of points of the curve.
  * It is near the work of the sum over the states of 12 cuts.
  */
@@ -247,11 +252,12 @@ export const INDEPENDENT_MAX_WORK: number = 2 ** 26;
  *   For example, 20 stages of 2 feeds give 20 groups of 2 cuts.
  * - In a group of more than `MINIMAL_STOP_CUTS` cuts, it uses the Shannon expansion of `pathSetReliability` of collections.
  *   The expansion merges two states with the same sets left, and it drops a set that holds another set.
- * - The expansion is exponential in the worst case. When its steps times the count of points of the curve pass `maxWork`, the result is `undefined`.
+ * - The expansion is exponential in the worst case. The groups share one budget, `maxWork`.
+ *   When the steps of the expansions times the count of points of the curve pass it, the result is `undefined`.
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
  * @param sets - The minimal sets of the cuts. With `undefined`, as for no minimal sets, the result is `undefined`. With no sets, it is `[[0, 0]]`
- * @param maxWork - The budget of the expansion of a group of more than `MINIMAL_STOP_CUTS` cuts, a whole number from 1. The default is `INDEPENDENT_MAX_WORK`
+ * @param maxWork - The budget of the expansions of the groups of more than `MINIMAL_STOP_CUTS` cuts, a whole number from 1. The default is `INDEPENDENT_MAX_WORK`
  * @throws RangeError when a curve does not end at a chance of 0, or for a bad `maxWork`
  */
 export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined, maxWork: number = INDEPENDENT_MAX_WORK): Survival | undefined {
@@ -266,6 +272,8 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
   const points = independentPoints(usedCurves);
   // Two groups of cuts that share no set are independent: the supply works when it works in each group.
   const groupChances: ((days: number) => number)[] = [];
+  // The expansions of all groups share one budget.
+  let work = maxWork;
   for (const group of cutGroups(used.length, usedSets)) {
     const curvesOf = group.map((index) => usedCurves[index] ?? []);
     const setsOf = usedSets.filter((set) => group.includes(set[0] ?? -1)).map((set) => set.map((index) => group.indexOf(index)));
@@ -274,11 +282,19 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
       groupChances.push(stateChance(curvesOf, setsOf));
       continue;
     }
-    const chances = expandedChances(curvesOf, setsOf, points, maxWork);
-    if (chances === undefined) return undefined;
-    const chanceOf = new Map(points.map((days, index) => [days, chances[index] ?? 0]));
-    groupChances.push((days) => chanceOf.get(days) ?? 0);
+    const expanded = expandedChances(curvesOf, setsOf, points, work);
+    if (expanded === undefined) return undefined;
+    work -= expanded.steps * points.length;
+    const chanceOf = new Map(points.map((days, index) => [days, expanded.chances[index] ?? 0]));
+    groupChances.push((days) => {
+      const chance = chanceOf.get(days);
+      if (chance === undefined) throw new Error(`The expansion has no chance at ${String(days)} days.`);
+      return chance;
+    });
   }
+  // With one group, the chance of the group is the result, with no rounding of 1 - (1 - chance).
+  const [only] = groupChances;
+  if (groupChances.length === 1 && only !== undefined) return curveFrom(points, only);
   return curveFrom(points, (days) => Math.min(1, Math.max(0, 1 - groupChances.reduce((works, chanceAt) => works * (1 - chanceAt(days)), 1))));
 }
 
@@ -377,20 +393,28 @@ function vectorRing(width: number): OrderedRing<Float64Array> {
 /**
  * The chance of a stop at each point, from the Shannon expansion of `pathSetReliability`. A set works when each of its cuts is on.
  * One call gives `EXPANSION_WIDTH` points. When the steps of one expansion times the count of points pass `maxWork`, the result is `undefined`.
+ * Else `steps` is the count of steps of one expansion.
  */
-function expandedChances(curves: readonly Survival[], sets: readonly (readonly number[])[], points: readonly number[], maxWork: number): number[] | undefined {
+function expandedChances(
+  curves: readonly Survival[],
+  sets: readonly (readonly number[])[],
+  points: readonly number[],
+  maxWork: number,
+): { readonly chances: number[]; readonly steps: number } | undefined {
   const maxSteps = Math.floor(maxWork / points.length);
   if (maxSteps < 1) return undefined;
   const out: number[] = [];
+  let steps = 0;
   for (let start = 0; start < points.length; start += EXPANSION_WIDTH) {
     const times = points.slice(start, start + EXPANSION_WIDTH);
     const chances = curves.map((curve) => Float64Array.from(times, (days) => survivalAt(curve, days)));
     const result = pathSetReliability(sets, chances, vectorRing(times.length), { maxSteps });
     // Each call has the same sets, so the first call tells if the expansion is in the budget.
     if (result.kind === "budget") return undefined;
+    steps = result.steps;
     for (const chance of result.value) out.push(Math.min(1, Math.max(0, chance)));
   }
-  return out;
+  return { chances: out, steps };
 }
 
 /**
@@ -443,7 +467,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
   const given = relevant.map((index) => caseCuts.cuts[index]?.duration);
   // With a stack, the needs give the minimal sets. When their search passes its budget, the sets of each list of cuts are the check.
   const parts = relevant.map((index) => caseCuts.cuts[index]?.part ?? "");
-  const structural = options.stack === undefined ? undefined : stackStops(options.stack, draw.supply, parts, options.down, maxSetsOf(options));
+  const structural = options.stack === undefined ? undefined : stackStops(options.stack, draw.supply, parts, options.down, budgetsOf(options).maxSets);
   const sets = structural ?? minimalStops(given.length, stops);
   // The stop has no curve when a cut with no curve can be part of it. With no minimal sets, the query cannot tell.
   const unsourced = given.flatMap((curve, index) => (curve === undefined ? [index] : []));
@@ -454,7 +478,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
   const keptStops = (cuts: readonly number[]): boolean => stops(cuts.map((index) => kept[index] ?? -1));
   const keptSets = sets?.map((set) => set.map((index) => kept.indexOf(index)));
   const upper = upperStop(curves, keptSets);
-  const independent = independentStop(curves, keptSets);
+  const independent = independentStop(curves, keptSets, budgetsOf(options).maxWork);
   return { event: eventStop(curves, keptStops), independent: independent ?? upper, upper, coarse: keptSets === undefined, independentUpper: independent === undefined };
 }
 
@@ -472,7 +496,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
  * - When the expansion of `independentStop` passes its budget, `independent` is `upper`, and `independentUpper` is true.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopCurveOptions = {}): StopCurves | undefined {
-  maxSetsOf(options);
+  budgetsOf(options);
   return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
 }
 
@@ -514,7 +538,7 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
  */
 export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: ShortfallOptions = {}): Shortfall {
   const horizon = horizonOf(options);
-  maxSetsOf(options);
+  budgetsOf(options);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
@@ -561,7 +585,7 @@ export interface YearShortfall extends Shortfall {
  */
 export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
   horizonOf(options);
-  maxSetsOf(options);
+  budgetsOf(options);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
