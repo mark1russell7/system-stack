@@ -16,7 +16,7 @@ Each function is a plain function with no clock, no network and no file. The uni
 | `Store` | An amount of one resource, with an optional due date and an optional part that holds it. |
 | `Draw` | A need that a load takes each day, its level, its count of users and the part that supplies it. |
 | `DirectUse` | One unit of a resource gives an amount of a need. |
-| `Converter` | A run takes some resources and gives an amount of a need, for example a stove that cooks dry rice with water and fuel. |
+| `Converter` | A run takes some resources and gives an amount of a need or of a resource. Examples are a stove that cooks dry rice with water and fuel, and a generator that charges a battery from fuel. |
 | `CaseCuts` | A case: the parts that it cuts, the survival curve of the duration of each cut, and factors on the rates. |
 | `Prior` | The events of a case in one year at one place, and the share that reach the place. |
 
@@ -25,6 +25,7 @@ Each function is a plain function with no clock, no network and no file. The uni
 - A draw takes from the stores only when the case stops its supply part.
 - The draws take the resources in the order of their level, then of the codes of their needs.
 - A draw takes from its direct uses first, then from its converters.
+- A take of a resource uses its stock first, then the converters that make it, through each chain. Thus a direct use of the battery can use the fuel of the generator.
 - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
 - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
 - The take order is a rule, not the best share. The days are the days of this order. `takes` gives the amount of each resource that a draw takes.
@@ -84,4 +85,4 @@ In the sample, the rice needs 2 L of water for each kg. The drinking water holds
 
 ## The gate
 
-`checkEndurance(layer, stack)` gives the faults of a layer. `ENDURANCE_CODES` lists the codes. The gate finds two records with one key, and an unknown level, resource or part. It also finds a value out of range, a bad date, an empty converter and a bad survival curve. A draw with no way to get its need is a warning.
+`checkEndurance(layer, stack)` gives the faults of a layer. `ENDURANCE_CODES` lists the codes. The gate finds two records with one key, and an unknown level, resource or part. It also finds a value out of range, a bad date, an empty converter and a bad survival curve. Converters that make a resource from itself are a cycle, and the gate refuses them. A draw with no way to get its need is a warning.

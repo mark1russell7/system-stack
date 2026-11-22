@@ -1,8 +1,8 @@
 import { STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { caseStopped, drawDemand, enduranceOf, storeAmounts } from "./endurance.ts";
-import type { CaseCuts, EnduranceLayer } from "./layer.ts";
+import { caseStopped, drawDemand, enduranceOf, giftNeed, storeAmounts } from "./endurance.ts";
+import type { CaseCuts, EnduranceLayer, Gift } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 
 const AT = "2026-12-01";
@@ -148,7 +148,7 @@ describe("the takes of a case", () => {
    */
   function given(layer: EnduranceLayer, need: string, takes: Readonly<Record<string, number>>): number {
     const direct = (layer.direct ?? []).filter((use) => use.need === need);
-    const converters = (layer.converters ?? []).filter((converter) => converter.gives.need === need);
+    const converters = (layer.converters ?? []).filter((converter) => giftNeed(converter) === need);
     let total = direct.reduce((sum, use) => sum + (takes[use.resource] ?? 0) * use.amount, 0);
     for (const converter of converters) {
       const runs = converter.takes.map((input) => (takes[input.resource] ?? 0) / input.amount);
@@ -197,6 +197,122 @@ describe("the takes of a case", () => {
           converters: [{ id: "mix", takes: [{ resource: "x", amount: 1 }, { resource: "w", amount: 1 }], gives: { need: "net", amount: 1 } }],
         };
         takesFit(layer, { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] });
+      }),
+    );
+  });
+});
+
+describe("a converter that gives a resource", () => {
+  const GRID_CUT: CaseCuts = { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] };
+  /** A generator changes 1 L of fuel into 3000 Wh of the battery. The power takes 1000 Wh each day from the battery. */
+  function generatorLayer(fuel: number, battery: number): EnduranceLayer {
+    return {
+      schema: SAMPLE_ENDURANCE.schema,
+      levels: ["critical", "normal"],
+      resources: [{ code: "fuel", unit: "L" }, { code: "battery", unit: "Wh" }],
+      stores: [{ id: "can", resource: "fuel", amount: fuel }, { id: "pack", resource: "battery", amount: battery }],
+      draws: [
+        { need: "power", level: "critical", perDay: 1000, supply: "grid" },
+        { need: "warmth", level: "normal", perDay: 500, supply: "grid" },
+      ],
+      direct: [{ resource: "battery", need: "power", amount: 1 }],
+      converters: [
+        { id: "generator", device: "gen", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "battery", amount: 3000 } },
+        { id: "heater", takes: [{ resource: "battery", amount: 1 }], gives: { need: "warmth", amount: 1 } },
+      ],
+    };
+  }
+
+  it("takes the stock of the battery first, then the fuel through the generator", () => {
+    const result = enduranceOf(generatorLayer(10, 1000), GRID_CUT, { at: AT });
+    // (1000 Wh + 10 L x 3000 Wh) / 1000 Wh a day = 31 days. The power takes all, so the warmth gets nothing.
+    expect(result.needs["power"]?.days).toBeCloseTo(31, 9);
+    expect(result.needs["power"]?.takes["battery"]).toBeCloseTo(1000, 9);
+    expect(result.needs["power"]?.takes["fuel"]).toBeCloseTo(10, 9);
+    expect(result.needs["power"]?.binding).toEqual(["battery", "fuel"]);
+    expect(result.needs["warmth"]?.days).toBe(0);
+    expect(result.needs["warmth"]?.binding).toEqual(["battery", "fuel"]);
+  });
+
+  it("runs a chain of two converters, and gives only the stock when the generator is down", () => {
+    // With no power draw, the heater takes the battery and the generator: 31000 Wh / 500 Wh a day = 62 days.
+    const layer = generatorLayer(10, 1000);
+    const alone: EnduranceLayer = { ...layer, draws: layer.draws.filter((draw) => draw.need === "warmth") };
+    expect(enduranceOf(alone, GRID_CUT, { at: AT }).needs["warmth"]?.days).toBeCloseTo(62, 9);
+    expect(enduranceOf(alone, GRID_CUT, { at: AT, down: ["gen"] }).needs["warmth"]?.days).toBeCloseTo(2, 9);
+    expect(enduranceOf(layer, GRID_CUT, { at: AT, down: ["gen"] }).needs["power"]).toMatchObject({ days: 1, binding: ["battery"] });
+  });
+
+  it("finds the runs when two inputs come from one resource", () => {
+    // Each kit takes 1 a and 1 b, and each of them takes 1 L of fuel. So 10 L give 5 kits, not 10.
+    const layer: EnduranceLayer = {
+      schema: SAMPLE_ENDURANCE.schema,
+      levels: ["critical"],
+      resources: [{ code: "fuel", unit: "L" }, { code: "a", unit: "u" }, { code: "b", unit: "u" }],
+      stores: [{ id: "can", resource: "fuel", amount: 10 }],
+      draws: [{ need: "kit", level: "critical", perDay: 1, supply: "grid" }],
+      converters: [
+        { id: "make-a", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "make-b", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "b", amount: 1 } },
+        { id: "kit", takes: [{ resource: "a", amount: 1 }, { resource: "b", amount: 1 }], gives: { need: "kit", amount: 1 } },
+      ],
+    };
+    const result = enduranceOf(layer, GRID_CUT, { at: AT });
+    expect(result.needs["kit"]?.days).toBeCloseTo(5, 6);
+    expect(result.needs["kit"]?.takes["fuel"]).toBeCloseTo(10, 6);
+    // a and b are made only by converters, with no store, so they are not binding.
+    expect(result.needs["kit"]?.binding).toEqual(["fuel"]);
+  });
+
+  it("has a gift of a need or of a resource, not of the two", () => {
+    // @ts-expect-error A gift has a need or a resource, not the two.
+    const both: Gift = { need: "a", resource: "b", amount: 1 };
+    expect(both.amount).toBe(1);
+  });
+
+  it("takes the makers in the order of the layer, which is a rule and not the best share", () => {
+    // a comes from fuel first, then from wood. b comes only from fuel. The best share makes a from wood and gives 10 kits.
+    // The order takes the fuel for a first, so a kit takes 2 L of fuel, and 10 L give 5 kits.
+    const layer: EnduranceLayer = {
+      schema: SAMPLE_ENDURANCE.schema,
+      levels: ["critical"],
+      resources: [{ code: "fuel", unit: "L" }, { code: "wood", unit: "kg" }, { code: "a", unit: "u" }, { code: "b", unit: "u" }],
+      stores: [{ id: "can", resource: "fuel", amount: 10 }, { id: "pile", resource: "wood", amount: 10 }],
+      draws: [{ need: "kit", level: "critical", perDay: 1, supply: "grid" }],
+      converters: [
+        { id: "a-from-fuel", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "a-from-wood", takes: [{ resource: "wood", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "b-from-fuel", takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "b", amount: 1 } },
+        { id: "kit", takes: [{ resource: "a", amount: 1 }, { resource: "b", amount: 1 }], gives: { need: "kit", amount: 1 } },
+      ],
+    };
+    expect(enduranceOf(layer, GRID_CUT, { at: AT }).needs["kit"]?.days).toBeCloseTo(5, 6);
+  });
+
+  it("gives each draw its days times its demand, and takes no more than the stores, for each amount", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 50, noNaN: true }), fc.double({ min: 0, max: 50_000, noNaN: true }), (fuel, battery) => {
+        const result = enduranceOf(generatorLayer(fuel, battery), GRID_CUT, { at: AT });
+        const power = result.needs["power"];
+        const warmth = result.needs["warmth"];
+        if (power === undefined || warmth === undefined) throw new Error("The cut stops both draws.");
+        const used = (resource: string): number => (power.takes[resource] ?? 0) + (warmth.takes[resource] ?? 0);
+        expect(used("fuel")).toBeLessThanOrEqual(fuel * (1 + 1e-9) + 1e-9);
+        expect(used("battery")).toBeLessThanOrEqual(battery * (1 + 1e-9) + 1e-9);
+        // Each Wh of the draws comes from the battery stock or from 3000 Wh for each L of fuel.
+        const given = (takes: Readonly<Record<string, number>>): number => (takes["battery"] ?? 0) + (takes["fuel"] ?? 0) * 3000;
+        expect(given(power.takes)).toBeCloseTo(power.days * 1000, 4);
+        expect(given(warmth.takes)).toBeCloseTo(warmth.days * 500, 4);
+        expect(power.days).toBeCloseTo((battery + fuel * 3000) / 1000, 6);
+      }),
+    );
+  });
+
+  it("never gives the power fewer days with more fuel", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 50, noNaN: true }), fc.double({ min: 0, max: 50, noNaN: true }), (fuel, more) => {
+        const days = (amount: number): number => enduranceOf(generatorLayer(amount, 500), GRID_CUT, { at: AT }).needs["power"]?.days ?? 0;
+        expect(days(fuel + more)).toBeGreaterThanOrEqual(days(fuel) * (1 - 1e-9));
       }),
     );
   });

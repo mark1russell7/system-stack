@@ -32,7 +32,7 @@ const converter = z.strictObject({
   id,
   device: id.optional(),
   takes: z.array(z.strictObject({ resource: id, amount })).readonly(),
-  gives: z.strictObject({ need: id, amount }),
+  gives: z.union([z.strictObject({ need: id, amount }), z.strictObject({ resource: id, amount })]),
 });
 
 const point = z.tuple([z.number(), z.number()]).readonly();

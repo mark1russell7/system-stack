@@ -53,9 +53,13 @@ export interface DirectUse {
   readonly amount: number;
 }
 
+/** The gift of one run of a converter: an amount of a need, or an amount of a resource, in its unit. */
+export type Gift = { readonly need: string; readonly resource?: never; readonly amount: number } | { readonly resource: string; readonly need?: never; readonly amount: number };
+
 /**
- * A converter: a device or an action that changes resources into a need.
+ * A converter: a device or an action that changes resources into a need or into a resource.
  * Example: a stove cooks 1 kg of dry rice with 2 L of water and 0.05 kg of fuel, and gives 3600 kcal.
+ * Example: a generator changes 1 L of fuel into 3000 Wh of the battery. Then a direct use of the battery can take that energy.
  */
 export interface Converter {
   readonly id: string;
@@ -63,8 +67,8 @@ export interface Converter {
   readonly device?: string | undefined;
   /** The resources that one run takes. */
   readonly takes: readonly { readonly resource: string; readonly amount: number }[];
-  /** The need that one run gives, and its amount in the unit of the need. */
-  readonly gives: { readonly need: string; readonly amount: number };
+  /** The need or the resource that one run gives, and its amount. A chain of converters cannot make a resource from itself. */
+  readonly gives: Gift;
 }
 
 /**
@@ -113,7 +117,10 @@ export interface Prior {
 /** The days that one draw holds, and the resources that are used up at that time. */
 export interface DrawEndurance {
   readonly days: number;
-  /** The inputs of the draw that are used up at `days`, in the order of their codes. A higher draw can use up an input first. */
+  /**
+   * The inputs of the draw that are used up at `days`, through each chain of converters, in the order of their codes. A higher draw can use up an input first.
+   * A resource that only converters make, with no store of the layer, is not in the list.
+   */
   readonly binding: readonly string[];
   /** The amount of each resource that the draw takes in its days, by the code of the resource. A resource with no take is not in the record. */
   readonly takes: Readonly<Record<string, number>>;

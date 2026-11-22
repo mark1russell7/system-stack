@@ -1,5 +1,7 @@
+import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
 import { dayNumber, type Fault, type Stack } from "@mark1russell7/system-stack";
-import type { EnduranceLayer, Survival } from "./layer.ts";
+import { giftNeed, giftResource } from "./endurance.ts";
+import type { Converter, EnduranceLayer, Survival } from "./layer.ts";
 
 // The gate of an endurance layer: the meaning of a layer with a correct form, for its base stack.
 
@@ -17,6 +19,7 @@ import type { EnduranceLayer, Survival } from "./layer.ts";
  * - `endurance-curve`: a survival curve does not start at `[0, 1]`, or it does not end at a chance of 0.
  *   Or its days do not increase, or its chance increases.
  * - `endurance-prior-case`: a prior names a case that the layer does not have.
+ * - `endurance-cycle`: converters make a resource from itself, through one converter or a chain. One fault names each cycle.
  * - `endurance-no-way` (warning): a draw has no direct use and no converter, so it holds 0 days when its supply stops.
  */
 export const ENDURANCE_CODES: readonly [
@@ -29,6 +32,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-converter-empty",
   "endurance-curve",
   "endurance-prior-case",
+  "endurance-cycle",
   "endurance-no-way",
 ] = [
   "endurance-twice",
@@ -40,6 +44,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-converter-empty",
   "endurance-curve",
   "endurance-prior-case",
+  "endurance-cycle",
   "endurance-no-way",
 ];
 
@@ -125,7 +130,7 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     range(draw.need, "rate", draw.perDay);
     if (draw.users !== undefined) range(draw.need, "count of users", draw.users);
     part(draw.need, "supply", draw.supply);
-    const ways = direct.some((use) => use.need === draw.need) || converters.some((converter) => converter.gives.need === draw.need);
+    const ways = direct.some((use) => use.need === draw.need) || converters.some((converter) => giftNeed(converter) === draw.need);
     if (!ways) add("warning", "endurance-no-way", draw.need, `The draw "${draw.need}" has no direct use and no converter. It holds 0 days when its supply stops.`);
   }
   for (const use of direct) {
@@ -140,6 +145,8 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
       range(converter.id, "amount", input.amount);
     }
     range(converter.id, "amount", converter.gives.amount);
+    const made = giftResource(converter);
+    if (made !== undefined) resource(converter.id, made);
     if (!converter.takes.some((input) => input.amount > 0) || converter.gives.amount === 0) add("error", "endurance-converter-empty", converter.id, `The converter "${converter.id}" takes nothing, or it gives nothing.`);
     part(converter.id, "device", converter.device);
   }
@@ -155,6 +162,12 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     for (const [need, factor] of Object.entries(item.factors ?? {})) range(`${item.case}/${need}`, "factor", factor);
     if (item.leadSeconds !== undefined) range(item.case, "lead time", item.leadSeconds);
   }
+  for (const cycle of resourceCycles(converters)) {
+    const [first = ""] = cycle;
+    const names = cycle.map((code) => `"${code}"`).join(", ");
+    const message = cycle.length === 1 ? `A converter makes the resource ${names} from itself.` : `Converters make the resources ${names} from each other.`;
+    add("error", "endurance-cycle", first, `${message} A chain of converters cannot end.`);
+  }
   for (const prior of priors) {
     const at = `${prior.case}@${prior.place}`;
     if (!caseCodes.has(prior.case)) add("error", "endurance-prior-case", at, `The prior "${at}" names the case "${prior.case}", which the layer does not have.`);
@@ -163,6 +176,23 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     date(at, prior.asOf);
   }
   return faults;
+}
+
+/** This function gives each cycle of resources: a resource is made from a resource that a converter makes from it. Each cycle is a list of codes. */
+function resourceCycles(converters: readonly Converter[]): string[][] {
+  const from = new Map<string, Set<string>>();
+  for (const converter of converters) {
+    const made = giftResource(converter);
+    if (made === undefined) continue;
+    const inputs = from.get(made) ?? new Set<string>();
+    for (const input of converter.takes) if (input.amount > 0) inputs.add(input.resource);
+    from.set(made, inputs);
+  }
+  const successors = (code: string): Iterable<string> => from.get(code) ?? [];
+  return stronglyConnectedComponents(from.keys(), successors).filter((component) => {
+    const [only = ""] = component;
+    return component.length > 1 || (from.get(only)?.has(only) ?? false);
+  });
 }
 
 /** This function tells if a list of faults has an error. */

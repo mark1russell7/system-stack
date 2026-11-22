@@ -68,13 +68,32 @@ describe("checkEndurance", () => {
   });
 
   it("has a code for each fault", () => {
-    expect(ENDURANCE_CODES).toHaveLength(10);
+    expect(ENDURANCE_CODES).toHaveLength(11);
   });
 });
 
 const AT = "2026-12-01";
 
 describe("curveFault", () => {
+  it("refuses a cycle of converters and a gift of an unknown resource", () => {
+    const layer: EnduranceLayer = {
+      ...SAMPLE_ENDURANCE,
+      resources: [...SAMPLE_ENDURANCE.resources, { code: "a", unit: "u" }, { code: "b", unit: "u" }],
+      converters: [
+        ...(SAMPLE_ENDURANCE.converters ?? []),
+        { id: "a-from-b", takes: [{ resource: "b", amount: 1 }], gives: { resource: "a", amount: 1 } },
+        { id: "b-from-a", takes: [{ resource: "a", amount: 1 }], gives: { resource: "b", amount: 1 } },
+        { id: "again", takes: [{ resource: "fuel.propane", amount: 1 }, { resource: "energy.battery", amount: 1 }], gives: { resource: "energy.battery", amount: 2 } },
+        { id: "unknown", takes: [{ resource: "a", amount: 1 }], gives: { resource: "nothing", amount: 1 } },
+      ],
+    };
+    const faults = checkEndurance(layer);
+    expect(faults.filter((fault) => fault.code === "endurance-cycle").map((fault) => fault.at)).toEqual(expect.arrayContaining(["energy.battery"]));
+    expect(faults.filter((fault) => fault.code === "endurance-cycle")).toHaveLength(2);
+    expect(faults.some((fault) => fault.code === "endurance-resource-unknown" && fault.at === "unknown")).toBe(true);
+    expect(checkEndurance(SAMPLE_ENDURANCE).filter((fault) => fault.code === "endurance-cycle")).toEqual([]);
+  });
+
   it("gives the first fault of a curve", () => {
     expect(curveFault([[0, 1], [1, 0]])).toBeUndefined();
     expect(curveFault([])).toBe("The curve does not start at [0, 1].");

@@ -19,6 +19,7 @@ Endurance: build/layer.chunk.d.ts#Endurance
 EnduranceCode: build/index.d.ts#EnduranceCode
 EnduranceFault: build/index.d.ts#EnduranceFault
 EnduranceLayer: build/layer.chunk.d.ts#EnduranceLayer
+Gift: build/layer.chunk.d.ts#Gift
 IsoDate: build/layer.chunk.d.ts#IsoDate
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
 Prior: build/layer.chunk.d.ts#Prior
@@ -39,6 +40,8 @@ curveFault: build/index.d.ts#curveFault
 drawDemand: build/index.d.ts#drawDemand
 enduranceOf: build/index.d.ts#enduranceOf
 eventStop: build/index.d.ts#eventStop
+giftNeed: build/index.d.ts#giftNeed
+giftResource: build/index.d.ts#giftResource
 hasEnduranceError: build/index.d.ts#hasEnduranceError
 joinEndurance: build/index.d.ts#joinEndurance
 longestStop: build/index.d.ts#longestStop
@@ -76,7 +79,7 @@ export interface CaseOptions {
 }
 
 ### build/index.d.ts#ENDURANCE_CODES
-export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-no-way"];
+export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-no-way"];
 
 ### build/index.d.ts#EnduranceCode
 export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
@@ -150,6 +153,12 @@ export declare function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, o
 ### build/index.d.ts#eventStop
 export declare function eventStop(curves: readonly Survival[], stops: (cuts: readonly number[]) => boolean): Survival;
 
+### build/index.d.ts#giftNeed
+export declare function giftNeed(converter: Converter): string | undefined;
+
+### build/index.d.ts#giftResource
+export declare function giftResource(converter: Converter): string | undefined;
+
 ### build/index.d.ts#hasEnduranceError
 export declare function hasEnduranceError(faults: readonly EnduranceFault[]): boolean;
 
@@ -206,10 +215,7 @@ interface Converter {
     readonly resource: string;
     readonly amount: number;
   }[];
-  readonly gives: {
-    readonly need: string;
-    readonly amount: number;
-  };
+  readonly gives: Gift;
 }
 
 ### build/layer.chunk.d.ts#Cut
@@ -265,6 +271,17 @@ interface EnduranceLayer {
   readonly cases?: readonly CaseCuts[] | undefined;
   readonly priors?: readonly Prior[] | undefined;
 }
+
+### build/layer.chunk.d.ts#Gift
+type Gift = {
+  readonly need: string;
+  readonly resource?: never;
+  readonly amount: number;
+} | {
+  readonly resource: string;
+  readonly need?: never;
+  readonly amount: number;
+};
 
 ### build/layer.chunk.d.ts#IsoDate
 type IsoDate = string;
