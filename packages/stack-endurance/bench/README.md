@@ -8,6 +8,8 @@
 - An A/A arm repeats the case of 12 cuts. Its spread is the noise of the job.
 - `limits.json` keeps the frozen limit of each case, with its values, the commit and the date. The rule is `runLimit`: the worst value of 5 runs or more plus their spread.
 - The runners of CI have different CPU models. The frozen limits pool 24 jobs of 4 runs on 6 CPU models, so one limit holds for each of these models. The timed code is the same in the 4 commits of these runs.
+- The pooled limit is a ceiling. It stops only a large regression: approximately 1.5 times on the EPYC 7763 and 2.4 times on the EPYC 9V45. It does not hold a gain.
+- A limit for each CPU model comes after a freeze run on a second day. The jobs on the 9V45 have two levels with low A/A noise, so one name can be two machine kinds.
 - `node bench/main.ts read --in <folder> --freeze <file> --commit <sha>` freezes the limits of the records under a folder. Give `--commit` when the runs come from several commits.
 - A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
 - The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read. A job above its limit blocks the run.
