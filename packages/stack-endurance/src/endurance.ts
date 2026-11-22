@@ -1,4 +1,5 @@
 import { dayNumber, stopped, type Stack } from "@mark1russell7/system-stack";
+import { largestFit, type Try } from "./fit.ts";
 import type { CaseCuts, Converter, DirectUse, Draw, Endurance, EnduranceLayer, IsoDate } from "./layer.ts";
 
 // The endurance query: the days that each draw holds when a case stops its supply.
@@ -159,13 +160,13 @@ function takeResource(left: Map<string, number>, makers: Makers, resource: strin
 
 /**
  * This function runs a converter up to `wanted` times with the resources of `left`, and it gives the count of runs.
- * It changes `left`. When two inputs come from one resource, a bisection finds the runs that the resources give.
+ * It changes `left`. When two inputs come from one resource, `largestFit` finds the runs that the resources give.
  */
 function run(left: Map<string, number>, makers: Makers, converter: Converter, wanted: number, path: ReadonlySet<string>): number {
   const inputs = inputsOf(converter);
   const most = Math.min(wanted, mostRuns(left, makers, converter, path));
   if (!(most > 0)) return 0;
-  const attempt = (runs: number): Map<string, number> | undefined => {
+  const attempt = (runs: number): Try<Map<string, number>> => {
     const copy = new Map(left);
     let need = 0;
     let short = 0;
@@ -173,24 +174,9 @@ function run(left: Map<string, number>, makers: Makers, converter: Converter, wa
       need += runs * each;
       short += takeResource(copy, makers, resource, runs * each, path);
     }
-    return short <= TOLERANCE * need ? copy : undefined;
+    return { short, need, value: copy };
   };
-  let runs = most;
-  let best = attempt(most);
-  if (best === undefined) {
-    let low = 0;
-    let high = most;
-    for (let step = 0; step < 200 && high - low > TOLERANCE * high; step += 1) {
-      const mid = (low + high) / 2;
-      const tried = attempt(mid);
-      if (tried === undefined) high = mid;
-      else {
-        low = mid;
-        best = tried;
-      }
-    }
-    runs = low;
-  }
+  const { x: runs, value: best } = largestFit(most, attempt);
   if (best === undefined) return 0;
   for (const [resource, amount] of best) left.set(resource, amount);
   return runs;
@@ -226,9 +212,6 @@ function inputClosure(ways: Ways): Set<string> {
   }
   return out;
 }
-
-/** The relative tolerance of a take and of the bisection. */
-const TOLERANCE = 1e-13;
 
 /** The relative tolerance of a used-up resource. */
 const USED_UP = 1e-9;
@@ -268,18 +251,13 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
       const left = new Map(before);
       return { left, short: take(left, ways, days * demand) };
     };
-    const fits = (days: number): boolean => after(days).short <= TOLERANCE * days * demand;
-    // The upper limit: the days that the draw holds when it takes all the stores itself. A bisection finds the days below it.
-    let high = capacity(start, ways) / demand;
-    let low = 0;
-    if (fits(high)) low = high;
-    else
-      for (let step = 0; step < 200 && high - low > TOLERANCE * high; step += 1) {
-        const mid = (low + high) / 2;
-        if (fits(mid)) low = mid;
-        else high = mid;
-      }
-    const { left } = after(low);
+    // The upper limit: the days that the draw holds when it takes all the stores itself. `largestFit` finds the days below it.
+    const fit = largestFit(capacity(start, ways) / demand, (days) => {
+      const tried = after(days);
+      return { short: tried.short, need: days * demand, value: tried.left };
+    });
+    const low = fit.x;
+    const left = fit.value ?? after(low).left;
     const binding = [...inputClosure(ways)]
       .filter((resource) => !makers.has(resource) || stocked.has(resource))
       .filter((resource) => mostResource(left, makers, resource, NO_PATH) <= USED_UP * Math.max(1, start.get(resource) ?? 0))
