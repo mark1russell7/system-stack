@@ -13,7 +13,7 @@ import { parseArgs } from "node:util";
 import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell7/rigor-bench";
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms, so the order of `armOrder` is balanced. */
 export const JOB_ROUNDS = 16;
@@ -104,7 +104,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
   const gate = runGate(gates);
   const enforced = args["enforce"] === true;
   const models = [...new Set(reads.map((item) => item.cpu))].map((model) => ({ model, jobs: reads.filter((item) => item.cpu === model).length }));
-  writeGateLine(gateLine(gates.flatMap((job) => job.cases.map((item) => ({ case: `${job.job}/${item.case}`, outcome: item.outcome }))), { title: "independentStop cost", enforced, reason: gate.reason, models }));
+  writeGateLine(gateLine(runCases(gates), { title: "independentStop cost", enforced, reason: gate.reason, models }));
   if (enforced) writeGateVerdict(gate.outcome);
   process.stdout.write(`gate: ${gate.outcome}. ${gate.reason}\n`);
   return enforced && gate.outcome !== "pass" ? 1 : 0;

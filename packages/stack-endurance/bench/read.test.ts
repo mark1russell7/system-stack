@@ -3,7 +3,7 @@ import type { ArmProcess, BenchEnv, FreshRecord } from "@mark1russell7/rigor-ben
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BENCH_SEED } from "./inputs.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, readReport, RECORD_SCHEMA, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, MIN_READ_JOBS, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
 const STAMP = { commit: "0".repeat(40), date: "2026-11-22", runs: ["1"] };
@@ -105,12 +105,28 @@ describe("the gate of a job", () => {
 });
 
 describe("the gate of a run", () => {
-  it("blocks when one job blocks, and gives no read when one job cannot read", () => {
+  it("passes a case that 3 jobs or more read within their limits, and skips the jobs that do not read", () => {
     const file = frozen();
     const pass = jobGate(jobRead(JOBS[0] as JobRecord), file);
-    expect(runGate([pass, pass]).outcome).toBe("pass");
-    expect(runGate([pass, jobGate(jobRead(jobRecord("slow", 1.5)), file)]).outcome).toBe("block");
-    expect(runGate([pass, jobGate(jobRead(JOBS[0] as JobRecord), undefined)]).outcome).toBe("no read");
+    const other = jobGate(jobRead(jobRecord("other", 0.6, () => 1, { ...ENV, cpu: "cpu-b" })), file);
+    expect(runGate([pass, pass, pass]).outcome).toBe("pass");
+    expect(runGate([pass, pass, other, pass]).outcome).toBe("pass");
+    expect(runCases([pass, pass, other, pass]).map((item) => item.reads)).toEqual([3, 3, 3]);
+  });
+
+  it("gives no read when fewer than 3 jobs read a case, also when each read is within", () => {
+    const file = frozen();
+    const pass = jobGate(jobRead(JOBS[0] as JobRecord), file);
+    const noisy = jobGate(jobRead(jobRecord("noisy", 0.5, (round) => (round % 2 === 0 ? 1.3 : 0.75))), file);
+    expect(runGate([pass, pass, noisy, noisy]).outcome).toBe("no read");
+    expect(runGate([0, 1, 2].map(() => jobGate(jobRead(JOBS[0] as JobRecord), undefined))).outcome).toBe("no read");
+    expect(runCases([pass, pass])[0]?.reason).toBe(`2 jobs read the case, and the gate needs ${String(MIN_READ_JOBS)}.`);
+  });
+
+  it("blocks when one job that reads a case is above its limit", () => {
+    const file = frozen();
+    const pass = jobGate(jobRead(JOBS[0] as JobRecord), file);
+    expect(runGate([pass, pass, pass, jobGate(jobRead(jobRecord("slow", 1.5)), file)]).outcome).toBe("block");
   });
 
   it("reports each job, each no read and the candidate limits", () => {
@@ -118,6 +134,7 @@ describe("the gate of a run", () => {
     const report = readReport(reads, reads.map((read) => jobGate(read, undefined)), frozen());
     expect(report).toContain("| job-1 | cpu-a |");
     expect(report).toContain("There is no file of frozen limits.");
+    expect(report).toContain("| m12 | 0 | cannot decide: 0 jobs read the case");
     expect(report).toContain("The candidate limits of these 5 jobs");
   });
 });

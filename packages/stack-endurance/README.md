@@ -101,4 +101,5 @@ In the sample, the rice needs 2 L of water for each kg. The drinking water holds
 - An A/A arm repeats the case of 12 cuts. Its spread is the noise of the job.
 - `bench/limits.json` keeps the frozen limit of each case, with its values, the commit and the date. The rule is `runLimit`: the worst value of 5 runs or more plus their spread.
 - A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
+- The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read. A job above its limit blocks the run.
 - Timed runs give valid values only in CI. On a local computer, start only the tests of `bench/`.

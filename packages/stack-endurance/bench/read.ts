@@ -202,9 +202,39 @@ function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | un
   return undefined;
 }
 
-/** This function gives the gate of all jobs: each case of each job, with the name `<job>/<case>`. */
+/** The jobs that must read a case before the run decides it. */
+export const MIN_READ_JOBS = 3;
+
+/** The outcome of one case over all jobs of a run. */
+export interface RunCase {
+  readonly case: string;
+  readonly outcome: LimitOutcome;
+  /** The jobs that read the case: their outcome is `within` or `beyond`. */
+  readonly reads: number;
+  /** The reason of a no read. */
+  readonly reason?: string;
+}
+
+/**
+ * This function gives the outcome of each case over all jobs of a run.
+ *
+ * - A case is `beyond` when a job that reads it is `beyond`.
+ * - A case is `within` when at least `MIN_READ_JOBS` jobs read it and each is `within`.
+ * - Each other case is `cannot decide`. A job on a CPU model with no frozen value, a noisy job and a missing job do not read.
+ */
+export function runCases(gates: readonly JobGate[]): RunCase[] {
+  return BENCH_CUTS.map((cuts): RunCase => {
+    const id = caseId(cuts);
+    const outcomes = gates.flatMap((gate) => gate.cases.filter((item) => item.case === id && item.outcome !== "cannot decide").map((item) => item.outcome));
+    if (outcomes.includes("beyond")) return { case: id, outcome: "beyond", reads: outcomes.length };
+    if (outcomes.length >= MIN_READ_JOBS) return { case: id, outcome: "within", reads: outcomes.length };
+    return { case: id, outcome: "cannot decide", reads: outcomes.length, reason: `${String(outcomes.length)} jobs read the case, and the gate needs ${String(MIN_READ_JOBS)}.` };
+  });
+}
+
+/** This function gives the gate of a run: `gateOf` over the outcome of each case in `runCases`. */
 export function runGate(gates: readonly JobGate[]): Gate {
-  return gateOf(gates.flatMap((job) => job.cases.map((item) => ({ case: `${job.job}/${item.case}`, outcome: item.outcome }))));
+  return gateOf(runCases(gates));
 }
 
 const ms = (value: number | undefined): string => (value === undefined ? "-" : value < 10 ? value.toFixed(3) : value.toFixed(1));
@@ -225,8 +255,11 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     const values = ids.map((id) => ms(read.cases.find((item) => item.case === id)?.ms));
     lines.push(`| ${read.job} | ${read.cpu} | ${values.join(" | ")} | ${read.aa === undefined ? "-" : read.aa.spread.toFixed(4)} | ${gate} |`);
   }
+  const run = runCases(gates);
+  lines.push("", "The gate of each case over the jobs:", "", "| Case | Jobs that read | Outcome |", "| --- | --- | --- |");
+  for (const item of run) lines.push(`| ${item.case} | ${String(item.reads)} | ${item.outcome}${item.reason === undefined ? "" : `: ${item.reason}`} |`);
   const reasons = [...new Set(gates.flatMap((gate) => gate.cases.flatMap((item) => (item.reason === undefined ? [] : [`${gate.job}: ${item.reason}`]))))];
-  if (reasons.length > 0) lines.push("", "The no reads:", "", ...reasons.map((reason) => `- ${reason}`));
+  if (reasons.length > 0) lines.push("", "The jobs that do not read:", "", ...reasons.map((reason) => `- ${reason}`));
   if (candidate !== undefined) {
     lines.push("", `The candidate limits of these ${String(reads.length)} jobs (${RULE}):`, "", "| Case | Worst (ms) | Spread (ms) | Limit (ms) |", "| --- | --- | --- | --- |");
     for (const id of ids) {
