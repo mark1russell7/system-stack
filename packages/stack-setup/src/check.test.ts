@@ -148,7 +148,7 @@ describe("checkSetup", () => {
     for (const mib of [0, 1.5, 65537, Number.NaN]) expect(codes(withSteps([{ kind: "swap", id: "s", path: "/swapfile", mib }])), String(mib)).toEqual(["setup-swap-size"]);
   });
 
-  it("refuses an archive in a folder of the system, a mark outside its folder and a count to strip out of its range", () => {
+  it("refuses an archive outside the folder of an app, a mark outside its folder and a count to strip out of its range", () => {
     const archive = (more: Partial<Extract<Step, { kind: "archive" }>>): Step => ({
       kind: "archive",
       id: "a",
@@ -160,10 +160,13 @@ describe("checkSetup", () => {
       ...more,
     });
     expect(codes(withSteps([archive({})]))).toEqual([]);
-    for (const into of ["/srv/a", "/usr/local/lib/a", "/etc/a/b", "/home/a/tools"]) {
+    for (const into of ["/srv/a", "/opt/a/b", "/opt/libs", "/usr/local/a", "/usr/local/a/b"]) {
       expect(codes(withSteps([archive({ into, mark: { path: `${into}/m`, sha256: "b".repeat(64) } })])), into).toEqual([]);
     }
-    for (const into of ["/opt", "/usr/lib", "/var/lib", "/etc/ssh", "/home/a", "/bin/a", "/tmp/a", "/proc/a/b", "opt/a", "/opt/a/../b"]) {
+    // Only the folder of an app passes: a folder of the system, or a name that the FHS keeps, is refused at each depth.
+    const system = ["/opt", "/srv", "/usr/local", "/opt/lib", "/opt/bin/a", "/usr/local/bin", "/usr/local/lib/a", "/usr/local/share/a"];
+    const others = ["/usr/lib/x86_64-linux-gnu", "/var/lib/dpkg", "/etc/systemd/system", "/usr/share/keyrings", "/etc/a/b", "/home/a/tools", "/var/tmp/a"];
+    for (const into of [...system, ...others, "/bin/a", "/tmp/a", "/proc/a/b", "opt/a", "/opt/a/../b", "/opt/a/"]) {
       expect(codes(withSteps([archive({ into, mark: { path: `${into}/m`, sha256: "b".repeat(64) } })])), into).toContain("setup-archive");
     }
     expect(codes(withSteps([archive({ mark: { path: "/opt/ab/m", sha256: "b".repeat(64) } })]))).toEqual(["setup-archive"]);
@@ -174,6 +177,11 @@ describe("checkSetup", () => {
     expect(codes(withSteps([archive({ mark: { path: "/opt/a/m", sha256: "x" } })]))).toEqual(["setup-sha256"]);
     // The folder of an archive is a path that the step writes.
     expect(codes(withSteps([archive({}), file({ id: "f", path: "/opt/a" })]))).toEqual(["setup-path-twice"]);
+    // The archive step replaces its whole folder, so no other step writes a path in it, and no archive is in the folder of another.
+    expect(codes(withSteps([file({ id: "f", path: "/opt/a/etc/x" }), archive({})]))).toEqual(["setup-path-twice"]);
+    const inner = archive({ id: "b", into: "/opt/a/b", mark: { path: "/opt/a/b/m", sha256: "b".repeat(64) } });
+    expect(codes(withSteps([archive({}), inner]))).toEqual(["setup-path-twice"]);
+    expect(codes(withSteps([archive({}), file({ id: "f", path: "/opt/ab/x" })]))).toEqual([]);
   });
 
   it("refuses a command that is empty or whose first argument is not a literal program", () => {

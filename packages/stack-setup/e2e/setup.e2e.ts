@@ -17,6 +17,8 @@ const SWAP = "/var/lib/stack-setup-e2e.swap";
 const DOWNLOAD = "/opt/stack-setup-e2e/LICENSE";
 const ARCHIVE = "/opt/stack-setup-e2e-node";
 const INPUT = "/srv/stack-setup-e2e/input";
+/** A folder that a user owns. The archive step refuses a folder in it. */
+const OWNED = "/opt/stack-setup-e2e-owned";
 
 /** The values of the two variables. They are examples. */
 const TOKEN = "an-example-of-a-token";
@@ -86,9 +88,23 @@ const FAILING: SetupLayer = {
   profiles: [{ name: "fail", part: HOST, hosts: [HOST], steps: [{ kind: "command", id: "never", run: ["true"], check: ["false"] }] }],
 };
 
+/** A layer with an archive in a folder that a user can change. */
+const REFUSED: SetupLayer = {
+  schema: SETUP_SCHEMA,
+  profiles: [
+    {
+      name: "refused",
+      part: HOST,
+      hosts: [HOST],
+      steps: [{ kind: "archive", id: "node", url: NODE_URL, sha256: NODE_SHA256, into: `${OWNED}/node`, strip: 1, mark: { path: `${OWNED}/node/m`, sha256: NODE_MARK_SHA256 } }],
+    },
+  ],
+};
+
 let folder = "";
 let script = "";
 let failing = "";
+let refused = "";
 
 /** This function gives the text of a script, or stops the test with the faults of the gate. */
 function scriptText(layer: SetupLayer): string {
@@ -132,6 +148,8 @@ before(() => {
   failing = join(folder, "failing.sh");
   writeFileSync(script, scriptText(LAYER));
   writeFileSync(failing, scriptText(FAILING));
+  refused = join(folder, "refused.sh");
+  writeFileSync(refused, scriptText(REFUSED));
 });
 
 after(() => {
@@ -145,7 +163,7 @@ test("the script holds no value of a variable", () => {
 });
 
 test("shellcheck finds nothing in the script", () => {
-  const run = start("shellcheck", ["-s", "sh", script, failing]);
+  const run = start("shellcheck", ["-s", "sh", script, failing, refused]);
   assert.equal(run.status, 0, run.stdout + run.stderr);
 });
 
@@ -190,6 +208,8 @@ test("the host has each record of the layer", () => {
   assert.equal(asRoot(["sha256sum", NODE_MARK]).split(" ")[0], NODE_MARK_SHA256);
   assert.equal(start(`${ARCHIVE}/bin/node`, ["--version"]).stdout, "v24.21.0\n");
   assert.equal(asRoot(["find", ARCHIVE, "(", "!", "-user", "root", "-o", "!", "-group", "root", ")", "-print"]), "");
+  assert.equal(asRoot(["find", ARCHIVE, "!", "-type", "l", "-perm", "/6022", "-print"]), "", "no file is writable by other users or has a set-ID bit");
+  assert.equal(asRoot(["stat", "-c", "%a %U", ARCHIVE]), "755 root\n");
   assert.equal(start("test", ["-e", `${ARCHIVE}.setup-new`]).status, 1, "no new folder is left");
   assert.equal(start("test", ["-e", `${ARCHIVE}.setup-old`]).status, 1, "no old folder is left");
   assert.equal(asRoot(["cat", INPUT]), TOKEN);
@@ -230,6 +250,34 @@ test("the script extracts the archive again when a file of its folder has an own
   assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
   assert.equal(changes(apply.stdout), 1);
   assert.equal(asRoot(["stat", "-c", "%U %G", `${ARCHIVE}/bin/node`]), "root root\n");
+});
+
+test("the script extracts the archive again when other users can write a file of its folder", () => {
+  asRoot(["chmod", "o+w", `${ARCHIVE}/bin/node`]);
+  const check = setup(script, "check");
+  assert.equal(check.status, SETUP_EXIT.changes, check.stdout + check.stderr);
+  assert.deepEqual(
+    reports(check.stdout).filter((line) => !line.startsWith("ok: ")),
+    ["change: app.node"],
+  );
+  const apply = setup(script, "apply");
+  assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
+  assert.equal(changes(apply.stdout), 1);
+  assert.equal(asRoot(["find", ARCHIVE, "!", "-type", "l", "-perm", "/6022", "-print"]), "");
+});
+
+test("the script refuses an archive in a folder that a user can change, before the download", () => {
+  asRoot(["install", "-d", "-o", USER, "-m", "755", OWNED]);
+  try {
+    const run = setup(refused, "apply", {});
+    assert.equal(run.status, SETUP_EXIT.failed, run.stdout + run.stderr);
+    assert.ok(run.stderr.includes(`setup: only root can change the folder ${OWNED} above the archive`), run.stderr);
+    assert.match(run.stderr, /^failed: refused\.node: the change failed$/m);
+    assert.equal(start("test", ["-e", `${OWNED}/node.setup-new`]).status, 1, "no new folder");
+    assert.equal(start("test", ["-e", `${OWNED}/node`]).status, 1, "no folder");
+  } finally {
+    asRoot(["rm", "-rf", OWNED]);
+  }
 });
 
 test("a step whose check fails after the change stops the script", () => {

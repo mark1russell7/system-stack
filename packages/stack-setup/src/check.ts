@@ -121,22 +121,24 @@ function checkProgram(faults: Faults, at: string, label: string, command: readon
 /** The largest count of the folders that an archive step removes from each path. */
 const STRIP_LIMIT = 16;
 
-/** The first segments of a path that hold the system. An archive is not in them. */
-const SYSTEM_ROOTS: ReadonlySet<string> = new Set(["bin", "boot", "dev", "lib", "lib32", "lib64", "libx32", "proc", "root", "run", "sbin", "sys", "tmp"]);
+/** The names in `/opt` that the FHS keeps for the administrator of the host. */
+const OPT_NAMES: ReadonlySet<string> = new Set(["bin", "doc", "include", "info", "lib", "man"]);
 
-/** The first segments of a path whose folders two segments deep belong to the system or to its users, for example `/usr/lib` and `/home/a`. */
-const SYSTEM_PARENTS: ReadonlySet<string> = new Set(["etc", "home", "usr", "var"]);
+/** The names in `/usr/local` that the FHS keeps for the programs of the host. */
+const LOCAL_NAMES: ReadonlySet<string> = new Set(["bin", "etc", "games", "include", "lib", "lib32", "lib64", "libexec", "libx32", "man", "sbin", "share", "src"]);
 
 /**
- * This function tells if an archive step can replace a folder. The folder is two or more segments deep, and it is not a
- * folder of the system. A new folder in the place of a folder of the system breaks the host.
+ * This function tells if an archive step can replace a folder. The folder is the folder of an app, or a folder in it:
+ * `/opt/<name>`, `/srv/<name>` or `/usr/local/<name>`, where the FHS does not keep the name. The function refuses each
+ * other folder. A new folder in the place of a folder of the system breaks the host. A gate that cannot read a case does not pass it.
  */
 export function isArchiveFolder(path: string): boolean {
   if (!isPath(path)) return false;
-  const segments = path.split("/").slice(1);
-  const first = segments[0] ?? "";
-  if (segments.length < 2 || SYSTEM_ROOTS.has(first)) return false;
-  return !(segments.length === 2 && SYSTEM_PARENTS.has(first));
+  const [first, second, third] = path.split("/").slice(1);
+  if (first === "opt") return second !== undefined && !OPT_NAMES.has(second);
+  if (first === "srv") return second !== undefined;
+  if (first === "usr" && second === "local") return third !== undefined && !LOCAL_NAMES.has(third);
+  return false;
 }
 
 /** This function examines the fields of one step that are not texts. */
@@ -181,7 +183,7 @@ function checkStep(faults: Faults, at: string, step: Step): void {
       if (!SHA256_FORM.test(step.sha256)) faults.error("setup-sha256", at, "The SHA-256 of the archive is not 64 lowercase hexadecimal digits.");
       if (!SHA256_FORM.test(step.mark.sha256)) faults.error("setup-sha256", at, "The SHA-256 of the mark is not 64 lowercase hexadecimal digits.");
       if (!isArchiveFolder(step.into)) {
-        faults.error("setup-archive", at, `The folder "${step.into}" is not an absolute path two or more segments deep, or it is a folder of the system.`);
+        faults.error("setup-archive", at, `The folder "${step.into}" is not the folder of an app: /opt/<name>, /srv/<name> or /usr/local/<name>, where the FHS does not keep the name.`);
       }
       if (!isPath(step.mark.path) || !step.mark.path.startsWith(`${step.into}/`)) faults.error("setup-archive", at, `The mark "${step.mark.path}" is not a path in the folder "${step.into}".`);
       if (step.strip !== undefined && (!Number.isInteger(step.strip) || step.strip < 0 || step.strip > STRIP_LIMIT)) {
@@ -254,6 +256,7 @@ function checkHosts(faults: Faults, layer: SetupLayer, stack: Stack): void {
     const users = new Map<string, string>();
     let swap: string | undefined;
     let fstab: string | undefined;
+    const archives: (readonly [folder: string, at: string])[] = [];
     for (const profile of layer.profiles) {
       if (!profile.hosts.includes(host)) continue;
       for (const step of profile.steps) {
@@ -265,11 +268,22 @@ function checkHosts(faults: Faults, layer: SetupLayer, stack: Stack): void {
           if (path === "/etc/fstab") fstab ??= at;
         }
         if (step.kind === "swap") swap ??= at;
+        if (step.kind === "archive") archives.push([step.into, at]);
         if (step.kind === "user") {
           const first = users.get(step.name);
           if (first === undefined) users.set(step.name, at);
           else faults.error("setup-user-twice", at, `The steps "${first}" and "${at}" both set up the user "${step.name}" on the host "${host}".`, { other: first, host });
         }
+      }
+    }
+    // An archive step replaces its whole folder. A path of another step in that folder goes away at each change of the archive.
+    for (const [folder, archive] of archives) {
+      for (const [path, at] of writers) {
+        if (at === archive || !path.startsWith(`${folder}/`)) continue;
+        faults.error("setup-path-twice", at, `The step "${at}" writes "${path}" in the folder "${folder}" of the archive step "${archive}" on the host "${host}".`, {
+          other: archive,
+          host,
+        });
       }
     }
     if (swap !== undefined && fstab !== undefined) {
@@ -311,10 +325,10 @@ function checkProfile(faults: Faults, profile: Profile, parts: ReadonlyMap<strin
  * - `setup-secret-exposed`: a sensitive variable is in a unit, in the arguments of a command, or in a file that each user can read.
  * - `setup-text`: a text has the character NUL, or a key is not one line.
  * - `setup-path`: a path is not an absolute path of the safe characters.
- * - `setup-path-twice`: two steps of one host write one path.
+ * - `setup-path-twice`: two steps of one host write one path, or a step writes a path in the folder of an archive step.
  * - `setup-user-twice`: two steps of one host set up one user.
  * - `setup-mode`, `setup-url`, `setup-sha256`, `setup-swap-size`: a mode, an address, a SHA-256 or a size does not have its form.
- * - `setup-archive`: the folder of an archive is a folder of the system, or its mark or its count to strip is not correct.
+ * - `setup-archive`: the folder of an archive is not the folder of an app, or its mark or its count to strip is not correct.
  * - `setup-program`: a command is empty, or its first argument is not a literal program.
  * - `setup-cycle`: the needs of the parts of the profiles of one host make a cycle.
  *
