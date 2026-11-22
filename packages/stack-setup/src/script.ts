@@ -258,7 +258,7 @@ function foldersAbove(path: string): string[] {
  * user can put a link or a folder in the path between two commands. Then it extracts the archive into a new folder next to the
  * folder, as root, with no owner from the archive. It removes the write of the group and of other users, and the set-user-ID
  * and set-group-ID bits. Then it renames the old folder and the new folder. A process that runs a program of the old folder keeps its file.
- * The check examines the mark, the owner and the mode of each file of the folder, and the folders above it.
+ * The check examines that the folder is a folder and not a link. It also examines the mark, the owner and the mode of each file, and the folders above it.
  */
 function archiveCode(step: ArchiveStep): StepCode {
   const into = q(step.into);
@@ -270,6 +270,8 @@ function archiveCode(step: ArchiveStep): StepCode {
   return {
     helpers: ["root_folder"],
     check: [
+      `[ -d ${into} ]`,
+      `[ ! -L ${into} ]`,
       `[ -f ${mark} ]`,
       `[ "$(sha256sum ${mark} | cut -d' ' -f1)" = ${q(step.mark.sha256)} ]`,
       `[ -z "$(find ${into} \\( ! -user root -o ! -group root \\) -print -quit)" ]`,
@@ -293,12 +295,13 @@ function archiveCode(step: ArchiveStep): StepCode {
       "  return 1",
       "fi",
       `rm -rf ${fresh} ${old} || return 1`,
-      // No -p: a path that is there makes mkdir fail.
-      `mkdir -m 755 ${fresh} || return 1`,
+      // No -p: a path that is there makes mkdir fail. The mode 700 keeps other users out until the modes are correct.
+      `mkdir -m 700 ${fresh} || return 1`,
       `tar -xf "$tmp" -C ${fresh} --strip-components=${String(step.strip ?? 0)} --no-same-owner || return 1`,
       `chown -R -h root:root ${fresh} || return 1`,
       // As root, tar keeps the modes of the archive. chmod removes the write of other users and the set-ID bits, so no file gives a user the rights of root.
       `chmod -R go-w,ug-s ${fresh} || return 1`,
+      `chmod 755 ${fresh} || return 1`,
       `if [ -e ${into} ]; then`,
       `  mv ${into} ${old} || return 1`,
       "fi",

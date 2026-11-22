@@ -148,10 +148,11 @@ describe("setupScript", () => {
       },
     ]);
     expect(script).toContain(
-      `check_1() {\n  [ -f /opt/node/include/version.h ] || return 1\n  [ "$(sha256sum /opt/node/include/version.h | cut -d' ' -f1)" = ${"b".repeat(64)} ] || return 2\n` +
-        "  [ -z \"$(find /opt/node \\( ! -user root -o ! -group root \\) -print -quit)\" ] || return 3\n" +
-        "  [ -z \"$(find /opt/node ! -type l -perm /6022 -print -quit)\" ] || return 4\n" +
-        `  root_folder ${escapeShell("/")} || return 5\n  root_folder /opt || return 6\n}`,
+      "check_1() {\n  [ -d /opt/node ] || return 1\n  [ ! -L /opt/node ] || return 2\n" +
+        `  [ -f /opt/node/include/version.h ] || return 3\n  [ "$(sha256sum /opt/node/include/version.h | cut -d' ' -f1)" = ${"b".repeat(64)} ] || return 4\n` +
+        "  [ -z \"$(find /opt/node \\( ! -user root -o ! -group root \\) -print -quit)\" ] || return 5\n" +
+        "  [ -z \"$(find /opt/node ! -type l -perm /6022 -print -quit)\" ] || return 6\n" +
+        `  root_folder ${escapeShell("/")} || return 7\n  root_folder /opt || return 8\n}`,
     );
     expect(script).toContain("root_folder() {");
     // Each folder above is a folder that only root can change, before the download. No other user can put a link in the path.
@@ -165,7 +166,8 @@ describe("setupScript", () => {
     expect(script).toContain("chown -R -h root:root /opt/node.setup-new || return 1");
     expect(script).toContain("chmod -R go-w,ug-s /opt/node.setup-new || return 1");
     // No -p: a path that is there makes mkdir fail.
-    expect(script).toContain("mkdir -m 755 /opt/node.setup-new || return 1");
+    expect(script).toContain("mkdir -m 700 /opt/node.setup-new || return 1");
+    expect(script).toContain("chmod -R go-w,ug-s /opt/node.setup-new || return 1\n  chmod 755 /opt/node.setup-new || return 1");
     expect(script).not.toContain("mkdir -p");
     // The old folder moves away before the new folder takes its place, so a running program keeps its file.
     expect(script).toContain("if [ -e /opt/node ]; then\n    mv /opt/node /opt/node.setup-old || return 1\n  fi\n  mv /opt/node.setup-new /opt/node || return 1\n  rm -rf /opt/node.setup-old || return 1");

@@ -150,6 +150,11 @@ before(() => {
   writeFileSync(failing, scriptText(FAILING));
   refused = join(folder, "refused.sh");
   writeFileSync(refused, scriptText(REFUSED));
+  // On the hosted runner image, root is not the only user that can change /opt, so the archive step refuses each folder in it.
+  // The log keeps the owner and the mode of /opt. The runner is a new machine for each job, so the repair of the README is safe here.
+  process.stdout.write(`# /opt before the test: ${asRoot(["stat", "-c", "%U:%G %a", "/opt"])}`);
+  asRoot(["chown", "root:root", "/opt"]);
+  asRoot(["chmod", "755", "/opt"]);
 });
 
 after(() => {

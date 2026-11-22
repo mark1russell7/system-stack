@@ -83,6 +83,8 @@ The folder of an `archive` step is the folder of an app: `/opt/<name>`, `/srv/<n
 
 Before the download, the step makes sure that only root can change each folder above the folder. Root owns each of these folders, and its group and other users cannot write in it. Thus no other user can put a link in the path between two commands. The step makes a folder above that is not there, with the mode `755`.
 
+On some hosts, a group can write in `/opt` or `/usr/local`. For example, `/usr/local` of an old Debian host is `root:staff` with the mode `2775`. The step fails on such a host. To repair the host, start `chown root /usr/local` and `chmod go-w /usr/local` as root. Then the members of the group cannot write in the folder.
+
 The step removes the write of the group and of other users, and the set-user-ID and set-group-ID bits, from each file of the archive. No other step of the host writes a path in the folder.
 
 An `archive` step keeps a program of the old folder that operates. The old folder moves away before the new folder takes its place. The host needs `tar` and the program of the compression, for example `xz-utils` for a `.tar.xz` file.
