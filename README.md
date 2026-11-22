@@ -19,6 +19,7 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 | [`@mark1russell7/stack-placement`](packages/stack-placement/README.md) | The placement add-on: a candidate for each slot, and the front of the expected cost against the chance that a function works. |
 | [`@mark1russell7/stack-feeds`](packages/stack-feeds/README.md) | The feed add-on: the live lists of the parts from each source, and a gate that fails when a record or a list is old. |
 | [`@mark1russell7/stack-hazards`](packages/stack-hazards/README.md) | The hazard data: the public supplies that each hazard case can stop, the source of each claim, and the law of the duration of each stop or no read. |
+| [`@mark1russell7/stack-needs`](packages/stack-needs/README.md) | The need data: the daily food energy of each person from a cited table, and a fragment of an endurance layer from a household and a buy list. It is not on npm yet. |
 
 The core names no topic. Each topic is an add-on package. An add-on keeps its records in a layer of the stack, and it has its own checks and formulas. The add-ons do not know each other.
 
