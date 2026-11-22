@@ -21,6 +21,18 @@ describe("the gate of a calorie table", () => {
     expect(DGA_CALORIES.locator).toContain("pages 140 and 141");
   });
 
+  it("finds the gap of a row of one age of one sex that is not in the table", () => {
+    const rows = DGA_CALORIES.rows.filter((row) => !(row.sex === "female" && row.age === "36-40"));
+    const faults = checkCalorieTable({ ...DGA_CALORIES, rows }, { at: "2026-11-22" });
+    expect(faults.map((fault) => fault.code)).toEqual(["needs-gap"]);
+    expect(faults[0]?.message).toContain("432 to 491");
+  });
+
+  it("finds a last row that is not open", () => {
+    const rows = DGA_CALORIES.rows.map((row) => (row.sex === "male" && row.to === undefined ? { ...row, to: 1199 } : row));
+    expect(checkCalorieTable({ ...DGA_CALORIES, rows }, { at: "2026-11-22" }).map((fault) => fault.code)).toEqual(["needs-gap"]);
+  });
+
   it("finds a bad source, a bad hash, a bad row, an overlap and a bad need", () => {
     const broken: CalorieTable = {
       id: "broken",
@@ -38,6 +50,6 @@ describe("the gate of a calorie table", () => {
     expect(hasNeedsError(faults)).toBe(true);
     const source = faults.filter((fault) => fault.record === "source").map((fault) => fault.code);
     expect([...source].sort()).toEqual(["bad-date", "bad-url", "empty-title", "needs-hash", "unknown-license"]);
-    expect(faults.filter((fault) => fault.record === "row").map((fault) => fault.code)).toEqual(["needs-overlap", "needs-row", "needs-row", "needs-value", "needs-value"]);
+    expect(faults.filter((fault) => fault.record === "row").map((fault) => fault.code)).toEqual(["needs-overlap", "needs-row", "needs-row", "needs-value", "needs-value", "needs-gap", "needs-gap"]);
   });
 });

@@ -1,6 +1,6 @@
 import { checkSources, type Finding, type FindingCode, type GateOptions } from "@mark1russell7/guidebook";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
-import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieTable } from "./calorie.ts";
+import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } from "./calorie.ts";
 
 // The gate of a table of calorie needs: the gate of the sources of guidebook, the form of the hash, and the rows.
 
@@ -10,9 +10,10 @@ import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieTable } from "./calorie.ts"
  * - `needs-hash`: the hash of the source is not 64 lowercase hexadecimal digits.
  * - `needs-row`: a row has no age or a wrong sex. Or its range of months is not a range of whole numbers of 0 or more.
  * - `needs-overlap`: two rows of one sex have ages in common.
+ * - `needs-gap`: the rows of one sex do not cover each month with no gap, from the first row to an open last row.
  * - `needs-value`: a need is not a finite number above 0 in a unit of energy for each day.
  */
-export const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-value"] = ["needs-hash", "needs-row", "needs-overlap", "needs-value"];
+export const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value"] = ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value"];
 
 /** A code of the gate of a table of calorie needs. */
 export type NeedsCode = (typeof NEEDS_CODES)[number];
@@ -50,10 +51,12 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
   if (sha256 !== undefined && !/^[0-9a-f]{64}$/u.test(sha256)) add("needs-hash", "source", table.source.id, `The hash of the source "${table.source.id}" is not 64 lowercase hexadecimal digits.`);
 
   const whole = (value: number | undefined): boolean => value === undefined || (Number.isSafeInteger(value) && value >= 0);
+  const range = (row: CalorieRow): boolean => whole(row.from) && whole(row.to) && (row.to === undefined || row.to >= row.from);
+  const idOf = (index: number): string => `${table.id}.rows[${String(index)}]`;
   table.rows.forEach((row, index) => {
-    const id = `${table.id}.rows[${String(index)}]`;
+    const id = idOf(index);
     if (row.age.trim() === "" || !(CALORIE_SEXES as readonly unknown[]).includes(row.sex)) add("needs-row", "row", id, `The row "${id}" has no age or a sex that is not a sex of the table.`);
-    if (!whole(row.from) || !whole(row.to) || (row.to !== undefined && row.to < row.from)) add("needs-row", "row", id, `The row "${id}" has a range of months that is not a range of whole numbers of 0 or more.`);
+    if (!range(row)) add("needs-row", "row", id, `The row "${id}" has a range of months that is not a range of whole numbers of 0 or more.`);
     const needs = row.need.levels === undefined ? [row.need.each] : ACTIVITY_LEVELS.map((level) => row.need.levels?.[level]);
     if (!needs.every((need) => need !== undefined && goodNeed(need))) add("needs-value", "row", id, `The row "${id}" has a need that is not a number above 0 in kcal/d.`);
     for (const other of table.rows.slice(0, index)) {
@@ -61,6 +64,18 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
       if (row.from <= (other.to ?? Infinity) && other.from <= (row.to ?? Infinity)) add("needs-overlap", "row", id, `The row "${id}" (${row.sex}, ${row.age}) has ages in common with the row ${other.age}.`);
     }
   });
+
+  // The rows of each sex, in the order of their first month, cover each month with no gap to an open last row. A row with a bad range has its own finding.
+  for (const sex of CALORIE_SEXES) {
+    const rows = table.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sex === sex && range(row));
+    rows.sort((a, b) => a.row.from - b.row.from);
+    rows.slice(1).forEach(({ row, index }, at) => {
+      const before = rows[at]?.row.to;
+      if (before !== undefined && row.from > before + 1) add("needs-gap", "row", idOf(index), `The table has no row of a ${sex} for the months ${String(before + 1)} to ${String(row.from - 1)}.`);
+    });
+    const last = rows.at(-1);
+    if (last !== undefined && last.row.to !== undefined) add("needs-gap", "row", idOf(last.index), `The last row of a ${sex} ends at ${String(last.row.to)} months. It is not an open row.`);
+  }
   return findings;
 }
 

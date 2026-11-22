@@ -6,6 +6,6 @@ describe("the entry", () => {
     expect(entry.CALORIE_TABLES).toContain(entry.DGA_CALORIES);
     expect(entry.checkCalorieTable).toBeTypeOf("function");
     expect(entry.calorieNeed).toBeTypeOf("function");
-    expect(entry.foodFragment).toBeTypeOf("function");
+    expect(entry.householdFragment).toBeTypeOf("function");
   });
 });
