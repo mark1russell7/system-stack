@@ -12,12 +12,14 @@ import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { parseArgs } from "node:util";
 import { arrayOf, numberOf, recordOf, textOf } from "@mark1russell7/optional/read";
-import { errorMessage } from "@mark1russell7/text";
-import { ApiError, fetchTransport, send, statusLine, type Pace, type Reply, type Transport } from "polite-crawler/api";
+import { fetchTransport, statusLine, type Pace } from "polite-crawler/api";
 import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
-import { outageReader, type OutageTally } from "../src/outages.ts";
+import { outageReader, type OutageEvent, type OutageTally } from "../src/outages.ts";
+import { CAUSE_AFTER, CAUSE_BEFORE, STORM_CLASSES, type CauseOptions } from "../src/storms.ts";
+import { TryFault, get, passing, withTries, type FitContext } from "./fetch.ts";
+import { readStorms, type StormRecord } from "./storm-files.ts";
 
 /** The id of the figshare article of EAGLE-I. */
 export const EAGLE_ARTICLE = 24_237_376;
@@ -31,6 +33,7 @@ export const LAWS_SCHEMA = "eaglei-laws/1";
 const ARTICLE_URL = `https://api.figshare.com/v2/articles/${String(EAGLE_ARTICLE)}`;
 const OUTAGE_FILE = /^eaglei_outages_(\d{4})\.csv$/;
 const CUSTOMERS_FILE = "MCC.csv";
+const SOURCE = "EAGLE-I on figshare";
 
 /** A file of the article. */
 export interface DatasetFile {
@@ -99,60 +102,19 @@ export function ranges(size: number, bytes: number): [number, number][] {
   return list;
 }
 
-/** The parts of a fit: the pace, the transport, the bytes of a range request and the log. */
-export interface FitContext {
-  readonly pace: Pace;
-  readonly transport: Transport;
-  readonly chunkBytes: number;
-  readonly log: (line: string) => void;
-}
-
-// A signed URL of the storage is a short credential, so no message holds a query.
-const noQuery = (text: string): string => text.replace(/\?\S*/g, "?<query>");
-
-async function get(context: FitContext, url: string, what: string, headers: Readonly<Record<string, string>> = {}, read?: "bytes"): Promise<Reply> {
-  const exchange = { method: "GET", url, headers: { "accept-encoding": "identity", ...headers }, body: null, read };
-  const answer = await send(context.pace, context.transport, { source: "EAGLE-I on figshare", host: new URL(url).host, what, exchange, redact: noQuery });
-  return answer.reply;
-}
-
-/** The tries of one range. The scheduler of the host waits its backoff before each new try. */
-export const RANGE_TRIES = 4;
-
-/** A fault of one try that a new try can correct: a status 429 or 5xx, or a part that is too short. */
-class TryFault extends Error {}
-
-/** This function tells if a new try can correct a status. */
-const passing = (status: number): boolean => status === 429 || status >= 500;
-
 /** This function gives the bytes of one range of a file, in one try: a fresh redirect, then the range request. */
 async function rangeTry(context: FitContext, file: DatasetFile, start: number, end: number): Promise<Uint8Array> {
-  const redirect = await get(context, file.url, `the place of ${file.name}`);
+  const redirect = await get(context, SOURCE, file.url, `the place of ${file.name}`);
   const location = redirect.headers["location"];
   if (passing(redirect.status)) throw new TryFault(`The download of ${file.name} gave ${statusLine(redirect)}.`);
   if (!(redirect.status >= 300 && redirect.status < 400 && location !== undefined)) throw new Error(`The download of ${file.name} gave ${statusLine(redirect)}, not a redirect.`);
-  const reply = await get(context, new URL(location, file.url).href, `the bytes ${String(start)} to ${String(end)} of ${file.name}`, { range: `bytes=${String(start)}-${String(end)}` }, "bytes");
+  const reply = await get(context, SOURCE, new URL(location, file.url).href, `the bytes ${String(start)} to ${String(end)} of ${file.name}`, { range: `bytes=${String(start)}-${String(end)}` }, "bytes");
   const whole = reply.status === 200 && start === 0 && end === file.size - 1;
   if (passing(reply.status)) throw new TryFault(`The storage gave ${statusLine(reply)} for a range of ${file.name}.`);
   if (reply.status !== 206 && !whole) throw new Error(`The storage gave ${statusLine(reply)} for a range of ${file.name}.`);
   const bytes = reply.bytes ?? new Uint8Array();
   if (bytes.length !== end - start + 1) throw new TryFault(`The storage gave ${String(bytes.length)} bytes for a range of ${String(end - start + 1)} bytes of ${file.name}.`);
   return bytes;
-}
-
-/**
- * This function gives the bytes of one range of a file. A try with no answer, a status 429 or 5xx, or a short part comes again.
- * After `RANGE_TRIES` tries, the last fault stops the read. Each other fault stops it at once.
- */
-async function rangeOf(context: FitContext, file: DatasetFile, start: number, end: number): Promise<Uint8Array> {
-  for (let count = 1; ; count += 1) {
-    try {
-      return await rangeTry(context, file, start, end);
-    } catch (error) {
-      if (count >= RANGE_TRIES || !(error instanceof TryFault || error instanceof ApiError)) throw error;
-      context.log(`${file.name}: try ${String(count)} of the bytes ${String(start)} to ${String(end)} failed (${errorMessage(error)}). It comes again.`);
-    }
-  }
 }
 
 /**
@@ -164,7 +126,7 @@ async function rangeOf(context: FitContext, file: DatasetFile, start: number, en
 export async function* fileChunks(context: FitContext, file: DatasetFile): AsyncGenerator<Uint8Array> {
   const hash = createHash("md5");
   for (const [start, end] of ranges(file.size, context.chunkBytes)) {
-    const bytes = await rangeOf(context, file, start, end);
+    const bytes = await withTries(context, `${file.name}, the bytes ${String(start)} to ${String(end)}`, () => rangeTry(context, file, start, end));
     hash.update(bytes);
     yield bytes;
   }
@@ -186,6 +148,15 @@ export interface FitOptions {
   readonly share?: number | undefined;
   /** The time of the read. */
   readonly now: () => Date;
+  /** The event types of each case and the margins in time. With this option, the fit also gives the curves of each case. */
+  readonly storms?: { readonly classes: Readonly<Record<string, readonly string[]>>; readonly options?: CauseOptions | undefined } | undefined;
+}
+
+/** The curves of the outages of each case. An outage is in a case when a storm event of the case covers its county at its start. */
+export interface CauseLaws {
+  readonly storms: StormRecord;
+  readonly options: { readonly before: number; readonly after: number };
+  readonly cases: Readonly<Record<string, { readonly types: readonly string[]; readonly events: number; readonly regions: Readonly<Record<string, RegionCurve>> }>>;
 }
 
 /** The output of a fit: the source, the options, the counts and the curve of each state. */
@@ -207,6 +178,20 @@ export interface EagleLaws {
   readonly tally: OutageTally;
   readonly events: number;
   readonly regions: Readonly<Record<string, RegionCurve>>;
+  readonly causes?: CauseLaws | undefined;
+}
+
+/** This function reads the storm events of the years of the outage files and of the year before them. It gives the curves of each case. */
+async function causeLaws(context: FitContext, events: readonly OutageEvent[], years: readonly { readonly year: number }[], storms: NonNullable<FitOptions["storms"]>): Promise<CauseLaws> {
+  const first = years[0]?.year ?? 0;
+  const last = years.at(-1)?.year ?? 0;
+  const before = storms.options?.before ?? CAUSE_BEFORE;
+  const after = storms.options?.after ?? CAUSE_AFTER;
+  const { index, record } = await readStorms(context, (year) => year >= first - 1 && year <= last, storms.classes, { before, after });
+  const lists = new Map<string, OutageEvent[]>(Object.keys(storms.classes).map((name) => [name, []]));
+  for (const event of events) for (const name of index.causes(event)) lists.get(name)?.push(event);
+  const cases = Object.fromEntries([...lists].map(([name, list]) => [name, { types: storms.classes[name] ?? [], events: list.length, regions: outageCurves(list, eagleRegion) }]));
+  return { storms: { ...record, tally: index.tally() }, options: { before, after }, cases };
 }
 
 /**
@@ -215,7 +200,7 @@ export interface EagleLaws {
  * @throws Error when a request fails, or when a file is not complete or has a wrong MD5
  */
 export async function fitEagle(context: FitContext, options: FitOptions): Promise<EagleLaws> {
-  const record = await get(context, ARTICLE_URL, "the record of the article");
+  const record = await get(context, SOURCE, ARTICLE_URL, "the record of the article");
   if (record.status !== 200) throw new Error(`The figshare API gave ${statusLine(record)} for the record of the article.`);
   const files = eagleFiles(JSON.parse(record.body), options.years);
   const parts: Uint8Array[] = [];
@@ -233,6 +218,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     }
   }
   const { events, tally } = reader.finish();
+  const causes = options.storms === undefined ? undefined : await causeLaws(context, events, files.years, options.storms);
   const { version, modified, license, doi } = files;
   return {
     schema: LAWS_SCHEMA,
@@ -245,6 +231,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     tally,
     events: events.length,
     regions: outageCurves(events, eagleRegion),
+    causes,
   };
 }
 
@@ -253,6 +240,14 @@ export function lawsTable(laws: EagleLaws): string {
   const minutes = (days: number | undefined): string => (days === undefined ? "none" : String(Math.round(days * 1440)));
   const rows = Object.entries(laws.regions).map(([code, curve]) => `| ${code} | ${String(curve.count)} | ${String(curve.censored)} | ${minutes(curve.median)} | ${curve.open.toFixed(4)} |`);
   return ["| State | Events | Censored | Median (minutes) | Open |", "| --- | --- | --- | --- | --- |", ...rows].join("\n");
+}
+
+/** This function gives a table in Markdown of the events and the states with a curve of each case, then the counts of Storm Events. */
+export function causesTable(causes: CauseLaws): string {
+  const rows = Object.entries(causes.cases).map(([name, entry]) => `| ${name} | ${String(entry.events)} | ${String(Object.keys(entry.regions).length)} |`);
+  const { lines, skipped, tally } = causes.storms;
+  const counts = `Storm Events: ${String(lines)} lines, ${String(skipped)} skipped, ${String(tally.placed)} rows of a case in a county, ${String(tally.unplaced)} rows of a case in no county.`;
+  return ["| Case | Events | States |", "| --- | --- | --- |", ...rows, "", counts].join("\n");
 }
 
 /** This function reads the years of the option `--years`: one year, or a range, for example `2014-2025`. */
@@ -268,10 +263,10 @@ if (import.meta.main) {
   const { values } = parseArgs({ options: { years: { type: "string", default: "2014-2030" }, out: { type: "string", default: "out/eaglei-laws.json" }, share: { type: "string" } } });
   const pace: Pace = { scheduler: new HostScheduler(realClock, 1), now: realClock.now };
   const context: FitContext = { pace, transport: fetchTransport({ userAgent: USER_AGENT, timeoutMs: 600_000 }), chunkBytes: CHUNK_BYTES, log: (line) => console.log(line) };
-  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), now: () => new Date() });
+  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), now: () => new Date(), storms: { classes: STORM_CLASSES } });
   mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, `${JSON.stringify(laws, null, 2)}\n`);
-  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n`;
+  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}`;
   console.log(summary);
   const file = process.env["GITHUB_STEP_SUMMARY"];
   if (file !== undefined && file !== "") appendFileSync(file, `## The laws of EAGLE-I\n\n${summary}`);

@@ -6,6 +6,10 @@
 
 ## . (build/index.d.ts): names
 
+CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
+CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
+CauseOptions: build/index.d.ts#CauseOptions
+CauseTally: build/index.d.ts#CauseTally
 Claim: build/index.d.ts#Claim
 DurationLaw: build/index.d.ts#DurationLaw
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
@@ -34,8 +38,12 @@ OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/index.d.ts#Regions
+STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 SUPPLY_PARTS: build/index.d.ts#SUPPLY_PARTS
 Source: build/index.d.ts#Source
+StormArea: build/index.d.ts#StormArea
+StormCauses: build/index.d.ts#StormCauses
+StormRow: build/index.d.ts#StormRow
 SupplyState: build/index.d.ts#SupplyState
 SurvivalOptions: build/index.d.ts#SurvivalOptions
 checkHazards: build/index.d.ts#checkHazards
@@ -47,10 +55,33 @@ hazardCase: build/index.d.ts#hazardCase
 hazardOf: build/index.d.ts#hazardOf
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
+stormCauses: build/index.d.ts#stormCauses
+stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
+zoneCounties: build/index.d.ts#zoneCounties
 
 ## Declarations
+
+### build/index.d.ts#CAUSE_AFTER
+export declare const CAUSE_AFTER = 10800;
+
+### build/index.d.ts#CAUSE_BEFORE
+export declare const CAUSE_BEFORE = 3600;
+
+### build/index.d.ts#CauseOptions
+export interface CauseOptions {
+  readonly before?: number | undefined;
+  readonly after?: number | undefined;
+}
+
+### build/index.d.ts#CauseTally
+export interface CauseTally {
+  readonly rows: number;
+  readonly placed: number;
+  readonly unplaced: number;
+  readonly other: Readonly<Record<string, number>>;
+}
 
 ### build/index.d.ts#Claim
 export type Claim = {
@@ -219,6 +250,9 @@ export interface Regions {
   readonly codes: readonly string[];
 }
 
+### build/index.d.ts#STORM_CLASSES
+export declare const STORM_CLASSES: Readonly<Record<string, readonly string[]>>;
+
 ### build/index.d.ts#SUPPLY_PARTS
 export declare const SUPPLY_PARTS: readonly Part[];
 
@@ -231,6 +265,25 @@ export interface Source {
   readonly updated?: IsoDate | undefined;
   readonly read: IsoDate;
   readonly regions?: Regions | undefined;
+}
+
+### build/index.d.ts#StormArea
+export type StormArea = "C" | "Z" | "M";
+
+### build/index.d.ts#StormCauses
+export interface StormCauses {
+  add(row: StormRow): void;
+  causes(event: Pick<OutageEvent, "area" | "start">): readonly string[];
+  tally(): CauseTally;
+}
+
+### build/index.d.ts#StormRow
+export interface StormRow {
+  readonly type: string;
+  readonly kind: StormArea;
+  readonly area: string;
+  readonly begin: number;
+  readonly end: number;
 }
 
 ### build/index.d.ts#SupplyState
@@ -274,8 +327,17 @@ export declare function outageCurves(events: readonly OutageEvent[], region: (ar
 ### build/index.d.ts#outageReader
 export declare function outageReader(options: OutageOptions): OutageReader;
 
+### build/index.d.ts#stormCauses
+export declare function stormCauses(classes: Readonly<Record<string, readonly string[]>>, zones: ReadonlyMap<string, readonly string[]>, options?: CauseOptions): StormCauses;
+
+### build/index.d.ts#stormLine
+export declare function stormLine(line: string): StormRow | undefined;
+
 ### build/index.d.ts#supplyState
 export declare function supplyState(hazard: Hazard, part: string): SupplyState;
 
 ### build/index.d.ts#survivalOf
 export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;
+
+### build/index.d.ts#zoneCounties
+export declare function zoneCounties(text: string): Map<string, readonly string[]>;
