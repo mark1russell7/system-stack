@@ -58,6 +58,8 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
     updated: "2017-04-21",
     read: READ_CASES,
   },
+  "ready.mass-gatherings": ready("Mass gathering incidents", "public-spaces", "2026-05-13", READ_CASES),
+  "cisa.physical-security": cisa("Physical security", "topics/physical-security"),
   "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
   "dhs.ai-framework": dhs(
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
@@ -317,7 +319,15 @@ export const HAZARD_LIST: HazardList = {
         },
       ],
     },
-    { case: "security.civil-unrest", title: "Civil unrest", examined: [], cuts: [] },
+    {
+      case: "security.civil-unrest",
+      title: "Civil unrest",
+      // Ready.gov has no page on civil unrest. Its page on mass gatherings names fights and fires, and no stop of a
+      // supply. The page of CISA names public demonstrations, and no stop of a supply. FEMA CPG 201 (2018) has no
+      // civil disturbance in its text.
+      examined: ["ready.mass-gatherings", "cisa.physical-security"],
+      cuts: [],
+    },
     { case: "security.armed-conflict", title: "War", examined: [], cuts: [] },
     { case: "cbrne.emp", title: "Electromagnetic pulse", examined: ["cisa.emp"], cuts: pulseCuts() },
     {
