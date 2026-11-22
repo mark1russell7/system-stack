@@ -161,7 +161,7 @@ export interface NoLaw {
 ### build/index.d.ts#OutageCount
 export interface OutageCount {
   readonly area: string;
-  readonly out: number;
+  readonly out: number | undefined;
   readonly time: number;
 }
 
@@ -200,6 +200,7 @@ export interface OutageTally {
   readonly times: number;
   readonly repeats: number;
   readonly unknown: number;
+  readonly missing: number;
   readonly truncated: number;
 }
 

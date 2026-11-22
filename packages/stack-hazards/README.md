@@ -60,6 +60,7 @@ These functions make a law of a duration from the records of a source of outages
 
 - An event is a run of the times of an area with a count at or above the threshold of the area. The threshold is a share of the customers of the area.
 - A gap of the collection, or the end of the data, censors an event. A run that starts at the start of the data or after a gap is not an event.
+- A line of an area with no count stops the observation of that area. It censors an open event, and a run at the next time of the area is not an event.
 - The order of the areas is free. A file in the order of the counties and a file in the order of the times give the same events.
 - An open tail is a curve that does not get to 0. Its last chance falls to 0 at two times the largest observed time.
 

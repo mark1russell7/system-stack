@@ -6,8 +6,11 @@
 export interface OutageCount {
   /** The code of the area, for example the FIPS code of a county. */
   readonly area: string;
-  /** The count of the customers out of power. */
-  readonly out: number;
+  /**
+   * The count of the customers out of power. It is `undefined` when the source has a line of the area at the time with no count.
+   * Then the observation of the area stops at that time. An open run is censored, and a run at the next time has no known start.
+   */
+  readonly out: number | undefined;
   /** The time of the collection, in seconds from 1970-01-01T00:00:00Z. */
   readonly time: number;
 }
@@ -47,7 +50,9 @@ export interface OutageTally {
   readonly repeats: number;
   /** The counts of an area with no count of customers. The reader does not use them. */
   readonly unknown: number;
-  /** The runs that start at the start of the data or after a gap. Their start is not known, so they are not events. */
+  /** The lines of an area at a time with no count (`out` is `undefined`). The observation of the area stops at each of them. */
+  readonly missing: number;
+  /** The runs that start at the start of the data, after a gap or after a line with no count. Their start is not known, so they are not events. */
   readonly truncated: number;
 }
 
@@ -70,12 +75,18 @@ interface Run {
   readonly start: number;
   last: number;
   peak: number;
+  /** A line with no count stopped the observation of the run. */
+  stopped: boolean;
+  /** The run starts at the next time of its area after a line with no count, so its start is not known. */
+  blind: boolean;
 }
 
 interface AreaState {
   readonly limit: number | undefined;
   last: number;
   run: Run | undefined;
+  /** The last line of the area has no count. */
+  missed: boolean;
 }
 
 /** This function gives the index of the first value of `sorted` that is not less than `value`. */
@@ -97,6 +108,7 @@ function lowerBound(sorted: Float64Array, value: number): number {
  * - A run ends at a count under the threshold, or at a time of the collection with no count of the area.
  * - The end of a run is observed when the collection has a time within 1.5 intervals after the run. Else the event is censored.
  * - The start of a run is known when the collection has a time within 1.5 intervals before the run. Else the run is truncated.
+ * - A line with no count stops the observation of its area. An open run is censored. A run at the next time of the area is truncated.
  *
  * @param options - The customers of each area and the threshold
  * @returns The reader
@@ -115,6 +127,7 @@ export function outageReader(options: OutageOptions): OutageReader {
   let counts = 0;
   let repeats = 0;
   let unknown = 0;
+  let missing = 0;
   let finished = false;
 
   const stateOf = (area: string): AreaState => {
@@ -122,7 +135,7 @@ export function outageReader(options: OutageOptions): OutageReader {
     if (state === undefined) {
       const customers = options.customers.get(area);
       const limit = share === 0 ? least : customers === undefined ? undefined : Math.max(least, Math.ceil(share * customers));
-      state = { limit, last: Number.NEGATIVE_INFINITY, run: undefined };
+      state = { limit, last: Number.NEGATIVE_INFINITY, run: undefined, missed: false };
       areas.set(area, state);
     }
     return state;
@@ -132,8 +145,8 @@ export function outageReader(options: OutageOptions): OutageReader {
     add(count: OutageCount): void {
       if (finished) throw new Error("outageReader: the read is finished.");
       const { area, out, time } = count;
-      if (!(Number.isFinite(out) && out >= 0 && Number.isFinite(time))) throw new RangeError("outageReader: a count or a time is not a finite number.");
-      counts += 1;
+      if (!((out === undefined || (Number.isFinite(out) && out >= 0)) && Number.isFinite(time))) throw new RangeError("outageReader: a count or a time is not a finite number.");
+      if (out !== undefined) counts += 1;
       times.add(time);
       const state = stateOf(area);
       if (state.limit === undefined) {
@@ -144,16 +157,29 @@ export function outageReader(options: OutageOptions): OutageReader {
         repeats += 1;
         return;
       }
+      const previous = state.last;
       state.last = time;
-      const inside = out >= state.limit;
       const run = state.run;
+      if (out === undefined) {
+        missing += 1;
+        if (run !== undefined) {
+          run.stopped = true;
+          runs.push(run);
+          state.run = undefined;
+        }
+        state.missed = true;
+        return;
+      }
+      const inside = out >= state.limit;
+      const blind = state.missed && time - previous <= gap;
+      state.missed = false;
       if (run !== undefined && inside && time - run.last <= gap) {
         run.last = time;
         run.peak = Math.max(run.peak, out);
         return;
       }
       if (run !== undefined) runs.push(run);
-      state.run = inside ? { area, start: time, last: time, peak: out } : undefined;
+      state.run = inside ? { area, start: time, last: time, peak: out, stopped: false, blind } : undefined;
     },
 
     finish(): OutageRuns {
@@ -165,16 +191,16 @@ export function outageReader(options: OutageOptions): OutageReader {
       for (const run of runs) {
         const first = lowerBound(sorted, run.start);
         const before = sorted[first - 1];
-        if (before === undefined || run.start - before > gap) {
+        if (run.blind || before === undefined || run.start - before > gap) {
           truncated += 1;
           continue;
         }
         const after = sorted[lowerBound(sorted, run.last) + 1];
-        const censored = after === undefined || after - run.last > gap;
+        const censored = run.stopped || after === undefined || after - run.last > gap;
         events.push({ area: run.area, start: run.start, seconds: run.last - run.start + interval, peak: run.peak, censored });
       }
       events.sort((a, b) => a.start - b.start || (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
-      return { events, tally: { counts, times: sorted.length, repeats, unknown, truncated } };
+      return { events, tally: { counts, times: sorted.length, repeats, unknown, missing, truncated } };
     },
   };
 }

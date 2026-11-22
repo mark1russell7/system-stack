@@ -18,8 +18,9 @@ describe("eagleLine", () => {
     expect(eagleLine("9001,Testcounty,Teststate,3,2021-06-01 12:00:00")?.area).toBe("09001");
   });
 
-  it("gives no count for a line that it cannot read", () => {
-    expect(eagleLine("99001,Testcounty,Teststate,,2020-01-01 00:00:00")).toBeUndefined();
+  it("gives no count for a line that it cannot read, and an unknown count for an empty count", () => {
+    expect(eagleLine("99001,Testcounty,Teststate,,2020-01-01 00:00:00")).toEqual({ area: "99001", out: undefined, time: utc("2020-01-01 00:00:00") });
+    expect(eagleLine("99001,Testcounty,Teststate,many,2020-01-01 00:00:00")).toBeUndefined();
     expect(eagleLine("county,Testcounty,Teststate,4,2020-01-01 00:00:00")).toBeUndefined();
     expect(eagleLine("99001,Testcounty,Teststate,4")).toBeUndefined();
     expect(eagleLine("")).toBeUndefined();

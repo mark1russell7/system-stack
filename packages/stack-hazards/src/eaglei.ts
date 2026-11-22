@@ -20,6 +20,8 @@ const bare = (field: string | undefined): string => (field ?? "").trim().replace
  * This function reads one line of an outage file of EAGLE-I. It gives `undefined` for the header and for a line that it cannot read.
  * The columns change from year to year. This function reads the FIPS code in the first column, the time and the count before the time.
  * A county name with a comma in quotes does not move these columns. The function reads each time as UTC.
+ *
+ * An empty count gives `out: undefined`: the file has the county at the time, with no count.
  */
 export function eagleLine(line: string): OutageCount | undefined {
   const fields = line.split(",");
@@ -29,9 +31,9 @@ export function eagleLine(line: string): OutageCount | undefined {
     const match = TIME.exec(bare(fields[index]));
     if (match === null) continue;
     const out = bare(fields[index - 1]);
-    if (!COUNT.test(out)) return undefined;
+    if (out !== "" && !COUNT.test(out)) return undefined;
     const [year, month, day, hour, minute, second] = match.slice(1).map(Number) as [number, number, number, number, number, number];
-    return { area: area.padStart(5, "0"), out: Number(out), time: Date.UTC(year, month - 1, day, hour, minute, second) / 1000 };
+    return { area: area.padStart(5, "0"), out: out === "" ? undefined : Number(out), time: Date.UTC(year, month - 1, day, hour, minute, second) / 1000 };
   }
   return undefined;
 }

@@ -22,7 +22,7 @@ function record(change: Partial<EagleLaws["source"]> = {}): EagleLaws {
     scheme: "us-state-fips",
     lines: 100,
     skipped: 0,
-    tally: { counts: 100, times: 50, repeats: 0, unknown: 0, truncated: 0 },
+    tally: { counts: 100, times: 50, repeats: 0, unknown: 0, missing: 0, truncated: 0 },
     events: events.length,
     regions: outageCurves(events, (area) => area.slice(0, 2)),
   };
