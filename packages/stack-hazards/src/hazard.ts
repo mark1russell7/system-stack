@@ -57,11 +57,30 @@ export interface Source {
 }
 
 /**
+ * The bases of a claim of a source, in a fixed order. The axis is the object of the claim: the effect of the event, or the threat.
+ *
+ * - `told`: the source tells what the event does when it happens, as a fact of past events or of physics.
+ *   For example, a flood washes bridges away.
+ * - `assessed`: the source gives a judgment about the threat itself: the intent of an actor, a prepositioning, or a chance.
+ *   For example, an advisory assesses that state actors prepare to disrupt a sector in a conflict.
+ *
+ * A source that hedges an effect, for example with the word "potential", is assessed. The record does not make a hedge into a fact.
+ */
+export const CLAIM_BASES: readonly ["told", "assessed"] = ["told", "assessed"];
+
+/** The basis of a claim of a source: an effect that the source tells, or a risk that the source assesses. */
+export type ClaimBasis = (typeof CLAIM_BASES)[number];
+
+/**
  * A claim: the reason to put a cut in a case. A claim is a source that tells that the case can stop the part.
  * Or a claim is the definition of the case, when the case is the stop of the part. The text `says` tells the claim in own words.
  * It is not a quote.
+ *
+ * A claim of a source has a `basis`. A claim of the definition has no basis: the definition is its basis.
  */
-export type Claim = { readonly source: string; readonly definition?: never; readonly says: string } | { readonly definition: true; readonly source?: never; readonly says: string };
+export type Claim =
+  | { readonly source: string; readonly basis: ClaimBasis; readonly definition?: never; readonly says: string }
+  | { readonly definition: true; readonly source?: never; readonly basis?: never; readonly says: string };
 
 /** The fit of a law of a duration. */
 export interface Fit {

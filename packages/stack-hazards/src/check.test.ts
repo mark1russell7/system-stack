@@ -4,7 +4,7 @@ import { checkHazards, hasHazardError } from "./check.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_EVENT_LAW, NO_FOLLOW_LAW, NO_GEOMAGNETIC_LAW, NO_LAW } from "./data.ts";
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { STORM_CLASSES } from "./storms.ts";
-import { HAZARDS_SCHEMA, SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { CLAIM_BASES, HAZARDS_SCHEMA, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
 import { supplyState } from "./case.ts";
 
 /** The catastrophic cases, in the order of the list. */
@@ -175,6 +175,24 @@ describe("the gate of the reference data", () => {
     expect(unknownKinds(HAZARD_LIST.hazards.map((hazard) => hazard.case))).toEqual([]);
   });
 
+  it("gives each claim of a source a basis of the set, and no basis to a claim of the definition", () => {
+    const claims = HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.flatMap((cut) => cut.claims));
+    expect(CLAIM_BASES).toEqual(["told", "assessed"]);
+    for (const claim of claims) {
+      if (claim.definition === true) expect(claim.basis, claim.says).toBeUndefined();
+      else expect(CLAIM_BASES, claim.says).toContain(claim.basis);
+    }
+    // Each basis of the set has a claim.
+    expect(new Set(claims.flatMap((claim) => (claim.basis === undefined ? [] : [claim.basis])))).toEqual(new Set(CLAIM_BASES));
+  });
+
+  it("gives the basis assessed only to the claims of the sources that assess a risk", () => {
+    const assessed = new Set(HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.flatMap((cut) => cut.claims.flatMap((claim) => (claim.basis === "assessed" ? [claim.source] : [])))));
+    expect([...assessed].sort()).toEqual(["cisa.aa24-038a", "cisa.emp", "dhs.ai-framework"]);
+    const told = HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.flatMap((cut) => cut.claims.flatMap((claim) => (claim.basis === "told" ? [claim.source] : []))));
+    for (const source of assessed) expect(told, source).not.toContain(source);
+  });
+
   it("has each source of a claim in the list examined of its case", () => {
     for (const hazard of HAZARD_LIST.hazards) {
       for (const cut of hazard.cuts) for (const claim of cut.claims) if (claim.source !== undefined) expect(hazard.examined).toContain(claim.source);
@@ -236,8 +254,21 @@ describe("the gate of the cuts and the sources", () => {
 
   it("refuses a claim or an examined id with no source, and a source with no HTTPS URL or a wrong date", () => {
     expect(codes({ ...base, hazards: [{ ...hazard, examined: ["unknown"] }] })).toEqual(["hazards-source"]);
-    expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "unknown", says: "A page tells it." }] }] }] })).toEqual(["hazards-source"]);
+    expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "unknown", basis: "told", says: "A page tells it." }] }] }] })).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, url: "http://data.example.net" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, read: "21.11.2026" }))).toEqual(["hazards-source"]);
+  });
+
+  it("passes a claim of a source with each basis of the set", () => {
+    for (const basis of CLAIM_BASES) expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "outages", basis, says: "A page tells it." }] }] }] }), basis).toEqual([]);
+  });
+
+  it("refuses a claim of a source with no basis or a wrong basis, and a claim of the definition with a basis", () => {
+    const withClaim = (claim: unknown): HazardList => ({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [claim as Claim] }] }] });
+    expect(codes(withClaim({ source: "outages", says: "A page tells it." }))).toEqual(["hazards-source"]);
+    expect(codes(withClaim({ source: "outages", basis: "rumor", says: "A page tells it." }))).toEqual(["hazards-source"]);
+    expect(codes(withClaim({ source: "outages", basis: "", says: "A page tells it." }))).toEqual(["hazards-source"]);
+    expect(codes(withClaim({ definition: true, basis: "told", says: "The case is a stop of the grid." }))).toEqual(["hazards-source"]);
+    expect(checkHazards(withClaim({ source: "outages", basis: "rumor", says: "A page tells it." }))[0]?.message).toContain('"rumor"');
   });
 });

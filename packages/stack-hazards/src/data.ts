@@ -160,7 +160,10 @@ const STORM_EXAMINED = ["eaglei.outages", "noaa.storm-events", "nws.zone-county"
 /** This function gives the law of the grid cut of a storm case. The law is from the outages of EAGLE-I in the storm events of the case. */
 const stormLaw = (name: string): DurationLaw | NoLaw => EAGLEI_CAUSE_LAWS[name] ?? NO_STORM_LAW;
 
-const said = (source: string, says: string): Claim => ({ source, says });
+/** This function gives a claim of an effect that a source tells as a fact of past events or of physics. */
+const told = (source: string, says: string): Claim => ({ source, basis: "told", says });
+/** This function gives a claim of a risk or a threat that a source assesses. */
+const assessed = (source: string, says: string): Claim => ({ source, basis: "assessed", says });
 const defined = (says: string): Claim => ({ definition: true, says });
 
 /**
@@ -168,15 +171,18 @@ const defined = (says: string): Claim => ({ definition: true, says });
  * The two cases have different reasons for no law.
  */
 const outageEffects = (duration: NoLaw): HazardCut[] => [
-  { part: "phone.network", title: "No telephone service", claims: [said("ready.power-outages", "The page tells that a power outage can stop communications.")], duration },
-  { part: "water.main", title: "No water from the main", claims: [said("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration },
-  { part: "road.local", title: "No transport", claims: [said("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration },
-  { part: "food.retail", title: "The food shops are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration },
-  { part: "fuel.retail", title: "The fuel stations are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration },
-  { part: "cash.retail", title: "No banks and no cash machines", claims: [said("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration },
+  { part: "phone.network", title: "No telephone service", claims: [told("ready.power-outages", "The page tells that a power outage can stop communications.")], duration },
+  { part: "water.main", title: "No water from the main", claims: [told("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration },
+  { part: "road.local", title: "No transport", claims: [told("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration },
+  { part: "food.retail", title: "The food shops are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration },
+  { part: "fuel.retail", title: "The fuel stations are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration },
+  { part: "cash.retail", title: "No banks and no cash machines", claims: [told("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration },
 ];
 
-/** The cuts of an electromagnetic pulse, from the page of CISA. A case can add the same claims to each cut. */
+/**
+ * The cuts of an electromagnetic pulse, from the page of CISA. A case can add the same claims to each cut.
+ * The page assesses the threat of an attack, and tells only a potential of the damage. So each claim is assessed.
+ */
 const pulseCuts = (extra: readonly Claim[] = []): HazardCut[] =>
   [
     { part: "power.grid", title: "No power from the grid", says: "The page tells that an electromagnetic pulse can damage the electrical grid." },
@@ -184,7 +190,7 @@ const pulseCuts = (extra: readonly Claim[] = []): HazardCut[] =>
     { part: "water.main", title: "No water from the main", says: "The page tells that an electromagnetic pulse can damage the water systems." },
     { part: "sewer.main", title: "No public sewer", says: "The page tells that an electromagnetic pulse can damage the wastewater systems." },
     { part: "road.local", title: "No transport", says: "The page tells that an electromagnetic pulse can damage the transportation modes." },
-  ].map(({ part, title, says }) => ({ part, title, claims: [said("cisa.emp", says), ...extra], duration: NO_EVENT_LAW }));
+  ].map(({ part, title, says }) => ({ part, title, claims: [assessed("cisa.emp", says), ...extra], duration: NO_EVENT_LAW }));
 
 /**
  * The reference list of hazard cases. A case has a generic name and a code of the alert taxonomy.
@@ -202,7 +208,7 @@ export const HAZARD_LIST: HazardList = {
         {
           part: "power.grid",
           title: "No power from the grid",
-          claims: [defined("The case is a stop of the power from the grid."), said("ready.power-outages", "The page tells that the electrical power goes out.")],
+          claims: [defined("The case is a stop of the power from the grid."), told("ready.power-outages", "The page tells that the electrical power goes out.")],
           duration: EAGLEI_GRID_LAW,
         },
         ...outageEffects(NO_LAW),
@@ -219,16 +225,16 @@ export const HAZARD_LIST: HazardList = {
       title: "Winter storm",
       examined: ["ready.winter-weather", "nws.winter", ...STORM_EXAMINED],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.winter-weather", "The page tells that a winter storm can cut off the power.")], duration: stormLaw("met.winter.storm") },
-        { part: "phone.network", title: "No telephone service", claims: [said("ready.winter-weather", "The page tells that a winter storm can cut off the communication services.")], duration: NO_LAW },
-        { part: "road.local", title: "The roads are closed", claims: [said("nws.winter", "The page tells that a blizzard can make the roads impassable.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [told("ready.winter-weather", "The page tells that a winter storm can cut off the power.")], duration: stormLaw("met.winter.storm") },
+        { part: "phone.network", title: "No telephone service", claims: [told("ready.winter-weather", "The page tells that a winter storm can cut off the communication services.")], duration: NO_LAW },
+        { part: "road.local", title: "The roads are closed", claims: [told("nws.winter", "The page tells that a blizzard can make the roads impassable.")], duration: NO_LAW },
       ],
     },
     {
       case: "met.heat.extreme",
       title: "Extreme heat",
       examined: ["ready.heat", "nws.heat", ...STORM_EXAMINED],
-      cuts: [{ part: "power.grid", title: "No power from the grid", claims: [said("ready.heat", "The page tells that a heat wave can cause a loss of power.")], duration: stormLaw("met.heat.extreme") }],
+      cuts: [{ part: "power.grid", title: "No power from the grid", claims: [told("ready.heat", "The page tells that a heat wave can cause a loss of power.")], duration: stormLaw("met.heat.extreme") }],
     },
     {
       case: "met.tropical.hurricane",
@@ -239,13 +245,13 @@ export const HAZARD_LIST: HazardList = {
           part: "power.grid",
           title: "No power from the grid",
           claims: [
-            said("ready.hurricanes", "The page tells that power lines can be down after a hurricane."),
-            said("ready.hurricanes", "The page tells a person to get backup chargers before a hurricane."),
+            told("ready.hurricanes", "The page tells that power lines can be down after a hurricane."),
+            told("ready.hurricanes", "The page tells a person to get backup chargers before a hurricane."),
           ],
           duration: stormLaw("met.tropical.hurricane"),
         },
-        { part: "phone.network", title: "No telephone service", claims: [said("ready.hurricanes", "The page tells that the phone systems are often down after a disaster.")], duration: NO_LAW },
-        { part: "home.dwelling", title: "The home is damaged", claims: [said("nws.hurricane", "The page tells that a hurricane can destroy buildings and manufactured homes.")], duration: NO_LAW },
+        { part: "phone.network", title: "No telephone service", claims: [told("ready.hurricanes", "The page tells that the phone systems are often down after a disaster.")], duration: NO_LAW },
+        { part: "home.dwelling", title: "The home is damaged", claims: [told("nws.hurricane", "The page tells that a hurricane can destroy buildings and manufactured homes.")], duration: NO_LAW },
       ],
     },
     {
@@ -253,9 +259,9 @@ export const HAZARD_LIST: HazardList = {
       title: "Flood",
       examined: ["ready.floods", "nws.flood", ...STORM_EXAMINED],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.floods", "The page tells that power lines can be down in a flood.")], duration: stormLaw("met.flood") },
-        { part: "road.local", title: "The roads are closed", claims: [said("ready.floods", "The page tells that a flood can stop transportation and wash bridges away.")], duration: NO_LAW },
-        { part: "home.dwelling", title: "The home is damaged", claims: [said("ready.floods", "The page tells that a flood can damage buildings.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [told("ready.floods", "The page tells that power lines can be down in a flood.")], duration: stormLaw("met.flood") },
+        { part: "road.local", title: "The roads are closed", claims: [told("ready.floods", "The page tells that a flood can stop transportation and wash bridges away.")], duration: NO_LAW },
+        { part: "home.dwelling", title: "The home is damaged", claims: [told("ready.floods", "The page tells that a flood can damage buildings.")], duration: NO_LAW },
       ],
     },
     {
@@ -263,11 +269,11 @@ export const HAZARD_LIST: HazardList = {
       title: "Tornado",
       examined: ["ready.tornadoes", "nws.tornado", ...STORM_EXAMINED],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.tornadoes", "The page tells a person to stay clear of fallen power lines after a tornado.")], duration: stormLaw("met.tornado") },
+        { part: "power.grid", title: "No power from the grid", claims: [told("ready.tornadoes", "The page tells a person to stay clear of fallen power lines after a tornado.")], duration: stormLaw("met.tornado") },
         {
           part: "home.dwelling",
           title: "The home is damaged",
-          claims: [said("ready.tornadoes", "The page tells that a tornado can destroy buildings."), said("nws.tornado", "The page tells that a tornado can destroy strong structures.")],
+          claims: [told("ready.tornadoes", "The page tells that a tornado can destroy buildings."), told("nws.tornado", "The page tells that a tornado can destroy strong structures.")],
           duration: NO_LAW,
         },
       ],
@@ -277,17 +283,17 @@ export const HAZARD_LIST: HazardList = {
       title: "Earthquake",
       examined: ["ready.earthquakes"],
       cuts: [
-        { part: "gas.main", title: "No gas from the main", claims: [said("ready.earthquakes", "The page tells that an earthquake can cause leaks of the gas lines.")], duration: NO_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("ready.earthquakes", "The page tells that an earthquake can cause leaks of the water lines.")], duration: NO_LAW },
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.earthquakes", "The page tells that an earthquake can bring down power lines.")], duration: NO_LAW },
-        { part: "home.dwelling", title: "The home is damaged", claims: [said("ready.earthquakes", "The page tells that an earthquake can damage the building.")], duration: NO_LAW },
+        { part: "gas.main", title: "No gas from the main", claims: [told("ready.earthquakes", "The page tells that an earthquake can cause leaks of the gas lines.")], duration: NO_LAW },
+        { part: "water.main", title: "No water from the main", claims: [told("ready.earthquakes", "The page tells that an earthquake can cause leaks of the water lines.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [told("ready.earthquakes", "The page tells that an earthquake can bring down power lines.")], duration: NO_LAW },
+        { part: "home.dwelling", title: "The home is damaged", claims: [told("ready.earthquakes", "The page tells that an earthquake can damage the building.")], duration: NO_LAW },
       ],
     },
     {
       case: "fire.wildfire",
       title: "Wildfire",
       examined: ["ready.wildfires", "nws.wildfire"],
-      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [said("ready.wildfires", "The page tells a person to record the damage to the property after a wildfire.")], duration: NO_LAW }],
+      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [told("ready.wildfires", "The page tells a person to record the damage to the property after a wildfire.")], duration: NO_LAW }],
     },
     {
       case: "fire.structure",
@@ -297,7 +303,7 @@ export const HAZARD_LIST: HazardList = {
         {
           part: "home.dwelling",
           title: "The home is damaged",
-          claims: [defined("The case is a fire in the home."), said("ready.home-fires", "The page tells a person to make sure that the home is safe before entry.")],
+          claims: [defined("The case is a fire in the home."), told("ready.home-fires", "The page tells a person to make sure that the home is safe before entry.")],
           duration: NO_LAW,
         },
       ],
@@ -313,16 +319,16 @@ export const HAZARD_LIST: HazardList = {
       title: "Collapse driven by AI",
       examined: ["dhs.ai-framework", "dhs.ai-guidelines"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the energy utilities as a risk.")], duration: NO_EVENT_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the water utilities as a risk.")], duration: NO_EVENT_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [assessed("dhs.ai-framework", "The framework names a failure of the AI systems of the energy utilities as a risk.")], duration: NO_EVENT_LAW },
+        { part: "water.main", title: "No water from the main", claims: [assessed("dhs.ai-framework", "The framework names a failure of the AI systems of the water utilities as a risk.")], duration: NO_EVENT_LAW },
         {
           part: "network.access",
           title: "No access to the internet",
-          claims: [said("dhs.ai-framework", "The framework tells that cyberattacks with AI can disrupt the information technology sector and stop the access to services.")],
+          claims: [assessed("dhs.ai-framework", "The framework tells that cyberattacks with AI can disrupt the information technology sector and stop the access to services.")],
           duration: NO_EVENT_LAW,
         },
-        { part: "cash.retail", title: "No banks and no cash machines", claims: [said("dhs.ai-framework", "The framework names an interruption of the financial services of the banks as a risk of AI.")], duration: NO_EVENT_LAW },
-        { part: "care.local", title: "No hospitals and no pharmacies", claims: [said("dhs.ai-framework", "The framework names an interruption of the medical services of the hospitals as a risk of AI.")], duration: NO_EVENT_LAW },
+        { part: "cash.retail", title: "No banks and no cash machines", claims: [assessed("dhs.ai-framework", "The framework names an interruption of the financial services of the banks as a risk of AI.")], duration: NO_EVENT_LAW },
+        { part: "care.local", title: "No hospitals and no pharmacies", claims: [assessed("dhs.ai-framework", "The framework names an interruption of the medical services of the hospitals as a risk of AI.")], duration: NO_EVENT_LAW },
       ],
     },
     {
@@ -330,15 +336,15 @@ export const HAZARD_LIST: HazardList = {
       title: "Nuclear war",
       examined: ["cisa.emp", "ready.radiation"],
       cuts: [
-        ...pulseCuts([said("cisa.emp", "The page tells that a nuclear attack high in the air in a war can cause wide harm to the infrastructure.")]),
-        { part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW },
+        ...pulseCuts([assessed("cisa.emp", "The page tells that a nuclear attack high in the air in a war can cause wide harm to the infrastructure.")]),
+        { part: "home.dwelling", title: "The home is damaged", claims: [told("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW },
       ],
     },
     {
       case: "cbrne.nuclear-detonation",
       title: "Nuclear detonation",
       examined: ["ready.radiation"],
-      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW }],
+      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [told("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW }],
     },
     {
       case: "health.outbreak.pandemic",
@@ -373,12 +379,12 @@ export const HAZARD_LIST: HazardList = {
           part: "power.grid",
           title: "No power from the grid",
           claims: [
-            said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on the power grid."),
-            said("cisa.ir-alert-h-16-056-01", "The alert tells that cyber intrusions at three power distribution companies caused power outages for about 225,000 customers."),
+            told("ready.cybersecurity", "The page tells that a cyberattack can have an effect on the power grid."),
+            told("cisa.ir-alert-h-16-056-01", "The alert tells that cyber intrusions at three power distribution companies caused power outages for about 225,000 customers."),
           ],
           duration: NO_CYBER_LAW,
         },
-        { part: "road.local", title: "No transport", claims: [said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on transportation.")], duration: NO_EVENT_LAW },
+        { part: "road.local", title: "No transport", claims: [told("ready.cybersecurity", "The page tells that a cyberattack can have an effect on transportation.")], duration: NO_EVENT_LAW },
       ],
     },
     {
@@ -395,7 +401,7 @@ export const HAZARD_LIST: HazardList = {
         {
           part: "cash.retail",
           title: "No banks and no cash machines",
-          claims: [defined("The case is a stop of the banks and of the payments."), said("ready.financial-preparedness", "The page tells that the ATMs and the credit cards can fail in a disaster.")],
+          claims: [defined("The case is a stop of the banks and of the payments."), told("ready.financial-preparedness", "The page tells that the ATMs and the credit cards can fail in a disaster.")],
           duration: NO_EVENT_LAW,
         },
       ],
@@ -416,11 +422,11 @@ export const HAZARD_LIST: HazardList = {
       // their operational technology in a major crisis or conflict with the United States.
       examined: ["cisa.aa24-038a"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
-        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
-        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
-        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [assessed("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "phone.network", title: "No telephone service", claims: [assessed("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "road.local", title: "No transport", claims: [assessed("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "water.main", title: "No water from the main", claims: [assessed("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [assessed("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
       ],
     },
     { case: "cbrne.emp", title: "Electromagnetic pulse", examined: ["cisa.emp"], cuts: pulseCuts() },
@@ -433,29 +439,29 @@ export const HAZARD_LIST: HazardList = {
           part: "power.grid",
           title: "No power from the grid",
           claims: [
-            said("ready.space-weather", "The page tells that space weather can cause wide power outages."),
-            said("swpc.electric-power", "The page tells that space weather caused a blackout of nine hours in Canada in March 1989."),
+            told("ready.space-weather", "The page tells that space weather can cause wide power outages."),
+            told("swpc.electric-power", "The page tells that space weather caused a blackout of nine hours in Canada in March 1989."),
           ],
           duration: NO_GEOMAGNETIC_LAW,
         },
-        { part: "water.main", title: "No water from the main", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the water distribution.")], duration: NO_FOLLOW_LAW },
-        { part: "sewer.main", title: "No public sewer", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the wastewater systems.")], duration: NO_FOLLOW_LAW },
+        { part: "water.main", title: "No water from the main", claims: [told("ready.space-weather", "The page tells that the power outages of space weather can stop the water distribution.")], duration: NO_FOLLOW_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [told("ready.space-weather", "The page tells that the power outages of space weather can stop the wastewater systems.")], duration: NO_FOLLOW_LAW },
         {
           part: "phone.network",
           title: "No telephone service",
           claims: [
-            said("ready.space-weather", "The page tells that the power outages of space weather can stop the telephone and communications systems."),
-            said("ready.space-weather", "The page tells that space weather can damage the satellites of communications."),
+            told("ready.space-weather", "The page tells that the power outages of space weather can stop the telephone and communications systems."),
+            told("ready.space-weather", "The page tells that space weather can damage the satellites of communications."),
           ],
           duration: NO_EVENT_LAW,
         },
-        { part: "road.local", title: "No transport", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the public transportation.")], duration: NO_FOLLOW_LAW },
+        { part: "road.local", title: "No transport", claims: [told("ready.space-weather", "The page tells that the power outages of space weather can stop the public transportation.")], duration: NO_FOLLOW_LAW },
         {
           part: "fuel.retail",
           title: "The fuel stations are closed",
           claims: [
-            said("ready.space-weather", "The page tells that the power outages of space weather can stop the fuel distribution."),
-            said("ready.space-weather", "The page tells that the pumps of the gas stations need electricity."),
+            told("ready.space-weather", "The page tells that the power outages of space weather can stop the fuel distribution."),
+            told("ready.space-weather", "The page tells that the pumps of the gas stations need electricity."),
           ],
           duration: NO_FOLLOW_LAW,
         },
