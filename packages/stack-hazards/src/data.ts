@@ -1,5 +1,5 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
-import { HAZARDS_SCHEMA, type Claim, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
+import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
 // Each claim is in own words. The dataset holds no quote. A cut that no source names is not in the list: it is no read.
@@ -24,6 +24,14 @@ const dhs = (name: string, path: string, updated?: string): Source => ({
   name,
   url: `https://www.dhs.gov/sites/default/files/${path}`,
   publisher: "U.S. Department of Homeland Security",
+  license: FEDERAL_WORK,
+  updated,
+  read: READ_CASES,
+});
+const doe = (name: string, path: string, updated: IsoDate): Source => ({
+  name,
+  url: `https://www.energy.gov/sites/${path}`,
+  publisher: "U.S. Department of Energy",
   license: FEDERAL_WORK,
   updated,
   read: READ_CASES,
@@ -77,6 +85,23 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
     read: READ_CASES,
   },
   "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
+  "cisa.ir-alert-h-16-056-01": {
+    name: "Cyber-attack against Ukrainian critical infrastructure (IR-ALERT-H-16-056-01)",
+    url: "https://www.cisa.gov/news-events/ics-alerts/ir-alert-h-16-056-01",
+    publisher: "CISA",
+    license: FEDERAL_WORK,
+    updated: "2021-07-20",
+    read: READ_CASES,
+  },
+  "swpc.electric-power": {
+    name: "Electric power transmission",
+    url: "https://www.spaceweather.gov/impacts/electric-power-transmission",
+    publisher: "NOAA Space Weather Prediction Center",
+    license: FEDERAL_WORK,
+    read: READ_CASES,
+  },
+  "doe.maria-2017-10-23": doe("Hurricanes Maria and Irma event summary, October 23, 2017", "prod/files/2017/10/f38/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20October%2023%2C%202017.pdf", "2017-10-23"),
+  "doe.maria-2018-02-21": doe("Hurricanes Maria and Irma event summary, February 21, 2018", "default/files/2018/02/f49/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20February%2021%2C%202018.pdf", "2018-02-21"),
   "dhs.ai-framework": dhs(
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
     "2024-11/24_1114_dhs_ai-roles-and-responsibilities-framework-508.pdf",
@@ -101,6 +126,34 @@ export const NO_LAW: NoLaw = { read: false, reason: "No source with a law of the
 /** The duration of the grid cut of a storm case with no state of 30 outages of EAGLE-I in the storm events of the case. */
 export const NO_STORM_LAW: NoLaw = { read: false, reason: "No state has 30 outages of EAGLE-I in the storm events of this case." };
 
+/**
+ * The duration of a cut of a catastrophic case with no record of its events. A source or the definition tells that the case can stop the part.
+ * The sources read give no duration and no record of the events of the cut, so no law comes from data.
+ */
+export const NO_EVENT_LAW: NoLaw = { read: false, reason: "No source read gives a duration of this cut or a record of the events of this cut." };
+
+/** The duration of a cut that follows the stop of the grid, in a case whose grid cut has no law. */
+export const NO_FOLLOW_LAW: NoLaw = { read: false, reason: "This cut follows the stop of the grid in this case, and that cut has no law. No source read gives a duration of this cut." };
+
+/** The duration of the grid cut of a long collapse of the grid. The sources read tell of one event that meets the case. */
+export const NO_COLLAPSE_LAW: NoLaw = {
+  read: false,
+  reason:
+    "The event summaries of DOE tell of one long collapse: the grid of Puerto Rico after Hurricane Maria in 2017. Their first counts of the customers out are estimates from the load. One event gives no law. The law of EAGLE-I is from usual outages.",
+};
+
+/** The duration of the grid cut of a cyberattack. The sources read tell of one grid outage from a cyberattack, with no duration. */
+export const NO_CYBER_LAW: NoLaw = {
+  read: false,
+  reason: "The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack: about 225,000 customers in Ukraine in 2015. It gives no duration. One event gives no law.",
+};
+
+/** The duration of the grid cut of a solar storm. The sources read tell of three blackouts from space weather. */
+export const NO_GEOMAGNETIC_LAW: NoLaw = {
+  read: false,
+  reason: "The page of NOAA SWPC names three blackouts from space weather, in 1958, 1989 and 2003. Only the blackout of 1989 in Canada has a duration: 9 hours. Three events give no law.",
+};
+
 /** The sources that each storm case examined for the law of its grid cut. */
 const STORM_EXAMINED = ["eaglei.outages", "noaa.storm-events", "nws.zone-county"];
 
@@ -110,14 +163,17 @@ const stormLaw = (name: string): DurationLaw | NoLaw => EAGLEI_CAUSE_LAWS[name] 
 const said = (source: string, says: string): Claim => ({ source, says });
 const defined = (says: string): Claim => ({ definition: true, says });
 
-/** The cuts that a stop of the grid causes, from the page on power outages. A power outage and a long collapse of the grid share them. */
-const OUTAGE_EFFECTS: readonly HazardCut[] = [
-  { part: "phone.network", title: "No telephone service", claims: [said("ready.power-outages", "The page tells that a power outage can stop communications.")], duration: NO_LAW },
-  { part: "water.main", title: "No water from the main", claims: [said("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration: NO_LAW },
-  { part: "road.local", title: "No transport", claims: [said("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration: NO_LAW },
-  { part: "food.retail", title: "The food shops are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration: NO_LAW },
-  { part: "fuel.retail", title: "The fuel stations are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration: NO_LAW },
-  { part: "cash.retail", title: "No banks and no cash machines", claims: [said("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration: NO_LAW },
+/**
+ * This function gives the cuts that a stop of the grid causes, from the page on power outages. A power outage and a long collapse of the grid share them.
+ * The two cases have different reasons for no law.
+ */
+const outageEffects = (duration: NoLaw): HazardCut[] => [
+  { part: "phone.network", title: "No telephone service", claims: [said("ready.power-outages", "The page tells that a power outage can stop communications.")], duration },
+  { part: "water.main", title: "No water from the main", claims: [said("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration },
+  { part: "road.local", title: "No transport", claims: [said("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration },
+  { part: "food.retail", title: "The food shops are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration },
+  { part: "fuel.retail", title: "The fuel stations are closed", claims: [said("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration },
+  { part: "cash.retail", title: "No banks and no cash machines", claims: [said("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration },
 ];
 
 /** The cuts of an electromagnetic pulse, from the page of CISA. A case can add the same claims to each cut. */
@@ -128,7 +184,7 @@ const pulseCuts = (extra: readonly Claim[] = []): HazardCut[] =>
     { part: "water.main", title: "No water from the main", says: "The page tells that an electromagnetic pulse can damage the water systems." },
     { part: "sewer.main", title: "No public sewer", says: "The page tells that an electromagnetic pulse can damage the wastewater systems." },
     { part: "road.local", title: "No transport", says: "The page tells that an electromagnetic pulse can damage the transportation modes." },
-  ].map(({ part, title, says }) => ({ part, title, claims: [said("cisa.emp", says), ...extra], duration: NO_LAW }));
+  ].map(({ part, title, says }) => ({ part, title, claims: [said("cisa.emp", says), ...extra], duration: NO_EVENT_LAW }));
 
 /**
  * The reference list of hazard cases. A case has a generic name and a code of the alert taxonomy.
@@ -149,7 +205,7 @@ export const HAZARD_LIST: HazardList = {
           claims: [defined("The case is a stop of the power from the grid."), said("ready.power-outages", "The page tells that the electrical power goes out.")],
           duration: EAGLEI_GRID_LAW,
         },
-        ...OUTAGE_EFFECTS,
+        ...outageEffects(NO_LAW),
       ],
     },
     {
@@ -257,16 +313,16 @@ export const HAZARD_LIST: HazardList = {
       title: "Collapse driven by AI",
       examined: ["dhs.ai-framework", "dhs.ai-guidelines"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the energy utilities as a risk.")], duration: NO_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the water utilities as a risk.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the energy utilities as a risk.")], duration: NO_EVENT_LAW },
+        { part: "water.main", title: "No water from the main", claims: [said("dhs.ai-framework", "The framework names a failure of the AI systems of the water utilities as a risk.")], duration: NO_EVENT_LAW },
         {
           part: "network.access",
           title: "No access to the internet",
           claims: [said("dhs.ai-framework", "The framework tells that cyberattacks with AI can disrupt the information technology sector and stop the access to services.")],
-          duration: NO_LAW,
+          duration: NO_EVENT_LAW,
         },
-        { part: "cash.retail", title: "No banks and no cash machines", claims: [said("dhs.ai-framework", "The framework names an interruption of the financial services of the banks as a risk of AI.")], duration: NO_LAW },
-        { part: "care.local", title: "No hospitals and no pharmacies", claims: [said("dhs.ai-framework", "The framework names an interruption of the medical services of the hospitals as a risk of AI.")], duration: NO_LAW },
+        { part: "cash.retail", title: "No banks and no cash machines", claims: [said("dhs.ai-framework", "The framework names an interruption of the financial services of the banks as a risk of AI.")], duration: NO_EVENT_LAW },
+        { part: "care.local", title: "No hospitals and no pharmacies", claims: [said("dhs.ai-framework", "The framework names an interruption of the medical services of the hospitals as a risk of AI.")], duration: NO_EVENT_LAW },
       ],
     },
     {
@@ -275,14 +331,14 @@ export const HAZARD_LIST: HazardList = {
       examined: ["cisa.emp", "ready.radiation"],
       cuts: [
         ...pulseCuts([said("cisa.emp", "The page tells that a nuclear attack high in the air in a war can cause wide harm to the infrastructure.")]),
-        { part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_LAW },
+        { part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW },
       ],
     },
     {
       case: "cbrne.nuclear-detonation",
       title: "Nuclear detonation",
       examined: ["ready.radiation"],
-      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_LAW }],
+      cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_EVENT_LAW }],
     },
     {
       case: "health.outbreak.pandemic",
@@ -295,32 +351,41 @@ export const HAZARD_LIST: HazardList = {
     {
       case: "infra.power.grid-collapse",
       title: "Long collapse of the power grid",
-      examined: ["ready.power-outages"],
+      // The event summaries of DOE on Hurricane Maria tell of the one long collapse in the records read. One event gives no law.
+      examined: ["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21"],
       cuts: [
         {
           part: "power.grid",
           title: "No power from the grid",
           claims: [defined("The case is a stop of the power from the grid over a wide area for weeks or more.")],
           // The law of EAGLE-I is from usual outages, so it does not tell the duration of a collapse.
-          duration: NO_LAW,
+          duration: NO_COLLAPSE_LAW,
         },
-        ...OUTAGE_EFFECTS,
+        ...outageEffects(NO_FOLLOW_LAW),
       ],
     },
     {
       case: "cyber.infrastructure-attack",
       title: "Cyberattack on the infrastructure",
-      examined: ["ready.cybersecurity"],
+      examined: ["ready.cybersecurity", "cisa.ir-alert-h-16-056-01"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on the power grid.")], duration: NO_LAW },
-        { part: "road.local", title: "No transport", claims: [said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on transportation.")], duration: NO_LAW },
+        {
+          part: "power.grid",
+          title: "No power from the grid",
+          claims: [
+            said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on the power grid."),
+            said("cisa.ir-alert-h-16-056-01", "The alert tells that cyber intrusions at three power distribution companies caused power outages for about 225,000 customers."),
+          ],
+          duration: NO_CYBER_LAW,
+        },
+        { part: "road.local", title: "No transport", claims: [said("ready.cybersecurity", "The page tells that a cyberattack can have an effect on transportation.")], duration: NO_EVENT_LAW },
       ],
     },
     {
       case: "infra.supply-chain.food",
       title: "Failure of the food supply",
       examined: ["ready.food"],
-      cuts: [{ part: "food.retail", title: "The food shops are empty", claims: [defined("The case is a stop of the supply of food to the shops.")], duration: NO_LAW }],
+      cuts: [{ part: "food.retail", title: "The food shops are empty", claims: [defined("The case is a stop of the supply of food to the shops.")], duration: NO_EVENT_LAW }],
     },
     {
       case: "civic.economy.collapse",
@@ -331,7 +396,7 @@ export const HAZARD_LIST: HazardList = {
           part: "cash.retail",
           title: "No banks and no cash machines",
           claims: [defined("The case is a stop of the banks and of the payments."), said("ready.financial-preparedness", "The page tells that the ATMs and the credit cards can fail in a disaster.")],
-          duration: NO_LAW,
+          duration: NO_EVENT_LAW,
         },
       ],
     },
@@ -351,22 +416,30 @@ export const HAZARD_LIST: HazardList = {
       // their operational technology in a major crisis or conflict with the United States.
       examined: ["cisa.aa24-038a"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
-        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
-        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
-        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, to disrupt its operations in a conflict with the United States.")], duration: NO_EVENT_LAW },
       ],
     },
     { case: "cbrne.emp", title: "Electromagnetic pulse", examined: ["cisa.emp"], cuts: pulseCuts() },
     {
       case: "geo.space-weather.geomagnetic-storm",
       title: "Solar storm",
-      examined: ["ready.space-weather"],
+      examined: ["ready.space-weather", "swpc.electric-power"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("ready.space-weather", "The page tells that space weather can cause wide power outages.")], duration: NO_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the water distribution.")], duration: NO_LAW },
-        { part: "sewer.main", title: "No public sewer", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the wastewater systems.")], duration: NO_LAW },
+        {
+          part: "power.grid",
+          title: "No power from the grid",
+          claims: [
+            said("ready.space-weather", "The page tells that space weather can cause wide power outages."),
+            said("swpc.electric-power", "The page tells that space weather caused a blackout of nine hours in Canada in March 1989."),
+          ],
+          duration: NO_GEOMAGNETIC_LAW,
+        },
+        { part: "water.main", title: "No water from the main", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the water distribution.")], duration: NO_FOLLOW_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the wastewater systems.")], duration: NO_FOLLOW_LAW },
         {
           part: "phone.network",
           title: "No telephone service",
@@ -374,9 +447,9 @@ export const HAZARD_LIST: HazardList = {
             said("ready.space-weather", "The page tells that the power outages of space weather can stop the telephone and communications systems."),
             said("ready.space-weather", "The page tells that space weather can damage the satellites of communications."),
           ],
-          duration: NO_LAW,
+          duration: NO_EVENT_LAW,
         },
-        { part: "road.local", title: "No transport", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the public transportation.")], duration: NO_LAW },
+        { part: "road.local", title: "No transport", claims: [said("ready.space-weather", "The page tells that the power outages of space weather can stop the public transportation.")], duration: NO_FOLLOW_LAW },
         {
           part: "fuel.retail",
           title: "The fuel stations are closed",
@@ -384,7 +457,7 @@ export const HAZARD_LIST: HazardList = {
             said("ready.space-weather", "The page tells that the power outages of space weather can stop the fuel distribution."),
             said("ready.space-weather", "The page tells that the pumps of the gas stations need electricity."),
           ],
-          duration: NO_LAW,
+          duration: NO_FOLLOW_LAW,
         },
       ],
     },

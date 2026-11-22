@@ -1,7 +1,7 @@
 import { unknownKinds } from "@mark1russell7/alerts";
 import { describe, expect, it } from "vitest";
 import { checkHazards, hasHazardError } from "./check.ts";
-import { HAZARD_LIST, HAZARD_SOURCES, NO_LAW } from "./data.ts";
+import { HAZARD_LIST, HAZARD_SOURCES, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_EVENT_LAW, NO_FOLLOW_LAW, NO_GEOMAGNETIC_LAW, NO_LAW } from "./data.ts";
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { STORM_CLASSES } from "./storms.ts";
 import { HAZARDS_SCHEMA, SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
@@ -67,7 +67,8 @@ describe("the gate of the reference data", () => {
       "met.flood power.grid",
       "met.tornado power.grid",
     ]);
-    expect(cuts.filter(({ cut }) => !cut.duration.read).every(({ cut }) => cut.duration === NO_LAW)).toBe(true);
+    const noLaw = cuts.filter(({ hazard, cut }) => !cut.duration.read && !CATASTROPHIC.includes(hazard));
+    expect(noLaw.every(({ cut }) => cut.duration === NO_LAW)).toBe(true);
     expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-no-law")).toHaveLength(cuts.length - laws.length);
   });
 
@@ -134,8 +135,40 @@ describe("the gate of the reference data", () => {
     const [grid, ...effects] = cutsOf("infra.power.grid-collapse");
     expect(grid?.part).toBe("power.grid");
     expect(grid?.claims.every((claim) => claim.definition === true)).toBe(true);
-    expect(grid?.duration).toBe(NO_LAW);
-    expect(effects).toEqual(cutsOf("infra.power.outage").slice(1));
+    expect(grid?.duration).toBe(NO_COLLAPSE_LAW);
+    expect(effects.map(({ duration: _duration, ...cut }) => cut)).toEqual(cutsOf("infra.power.outage").slice(1).map(({ duration: _duration, ...cut }) => cut));
+    for (const cut of effects) expect(cut.duration, cut.part).toBe(NO_FOLLOW_LAW);
+    for (const cut of cutsOf("infra.power.outage").slice(1)) expect(cut.duration, cut.part).toBe(NO_LAW);
+  });
+
+  it("gives each cut of a catastrophic case no law, with the reason of the sources that it read", () => {
+    const reasons = Object.fromEntries(
+      HAZARD_LIST.hazards.filter((hazard) => CATASTROPHIC.includes(hazard.case)).flatMap((hazard) => hazard.cuts.map((cut) => [`${hazard.case} ${cut.part}`, cut.duration])),
+    );
+    const specific = {
+      "infra.power.grid-collapse power.grid": NO_COLLAPSE_LAW,
+      "cyber.infrastructure-attack power.grid": NO_CYBER_LAW,
+      "geo.space-weather.geomagnetic-storm power.grid": NO_GEOMAGNETIC_LAW,
+      "geo.space-weather.geomagnetic-storm water.main": NO_FOLLOW_LAW,
+      "geo.space-weather.geomagnetic-storm sewer.main": NO_FOLLOW_LAW,
+      "geo.space-weather.geomagnetic-storm road.local": NO_FOLLOW_LAW,
+      "geo.space-weather.geomagnetic-storm fuel.retail": NO_FOLLOW_LAW,
+      ...Object.fromEntries(["phone.network", "water.main", "road.local", "food.retail", "fuel.retail", "cash.retail"].map((part) => [`infra.power.grid-collapse ${part}`, NO_FOLLOW_LAW])),
+    };
+    for (const [key, law] of Object.entries(reasons)) expect(law, key).toBe(specific[key as keyof typeof specific] ?? NO_EVENT_LAW);
+    expect(Object.keys(reasons)).toHaveLength(39);
+    for (const law of [NO_EVENT_LAW, NO_FOLLOW_LAW, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_GEOMAGNETIC_LAW]) {
+      expect(law.read).toBe(false);
+      for (const sentence of law.reason.split(/(?<=\.) /u)) expect(sentence.split(" ").length, sentence).toBeLessThanOrEqual(25);
+    }
+  });
+
+  it("examines the sources of the event records that the reasons name", () => {
+    const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
+    expect(examined("infra.power.grid-collapse")).toEqual(["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21"]);
+    expect(examined("cyber.infrastructure-attack")).toEqual(["ready.cybersecurity", "cisa.ir-alert-h-16-056-01"]);
+    expect(examined("geo.space-weather.geomagnetic-storm")).toEqual(["ready.space-weather", "swpc.electric-power"]);
+    for (const id of ["doe.maria-2017-10-23", "doe.maria-2018-02-21", "cisa.ir-alert-h-16-056-01", "swpc.electric-power"]) expect(HAZARD_SOURCES[id]?.license.url, id).toContain("copyright.gov");
   });
 
   it("has a code of the alert taxonomy for each case, so that an alert can reach each case", () => {

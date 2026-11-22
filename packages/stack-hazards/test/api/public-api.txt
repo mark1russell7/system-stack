@@ -28,6 +28,11 @@ HazardList: build/index.d.ts#HazardList
 IsoDate: build/index.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
 License: build/index.d.ts#License
+NO_COLLAPSE_LAW: build/index.d.ts#NO_COLLAPSE_LAW
+NO_CYBER_LAW: build/index.d.ts#NO_CYBER_LAW
+NO_EVENT_LAW: build/index.d.ts#NO_EVENT_LAW
+NO_FOLLOW_LAW: build/index.d.ts#NO_FOLLOW_LAW
+NO_GEOMAGNETIC_LAW: build/index.d.ts#NO_GEOMAGNETIC_LAW
 NO_LAW: build/index.d.ts#NO_LAW
 NO_STORM_LAW: build/index.d.ts#NO_STORM_LAW
 NoLaw: build/index.d.ts#NoLaw
@@ -180,6 +185,21 @@ export interface License {
   readonly name: string;
   readonly url: string;
 }
+
+### build/index.d.ts#NO_COLLAPSE_LAW
+export declare const NO_COLLAPSE_LAW: NoLaw;
+
+### build/index.d.ts#NO_CYBER_LAW
+export declare const NO_CYBER_LAW: NoLaw;
+
+### build/index.d.ts#NO_EVENT_LAW
+export declare const NO_EVENT_LAW: NoLaw;
+
+### build/index.d.ts#NO_FOLLOW_LAW
+export declare const NO_FOLLOW_LAW: NoLaw;
+
+### build/index.d.ts#NO_GEOMAGNETIC_LAW
+export declare const NO_GEOMAGNETIC_LAW: NoLaw;
 
 ### build/index.d.ts#NO_LAW
 export declare const NO_LAW: NoLaw;

@@ -71,7 +71,18 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 | `geo.space-weather.geomagnetic-storm` | Solar storm | The Ready.gov page on space weather |
 
 - A catastrophic case with no cut is a gap, and each of its supplies is no read. For each of these cases, the dataset read sources, and none of them names a cut. For the severe pandemic, the guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not public supplies. For civil unrest, Ready.gov has no page, and the pages on mass gatherings and on physical security name no cut. The text of FEMA CPG 201 does not have the words civil, riot or unrest.
-- No cut of these cases has a law of its duration. The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid.
+- No cut of these cases has a law of its duration. No source read gives a law, and a number from no source is not a law. Each cut has a no read with its reason:
+
+| No read | Its cuts | The reason |
+| --- | --- | --- |
+| `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. One event gives no law. |
+| `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. |
+| `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. |
+| `NO_FOLLOW_LAW` | The cuts that follow the stop of the grid in a collapse or a solar storm | The grid cut of the case has no law, and no source read gives a duration of its own. |
+| `NO_EVENT_LAW` | Each other cut | No source read gives a duration of the cut or a record of its events. |
+
+- The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid. The early counts of DOE for Puerto Rico are estimates from the load, not counts of customers.
+- The OE-417 summaries of DOE have the outages of each cause, cyber events included. Their site did not answer the read of 2026-11-22, so the dataset does not use them yet.
 
 ## The laws from outage records
 
