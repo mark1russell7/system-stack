@@ -1,4 +1,4 @@
-import type { CaseCuts, Cut } from "@mark1russell7/stack-endurance";
+import type { CaseCuts, Cut } from "@mark1russell7/system-stack";
 import type { Hazard, HazardCut, HazardList } from "./hazard.ts";
 
 // The bind of a hazard case to a stack: the values of `CaseCuts` of stack-endurance, with the curve of the region of the user.

@@ -6,10 +6,10 @@
 
 ## . (build/index.d.ts): names
 
-CaseCuts: build/layer.chunk.d.ts#CaseCuts
+type CaseCuts: @mark1russell7/system-stack#CaseCuts (external)
 CaseOptions: build/index.d.ts#CaseOptions
 Converter: build/layer.chunk.d.ts#Converter
-Cut: build/layer.chunk.d.ts#Cut
+type Cut: @mark1russell7/system-stack#Cut (external)
 DirectUse: build/layer.chunk.d.ts#DirectUse
 Draw: build/layer.chunk.d.ts#Draw
 DrawEndurance: build/layer.chunk.d.ts#DrawEndurance
@@ -31,13 +31,13 @@ Shortfall: build/index.d.ts#Shortfall
 ShortfallOptions: build/index.d.ts#ShortfallOptions
 StopCurves: build/index.d.ts#StopCurves
 Store: build/layer.chunk.d.ts#Store
-Survival: build/layer.chunk.d.ts#Survival
+type Survival: @mark1russell7/system-stack#Survival (external)
 YearShortfall: build/index.d.ts#YearShortfall
 caseDraws: build/index.d.ts#caseDraws
 caseShortfall: build/index.d.ts#caseShortfall
 caseStopped: build/index.d.ts#caseStopped
 checkEndurance: build/index.d.ts#checkEndurance
-curveFault: build/index.d.ts#curveFault
+curveFault: @mark1russell7/system-stack#curveFault (external)
 drawDemand: build/index.d.ts#drawDemand
 enduranceOf: build/index.d.ts#enduranceOf
 eventStop: build/index.d.ts#eventStop
@@ -148,9 +148,6 @@ export declare function caseStopped(caseCuts: CaseCuts, options: Pick<CaseOption
 ### build/index.d.ts#checkEndurance
 export declare function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceFault[];
 
-### build/index.d.ts#curveFault
-export declare function curveFault(curve: Survival): string | undefined;
-
 ### build/index.d.ts#drawDemand
 export declare function drawDemand(draw: Draw, caseCuts: CaseCuts): number;
 
@@ -208,15 +205,6 @@ export declare function yearRate(prior: Prior): number;
 ### build/index.d.ts#yearShortfall
 export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall;
 
-### build/layer.chunk.d.ts#CaseCuts
-interface CaseCuts {
-  readonly case: string;
-  readonly title: string;
-  readonly cuts: readonly Cut[];
-  readonly factors?: Readonly<Record<string, number>> | undefined;
-  readonly leadSeconds?: number | undefined;
-}
-
 ### build/layer.chunk.d.ts#Converter
 interface Converter {
   readonly id: string;
@@ -226,14 +214,6 @@ interface Converter {
     readonly amount: number;
   }[];
   readonly gives: Gift;
-}
-
-### build/layer.chunk.d.ts#Cut
-interface Cut {
-  readonly part: string;
-  readonly title: string;
-  readonly duration?: Survival | undefined;
-  readonly source: string;
 }
 
 ### build/layer.chunk.d.ts#DirectUse
@@ -278,7 +258,7 @@ interface EnduranceLayer {
   readonly draws: readonly Draw[];
   readonly direct?: readonly DirectUse[] | undefined;
   readonly converters?: readonly Converter[] | undefined;
-  readonly cases?: readonly CaseCuts[] | undefined;
+  readonly cases?: readonly CaseCuts$1[] | undefined;
   readonly priors?: readonly Prior[] | undefined;
 }
 
@@ -320,9 +300,6 @@ interface Store {
   readonly due?: IsoDate | undefined;
   readonly part?: string | undefined;
 }
-
-### build/layer.chunk.d.ts#Survival
-type Survival = readonly (readonly [days: number, chance: number])[];
 
 ### build/schema.d.ts#EnduranceParse
 export type EnduranceParse = {

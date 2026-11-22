@@ -40,11 +40,11 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
-    "@mark1russell7/stack-endurance": "workspace:*",
     "@mark1russell7/system-stack": "workspace:*"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/stack-endurance": "workspace:*",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.3",
     "tsdown": "^0.23.1",

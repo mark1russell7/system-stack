@@ -2,7 +2,7 @@
 
 Hazard cases as reference data. Each case tells the public supplies that it can stop, and the source of each claim. Each cut has a law of the duration of the stop, or no read.
 
-It is an add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). It gives the values of `CaseCuts` of [`@mark1russell7/stack-endurance`](../stack-endurance/README.md). The cases have generic names and codes of an alert taxonomy, for example `met.winter.storm`. The data names no person and no place.
+It is an add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). It gives the values of `CaseCuts` of the core, and [`@mark1russell7/stack-endurance`](../stack-endurance/README.md) calculates with them. The cases have generic names and codes of an alert taxonomy, for example `met.winter.storm`. The data names no person and no place.
 
 Each function is a plain function with no clock, no network and no file.
 

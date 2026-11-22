@@ -1,5 +1,4 @@
-import type { Survival } from "@mark1russell7/stack-endurance";
-import type { Part } from "@mark1russell7/system-stack";
+import type { Part, Survival } from "@mark1russell7/system-stack";
 
 // The model of the hazard cases: the reference parts of the public supplies, the sources, the cuts and the laws of their durations.
 
@@ -58,8 +57,8 @@ export interface Source {
 }
 
 /**
- * A claim: the reason to put a cut in a case. A claim is a source that tells that the case can stop the part,
- * or the definition of the case, when the case is the stop of the part. The text `says` tells the claim in own words.
+ * A claim: the reason to put a cut in a case. A claim is a source that tells that the case can stop the part.
+ * Or a claim is the definition of the case, when the case is the stop of the part. The text `says` tells the claim in own words.
  * It is not a quote.
  */
 export type Claim = { readonly source: string; readonly definition?: never; readonly says: string } | { readonly definition: true; readonly source?: never; readonly says: string };

@@ -1,5 +1,4 @@
-import { curveFault } from "@mark1russell7/stack-endurance";
-import { dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
+import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.

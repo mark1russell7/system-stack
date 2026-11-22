@@ -1,3 +1,4 @@
+import { curveFault as coreCurveFault } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkEndurance, curveFault, ENDURANCE_CODES, hasEnduranceError } from "./check.ts";
 import type { EnduranceLayer } from "./layer.ts";
@@ -105,12 +106,8 @@ describe("curveFault", () => {
     expect(checkEndurance(SAMPLE_ENDURANCE).filter((fault) => fault.code === "endurance-cycle")).toEqual([]);
   });
 
-  it("gives the first fault of a curve", () => {
-    expect(curveFault([[0, 1], [1, 0]])).toBeUndefined();
-    expect(curveFault([])).toBe("The curve does not start at [0, 1].");
-    expect(curveFault([[0, 0.9], [1, 0]])).toBe("The curve does not start at [0, 1].");
-    expect(curveFault([[0, 1], [0, 0]])).toMatch(/days of the point 1/);
-    expect(curveFault([[0, 1], [1, 0.5], [2, 0.6], [3, 0]])).toMatch(/chance of the point 2/);
+  it("gives the curve check of the core", () => {
+    expect(curveFault).toBe(coreCurveFault);
     expect(curveFault([[0, 1], [1, 0.5]])).toBe("The curve does not end at a chance of 0.");
   });
 });
