@@ -1,5 +1,6 @@
 import { runLimit } from "@mark1russell7/rigor-bench";
 import type { ArmProcess, BenchEnv, FreshRecord } from "@mark1russell7/rigor-bench/fresh";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BENCH_SEED } from "./inputs.ts";
 import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, readReport, RECORD_SCHEMA, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
@@ -46,6 +47,13 @@ describe("the frozen limits", () => {
     expect(file.jobs).toHaveLength(MIN_JOBS);
     expect(file.commit).toBe(STAMP.commit);
     expect(limitFaults(file)).toEqual([]);
+  });
+
+  it("in bench/limits.json have no fault, and each case of the bench has a limit", () => {
+    const file = JSON.parse(readFileSync(new URL("./limits.json", import.meta.url), "utf8")) as FrozenLimits;
+    expect(limitFaults(file)).toEqual([]);
+    expect(Object.keys(file.cases)).toEqual(["m4", "m8", "m12"]);
+    expect(file.jobs.length).toBeGreaterThanOrEqual(MIN_JOBS);
   });
 
   it("need 5 jobs or more", () => {

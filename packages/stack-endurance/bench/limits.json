@@ -1,0 +1,91 @@
+{
+  "schema": "stack-endurance/independent-limits/1",
+  "measure": "the median time of one call of independentStop over the fresh children of one job, in milliseconds",
+  "rule": "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min)",
+  "seed": "stack-endurance/independent-stop/1",
+  "commit": "02712024206976fb4e1fd27627bdfb1dec1e343e",
+  "date": "2026-11-22",
+  "runs": [
+    "44989185059"
+  ],
+  "jobs": [
+    {
+      "job": "44989185059-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    },
+    {
+      "job": "44989185059-2",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    },
+    {
+      "job": "44989185059-3",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    },
+    {
+      "job": "44989185059-4",
+      "cpu": "AMD EPYC 9V74 80-Core Processor"
+    },
+    {
+      "job": "44989185059-5",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    },
+    {
+      "job": "44989185059-6",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    }
+  ],
+  "cases": {
+    "m4": {
+      "limit": 1.2889,
+      "worst": 1.0529638124999998,
+      "spread": 0.23589950000000037,
+      "values": [
+        1.02656696875,
+        1.0529638124999998,
+        1.0246959687500006,
+        0.8170643124999994,
+        1.0177282499999993,
+        1.0183840937500008
+      ]
+    },
+    "m8": {
+      "limit": 8.4354,
+      "worst": 6.853131499999989,
+      "spread": 1.5822589999999792,
+      "values": [
+        6.724256999999994,
+        6.853131499999989,
+        6.703198749999984,
+        5.27087250000001,
+        6.6480557499999975,
+        6.654317249999991
+      ]
+    },
+    "m12": {
+      "limit": 70.5991,
+      "worst": 59.36466950000005,
+      "spread": 11.234334500000102,
+      "values": [
+        58.85482200000001,
+        59.36466950000005,
+        58.737717499999974,
+        48.130334999999945,
+        58.52381749999995,
+        58.72170100000005
+      ]
+    }
+  },
+  "noiseCap": {
+    "limit": 0.055,
+    "worst": 0.03174747347751486,
+    "spread": 0.02316108789687507,
+    "values": [
+      0.011940877859375948,
+      0.010231765793664246,
+      0.03174747347751486,
+      0.008586385580639786,
+      0.012412587671169728,
+      0.014794480102514086
+    ]
+  }
+}
