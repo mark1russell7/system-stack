@@ -16,6 +16,7 @@ export interface Fit<T> {
 
 /**
  * The count of the tries of `largestFit`, for the tests of the cost. It is not in the public API, and it does not change a result.
+ * It is the one side effect of `largestFit` and of the queries that use it.
  */
 export const fitTries = { count: 0 };
 
@@ -28,6 +29,8 @@ export const fitTries = { count: 0 };
  *   With one try that does not fit, the step tries `x` times the part of the need that the stores gave.
  * - When a step does not halve the interval, the next step is a bisection. Thus a fit takes at most approximately twice the steps of a bisection.
  * - A step on the lower end tries a point just above it, so a correct estimate ends the fit in one more try.
+ * - An estimate that fits with a shortfall above 0 is in the band of the tolerance above the zero, so the fit ends there.
+ *   A bisection step or a probe at the lower end can fit with a shortfall of rounding below the zero. The fit does not end there.
  *
  * @param most - The upper limit of `x`
  * @param attempt - The try at an amount. It must not change its input
@@ -51,16 +54,19 @@ export function largestFit<T>(most: number, attempt: (x: number) => Try<T>): Fit
     if (bisect) x = (low + high) / 2;
     else if (before !== undefined && before.short > highShort) x = high - (highShort * (before.x - high)) / (before.short - highShort);
     else x = high * (1 - highShort / highNeed);
+    // Only a secant or ratio estimate through tries that do not fit lands at or above the zero of a convex shortfall.
+    const estimate = !bisect && x < high;
     if (!(x < high)) x = (low + high) / 2;
     const floor = low + 2 * TOLERANCE * high;
-    if (!(x > floor)) x = floor;
+    const clamped = !(x > floor);
+    if (clamped) x = floor;
     fitTries.count += 1;
     const tried = attempt(x);
     if (fits(tried)) {
       low = x;
       best = tried.value;
-      // A try that fits with a shortfall is in the band of the tolerance above the zero, so the fit ends.
-      if (tried.short > 0) break;
+      // An estimate that fits with a shortfall is in the band of the tolerance above the zero, so the fit ends.
+      if (tried.short > 0 && estimate && !clamped) break;
     } else {
       before = { x: high, short: highShort };
       high = x;

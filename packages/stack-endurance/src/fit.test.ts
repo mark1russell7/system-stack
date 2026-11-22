@@ -18,6 +18,12 @@ describe("largestFit", () => {
     expect(none.value).toBeUndefined();
   });
 
+  it("does not end below the zero on a shortfall of rounding", () => {
+    // Below 5, a rounding of 1 ulp of the need stays. A bisection step there fits, but it is not in the band above the zero.
+    const fit = largestFit(10, (x) => ({ short: x > 5 ? 0.01 * (x - 5) : x * Number.EPSILON, need: x, value: x }));
+    expect(fit.x).toBeCloseTo(5, 9);
+  });
+
   it("finds the zero of a linear shortfall in a few tries", () => {
     fitTries.count = 0;
     const fit = largestFit(100, linear(37.5, 2, 2));
@@ -70,6 +76,48 @@ function sharedChain(depth: number): EnduranceLayer {
     converters,
   };
 }
+
+/**
+ * A kit takes `bulk` of an ample resource a, and 1 b and 1 c. A maker gives `per` b (or c) for `per` L of fuel.
+ * A second converter after it makes 1 kit from 1 spare. So the exact days are fuel / 2 + spare.
+ */
+function twoWayLayer(fuel: number, per: number, bulk: number, spare: number): EnduranceLayer {
+  return {
+    schema: SAMPLE_ENDURANCE.schema,
+    levels: ["critical"],
+    resources: [{ code: "fuel", unit: "L" }, { code: "a", unit: "u" }, { code: "b", unit: "u" }, { code: "c", unit: "u" }, { code: "spare", unit: "u" }],
+    stores: [{ id: "can", resource: "fuel", amount: fuel }, { id: "tank", resource: "a", amount: 1e9 }, { id: "box", resource: "spare", amount: spare }],
+    draws: [{ need: "kit", level: "critical", perDay: 1, supply: "grid" }],
+    converters: [
+      { id: "make-b", takes: [{ resource: "fuel", amount: per }], gives: { resource: "b", amount: per } },
+      { id: "make-c", takes: [{ resource: "fuel", amount: per }], gives: { resource: "c", amount: per } },
+      { id: "kit", takes: [{ resource: "a", amount: bulk }, { resource: "b", amount: 1 }, { resource: "c", amount: 1 }], gives: { need: "kit", amount: 1 } },
+      { id: "kit-from-spare", takes: [{ resource: "spare", amount: 1 }], gives: { need: "kit", amount: 1 } },
+    ],
+  };
+}
+
+describe("a shared chain and a second way", () => {
+  it("gives the exact days, fuel / 2 + spare, for each amount", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0.1, max: 100, noNaN: true }),
+        fc.constantFrom(1, 3, 7, 0.1, 1 / 3),
+        fc.constantFrom(0, 1, 100, 1e4),
+        fc.double({ min: 0.1, max: 50, noNaN: true }),
+        (fuel, per, bulk, spare) => {
+          const days = enduranceOf(twoWayLayer(fuel, per, bulk, spare), CUT, { at: "2026-12-01" }).needs["kit"]?.days ?? Number.NaN;
+          const exact = fuel / 2 + spare;
+          expect(Math.abs(days - exact)).toBeLessThanOrEqual(1e-9 * exact);
+        },
+      ),
+    );
+    // The cases of the review of 0.3.1, which were 13 % to 22 % short.
+    for (const [fuel, per, bulk, spare] of [[7, 0.1, 1, 0.7], [10, 0.1, 100, 3], [13.7, 0.1, 1e4, 0.7]] as const) {
+      expect(enduranceOf(twoWayLayer(fuel, per, bulk, spare), CUT, { at: "2026-12-01" }).needs["kit"]?.days).toBeCloseTo(fuel / 2 + spare, 9);
+    }
+  });
+});
 
 describe("the cost of a shared chain", () => {
   it("gives the days of a shared chain of depth 3 with fewer than 5000 tries", () => {

@@ -228,7 +228,7 @@ const USED_UP = 1e-9;
  * - A converter whose device stops gives nothing. A store whose part stops gives nothing.
  * - A converter can give a resource. A take of a resource uses the stock first, then the converters that make it, through each chain.
  *
- * The function is pure. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
+ * The function is pure, but for an internal count of the tries of its fits for the tests. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
