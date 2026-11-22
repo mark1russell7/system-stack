@@ -18,6 +18,7 @@ CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
+DIRECT_USES: build/index.d.ts#DIRECT_USES
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FragmentDirectUse: build/index.d.ts#FragmentDirectUse
 FragmentDraw: build/index.d.ts#FragmentDraw
@@ -31,15 +32,25 @@ HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
 HouseholdFragmentRead: build/index.d.ts#HouseholdFragmentRead
 HouseholdFragmentResult: build/index.d.ts#HouseholdFragmentResult
 HouseholdStoresResult: build/index.d.ts#HouseholdStoresResult
+JOIN_CODES: build/index.d.ts#JOIN_CODES
+JoinCode: build/index.d.ts#JoinCode
+JoinFault: build/index.d.ts#JoinFault
+JoinReferences: build/index.d.ts#JoinReferences
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
+NEED_SUPPLIES: build/index.d.ts#NEED_SUPPLIES
 NO_COOK: build/index.d.ts#NO_COOK
 NeedsCode: build/index.d.ts#NeedsCode
 NeedsFinding: build/index.d.ts#NeedsFinding
 NoRowAction: build/index.d.ts#NoRowAction
 Person: build/index.d.ts#Person
+ReferenceNeed: build/index.d.ts#ReferenceNeed
+ReferencePart: build/index.d.ts#ReferencePart
+STORED_WATER: build/index.d.ts#STORED_WATER
+WATER_NEED: build/index.d.ts#WATER_NEED
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
 checkCalorieTable: build/index.d.ts#checkCalorieTable
+checkJoins: build/index.d.ts#checkJoins
 hasNeedsError: build/index.d.ts#hasNeedsError
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
@@ -114,6 +125,9 @@ export declare const DGA_CALORIES: CalorieTable;
 
 ### build/index.d.ts#DGA_SOURCE
 export declare const DGA_SOURCE: HashedSource;
+
+### build/index.d.ts#DIRECT_USES
+export declare const DIRECT_USES: readonly FragmentDirectUse[];
 
 ### build/index.d.ts#FOOD_NEED
 export declare const FOOD_NEED = "food.energy";
@@ -210,8 +224,31 @@ export interface HouseholdStoresResult {
   readonly storesRead: boolean;
 }
 
+### build/index.d.ts#JOIN_CODES
+export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-supply-need", "join-supply-part"];
+
+### build/index.d.ts#JoinCode
+export type JoinCode = (typeof JOIN_CODES)[number];
+
+### build/index.d.ts#JoinFault
+export interface JoinFault {
+  readonly level: "error";
+  readonly code: JoinCode;
+  readonly at: string;
+  readonly message: string;
+}
+
+### build/index.d.ts#JoinReferences
+export interface JoinReferences {
+  readonly needs: readonly ReferenceNeed[];
+  readonly parts: readonly ReferencePart[];
+}
+
 ### build/index.d.ts#NEEDS_CODES
 export declare const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value"];
+
+### build/index.d.ts#NEED_SUPPLIES
+export declare const NEED_SUPPLIES: Readonly<Record<string, string>>;
 
 ### build/index.d.ts#NO_COOK
 export declare const NO_COOK = "food.no-cook";
@@ -233,6 +270,23 @@ export interface Person {
   readonly level?: ActivityLevel | undefined;
 }
 
+### build/index.d.ts#ReferenceNeed
+export interface ReferenceNeed {
+  readonly code: string;
+  readonly unit: string;
+}
+
+### build/index.d.ts#ReferencePart
+export interface ReferencePart {
+  readonly id: string;
+}
+
+### build/index.d.ts#STORED_WATER
+export declare const STORED_WATER = "water.stored";
+
+### build/index.d.ts#WATER_NEED
+export declare const WATER_NEED = "hydration.drink";
+
 ### build/index.d.ts#calorieNeed
 export declare function calorieNeed(table: CalorieTable, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal;
 
@@ -241,6 +295,9 @@ export declare function calorieRow(table: CalorieTable, sex: CalorieSex, ageMont
 
 ### build/index.d.ts#checkCalorieTable
 export declare function checkCalorieTable(table: CalorieTable, options?: GateOptions): NeedsFinding[];
+
+### build/index.d.ts#checkJoins
+export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFault[];
 
 ### build/index.d.ts#hasNeedsError
 export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;
