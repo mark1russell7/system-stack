@@ -30,11 +30,11 @@ describe("the inputs of the bench", () => {
     expect(() => independentInput(1)).toThrow(RangeError);
   });
 
-  it("give a curve of independentStop at 4 and 14 cuts, and pass the default budget at 16 cuts", () => {
+  it("give a curve of independentStop up to 15 cuts, and pass the default budget at 16 cuts", () => {
     // At 16 cuts, the expansion has 17662 steps at more than 4000 points of the curve, so it passes INDEPENDENT_MAX_WORK.
     const wide = independentInput(16);
     expect(independentStop(wide.curves, wide.sets)).toBeUndefined();
-    for (const cuts of [4, 14]) {
+    for (const cuts of [4, 14, 15]) {
       const input = independentInput(cuts);
       const curve = independentStop(input.curves, input.sets);
       expect(curve, String(cuts)).toBeDefined();

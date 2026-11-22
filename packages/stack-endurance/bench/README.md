@@ -1,6 +1,6 @@
 # The bench of independentStop
 
-Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each point, for `m` cuts. This folder measures this cost at 4, 8 and 12 cuts. Past 12 cuts, `independentStop` uses the Shannon expansion of `pathSetReliability`. The case of 14 cuts measures that cost. It is the largest count of this input in the default budget `INDEPENDENT_MAX_WORK`. At 16 cuts, the expansion has 17662 steps, and the budget refuses it.
+Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each point, for `m` cuts. This folder measures this cost at 4, 8 and 12 cuts. Past 12 cuts, `independentStop` uses the Shannon expansion of `pathSetReliability`. The case of 14 cuts measures that cost. It is in the default budget `INDEPENDENT_MAX_WORK`, and 15 cuts are too. At 16 cuts, the expansion has 17662 steps, and the budget refuses it.
 
 - Each input has a fixed seed (`BENCH_SEED`). Each cut is in a minimal set, so a state has `m` bits.
 - The workflow `bench.yml` starts 6 jobs in CI. Each job has 20 rounds: 4 times the count of arms (`JOB_ROUNDS`). Each job times each case in fresh child processes with `freshArms` of `@mark1russell7/rigor-bench`.

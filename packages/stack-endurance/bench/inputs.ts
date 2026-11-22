@@ -14,7 +14,7 @@ import type { Survival } from "../src/layer.ts";
 export const BENCH_SEED = "stack-endurance/independent-stop/1";
 /**
  * The counts of cuts of the cases of the bench. 12 is `MINIMAL_STOP_CUTS`, the largest count of the sum over the states of `independentStop`.
- * The case of 14 cuts measures the Shannon expansion of `pathSetReliability`. 14 is the largest count of this input in `INDEPENDENT_MAX_WORK`.
+ * The case of 14 cuts measures the Shannon expansion of `pathSetReliability`. 14 cuts are in `INDEPENDENT_MAX_WORK`. 16 is the first count of this input that the budget refuses.
  */
 export const BENCH_CUTS = [4, 8, 12, 14] as const;
 /** The points of each curve after `[0, 1]`. */

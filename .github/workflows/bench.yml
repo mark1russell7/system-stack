@@ -86,7 +86,7 @@ jobs:
         working-directory: packages/stack-endurance
         run: |
           node bench/main.ts run --out "$RUNNER_TEMP/bench" --job "$GITHUB_RUN_ID-$RUN" \
-            --round-offset "$(( (RUN - 1) * 20 ))" --commit "$COMMIT" --run "$GITHUB_RUN_ID"
+            --job-index "$RUN" --commit "$COMMIT" --run "$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
