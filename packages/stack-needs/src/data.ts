@@ -1,21 +1,19 @@
 import type { CalorieNeed, CalorieTable } from "./calorie.ts";
-import type { License, Source } from "./source.ts";
+import type { HashedSource } from "./source.ts";
 
 // The estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025. Each value is from the tables of
 // Appendix 2 of the PDF, read on 2026-11-22. A calorie of the source is a food calorie, thus 1 kcal. The source gives
 // each need for a reference height and weight, to keep the weight of a person. A person can need more or less.
 // The rows of the toddlers are at 12, 15, 18 and 21 through 23 months. Each row here covers the months up to the next row.
 
-/** The law that puts the works of the United States federal government in the public domain (17 U.S.C. 105). */
-const FEDERAL_WORK: License = { name: "Public domain (a work of the United States federal government)", url: "https://www.copyright.gov/title17/92chap1.html#105" };
-
-/** The source of the calorie table: the PDF of the Dietary Guidelines for Americans, 2020-2025, 9th Edition. */
-export const DGA_SOURCE: Source = {
-  name: "Dietary Guidelines for Americans, 2020-2025, 9th Edition",
+/** The source of the calorie table: the PDF of the Dietary Guidelines for Americans, 2020-2025, 9th Edition. It is a work of the United States federal government. */
+export const DGA_SOURCE: HashedSource = {
+  id: "dga-2020-2025",
+  title: "Dietary Guidelines for Americans, 2020-2025, 9th Edition",
   url: "https://www.dietaryguidelines.gov/sites/default/files/2020-12/Dietary_Guidelines_for_Americans_2020-2025.pdf",
-  publisher: "U.S. Department of Agriculture and U.S. Department of Health and Human Services",
-  license: FEDERAL_WORK,
-  read: "2026-11-22",
+  license: "us-public-domain",
+  checked: "2026-11-22",
+  by: "U.S. Department of Agriculture and U.S. Department of Health and Human Services",
   sha256: "ceea04ce1a7c13a95a170f3548ed3926ad6dd49599bd730fb58bc9c02711d16e",
 };
 

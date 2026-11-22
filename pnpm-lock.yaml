@@ -368,15 +368,15 @@ importers:
 
   packages/stack-needs:
     dependencies:
+      '@mark1russell7/guidebook':
+        specifier: ^0.1.1
+        version: 0.1.1
       '@mark1russell7/market':
         specifier: ^0.3.1
         version: 0.3.1
       '@mark1russell7/quantity':
         specifier: ^0.4.3
         version: 0.4.3(zod@4.6.7)
-      '@mark1russell7/system-stack':
-        specifier: workspace:*
-        version: link:../system-stack
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -384,9 +384,6 @@ importers:
       '@mark1russell7/stack-endurance':
         specifier: workspace:*
         version: link:../stack-endurance
-      '@mark1russell7/stack-hazards':
-        specifier: workspace:*
-        version: link:../stack-hazards
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

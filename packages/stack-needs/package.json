@@ -41,14 +41,13 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@mark1russell7/guidebook": "^0.1.1",
     "@mark1russell7/market": "^0.3.1",
-    "@mark1russell7/quantity": "^0.4.3",
-    "@mark1russell7/system-stack": "workspace:*"
+    "@mark1russell7/quantity": "^0.4.3"
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
     "@mark1russell7/stack-endurance": "workspace:*",
-    "@mark1russell7/stack-hazards": "workspace:*",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.3",
     "fast-check": "^4.10.2",

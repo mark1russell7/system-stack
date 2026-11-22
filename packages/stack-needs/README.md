@@ -12,7 +12,7 @@ This package is not on npm yet. Other packages of this repository use it with `w
 
 | Record | What it tells |
 | --- | --- |
-| `Source` | A public file or page: its URL, its publisher, its license, the date of the read, and the SHA-256 hash of the file. It has the fields of a source of `@mark1russell7/stack-hazards`. |
+| `HashedSource` | A source of `@mark1russell7/guidebook` (an id, a title, a URL, a license and the date of the check), with the SHA-256 hash of the file. |
 | `CalorieTable` | A table of estimated calorie needs from one source, with the place of the tables in the source. |
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as an option, an activity level. |
@@ -25,7 +25,9 @@ This package is not on npm yet. Other packages of this repository use it with `w
 3. The activity level is an explicit input. The package has no default level.
 4. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
 
-`checkCalorieTable` is the gate of a table. It refuses a source with no HTTPS URL, no publisher, no license or a wrong date. These are the rules of the sources of `@mark1russell7/stack-hazards`. It also refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`.
+`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source. It also refuses a hash that is not 64 lowercase hexadecimal digits. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`.
+
+The field `sha256` is not in the source of guidebook yet. It moves there later.
 
 ## A first look
 
@@ -72,7 +74,7 @@ A caller adds the converters for the dry food in a different fragment, with the 
 
 The calorie table comes from Appendix 2 of the Dietary Guidelines for Americans, 2020-2025, 9th Edition (USDA and HHS). Table A2-1 gives the ages of 12 through 23 months, on page 139. Table A2-2 gives the ages of 2 and more, on pages 140 and 141. The table has 68 rows: 34 for each sex.
 
-The guidelines are a work of the United States federal government, in the public domain. The record of the source has the SHA-256 hash of the PDF of the read of 2026-11-22.
+The guidelines are a work of the United States federal government, in the public domain (the license `us-public-domain` of guidebook). The record of the source has the SHA-256 hash of the PDF of the check of 2026-11-22.
 
 - A calorie of the source is a food calorie, thus 1 kcal.
 - Table A2-1 gives one need for each age and sex of a toddler. The level does not change it.
