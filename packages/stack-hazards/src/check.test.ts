@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { checkHazards, hasHazardError } from "./check.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, NO_LAW } from "./data.ts";
-import { EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
+import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
+import { STORM_CLASSES } from "./storms.ts";
 import { HAZARDS_SCHEMA, SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
 
 const SOURCE: Source = {
@@ -37,11 +38,33 @@ describe("the gate of the reference data", () => {
     expect(hasHazardError(faults)).toBe(false);
   });
 
-  it("gives one warning for each cut with no law: each cut but the grid cut of a power outage", () => {
+  it("gives one warning for each cut with no law: each cut but the grid cuts of a power outage and of the storm cases", () => {
     const cuts = HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => ({ hazard: hazard.case, cut })));
-    const laws = cuts.filter(({ cut }) => cut.duration !== NO_LAW);
-    expect(laws.map(({ hazard, cut }) => `${hazard} ${cut.part}`)).toEqual(["infra.power.outage power.grid"]);
-    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-no-law")).toHaveLength(cuts.length - 1);
+    const laws = cuts.filter(({ cut }) => cut.duration.read);
+    expect(laws.map(({ hazard, cut }) => `${hazard} ${cut.part}`)).toEqual([
+      "infra.power.outage power.grid",
+      "met.winter.storm power.grid",
+      "met.heat.extreme power.grid",
+      "met.tropical.hurricane power.grid",
+      "met.flood power.grid",
+      "met.tornado power.grid",
+    ]);
+    expect(cuts.filter(({ cut }) => !cut.duration.read).every(({ cut }) => cut.duration === NO_LAW)).toBe(true);
+    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-no-law")).toHaveLength(cuts.length - laws.length);
+  });
+
+  it("has a law of its own on the grid cut of each storm case, with a curve for each region of its source", () => {
+    expect(Object.keys(EAGLEI_CAUSE_LAWS)).toEqual(Object.keys(STORM_CLASSES));
+    for (const [name, law] of Object.entries(EAGLEI_CAUSE_LAWS)) {
+      const source = EAGLEI_CAUSE_SOURCES[law.source];
+      const grid = HAZARD_LIST.hazards.find((hazard) => hazard.case === name)?.cuts.find((cut) => cut.part === "power.grid");
+      expect(grid?.duration).toBe(law);
+      expect(HAZARD_SOURCES[law.source]).toBe(source);
+      expect([law.source, law.scheme, source?.license.name]).toEqual([`eaglei.${name}`, "us-state-fips", "CC BY 4.0"]);
+      expect(Object.keys(law.curves).sort()).toEqual([...(source?.regions?.codes ?? [])].sort());
+      expect(law.fit.method).toContain("a storm event of the case");
+      for (const code of Object.keys(law.curves)) expect(EAGLEI_SOURCE.regions?.codes).toContain(code);
+    }
   });
 
   it("has the law of EAGLE-I on the grid cut, with a curve for each region of its source", () => {
@@ -55,7 +78,12 @@ describe("the gate of the reference data", () => {
 
   it("cuts only reference parts, and uses each source of the table", () => {
     const parts = new Set(SUPPLY_PARTS.map((part) => part.id));
-    const used = new Set(HAZARD_LIST.hazards.flatMap((hazard) => [...hazard.examined, ...hazard.cuts.flatMap((cut) => cut.claims.flatMap((claim) => (claim.source === undefined ? [] : [claim.source])))]));
+    const used = new Set(
+      HAZARD_LIST.hazards.flatMap((hazard) => [
+        ...hazard.examined,
+        ...hazard.cuts.flatMap((cut) => [...cut.claims.flatMap((claim) => (claim.source === undefined ? [] : [claim.source])), ...(cut.duration.read ? [cut.duration.source] : [])]),
+      ]),
+    );
     expect(HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => cut.part)).filter((part) => !parts.has(part))).toEqual([]);
     expect(Object.keys(HAZARD_SOURCES).filter((id) => !used.has(id))).toEqual([]);
   });

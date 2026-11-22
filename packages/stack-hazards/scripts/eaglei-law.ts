@@ -179,7 +179,7 @@ export function lawModule({ source, law, causes }: EagleLaw): string {
     ...sourceLines,
     "};",
     "",
-    "/** The law of the duration of a stop of the grid in each storm case, by the code of the case: the outages that start in a storm event of the case. */",
+    "/** The law of the duration of a stop of the grid in each storm case, by the code of the case. It is from the outages in the storm events of the case. */",
     "export const EAGLEI_CAUSE_LAWS: Readonly<Record<string, DurationLaw>> = {",
     ...caseLines,
     "};",
