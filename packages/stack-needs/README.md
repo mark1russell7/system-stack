@@ -46,7 +46,6 @@ const food = householdFragment({
   activity: "sedentary",
   catalog: SUPPLY_CATALOG,
   units: { "food.rice-white-1kg": 4, "food.peanut-butter-1kg": 2 },
-  supply: "food.retail",
   level: "critical",
   levels: ["critical"],
 });
@@ -62,7 +61,9 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 - The fragment has one draw `food.energy`. Its rate is the need of the persons for one day, in `kcal`. Its users are the persons.
 - Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
-- The direct use of `food.no-cook` gives 1 kcal of the need for each kcal.
+- The direct uses are the food uses of `uses`: each use for the need `food.energy`. The default `DIRECT_USES` gives `food.no-cook`, 1 kcal for each kcal.
+- The resources are the resources of the stores and of the food uses. The resource of each food use is in `kcal` in the catalog, or the function throws a `RangeError`.
+- The supply part of the draw is `supply`. Its default is the part of `NEED_SUPPLIES` for `food.energy`: `food.retail`.
 - The result also has the food energy of each product (`buyListEnergy`). A caller gets the energy of the dry food for its converters from it.
 
 The result has two reads. `needRead` tells if the draw has a read, and `storesRead` tells if each gift of the buy list has a read.
@@ -91,15 +92,20 @@ The package holds one record of each use and of each default supply part. `house
 | `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, 1 kcal for each kcal. |
 | `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
 
-`checkJoins(catalog, uses, supplies, { needs, parts })` gives one fault for each break. An empty list is a pass. Each fault is an error.
+`checkJoins(catalog, uses, supplies, { needs, parts })` gives one finding for each break. An empty list is a pass. Each finding is an error.
 
-| Code | The break |
-| --- | --- |
-| `join-use-resource` | A direct use names a resource that is not in the catalog. |
-| `join-use-need` | A direct use names a need that is not a reference need. |
-| `join-use-unit` | The unit of the resource of a direct use is not the unit of its need. |
-| `join-supply-need` | A supply names a need that is not a reference need. |
-| `join-supply-part` | A supply names a part that is not a reference part. |
+A finding has the form of a finding of `@mark1russell7/guidebook`, the same form as the findings of `checkCalorieTable`. Its record is `use` or `supply`. The `id` of a `use` finding is the resource of the use. The `id` of a `supply` finding is the need.
+
+| Code | Record | The break |
+| --- | --- | --- |
+| `join-use-resource` | `use` | A direct use names a resource that is not in the catalog. |
+| `join-use-need` | `use` | A direct use names a need that is not a reference need. |
+| `join-use-unit` | `use` | The unit of the resource of a direct use does not convert to the unit of its need. |
+| `join-use-amount` | `use` | The amount of a direct use is not the factor from the unit of its resource to the unit of its need. |
+| `join-supply-need` | `supply` | A supply names a need that is not a reference need. |
+| `join-supply-part` | `supply` | A supply names a part that is not a reference part. |
+
+A direct use is a definition. Thus its amount is the factor of the units, from `valueIn` of `@mark1russell7/quantity`. For example, a use in `gal` for a need in `L` gives 3.785411784 L for each gal. A different rate is a converter, and a converter has a cited source.
 
 The reference lists are parameters. An add-on does not import a different add-on, thus the caller gives them. Give `NEEDS` of `@mark1russell7/alerts` and `SUPPLY_PARTS` of `@mark1russell7/stack-hazards`. A test of the package joins these real lists. It also checks that `food.energy` is a need of `NEEDS` in `kcal`.
 
