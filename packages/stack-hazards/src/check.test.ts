@@ -4,6 +4,23 @@ import { HAZARD_LIST, HAZARD_SOURCES, NO_LAW } from "./data.ts";
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { STORM_CLASSES } from "./storms.ts";
 import { HAZARDS_SCHEMA, SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { supplyState } from "./case.ts";
+
+/** The catastrophic cases, in the order of the list. */
+const CATASTROPHIC = [
+  "civic.ai-collapse",
+  "security.nuclear-war",
+  "cbrne.nuclear-detonation",
+  "health.outbreak.pandemic",
+  "infra.power.grid-collapse",
+  "cyber.infrastructure-attack",
+  "infra.supply-chain.food",
+  "civic.economy.collapse",
+  "security.civil-unrest",
+  "security.armed-conflict",
+  "cbrne.emp",
+  "geo.space-weather.geomagnetic-storm",
+];
 
 const SOURCE: Source = {
   name: "A dataset of outages",
@@ -86,6 +103,26 @@ describe("the gate of the reference data", () => {
     );
     expect(HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => cut.part)).filter((part) => !parts.has(part))).toEqual([]);
     expect(Object.keys(HAZARD_SOURCES).filter((id) => !used.has(id))).toEqual([]);
+  });
+
+  it("has each catastrophic case once, and no cut for a case with no source that names one", () => {
+    const codes = HAZARD_LIST.hazards.map((hazard) => hazard.case);
+    expect(codes.filter((code) => CATASTROPHIC.includes(code))).toEqual(CATASTROPHIC);
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const code of ["security.civil-unrest", "security.armed-conflict", "health.outbreak.pandemic"]) {
+      const hazard = HAZARD_LIST.hazards.find((item) => item.case === code);
+      expect(hazard?.cuts, code).toEqual([]);
+      for (const part of SUPPLY_PARTS) expect(supplyState(hazard!, part.id).state).toBe("no-read");
+    }
+  });
+
+  it("gives a long collapse of the grid the cuts of a power outage, with no law of EAGLE-I", () => {
+    const cutsOf = (code: string) => HAZARD_LIST.hazards.find((hazard) => hazard.case === code)?.cuts ?? [];
+    const [grid, ...effects] = cutsOf("infra.power.grid-collapse");
+    expect(grid?.part).toBe("power.grid");
+    expect(grid?.claims.every((claim) => claim.definition === true)).toBe(true);
+    expect(grid?.duration).toBe(NO_LAW);
+    expect(effects).toEqual(cutsOf("infra.power.outage").slice(1));
   });
 
   it("has each source of a claim in the list examined of its case", () => {

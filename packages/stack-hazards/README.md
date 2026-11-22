@@ -45,11 +45,33 @@ A part of a stack that needs a public supply names a reference id in its needs. 
 
 ## The sources
 
-The claims of 0.1.0 come from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse.
+The claims of the cases of 0.1.0 come from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse.
 
 The law of the grid cut of a power outage comes from EAGLE-I of Oak Ridge National Laboratory (CC BY 4.0, DOI `10.6084/m9.figshare.24237376`). It has one curve for each state, the District of Columbia, Puerto Rico and the US Virgin Islands. The curves are a derived work.
 
 This law is for all causes. The grid cut of each storm case has a law of its own, from the outages that start in a storm event of the case. The law has a source of its own. Its regions are the states with 30 such outages or more. Each other cut has no law.
+
+## The catastrophic cases
+
+Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases come from pages of FEMA (Ready.gov), of CISA and of the Department of Homeland Security. Each is a work of the United States federal government, in the public domain.
+
+| Code | Case | The sources of its cuts |
+| --- | --- | --- |
+| `civic.ai-collapse` | Collapse driven by AI | The DHS framework for AI in critical infrastructure (2024) |
+| `security.nuclear-war` | Nuclear war | The CISA page on the electromagnetic pulse, the Ready.gov page on radiation emergencies |
+| `cbrne.nuclear-detonation` | Nuclear detonation | The Ready.gov page on radiation emergencies |
+| `health.outbreak.pandemic` | Severe pandemic | No cut |
+| `infra.power.grid-collapse` | Long collapse of the power grid | The definition, and the Ready.gov page on power outages |
+| `cyber.infrastructure-attack` | Cyberattack on the infrastructure | The Ready.gov page on cybersecurity |
+| `infra.supply-chain.food` | Failure of the food supply | The definition |
+| `civic.economy.collapse` | Financial collapse | The definition, and the Ready.gov page on financial preparedness |
+| `security.civil-unrest` | Civil unrest | No cut |
+| `security.armed-conflict` | War | No cut |
+| `cbrne.emp` | Electromagnetic pulse | The CISA page on the electromagnetic pulse |
+| `geo.space-weather.geomagnetic-storm` | Solar storm | The Ready.gov page on space weather |
+
+- A case with no cut is a gap. No source that the dataset read names a cut of it, so each of its supplies is no read.
+- No cut of these cases has a law of its duration. The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid.
 
 ## The laws from outage records
 
