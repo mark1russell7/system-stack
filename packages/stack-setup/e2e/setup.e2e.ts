@@ -15,6 +15,8 @@ const USER = "stack-setup-e2e";
 const FOLDER = "/etc/stack-setup-e2e";
 const SWAP = "/var/lib/stack-setup-e2e.swap";
 const DOWNLOAD = "/opt/stack-setup-e2e/LICENSE";
+const ARCHIVE = "/opt/stack-setup-e2e-node";
+const INPUT = "/srv/stack-setup-e2e/input";
 
 /** The values of the two variables. They are examples. */
 const TOKEN = "an-example-of-a-token";
@@ -23,6 +25,13 @@ const GREETING = "a greeting with 'quotes', $dollars and `ticks`";
 /** The license of this repository at a commit of its main branch, and the SHA-256 of that file. */
 const LICENSE_URL = "https://raw.githubusercontent.com/mark1russell7/system-stack/eef7f9f3a56e95c93944b3d0efb2d0b68c1d37a0/LICENSE";
 const LICENSE_SHA256 = "f5ac83ec2855d37f186d28771ce2abd671ff029dee51dc7c0c9cfb8a3109f9fc";
+
+/** The archive of Node.js 24.21.0 for Linux x64, and its SHA-256 in the file SHASUMS256.txt of the release. */
+const NODE_URL = "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz";
+const NODE_SHA256 = "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6";
+/** A header file of the archive, and its SHA-256. The archive step reads the version in the folder from this file. */
+const NODE_MARK = `${ARCHIVE}/include/node/node_version.h`;
+const NODE_MARK_SHA256 = "bd056729fddf4bfa58687036219f07417c334c4ecfcb513ac256fa254451bfc9";
 
 /** An example of a public key. No private key belongs to it. */
 const KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAnExampleKeyOfTheEndToEndTestOfTheSetup stack-setup-e2e";
@@ -50,8 +59,11 @@ const LAYER: SetupLayer = {
         { kind: "file", id: "env", path: `${FOLDER}/env`, text: ["TOKEN=", { $var: "TOKEN" }, "\n"], mode: "600" },
         { kind: "file", id: "greeting", path: `${FOLDER}/greeting`, text: [{ $var: "GREETING" }, "\n"] },
         { kind: "download", id: "license", url: LICENSE_URL, sha256: LICENSE_SHA256, path: DOWNLOAD },
+        { kind: "archive", id: "node", url: NODE_URL, sha256: NODE_SHA256, into: ARCHIVE, strip: 1, mark: { path: NODE_MARK, sha256: NODE_MARK_SHA256 } },
         { kind: "service", id: "service", name: USER, unit: UNIT },
         { kind: "command", id: "data", run: ["install", "-d", "-m", "755", "/srv/stack-setup-e2e"], check: ["test", "-d", "/srv/stack-setup-e2e"] },
+        // The command reads the sensitive variable on its standard input, so no argument of a process holds it.
+        { kind: "command", id: "input", run: ["dd", `of=${INPUT}`, "status=none"], check: ["test", "-s", INPUT], input: { $var: "TOKEN" } },
         { kind: "command", id: "home-data", run: ["mkdir", "-p", `/home/${USER}/data`], check: ["test", "-d", `/home/${USER}/data`], as: USER },
       ],
     },
@@ -156,7 +168,7 @@ test("the first apply makes the changes in the order of the needs", () => {
   assert.equal(run.status, SETUP_EXIT.ok, run.stdout + run.stderr);
   assert.ok(changes(run.stdout) > 0);
   const steps = reports(run.stdout).map((line) => line.replace(/^\w+: /, ""));
-  assert.deepEqual(steps, ["base.packages", "base.user", "base.swap", "app.env", "app.greeting", "app.license", "app.service", "app.data", "app.home-data"]);
+  assert.deepEqual(steps, ["base.packages", "base.user", "base.swap", "app.env", "app.greeting", "app.license", "app.node", "app.service", "app.data", "app.input", "app.home-data"]);
 });
 
 test("the second apply changes nothing, and the mode check passes", () => {
@@ -175,6 +187,12 @@ test("the host has each record of the layer", () => {
   assert.equal(asRoot(["stat", "-c", "%a %U %G", `${FOLDER}/greeting`]), "644 root root\n");
   assert.equal(asRoot(["cat", `${FOLDER}/greeting`]), `${GREETING}\n`);
   assert.equal(asRoot(["sha256sum", DOWNLOAD]).split(" ")[0], LICENSE_SHA256);
+  assert.equal(asRoot(["sha256sum", NODE_MARK]).split(" ")[0], NODE_MARK_SHA256);
+  assert.equal(start(`${ARCHIVE}/bin/node`, ["--version"]).stdout, "v24.21.0\n");
+  assert.equal(asRoot(["find", ARCHIVE, "(", "!", "-user", "root", "-o", "!", "-group", "root", ")", "-print"]), "");
+  assert.equal(start("test", ["-e", `${ARCHIVE}.setup-new`]).status, 1, "no new folder is left");
+  assert.equal(start("test", ["-e", `${ARCHIVE}.setup-old`]).status, 1, "no old folder is left");
+  assert.equal(asRoot(["cat", INPUT]), TOKEN);
   assert.equal(start("systemctl", ["is-active", USER]).stdout, "active\n");
   assert.equal(start("systemctl", ["is-enabled", USER]).stdout, "enabled\n");
   assert.ok(start("id", ["-nG", USER]).stdout.split(" ").map((group) => group.trim()).includes("adm"));
@@ -198,6 +216,20 @@ test("the script repairs a file that changed, and only that file", () => {
   assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
   assert.equal(changes(apply.stdout), 1);
   assert.equal(asRoot(["cat", `${FOLDER}/greeting`]), `${GREETING}\n`);
+});
+
+test("the script extracts the archive again when a file of its folder has an owner that is not root", () => {
+  asRoot(["chown", USER, `${ARCHIVE}/bin/node`]);
+  const check = setup(script, "check");
+  assert.equal(check.status, SETUP_EXIT.changes, check.stdout + check.stderr);
+  assert.deepEqual(
+    reports(check.stdout).filter((line) => !line.startsWith("ok: ")),
+    ["change: app.node"],
+  );
+  const apply = setup(script, "apply");
+  assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
+  assert.equal(changes(apply.stdout), 1);
+  assert.equal(asRoot(["stat", "-c", "%U %G", `${ARCHIVE}/bin/node`]), "root root\n");
 });
 
 test("a step whose check fails after the change stops the script", () => {

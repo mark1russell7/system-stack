@@ -134,6 +134,60 @@ describe("setupScript", () => {
     expect(scriptOf([{ kind: "command", id: "c", run: ["true"], check: ["true"], as: "root" }])).toContain("env true || return 1");
   });
 
+  it("extracts an archive into a new folder that root owns, and checks its mark", () => {
+    const script = scriptOf([
+      {
+        kind: "archive",
+        id: "node",
+        url: "https://example.org/node.tar.xz",
+        sha256: "a".repeat(64),
+        into: "/opt/node",
+        strip: 1,
+        mark: { path: "/opt/node/include/version.h", sha256: "b".repeat(64) },
+      },
+    ]);
+    expect(script).toContain(
+      `check_1() {\n  [ -f /opt/node/include/version.h ] || return 1\n  [ "$(sha256sum /opt/node/include/version.h | cut -d' ' -f1)" = ${"b".repeat(64)} ] || return 2\n` +
+        "  [ -z \"$(find /opt/node \\( ! -user root -o ! -group root \\) -print -quit)\" ] || return 3\n}",
+    );
+    expect(script).toContain('curl -fsSL --proto =https --proto-redir =https --tlsv1.2 --retry 4 --retry-max-time 120 -o "$tmp" https://example.org/node.tar.xz || return 1');
+    expect(script).toContain('  echo "setup: the SHA-256 of the archive does not agree" >&2');
+    expect(script).toContain("rm -rf /opt/node.setup-new /opt/node.setup-old || return 1");
+    expect(script).toContain('tar -xf "$tmp" -C /opt/node.setup-new --strip-components=1 --no-same-owner || return 1');
+    expect(script).toContain("chown -R -h root:root /opt/node.setup-new || return 1");
+    // The old folder moves away before the new folder takes its place, so a running program keeps its file.
+    expect(script).toContain("if [ -e /opt/node ]; then\n    mv /opt/node /opt/node.setup-old || return 1\n  fi\n  mv /opt/node.setup-new /opt/node || return 1\n  rm -rf /opt/node.setup-old || return 1");
+    expect(script).toContain('tmp=$(mktemp)');
+  });
+
+  it("gives the input of a command through printf, so no argument of a process holds it", () => {
+    const script = scriptOf(
+      [{ kind: "command", id: "join", run: ["tailscale", "up", "--auth-key=file:/dev/stdin"], check: ["tailscale", "status"], input: { $var: "KEY" } }],
+      [{ name: "KEY", sensitive: true }],
+    );
+    expect(script).toContain(`check_1() {\n  env tailscale status || return 1\n}`);
+    expect(script).toContain(`printf '%s' "$KEY" | env tailscale up --auth-key=file:/dev/stdin || return 1`);
+    expect(script).toContain('if [ -z "${KEY-}" ]; then');
+  });
+
+  it("reads the lists of apt again after a change of a source or a key of apt", () => {
+    const steps: Step[] = [
+      { kind: "package", id: "base", manager: "apt", names: ["curl"] },
+      { kind: "download", id: "key", url: "https://example.org/key.gpg", sha256: "a".repeat(64), path: "/usr/share/keyrings/example.gpg" },
+      { kind: "file", id: "list", path: "/etc/apt/sources.list.d/example.list", text: "deb https://example.org/apt stable main\n" },
+      { kind: "file", id: "other", path: "/etc/example.conf", text: "a=1\n" },
+      { kind: "package", id: "tool", manager: "apt", names: ["example"] },
+    ];
+    const script = scriptOf(steps);
+    const resets = script.split("\n").flatMap((line, index) => (line === "  apt_updated=0" ? [index] : []));
+    expect(resets).toHaveLength(2);
+    expect(script).toContain("  changed p.key\n  apt_updated=0\nfi");
+    expect(script).toContain("  changed p.list\n  apt_updated=0\nfi");
+    expect(script).toContain("  changed p.other\nfi");
+    // A script with no package step does not set the flag of the lists.
+    expect(scriptOf(steps.filter((step) => step.kind !== "package"))).not.toContain("apt_updated");
+  });
+
   it("writes only the unit of a service that does not start", () => {
     const unit = scriptOf([{ kind: "service", id: "s", name: "app", unit: "[Unit]\n", enable: false }]);
     expect(unit).toContain("systemctl daemon-reload");

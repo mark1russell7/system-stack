@@ -40,6 +40,7 @@ export const SETUP_CODES: readonly [
   "setup-url",
   "setup-sha256",
   "setup-swap-size",
+  "setup-archive",
   "setup-program",
   "setup-empty",
   "setup-cycle",
@@ -61,6 +62,7 @@ export const SETUP_CODES: readonly [
   "setup-url",
   "setup-sha256",
   "setup-swap-size",
+  "setup-archive",
   "setup-program",
   "setup-empty",
   "setup-cycle",
@@ -116,6 +118,27 @@ function checkProgram(faults: Faults, at: string, label: string, command: readon
   }
 }
 
+/** The largest count of the folders that an archive step removes from each path. */
+const STRIP_LIMIT = 16;
+
+/** The first segments of a path that hold the system. An archive is not in them. */
+const SYSTEM_ROOTS: ReadonlySet<string> = new Set(["bin", "boot", "dev", "lib", "lib32", "lib64", "libx32", "proc", "root", "run", "sbin", "sys", "tmp"]);
+
+/** The first segments of a path whose folders two segments deep belong to the system or to its users, for example `/usr/lib` and `/home/a`. */
+const SYSTEM_PARENTS: ReadonlySet<string> = new Set(["etc", "home", "usr", "var"]);
+
+/**
+ * This function tells if an archive step can replace a folder. The folder is two or more segments deep, and it is not a
+ * folder of the system. A new folder in the place of a folder of the system breaks the host.
+ */
+export function isArchiveFolder(path: string): boolean {
+  if (!isPath(path)) return false;
+  const segments = path.split("/").slice(1);
+  const first = segments[0] ?? "";
+  if (segments.length < 2 || SYSTEM_ROOTS.has(first)) return false;
+  return !(segments.length === 2 && SYSTEM_PARENTS.has(first));
+}
+
 /** This function examines the fields of one step that are not texts. */
 function checkStep(faults: Faults, at: string, step: Step): void {
   const mode = (value: string | undefined): void => {
@@ -153,6 +176,18 @@ function checkStep(faults: Faults, at: string, step: Step): void {
       path(step.path);
       mode(step.mode);
       return;
+    case "archive":
+      if (!isHttpsUrl(step.url)) faults.error("setup-url", at, "The address is not an HTTPS address with a host name, and with no user and no password.");
+      if (!SHA256_FORM.test(step.sha256)) faults.error("setup-sha256", at, "The SHA-256 of the archive is not 64 lowercase hexadecimal digits.");
+      if (!SHA256_FORM.test(step.mark.sha256)) faults.error("setup-sha256", at, "The SHA-256 of the mark is not 64 lowercase hexadecimal digits.");
+      if (!isArchiveFolder(step.into)) {
+        faults.error("setup-archive", at, `The folder "${step.into}" is not an absolute path two or more segments deep, or it is a folder of the system.`);
+      }
+      if (!isPath(step.mark.path) || !step.mark.path.startsWith(`${step.into}/`)) faults.error("setup-archive", at, `The mark "${step.mark.path}" is not a path in the folder "${step.into}".`);
+      if (step.strip !== undefined && (!Number.isInteger(step.strip) || step.strip < 0 || step.strip > STRIP_LIMIT)) {
+        faults.error("setup-archive", at, `The count ${String(step.strip)} of the folders to remove is not a whole number from 0 to ${String(STRIP_LIMIT)}.`);
+      }
+      return;
     case "swap":
       path(step.path);
       if (!Number.isInteger(step.mib) || step.mib < 1 || step.mib > SWAP_MIB_LIMIT) faults.error("setup-swap-size", at, `The size ${String(step.mib)} MiB is not a whole number from 1 to ${String(SWAP_MIB_LIMIT)}.`);
@@ -170,9 +205,9 @@ function checkStep(faults: Faults, at: string, step: Step): void {
 
 /**
  * This function tells why a sensitive variable cannot be in a text of a step, or gives `undefined` when it can.
- * A secret can be only in a file that no other user can read.
+ * A secret can be only in a file that no other user can read, or in the input of a command.
  */
-function secretPlace(step: Step): string | undefined {
+function secretPlace(step: Step, input: boolean): string | undefined {
   switch (step.kind) {
     case "file": {
       const mode = step.mode ?? DEFAULT_MODE;
@@ -181,7 +216,7 @@ function secretPlace(step: Step): string | undefined {
     case "service":
       return "each user can read the unit of a service";
     case "command":
-      return "each user can read the arguments of a process";
+      return input ? undefined : "each user can read the arguments of a process";
     default:
       return "the step has no place for a secret";
   }
@@ -190,7 +225,10 @@ function secretPlace(step: Step): string | undefined {
 /** This function examines the texts of a step: the character NUL and the variables. */
 function checkTexts(faults: Faults, at: string, step: Step, variables: ReadonlyMap<string, Variable>, used: Set<string>): void {
   let nul = false;
-  for (const text of stepTexts(step)) {
+  const texts = stepTexts(step);
+  // The input of a command is the last text of the step.
+  const inputAt = step.kind === "command" && step.input !== undefined ? texts.length - 1 : -1;
+  for (const [index, text] of texts.entries()) {
     for (const part of textParts(text)) {
       if (typeof part === "string") {
         nul ||= part.includes("\0");
@@ -201,7 +239,7 @@ function checkTexts(faults: Faults, at: string, step: Step, variables: ReadonlyM
       if (variable === undefined) {
         faults.error("setup-variable", at, `The step reads the variable "${part.$var}", and the layer has no variable with that name.`);
       } else if (variable.sensitive === true) {
-        const place = secretPlace(step);
+        const place = secretPlace(step, index === inputAt);
         if (place !== undefined) faults.error("setup-secret-exposed", at, `The step has the sensitive variable "${part.$var}", and ${place}.`);
       }
     }
@@ -270,12 +308,13 @@ function checkProfile(faults: Faults, profile: Profile, parts: ReadonlyMap<strin
  * - `setup-part`: the part of a profile is not a part of the stack.
  * - `setup-host`: a profile names no host, or a host that is not a part of the stack.
  * - `setup-variable`: a text reads a variable that the layer does not have.
- * - `setup-secret-exposed`: a sensitive variable is in a unit, in a command, or in a file that each user can read.
+ * - `setup-secret-exposed`: a sensitive variable is in a unit, in the arguments of a command, or in a file that each user can read.
  * - `setup-text`: a text has the character NUL, or a key is not one line.
  * - `setup-path`: a path is not an absolute path of the safe characters.
  * - `setup-path-twice`: two steps of one host write one path.
  * - `setup-user-twice`: two steps of one host set up one user.
  * - `setup-mode`, `setup-url`, `setup-sha256`, `setup-swap-size`: a mode, an address, a SHA-256 or a size does not have its form.
+ * - `setup-archive`: the folder of an archive is a folder of the system, or its mark or its count to strip is not correct.
  * - `setup-program`: a command is empty, or its first argument is not a literal program.
  * - `setup-cycle`: the needs of the parts of the profiles of one host make a cycle.
  *
