@@ -378,12 +378,18 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3(zod@4.6.7)
     devDependencies:
+      '@mark1russell7/alerts':
+        specifier: ^0.1.5
+        version: 0.1.5
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
       '@mark1russell7/stack-endurance':
         specifier: workspace:*
         version: link:../stack-endurance
+      '@mark1russell7/stack-hazards':
+        specifier: workspace:*
+        version: link:../stack-hazards
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

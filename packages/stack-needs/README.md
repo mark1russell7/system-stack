@@ -81,6 +81,39 @@ A caller adds the converters for the dry food in a different fragment, with the 
 
 This fragment owns the resource codes of the buy list, for example `water.stored`. `joinEndurance` of `@mark1russell7/stack-endurance` gives a fault when two fragments have one resource code. Thus a later water draw comes into this same fragment, and not into a different fragment.
 
+## The uses, the supply parts and the join gate
+
+The package holds one record of each use and of each default supply part. `householdFragment` takes its food use from `DIRECT_USES`.
+
+| Name | What it has |
+| --- | --- |
+| `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` to `food.retail`. A household with a well gives a different part. |
+| `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, 1 kcal for each kcal. |
+| `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
+
+`checkJoins(catalog, uses, supplies, { needs, parts })` gives one fault for each break. An empty list is a pass. Each fault is an error.
+
+| Code | The break |
+| --- | --- |
+| `join-use-resource` | A direct use names a resource that is not in the catalog. |
+| `join-use-need` | A direct use names a need that is not a reference need. |
+| `join-use-unit` | The unit of the resource of a direct use is not the unit of its need. |
+| `join-supply-need` | A supply names a need that is not a reference need. |
+| `join-supply-part` | A supply names a part that is not a reference part. |
+
+The reference lists are parameters. An add-on does not import a different add-on, thus the caller gives them. Give `NEEDS` of `@mark1russell7/alerts` and `SUPPLY_PARTS` of `@mark1russell7/stack-hazards`. A test of the package joins these real lists. It also checks that `food.energy` is a need of `NEEDS` in `kcal`.
+
+```ts
+import { NEEDS } from "@mark1russell7/alerts";
+import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
+import { SUPPLY_PARTS } from "@mark1russell7/stack-hazards";
+import { checkJoins, DIRECT_USES, NEED_SUPPLIES } from "@mark1russell7/stack-needs";
+
+console.log(checkJoins(SUPPLY_CATALOG, DIRECT_USES, NEED_SUPPLIES, { needs: NEEDS, parts: SUPPLY_PARTS })); // []
+```
+
+The gate does not examine the FoodKeeper `id` of each product. That join goes to the gate of the catalog of `@mark1russell7/market`.
+
 ## The sources
 
 The calorie table comes from Appendix 2 of the Dietary Guidelines for Americans, 2020-2025, 9th Edition (USDA and HHS). Table A2-1 gives the ages of 12 through 23 months, on page 139. Table A2-2 gives the ages of 2 and more, on pages 140 and 141. The table has 68 rows: 34 for each sex.
@@ -96,4 +129,4 @@ The guidelines are a work of the United States federal government, in the public
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie table, the gate, `calorieNeed` and `householdFragment`. |
+| `@mark1russell7/stack-needs` | The records, the calorie table, the gate, `calorieNeed`, `householdFragment`, the uses, the supply parts and `checkJoins`. |

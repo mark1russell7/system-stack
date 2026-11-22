@@ -1,17 +1,15 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
 import { calorieNeed, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type Person } from "./calorie.ts";
 import { DGA_CALORIES } from "./data.ts";
+import { DIRECT_USES, FOOD_NEED, NO_COOK, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: one draw of food energy and the stores of the list.
 // The records have the form of the records of `@mark1russell7/stack-endurance`. An add-on does not import a different add-on, so the form is a copy.
 // A test assigns the layer to `EnduranceLayer` of stack-endurance. That test is the type gate of the copy.
 // The fragment has no converter. No cited source gives the water and the fuel to cook 1 kg of dry food, and a number with no source is not data.
 
-/** The code of the need of the food draw: food energy, in `kcal` for each day. */
-export const FOOD_NEED = "food.energy";
-
-/** The resource of the food to eat with no water and no fuel, in `kcal`. It has a direct use for the food draw. */
-export const NO_COOK = "food.no-cook";
+/** The direct uses of the food draw: the uses of `DIRECT_USES` for the need `food.energy`. */
+const FOOD_USES: readonly FragmentDirectUse[] = DIRECT_USES.filter((use) => use.need === FOOD_NEED);
 
 /** A resource of a store, with its unit. */
 export interface FragmentResource {
@@ -35,13 +33,6 @@ export interface FragmentDraw {
   /** The count of the persons of the draw. */
   readonly users: number;
   readonly supply: string;
-}
-
-/** The direct use of a resource for a need: 1 unit of the resource gives `amount` of the need. */
-export interface FragmentDirectUse {
-  readonly resource: string;
-  readonly need: string;
-  readonly amount: number;
 }
 
 /** A fragment of an endurance layer, with the form of `EnduranceLayer` of `@mark1russell7/stack-endurance`. It has no converter. */
@@ -158,7 +149,7 @@ function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]
  * - The fragment has one draw of food energy. Its rate is the need of the persons for one day, and its users are the persons.
  * - Each gift of the buy list with a read is one store, with the `id` `<prefix>:<product>:<resource>`. A gift with no read has no store.
  * - The resources are the resources of the stores and `food.no-cook`, with the units of the catalog.
- * - The direct use of `food.no-cook` gives 1 kcal of the need for each kcal.
+ * - The direct use of `food.no-cook` gives 1 kcal of the need for each kcal. It is the food use of `DIRECT_USES`.
  * - The fragment has no converter. A caller adds converters for the dry food, with the water and the fuel of each run.
  *
  * A person with no row in the table gives no layer, because a low rate gives too many days.
@@ -197,7 +188,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
       resources,
       stores,
       draws: [draw],
-      direct: [{ resource: NO_COOK, need: FOOD_NEED, amount: 1 }],
+      direct: FOOD_USES.map((use) => ({ ...use })),
     },
     need,
     needRead: true,

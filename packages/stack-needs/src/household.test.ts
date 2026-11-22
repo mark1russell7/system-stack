@@ -2,7 +2,8 @@ import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { FOOD_NEED, householdFragment, NO_COOK, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
+import { householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
+import { FOOD_NEED, NO_COOK } from "./uses.ts";
 
 /** Two made-up adults of 33 years. Sedentary, they need 2400 + 1800 = 4200 kcal each day. */
 const adults: Person[] = [
