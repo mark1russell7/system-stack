@@ -1,8 +1,12 @@
 import { createHash } from "node:crypto";
+import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, RANGE_TRIES, eagleFiles, fitEagle, lawsTable, linesOf, ranges, yearsOf, type FitContext } from "./eaglei-fit.ts";
+import { EAGLE_ARTICLE, eagleFiles, fitEagle, lawsTable, linesOf, ranges, yearsOf } from "./eaglei-fit.ts";
+import { RANGE_TRIES, type FitContext } from "./fetch.ts";
+import { STORM_BASE, stormFiles } from "./storm-files.ts";
+import { STORM_CLASSES } from "../src/storms.ts";
 
 // A made-up article on fake hosts. The code 99 is not the code of a state.
 const API = `https://api.figshare.com/v2/articles/${String(EAGLE_ARTICLE)}`;
@@ -28,6 +32,19 @@ const FILES: Record<string, string> = {
   "DQI.csv": "state,dqi\n",
 };
 const NAMES = Object.keys(FILES);
+
+// Made-up storm events of the county 99001: a winter storm by county, and a tornado by the zone 99005. The older file of 2020 has a flood that the job does not read.
+const STORM_HEAD = "BEGIN_YEARMONTH,BEGIN_DAY,BEGIN_TIME,END_YEARMONTH,END_DAY,END_TIME,EPISODE_ID,EVENT_ID,STATE,STATE_FIPS,YEAR,MONTH_NAME,EVENT_TYPE,CZ_TYPE,CZ_FIPS,CZ_NAME,WFO,BEGIN_DATE_TIME,CZ_TIMEZONE,END_DATE_TIME";
+const storm = (begin: string, end: string, type: string, kind: string, cz: number): string =>
+  `${begin.replaceAll(" ", ",")},${end.replaceAll(" ", ",")},1,2,"TESTSTATE",99,2020,"December","${type}","${kind}",${String(cz)},"TEST","XXX","x","CST-6","x"`;
+const STORMS: Record<string, string> = {
+  "StormEvents_details-ftp_v1.0_d2019_c20260101.csv.gz": `${STORM_HEAD}\n`,
+  "StormEvents_details-ftp_v1.0_d2020_c20250101.csv.gz": [STORM_HEAD, storm("202012 31 1600", "202012 31 1900", "Flood", "C", 1)].join("\n"),
+  "StormEvents_details-ftp_v1.0_d2020_c20260101.csv.gz": [STORM_HEAD, storm("202012 31 1600", "202012 31 1900", "Winter Storm", "C", 1), storm("202012 31 1655", "202012 31 1700", "Tornado", "Z", 5), storm("202012 31 1600", "202012 31 1900", "Hail", "C", 1)].join("\n"),
+  "StormEvents_details-ftp_v1.0_d2021_c20260101.csv.gz": `${STORM_HEAD}\n`,
+};
+const LISTING = [...Object.keys(STORMS), "StormEvents_fatalities-ftp_v1.0_d2020_c20260101.csv.gz", "StormEvents_details-ftp_v1.0_d2022_c20260101.csv.gz"].map((name) => `<a href="${name}">${name}</a>`).join("\n");
+const ZONES = "TS|005|XXX|Test Zone|TS005|Test|99001|C|xx|0|0\n";
 const md5 = (text: string): string => createHash("md5").update(text).digest("hex");
 
 function article(change: (file: Record<string, unknown>) => Record<string, unknown> = (file) => file): unknown {
@@ -61,6 +78,12 @@ function fake(record: unknown, options: FakeOptions = {}): { transport: Transpor
       const name = NAMES[Number(url.pathname.split("/").pop()) - 1] ?? "";
       return Promise.resolve(reply(options.redirect ?? 302, { location: `${STORE}/${name}?X-Amz-Signature=abc` }, ""));
     }
+    if (url.host === new URL(STORM_BASE).host) {
+      if (exchange.url === STORM_BASE) return Promise.resolve(reply(200, {}, "", new Uint8Array(Buffer.from(LISTING))));
+      const data = STORMS[url.pathname.split("/").pop() ?? ""];
+      return Promise.resolve(data === undefined ? reply(404, {}, "") : reply(200, {}, "", new Uint8Array(gzipSync(data))));
+    }
+    if (url.host === "www.weather.gov") return Promise.resolve(reply(200, {}, "", new Uint8Array(Buffer.from(ZONES))));
     stored += 1;
     const fault = options.faults?.[stored];
     if (fault === "cut") return Promise.reject(new TypeError("terminated"));
@@ -127,6 +150,31 @@ describe("fitEagle", () => {
     expect(hosts.filter((host) => host === "ndownloader.figshare.com").length).toBe(store);
     expect(store).toBeGreaterThan(3);
     expect(lawsTable(laws)).toContain("| 99 | 1 | 0 | 90 | 0.0000 |");
+  });
+
+  it("gives the curves of each case from the storm events of the county at the start of each outage", async () => {
+    const laws = await fitEagle(context(fake(article()).transport), { now: () => new Date("2026-11-22T00:00:00Z"), storms: { classes: STORM_CLASSES } });
+    const causes = laws.causes;
+    expect(causes?.storms.files.map((file) => file.name)).toEqual([
+      "StormEvents_details-ftp_v1.0_d2019_c20260101.csv.gz",
+      "StormEvents_details-ftp_v1.0_d2020_c20260101.csv.gz",
+      "StormEvents_details-ftp_v1.0_d2021_c20260101.csv.gz",
+    ]);
+    expect(causes?.storms).toMatchObject({ zones: "bp16ap26.dbx", lines: 6, skipped: 3, tally: { rows: 3, placed: 2, unplaced: 0, other: { Hail: 1 } } });
+    expect(causes?.options).toEqual({ before: 3600, after: 10_800 });
+    expect(causes?.cases["met.winter.storm"]).toMatchObject({ events: 1, regions: { "99": { count: 1, median: 5400 / 86_400 } } });
+    expect(causes?.cases["met.tornado"]?.events).toBe(1);
+    expect(causes?.cases["met.flood"]).toEqual({ types: STORM_CLASSES["met.flood"], events: 0, regions: {} });
+    expect(laws.regions).toEqual((await fitEagle(context(fake(article()).transport), { now: () => new Date() })).regions);
+  });
+
+  it("gives the newest details file of each year of the test, and no other file", () => {
+    expect(stormFiles(LISTING, (year) => year >= 2020)).toEqual([
+      { year: 2020, name: "StormEvents_details-ftp_v1.0_d2020_c20260101.csv.gz" },
+      { year: 2021, name: "StormEvents_details-ftp_v1.0_d2021_c20260101.csv.gz" },
+      { year: 2022, name: "StormEvents_details-ftp_v1.0_d2022_c20260101.csv.gz" },
+    ]);
+    expect(stormFiles("<html></html>", () => true)).toEqual([]);
   });
 
   it("tries a range again after a cut and a 503, with a new redirect, and gives the same curves", async () => {
