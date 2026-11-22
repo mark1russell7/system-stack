@@ -95,7 +95,7 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   },
   "swpc.electric-power": {
     name: "Electric power transmission",
-    url: "https://www.swpc.noaa.gov/impacts/electric-power-transmission",
+    url: "https://www.spaceweather.gov/impacts/electric-power-transmission",
     publisher: "NOAA Space Weather Prediction Center",
     license: FEDERAL_WORK,
     read: READ_CASES,
