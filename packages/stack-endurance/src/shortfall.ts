@@ -321,10 +321,13 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   // The stop has no curve when a cut with no curve can be part of it. Past MINIMAL_STOP_CUTS, the query cannot tell.
   const unsourced = given.flatMap((curve, index) => (curve === undefined ? [index] : []));
   if (unsourced.length > 0 && (sets === undefined || sets.some((set) => set.some((index) => unsourced.includes(index))))) return undefined;
-  // A cut with no curve is in no minimal set here. Its curve of 0 changes no curve of the result.
-  const curves = given.map((curve): Survival => curve ?? [[0, 0]]);
-  const upper = upperStop(curves, sets);
-  return { event: eventStop(curves, stops), independent: independentStop(curves, sets) ?? upper, upper, coarse: sets === undefined };
+  // A cut with no curve is in no minimal set here, so it does not change a stop. The curves do not include it.
+  const kept = given.flatMap((curve, index) => (curve === undefined ? [] : [index]));
+  const curves = kept.map((index) => given[index] ?? []);
+  const keptStops = (cuts: readonly number[]): boolean => stops(cuts.map((index) => kept[index] ?? -1));
+  const keptSets = sets?.map((set) => set.map((index) => kept.indexOf(index)));
+  const upper = upperStop(curves, keptSets);
+  return { event: eventStop(curves, keptStops), independent: independentStop(curves, keptSets) ?? upper, upper, coarse: keptSets === undefined };
 }
 
 /**
