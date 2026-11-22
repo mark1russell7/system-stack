@@ -6,7 +6,7 @@ import type { Converter, EnduranceLayer, Survival } from "./layer.ts";
 // The gate of an endurance layer: the meaning of a layer with a correct form, for its base stack.
 
 /**
- * These are the codes of the gate. Each code is an error, except `endurance-no-way`, which is a warning.
+ * These are the codes of the gate. Each code is an error, except `endurance-no-way` and `endurance-cut-no-curve`, which are warnings.
  *
  * - `endurance-twice`: two or more records of one list have one key. A key is a level, a resource, a store, a need, a converter or a case.
  *   The key of a prior is its case and its place. A converter takes each resource on one line, and a case cuts each part one time.
@@ -21,6 +21,7 @@ import type { Converter, EnduranceLayer, Survival } from "./layer.ts";
  * - `endurance-prior-case`: a prior names a case that the layer does not have.
  * - `endurance-cycle`: converters make a resource from itself, through one converter or a chain. One fault names each cycle.
  * - `endurance-no-way` (warning): a draw has no direct use and no converter, so it holds 0 days when its supply stops.
+ * - `endurance-cut-no-curve` (warning): a cut has no curve of its duration. The draws whose stop it can be part of are no read in the shortfall.
  */
 export const ENDURANCE_CODES: readonly [
   "endurance-twice",
@@ -34,6 +35,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-no-way",
+  "endurance-cut-no-curve",
 ] = [
   "endurance-twice",
   "endurance-level-unknown",
@@ -46,6 +48,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-no-way",
+  "endurance-cut-no-curve",
 ];
 
 /** A code of `ENDURANCE_CODES`. */
@@ -156,6 +159,10 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     for (const cut of item.cuts) {
       const at = `${item.case}/${cut.part}`;
       part(at, "cut", cut.part);
+      if (cut.duration === undefined) {
+        add("warning", "endurance-cut-no-curve", at, `The cut "${at}" has no curve of its duration, so the draws that it can stop are no read.`);
+        continue;
+      }
       const fault = curveFault(cut.duration);
       if (fault !== undefined) add("error", "endurance-curve", at, `The duration of the cut "${at}": ${fault}`);
     }
