@@ -81,7 +81,7 @@ The fragment has no converter. Thus, with this fragment alone, only `food.no-coo
 
 A caller adds the converters for the dry food in a different fragment, with the water and the fuel of each run. Then `joinEndurance` joins the fragments. The dry food then adds days only while the water and the fuel last.
 
-This fragment owns the resource codes of the buy list, for example `water.stored`. `joinEndurance` of `@mark1russell7/stack-endurance` gives a fault when two fragments have one resource code. Thus a later water draw comes into this same fragment, and not into a different fragment.
+This fragment declares the resource codes of the buy list, for example `water.stored` in `L`. A different fragment, for example the fragment of a water tank, can declare the same resource. `joinEndurance` of `@mark1russell7/stack-endurance` joins two equal records into one. A different unit is a fault of the join.
 
 ## The sources
 
