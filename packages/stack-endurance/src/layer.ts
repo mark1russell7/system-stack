@@ -3,6 +3,8 @@
 // A case cuts some parts for a time. The queries give the days that each draw holds, and the days that it does not get its need.
 // The add-on names no topic: the resources, the needs and the levels are data. The unit of time is the day.
 
+import type { CaseCuts } from "@mark1russell7/system-stack";
+
 /** The name of the format of an endurance layer. It is the key of the layer in `Stack.layers`. */
 export const ENDURANCE_SCHEMA = "endurance/1";
 
@@ -71,39 +73,8 @@ export interface Converter {
   readonly gives: Gift;
 }
 
-/**
- * The chance that a cut lasts more than a time: a list of points `[days, chance]`, from `[0, 1]` down to a chance of 0.
- * The days increase, and the chance does not increase. Between two points the chance is linear. This is a survival curve.
- */
-export type Survival = readonly (readonly [days: number, chance: number])[];
-
-/** A cut of a case: a part that the case stops, and the curve of the duration of the stop. */
-export interface Cut {
-  /** The `id` of the part of the stack. */
-  readonly part: string;
-  /** The printed name of the cut, for example "Power outage". */
-  readonly title: string;
-  /**
-   * The survival curve of the duration of the cut. A cut can have no curve, as before a source gives one.
-   * Then each draw whose stop the cut can be part of is no read in the shortfall (`stopCurves`), not a pass.
-   */
-  readonly duration?: Survival | undefined;
-  /** The source of the curve, or of the cut when it has no curve. */
-  readonly source: string;
-}
-
-/** A case: an event that cuts some parts at the same time, and the change that it makes to the draws. */
-export interface CaseCuts {
-  /** The code of the case. */
-  readonly case: string;
-  /** The printed name of the case, for example "Winter storm". */
-  readonly title: string;
-  readonly cuts: readonly Cut[];
-  /** A factor on the amount of a need for each day, by the code of the need. Example: 1.5 for water in a heat wave. The default is 1. */
-  readonly factors?: Readonly<Record<string, number>> | undefined;
-  /** The usual time from the warning to the start, in seconds. A case with no warning has no lead time. */
-  readonly leadSeconds?: number | undefined;
-}
+// The core holds the records of the cuts of a case, so that each add-on shares them. This entry gives them again.
+export type { CaseCuts, Cut, Survival } from "@mark1russell7/system-stack";
 
 /** The yearly prior of one case at one place. */
 export interface Prior {

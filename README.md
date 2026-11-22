@@ -18,6 +18,7 @@ The site is at <https://mark1russell7.github.io/system-stack/>.
 | [`@mark1russell7/stack-endurance`](packages/stack-endurance/README.md) | The endurance add-on: stores, draws and converters, the days that each draw holds when a case cuts its supply, and the shortfall of each level in one year. |
 | [`@mark1russell7/stack-placement`](packages/stack-placement/README.md) | The placement add-on: a candidate for each slot, and the front of the expected cost against the chance that a function works. |
 | [`@mark1russell7/stack-feeds`](packages/stack-feeds/README.md) | The feed add-on: the live lists of the parts from each source, and a gate that fails when a record or a list is old. |
+| [`@mark1russell7/stack-hazards`](packages/stack-hazards/README.md) | The hazard data: the public supplies that each hazard case can stop, the source of each claim, and the law of the duration of each stop or no read. |
 
 The core names no topic. Each topic is an add-on package. An add-on keeps its records in a layer of the stack, and it has its own checks and formulas. The add-ons do not know each other.
 

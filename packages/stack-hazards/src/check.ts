@@ -1,0 +1,116 @@
+import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
+import { SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+
+// The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
+
+/**
+ * These are the codes of the gate. Each code is an error, except `hazards-no-law`, which is a warning.
+ *
+ * - `hazards-twice`: two cases have one code, or a case cuts one part two times.
+ * - `hazards-part-unknown`: a cut names a part that is not a reference part.
+ * - `hazards-no-claim`: a cut has no claim.
+ * - `hazards-source`: a claim, a law or the list `examined` names a source that the table does not have.
+ *   Or a source has no name, no URL, no publisher or a wrong date.
+ * - `hazards-license`: a source has no license name or no license URL.
+ * - `hazards-law-region`: the source of a law has no regions, or the law has another scheme.
+ *   Or the law has no curve for a region of its source.
+ * - `hazards-fit`: the fit of a law has no family, no method, or a count of events that is not a whole number above 0.
+ * - `hazards-curve`: a curve of a law does not have the form of a survival curve.
+ * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
+ */
+export const HAZARD_CODES: readonly [
+  "hazards-twice",
+  "hazards-part-unknown",
+  "hazards-no-claim",
+  "hazards-source",
+  "hazards-license",
+  "hazards-law-region",
+  "hazards-fit",
+  "hazards-curve",
+  "hazards-no-law",
+] = ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-no-law"];
+
+/** A code of the gate of a list of hazard cases. */
+export type HazardCode = (typeof HAZARD_CODES)[number];
+
+/** A fault of a list of hazard cases. */
+export interface HazardFault extends Fault {
+  readonly code: HazardCode;
+}
+
+/**
+ * This function gives each fault of a list of hazard cases. A list with no error tells that the gate passes.
+ * The reference parts are `SUPPLY_PARTS` by default. The faults are in the order of the list. The function is pure.
+ */
+export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_PARTS): HazardFault[] {
+  const faults: HazardFault[] = [];
+  const add = (level: "error" | "warning", code: HazardCode, at: string, message: string): void => {
+    faults.push({ level, code, at, message });
+  };
+  const known = new Set(parts.map((part) => part.id));
+
+  for (const [id, source] of Object.entries(list.sources)) {
+    const at = `sources.${id}`;
+    for (const fault of sourceFaults(source)) add("error", "hazards-source", at, `The source "${id}" ${fault}.`);
+    if (source.license.name.trim() === "" || source.license.url.trim() === "") add("error", "hazards-license", at, `The source "${id}" has no license name or no license URL.`);
+  }
+  const sourceAt = (at: string, id: string): void => {
+    if (list.sources[id] === undefined) add("error", "hazards-source", at, `"${at}" names the source "${id}", and the table of the sources does not have it.`);
+  };
+
+  const cases = new Set<string>();
+  for (const hazard of list.hazards) {
+    if (cases.has(hazard.case)) add("error", "hazards-twice", hazard.case, `Two cases have the code "${hazard.case}".`);
+    cases.add(hazard.case);
+    for (const id of hazard.examined) sourceAt(`${hazard.case}.examined`, id);
+    const cut = new Set<string>();
+    for (const item of hazard.cuts) {
+      const at = `${hazard.case}.${item.part}`;
+      if (cut.has(item.part)) add("error", "hazards-twice", at, `The case "${hazard.case}" cuts the part "${item.part}" two times.`);
+      cut.add(item.part);
+      if (!known.has(item.part)) add("error", "hazards-part-unknown", at, `The cut "${at}" names a part that is not a reference part.`);
+      if (item.claims.length === 0) add("error", "hazards-no-claim", at, `The cut "${at}" has no claim.`);
+      for (const claim of item.claims) if (claim.source !== undefined) sourceAt(at, claim.source);
+      if (item.duration.read) for (const [code, message] of lawFaults(item.duration, list.sources)) add("error", code, at, `The law of the cut "${at}": ${message}`);
+      else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
+    }
+  }
+  return faults;
+}
+
+/** This function gives the faults of the fields of a source, as the ends of sentences. */
+function sourceFaults(source: Source): string[] {
+  const faults: string[] = [];
+  if (source.name.trim() === "") faults.push("has no name");
+  if (!/^https:\/\/\S+$/u.test(source.url)) faults.push("has no HTTPS URL");
+  if (source.publisher.trim() === "") faults.push("has no publisher");
+  if (dayNumber(source.read) === undefined) faults.push("has a date of the read that is not a date YYYY-MM-DD");
+  if (source.updated !== undefined && dayNumber(source.updated) === undefined) faults.push("has a date of the last change that is not a date YYYY-MM-DD");
+  return faults;
+}
+
+/** This function gives the faults of a law of a duration with their codes. */
+function lawFaults(law: DurationLaw, sources: HazardList["sources"]): [HazardCode, string][] {
+  const faults: [HazardCode, string][] = [];
+  const source = sources[law.source];
+  if (source === undefined) return [["hazards-source", `the table of the sources does not have the source "${law.source}".`]];
+  if (source.license.name.trim() === "" || source.license.url.trim() === "") faults.push(["hazards-license", `the source "${law.source}" has no license.`]);
+  const { family, method, count } = law.fit;
+  if (family.trim() === "" || method.trim() === "" || !Number.isInteger(count) || count < 1) faults.push(["hazards-fit", "the fit has no family, no method, or no count of events above 0."]);
+  if (source.regions === undefined) faults.push(["hazards-law-region", `the source "${law.source}" has no regions.`]);
+  else if (source.regions.scheme !== law.scheme) faults.push(["hazards-law-region", `the scheme "${law.scheme}" is not the scheme "${source.regions.scheme}" of the source.`]);
+  else {
+    const missing = source.regions.codes.filter((code) => law.curves[code] === undefined);
+    if (missing.length > 0) faults.push(["hazards-law-region", `the law has no curve for the regions ${missing.join(", ")} of its source.`]);
+  }
+  for (const [code, curve] of Object.entries(law.curves)) {
+    const fault = curveFault(curve);
+    if (fault !== undefined) faults.push(["hazards-curve", `the curve of the region "${code}": ${fault}`]);
+  }
+  return faults;
+}
+
+/** This function tells if a list of faults has an error. */
+export function hasHazardError(faults: readonly HazardFault[]): boolean {
+  return faults.some((fault) => fault.level === "error");
+}

@@ -10,7 +10,7 @@ Each function is a plain function with no clock and no network.
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers, the join of stacks, the hold of known faults and a sample stack. |
+| `@mark1russell7/system-stack` | The records of a stack, the parts that work, the paths and the stop sets, the checks, the check of the layers, the join of stacks, the hold of known faults, the cuts of a case and a sample stack. |
 | `@mark1russell7/system-stack/schema` | `stackSchema`, the zod schema of a stack, `parseStack`, `formErrors` for the layers of add-ons, and `parseKnown` for a list of known faults. |
 
 The root entry has no schema library. Thus a page that only asks which parts work gets no zod.
@@ -189,6 +189,19 @@ holdKnown(faults, known, { today: "2026-11-18" });
 ```
 
 A file of known faults has the format `known/1`: `{ "schema": "known/1", "known": [...] }`. `parseKnown` of the entry `/schema` reads it.
+
+## The cuts of a case
+
+A case is an event that stops some parts at the same time, for example a winter storm. The add-ons share the records of a case. One add-on gives the cuts of a case, and another add-on calculates with them.
+
+| Record or function | What it tells |
+| --- | --- |
+| `CaseCuts` | A case: its code, its name, its cuts and the changes that it makes to the add-ons. |
+| `Cut` | A part that the case stops, the source of the cut and the curve of the duration of the stop. |
+| `Survival` | The chance that a cut lasts more than a time: points `[days, chance]` from `[0, 1]` down to a chance of 0. |
+| `curveFault(curve)` | The first fault of a survival curve, or `undefined`. |
+
+A cut can have no curve, as before a source gives one. Then each result that needs the curve is no read, not a pass.
 
 ## The layers of the add-ons
 
