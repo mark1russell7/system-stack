@@ -112,7 +112,7 @@ describe("the gate of a run", () => {
     const other = jobGate(jobRead(jobRecord("other", 0.6, () => 1, { ...ENV, cpu: "cpu-b" })), file);
     expect(runGate([pass, pass, pass]).outcome).toBe("pass");
     expect(runGate([pass, pass, other, pass]).outcome).toBe("pass");
-    expect(runCases([pass, pass, other, pass]).map((item) => item.reads)).toEqual([3, 3, 3]);
+    expect(runCases([pass, pass, other, pass]).map((item) => item.reads)).toEqual(IDS.map(() => 3));
   });
 
   it("gives no read when fewer than 3 jobs read a case, also when each read is within", () => {
