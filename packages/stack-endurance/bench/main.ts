@@ -2,7 +2,8 @@
  * The bench of `independentStop`. It is for CI: a timed run on a shared computer does not give a valid value.
  *
  * - `node bench/main.ts run --out <folder> --job <label> [--round-offset <n>] [--commit <sha>] [--run <id>]` times each case in fresh children and writes `records.json`.
- * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>]` reads the records of each job.
+ * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
+ *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
  *
  * `read` writes the report to the step summary and the gate line as an annotation. With `--enforce`, a gate that is not `pass` exits with 1.
  */
@@ -87,7 +88,9 @@ function read(args: Record<string, string | boolean | undefined>): number {
   // A job that failed gives no record. Each of its cases is a no read, so a lost job does not pass.
   const expected = Number(args["expect"] ?? 0);
   for (let index = reads.length; index < expected; index += 1) gates.push(missingJob(`missing-${String(index + 1)}`));
-  const commits = [...new Set(records.map((record) => record.commit ?? ""))];
+  // The jobs of a freeze time one commit. With --commit, they can come from runs of several commits with the same timed code, and the file names that commit.
+  const stamped = typeof args["commit"] === "string" ? args["commit"] : undefined;
+  const commits = stamped === undefined ? [...new Set(records.map((record) => record.commit ?? ""))] : [stamped];
   const runs = typeof args["runs"] === "string" ? args["runs"].split(",").filter((id) => id !== "") : [...new Set(records.flatMap((record) => (record.run === undefined ? [] : [record.run])))];
   const candidate =
     reads.length >= 5 && commits.length === 1 && commits[0] !== ""
@@ -98,7 +101,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
   const summary = process.env["GITHUB_STEP_SUMMARY"];
   if (summary !== undefined && summary !== "") writeFileSync(summary, report, { flag: "a" });
   if (typeof args["freeze"] === "string") {
-    if (candidate === undefined) process.stdout.write("There is no candidate file: a freeze needs 5 jobs or more of one commit.\n");
+    if (candidate === undefined) process.stdout.write("There is no candidate file: a freeze needs 5 jobs or more of one commit, or --commit.\n");
     else writeFileSync(args["freeze"], `${JSON.stringify(candidate, null, 2)}\n`);
   }
   const gate = runGate(gates);
