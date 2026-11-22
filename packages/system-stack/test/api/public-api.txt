@@ -170,6 +170,7 @@ export type StackJoiner<Layer> = StackAddOn<Layer> & LayerJoiner$1<Layer>;
 ### build/index.d.ts#StopOptions
 export interface StopOptions extends PathOptions {
   readonly size?: number | undefined;
+  readonly among?: Iterable<string> | undefined;
 }
 
 ### build/index.d.ts#Survival

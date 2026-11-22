@@ -100,7 +100,7 @@ Three functions tell why a part works, and which failures stop it. They read onl
 | Function | What it gives |
 | --- | --- |
 | `pathSets(stack, part)` | Each smallest set of other parts with which the part works. |
-| `stopSets(stack, part, { size })` | Each smallest set of other parts whose failure stops the part, up to `size` parts. The default of `size` is 1. |
+| `stopSets(stack, part, { size, among })` | Each smallest set of other parts whose failure stops the part, up to `size` parts. The default of `size` is 1. With `among`, only those parts can fail. |
 | `smallestStop(stack, part)` | One stop set with the smallest count of parts. |
 
 ```ts
@@ -111,6 +111,8 @@ stopSets(stack, "program"); // => { kind: "exact", sets: [] }: no failure of one
 stopSets(stack, "program", { size: 2 }); // => { kind: "exact", sets: [["power", "host-b"], ["host-a", "host-b"]] }
 smallestStop(stack, "program"); // => { kind: "exact", parts: ["power", "host-b"] }
 ```
+
+The option `among` gives the stop sets of some parts only: each other part that is not down works. Thus a case that cuts some parts gets the stop sets of its cuts. The search does not examine the other parts, so a large stack with few cuts stays in the budget.
 
 A stop set of one part is a single point of failure. The sample alert has two:
 

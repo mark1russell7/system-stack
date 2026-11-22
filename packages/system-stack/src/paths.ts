@@ -16,6 +16,11 @@ export interface PathOptions {
 export interface StopOptions extends PathOptions {
   /** The largest size of a set. It is a whole number from 0. The default is 1. */
   readonly size?: number | undefined;
+  /**
+   * The `id` of each part that can fail. A stop set has only these parts, and each other part that is not down works.
+   * Thus a case that cuts some parts gets the stop sets of its cuts. The default is each part.
+   */
+  readonly among?: Iterable<string> | undefined;
 }
 
 /**
@@ -99,7 +104,7 @@ interface Paths {
  * This function gives the path family of a part. It is the smallest fixed point of the needs: the start is "no part
  * has a path", and each round gives each part the paths that its needs permit. Thus it agrees with `working`.
  */
-function pathFamily(stack: Stack, root: string, options: PathOptions): Paths {
+function pathFamily(stack: Stack, root: string, options: PathOptions, among?: ReadonlySet<string>): Paths {
   const maxSets = readMaxSets(options);
   const off = new Set(options.down);
   const first = new Map<string, number>();
@@ -135,7 +140,8 @@ function pathFamily(stack: Stack, root: string, options: PathOptions): Paths {
   }
 
   const reach = order.filter((index) => index !== rootIndex).sort((a, b) => a - b);
-  const bit = new Map<number, bigint>(reach.map((index, position) => [index, 1n << BigInt(position)]));
+  // A part that is not in `among` works, so it has no bit. A path set then has only the parts of `among`.
+  const bit = new Map<number, bigint>(reach.map((index, position) => [index, among === undefined || among.has(stack.parts[index]?.id ?? "") ? 1n << BigInt(position) : 0n]));
   const families = new Map<number, Family>();
   const ofPart = (id: string): Family => {
     const index = first.get(id);
@@ -226,7 +232,8 @@ export function pathSets(stack: Stack, part: string, options: PathOptions = {}):
  * - A part with no needs has no stop set.
  *
  * The parts of `down` are down before the search. Thus the result shows the single points of failure that a
- * failure makes. The function is pure.
+ * failure makes. With `among`, only those parts can fail, and the search does not examine the other parts.
+ * The function is pure.
  *
  * @throws RangeError when `maxSets` is not a whole number from 1, or `size` is not a whole number from 0
  */
@@ -236,7 +243,7 @@ export function stopSets(stack: Stack, part: string, options: StopOptions = {}):
   const maxSets = readMaxSets(options);
   let paths: Paths;
   try {
-    paths = pathFamily(stack, part, options);
+    paths = pathFamily(stack, part, options, options.among === undefined ? undefined : new Set(options.among));
   } catch (signal) {
     if (signal === BUDGET) return { kind: "budget" };
     throw signal;
