@@ -274,6 +274,8 @@ describe("caseShortfall", () => {
     expect(stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 64 })?.coarse).toBe(true);
     const exact = stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 128 });
     expect(exact?.coarse).toBe(false);
+    // The 15 cuts of the sets are more than MINIMAL_STOP_CUTS, so independent is upper.
+    expect(exact?.independentUpper).toBe(true);
     for (const days of TIMES) expect(survivalAt(exact?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 7 * survivalAt(GRID, days)), 9);
     // caseShortfall gives the option to the stop curves of each draw.
     const endurance = enduranceOf(SAMPLE_ENDURANCE, { ...storm, cuts }, { at: AT, stack });
