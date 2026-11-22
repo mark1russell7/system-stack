@@ -216,7 +216,10 @@ export const INDEPENDENT_TOLERANCE = 1e-6;
  * - When any one cut stops the supply, the result is `1 - prod(1 - s)`. It is not less than the longest cut (`eventStop`).
  * - When the supply needs `any` of two parts, the stop of the two is `s1 * s2`. It is not more than the shorter cut.
  * - The result is not more than `upperStop` of the same sets, because `upperStop` is a limit for each dependence.
- * - Between two times of `bendTimes` the chance is a polynomial, not a line. The function adds points until the curve is within `INDEPENDENT_TOLERANCE` of the chance.
+ * - Between two points of the curves the chance is a polynomial, not a line. The function splits each such segment into equal pieces.
+ *   The chance is linear in each `s`, and each mixed second derivative is between -1 and 1.
+ *   Thus `|f''| <= (sum |s'|)^2 - sum s'^2`, and the line of a piece of length `h` is within `h^2 |f''| / 8` of the chance.
+ *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. The count of points is less than `n / sqrt(8 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
  * @param sets - The minimal sets of `minimalStops`. With `undefined`, as for too many cuts, the result is `undefined`
@@ -224,40 +227,46 @@ export const INDEPENDENT_TOLERANCE = 1e-6;
  */
 export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined {
   if (sets === undefined) return undefined;
-  const count = curves.length;
-  const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << index), 0));
-  const stopping = Array.from({ length: 1 << count }, (_, mask) => setMasks.some((set) => (set & mask) === set));
+  // Only the cuts of a set change the chance. Their place in `used` is their bit in a state.
+  const used = [...new Set(sets.flat())].sort((x, y) => x - y);
+  const usedCurves = used.map((index) => curves[index] ?? []);
+  const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << used.indexOf(index)), 0));
+  const stopping = Array.from({ length: 1 << used.length }, (_, mask) => setMasks.some((set) => (set & mask) === set));
+  const states = new Float64Array(1 << used.length);
   const chanceAt = (days: number): number => {
-    // The chance of each set of cuts that are on, one cut at a time.
-    let states = [1];
-    for (const curve of curves) {
+    // The chance of each state of the cuts, one cut at a time. Bit k of a state is 1 when cut k is on.
+    states[0] = 1;
+    let length = 1;
+    for (const curve of usedCurves) {
       const on = survivalAt(curve, days);
-      const next = new Array<number>(states.length * 2);
-      for (const [mask, chance] of states.entries()) {
-        next[mask] = chance * (1 - on);
-        next[mask + states.length] = chance * on;
+      for (let mask = 0; mask < length; mask += 1) {
+        const chance = states[mask] ?? 0;
+        states[mask + length] = chance * on;
+        states[mask] = chance * (1 - on);
       }
-      states = next;
+      length *= 2;
     }
     let total = 0;
-    for (const [mask, chance] of states.entries()) if (stopping[mask]) total += chance;
+    for (let mask = 0; mask < length; mask += 1) if (stopping[mask]) total += states[mask] ?? 0;
     return Math.min(1, Math.max(0, total));
   };
-  const times = bendTimes(curves);
+  const times = [...new Set(usedCurves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
   const points: number[] = [];
-  const refine = (t0: number, c0: number, t1: number, c1: number, depth: number): void => {
-    const middle = (t0 + t1) / 2;
-    // Two times that are next to each other as floats have no time between them.
-    if (!(middle > t0 && middle < t1)) return;
-    const cm = chanceAt(middle);
-    if (depth >= 2 && (depth >= 24 || Math.abs(cm - (c0 + c1) / 2) <= INDEPENDENT_TOLERANCE / 2)) return;
-    refine(t0, c0, middle, cm, depth + 1);
-    points.push(middle);
-    refine(middle, cm, t1, c1, depth + 1);
-  };
   for (const [index, t1] of times.entries()) {
     const t0 = times[index - 1];
-    if (t0 !== undefined) refine(t0, chanceAt(t0), t1, chanceAt(t1), 0);
+    if (t0 !== undefined) {
+      const h = t1 - t0;
+      const slopes = usedCurves.map((curve) => Math.abs(survivalAt(curve, t1) - survivalAt(curve, t0)) / h);
+      const sum = slopes.reduce((total, slope) => total + slope, 0);
+      const bound = Math.max(0, sum * sum - slopes.reduce((total, slope) => total + slope * slope, 0));
+      // A margin of 10 % keeps the rounding of the chance under the tolerance.
+      const pieces = Math.ceil(h * Math.sqrt(bound / (8 * 0.9 * INDEPENDENT_TOLERANCE)));
+      for (let piece = 1; piece < pieces; piece += 1) {
+        const days = t0 + (h * piece) / pieces;
+        // Two times that are next to each other as floats have no time between them.
+        if (days > (points[points.length - 1] ?? t0) && days < t1) points.push(days);
+      }
+    }
     points.push(t1);
   }
   return curveFrom(points, chanceAt);

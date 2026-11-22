@@ -200,7 +200,7 @@ describe("independentStop", () => {
 
   it("lies within the tolerance of the exact chance, and between the chance of one set and upperStop, for each curve and set", () => {
     fc.assert(
-      fc.property(fc.array(curve, { minLength: 1, maxLength: 4 }), fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 4 }), (curves, rawSets) => {
+      fc.property(fc.array(curve, { minLength: 1, maxLength: 5 }), fc.array(fc.integer({ min: 1, max: 31 }), { minLength: 1, maxLength: 4 }), (curves, rawSets) => {
         const sets = [...new Set(rawSets.map((mask) => mask & ((1 << curves.length) - 1)).filter((mask) => mask > 0))].map((mask) =>
           curves.flatMap((_, index) => ((mask >> index) & 1 ? [index] : [])),
         );
@@ -208,26 +208,54 @@ describe("independentStop", () => {
         const independent = independentStop(curves, sets) ?? [];
         const upper = upperStop(curves, sets);
         expect(curveFault(independent)).toBeUndefined();
-        for (const days of [0, 0.3, 1, 2.2, 4, 7.5, 12, 20]) {
+        // The reads of the test: fixed times, and 15 fractions of each piece of the result, with the value of its line.
+        const reads: [number, number][] = [0, 0.3, 1, 2.2, 4, 7.5, 12, 20].map((days) => [days, survivalAt(independent, days)]);
+        for (const [index, [t1, c1]] of independent.slice(1).entries()) {
+          const [t0, c0] = independent[index] ?? [0, 1];
+          for (let step = 1; step < 16; step += 1) reads.push([t0 + ((t1 - t0) * step) / 16, c0 + ((c1 - c0) * step) / 16]);
+        }
+        const masks = Array.from({ length: 1 << curves.length }, (_, mask) => sets.some((set) => set.every((index) => (mask >> index) & 1)));
+        let worst = 0;
+        let worstAt = 0;
+        let faults = 0;
+        for (const [days, value] of reads) {
           const on = curves.map((item) => survivalAt(item, days));
           // The exact chance: sum over each state of the cuts that contains a set.
           let exact = 0;
-          for (let mask = 0; mask < 1 << curves.length; mask += 1) {
-            if (!sets.some((set) => set.every((index) => (mask >> index) & 1))) continue;
-            exact += on.reduce((product, chance, index) => product * ((mask >> index) & 1 ? chance : 1 - chance), 1);
+          for (const [mask, stops] of masks.entries()) {
+            if (stops) exact += on.reduce((product, chance, index) => product * ((mask >> index) & 1 ? chance : 1 - chance), 1);
           }
-          const value = survivalAt(independent, days);
-          expect(Math.abs(value - exact), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE * 1.01);
-          expect(value).toBeLessThanOrEqual(survivalAt(upper, days) + INDEPENDENT_TOLERANCE);
-          for (const set of sets) expect(value).toBeGreaterThanOrEqual(set.reduce((product, index) => product * (on[index] ?? 0), 1) - INDEPENDENT_TOLERANCE);
+          if (Math.abs(value - exact) > worst) [worst, worstAt] = [Math.abs(value - exact), days];
+          if (value > survivalAt(upper, days) + INDEPENDENT_TOLERANCE) faults += 1;
+          for (const set of sets) if (value < set.reduce((product, index) => product * (on[index] ?? 0), 1) - INDEPENDENT_TOLERANCE) faults += 1;
         }
+        expect(worst, String(worstAt)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+        expect(faults).toBe(0);
       }),
+      { numRuns: 400 },
     );
-  });
+  }, 30_000);
 
   it("gives a curve with no two points at one time when two bend times are next to each other", () => {
     const curves: Survival[] = [[[0, 1], [0.18848476106898124, 0]], [[0, 1], [0.04644542849054632, 4.180786278414646e-219], [2.135038516073287, 0], [2.145846001067972, 0]], [[0, 1], [0.01, 0]]];
     expect(curveFault(independentStop(curves, [[1], [0]]) ?? [])).toBeUndefined();
+  });
+
+  it("keeps each piece within the tolerance where the error is not at the middle of the piece", () => {
+    // Under the midpoint rule of the first version, this case was 1.14e-6 off at 0.0294 days.
+    const curves: Survival[] = [[[0, 1], [0.04958005580156582, 0], [0.05958005580156582, 0]], [[0, 1], [0.05593706829136056, 0], [0.06593706829136056, 0]], [[0, 1], [0.06122488094294064, 0], [0.07122488094294063, 0]], [[0, 1], [4.608966653311293, 0]]];
+    const independent = independentStop(curves, [[3], [0, 1, 2]]) ?? [];
+    let worst = 0;
+    for (const [index, [t1, c1]] of independent.slice(1).entries()) {
+      const [t0, c0] = independent[index] ?? [0, 1];
+      for (let step = 1; step < 16; step += 1) {
+        const days = t0 + ((t1 - t0) * step) / 16;
+        const [a, b, c, d] = curves.map((curve) => survivalAt(curve, days)) as [number, number, number, number];
+        const exact = 1 - (1 - d) * (1 - a * b * c);
+        worst = Math.max(worst, Math.abs(c0 + ((c1 - c0) * step) / 16 - exact));
+      }
+    }
+    expect(worst).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
   });
 
   it("gives nothing with no sets for too many cuts", () => {
