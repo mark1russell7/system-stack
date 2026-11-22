@@ -40,6 +40,16 @@ describe("stackStops", () => {
     expect(stackStops(generated, "s", copies.flat())).toBeUndefined();
     // With the cuts of one stage only, the other copies work, and the search is small.
     expect(stackStops(generated, "s", ["a0", "b0"])).toEqual([[0, 1]]);
+    // A larger budget ends the search: each stage is a minimal set.
+    expect(stackStops(generated, "s", copies.flat(), [], 2 ** 14)).toEqual(copies.map((_, stage) => [2 * stage, 2 * stage + 1]));
+  });
+
+  it("keeps the sets of cuts in the budget", () => {
+    // Two cuts of each copy of one stage give 4 sets of cuts. A budget of 3 cannot hold them.
+    const copies = Array.from({ length: 2 }, (_, stage) => [`a${String(stage)}`, `b${String(stage)}`]);
+    const generated = stack([...copies.flat().map((id) => ({ id, kind: "copy" })), { id: "s", kind: "x", needs: copies.map((any) => ({ any })) }]);
+    expect(stackStops(generated, "s", ["a0", "a0", "b0", "b0"], [], 4)).toEqual([[0, 2], [1, 2], [0, 3], [1, 3]]);
+    expect(stackStops(generated, "s", ["a0", "a0", "b0", "b0"], [], 3)).toBeUndefined();
   });
 
   // Generated stacks: each need names a part of the stack, or a part that is not in it. The needs can go round.

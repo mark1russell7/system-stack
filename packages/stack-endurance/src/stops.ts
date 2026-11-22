@@ -9,19 +9,20 @@ import { DEFAULT_MAX_SETS, stopSets, type Stack } from "@mark1russell7/system-st
  * - `parts` has the part of each cut that counts. Two cuts of one part are two cuts: each one stops what the part stops.
  * - A cut of the supply stops it alone. The other sets come from `stopSets` with the cut parts as `among`, so no other part can fail.
  * - The parts of `down` are down for the full event. The caller makes sure that they do not stop the supply with no cut.
- * - The result is `undefined` when the search passes its budget, or when the sets of cuts are more than `DEFAULT_MAX_SETS`.
+ * - The result is `undefined` when the search passes its budget, or when the sets of cuts are more than `maxSets`.
  *
  * @param stack - The base stack
  * @param supply - The part of the supply of a draw
  * @param parts - The part of each cut that counts
  * @param down - The parts that are down for the full event
+ * @param maxSets - The largest count of sets in one step of the search, and of the sets of cuts (`maxSets` of `stopSets`)
  */
-export function stackStops(stack: Stack, supply: string, parts: readonly string[], down: readonly string[] = []): number[][] | undefined {
+export function stackStops(stack: Stack, supply: string, parts: readonly string[], down: readonly string[] = [], maxSets: number = DEFAULT_MAX_SETS): number[][] | undefined {
   const cutsOf = new Map<string, number[]>();
   for (const [index, part] of parts.entries()) cutsOf.set(part, [...(cutsOf.get(part) ?? []), index]);
   const own = (cutsOf.get(supply) ?? []).map((index) => [index]);
   const among = [...cutsOf.keys()].filter((part) => part !== supply);
-  const found = stopSets(stack, supply, { down, among, size: among.length });
+  const found = stopSets(stack, supply, { down, among, size: among.length, maxSets });
   if (found.kind === "budget") return undefined;
   // The empty set: the supply is not in the stack, or it does not work in the base stack.
   // In both, `stopped` of the core does not count it as stopped, so only a cut of the supply stops it.
@@ -32,7 +33,7 @@ export function stackStops(stack: Stack, supply: string, parts: readonly string[
     let choices: number[][] = [[]];
     for (const part of set) {
       const cuts = cutsOf.get(part) ?? [];
-      if (choices.length * cuts.length + out.length > DEFAULT_MAX_SETS) return undefined;
+      if (choices.length * cuts.length + out.length > maxSets) return undefined;
       choices = choices.flatMap((choice) => cuts.map((cut) => [...choice, cut]));
     }
     out.push(...choices.map((choice) => choice.sort((x, y) => x - y)));
