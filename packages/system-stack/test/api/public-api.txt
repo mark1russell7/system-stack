@@ -9,6 +9,8 @@
 type AddOn: @mark1russell7/coeval/layers#AddOn (external)
 AllOf: build/known.chunk.d.ts#AllOf
 AnyOf: build/known.chunk.d.ts#AnyOf
+CaseCuts: build/index.d.ts#CaseCuts
+Cut: build/index.d.ts#Cut
 DEFAULT_MAX_SETS: build/index.d.ts#DEFAULT_MAX_SETS
 FAULT_LEVELS: build/known.chunk.d.ts#FAULT_LEVELS
 Fault: build/known.chunk.d.ts#Fault
@@ -46,9 +48,11 @@ StackJoinCode: build/index.d.ts#StackJoinCode
 StackJoinFinding: build/index.d.ts#StackJoinFinding
 StackJoiner: build/index.d.ts#StackJoiner
 StopOptions: build/index.d.ts#StopOptions
+Survival: build/index.d.ts#Survival
 anyCount: build/known.chunk.d.ts#anyCount
 checkStack: build/known.chunk.d.ts#checkStack
 checkStackLayers: build/index.d.ts#checkStackLayers
+curveFault: build/index.d.ts#curveFault
 dayNumber: build/index.d.ts#dayNumber
 holdKnown: build/known.chunk.d.ts#holdKnown
 isAllOf: build/known.chunk.d.ts#isAllOf
@@ -83,6 +87,23 @@ partSchema: build/schema.d.ts#partSchema
 stackSchema: build/schema.d.ts#stackSchema
 
 ## Declarations
+
+### build/index.d.ts#CaseCuts
+export interface CaseCuts {
+  readonly case: string;
+  readonly title: string;
+  readonly cuts: readonly Cut[];
+  readonly factors?: Readonly<Record<string, number>> | undefined;
+  readonly leadSeconds?: number | undefined;
+}
+
+### build/index.d.ts#Cut
+export interface Cut {
+  readonly part: string;
+  readonly title: string;
+  readonly duration?: Survival | undefined;
+  readonly source: string;
+}
 
 ### build/index.d.ts#DEFAULT_MAX_SETS
 export declare const DEFAULT_MAX_SETS = 4096;
@@ -151,8 +172,14 @@ export interface StopOptions extends PathOptions {
   readonly size?: number | undefined;
 }
 
+### build/index.d.ts#Survival
+export type Survival = readonly (readonly [days: number, chance: number])[];
+
 ### build/index.d.ts#checkStackLayers
 export declare function checkStackLayers(stack: Stack, addOns: readonly StackAddOn<unknown>[]): LayerFinding$1[];
+
+### build/index.d.ts#curveFault
+export declare function curveFault(curve: Survival): string | undefined;
 
 ### build/index.d.ts#dayNumber
 export declare function dayNumber(date: string): number | undefined;

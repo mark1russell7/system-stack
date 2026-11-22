@@ -1,0 +1,176 @@
+# The public API of @mark1russell7/stack-hazards
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+Claim: build/index.d.ts#Claim
+DurationLaw: build/index.d.ts#DurationLaw
+Fit: build/index.d.ts#Fit
+HAZARDS_SCHEMA: build/index.d.ts#HAZARDS_SCHEMA
+HAZARD_CODES: build/index.d.ts#HAZARD_CODES
+HAZARD_LIST: build/index.d.ts#HAZARD_LIST
+HAZARD_SOURCES: build/index.d.ts#HAZARD_SOURCES
+Hazard: build/index.d.ts#Hazard
+HazardCaseOptions: build/index.d.ts#HazardCaseOptions
+HazardCode: build/index.d.ts#HazardCode
+HazardCut: build/index.d.ts#HazardCut
+HazardFault: build/index.d.ts#HazardFault
+HazardList: build/index.d.ts#HazardList
+IsoDate: build/index.d.ts#IsoDate
+License: build/index.d.ts#License
+NO_LAW: build/index.d.ts#NO_LAW
+NoLaw: build/index.d.ts#NoLaw
+Regions: build/index.d.ts#Regions
+SUPPLY_PARTS: build/index.d.ts#SUPPLY_PARTS
+Source: build/index.d.ts#Source
+SupplyState: build/index.d.ts#SupplyState
+checkHazards: build/index.d.ts#checkHazards
+hasHazardError: build/index.d.ts#hasHazardError
+hazardCase: build/index.d.ts#hazardCase
+hazardOf: build/index.d.ts#hazardOf
+supplyState: build/index.d.ts#supplyState
+
+## Declarations
+
+### build/index.d.ts#Claim
+export type Claim = {
+  readonly source: string;
+  readonly definition?: never;
+  readonly says: string;
+} | {
+  readonly definition: true;
+  readonly source?: never;
+  readonly says: string;
+};
+
+### build/index.d.ts#DurationLaw
+export interface DurationLaw {
+  readonly read: true;
+  readonly source: string;
+  readonly fit: Fit;
+  readonly scheme: string;
+  readonly curves: Readonly<Record<string, Survival>>;
+}
+
+### build/index.d.ts#Fit
+export interface Fit {
+  readonly family: string;
+  readonly method: string;
+  readonly count: number;
+}
+
+### build/index.d.ts#HAZARDS_SCHEMA
+export declare const HAZARDS_SCHEMA = "hazards/1";
+
+### build/index.d.ts#HAZARD_CODES
+export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-no-law"];
+
+### build/index.d.ts#HAZARD_LIST
+export declare const HAZARD_LIST: HazardList;
+
+### build/index.d.ts#HAZARD_SOURCES
+export declare const HAZARD_SOURCES: Readonly<Record<string, Source>>;
+
+### build/index.d.ts#Hazard
+export interface Hazard {
+  readonly case: string;
+  readonly title: string;
+  readonly cuts: readonly HazardCut[];
+  readonly examined: readonly string[];
+}
+
+### build/index.d.ts#HazardCaseOptions
+export interface HazardCaseOptions {
+  readonly region?: {
+    readonly scheme: string;
+    readonly code: string;
+  } | undefined;
+  readonly parts?: Readonly<Record<string, readonly string[]>> | undefined;
+}
+
+### build/index.d.ts#HazardCode
+export type HazardCode = (typeof HAZARD_CODES)[number];
+
+### build/index.d.ts#HazardCut
+export interface HazardCut {
+  readonly part: string;
+  readonly title: string;
+  readonly claims: readonly Claim[];
+  readonly duration: DurationLaw | NoLaw;
+}
+
+### build/index.d.ts#HazardFault
+export interface HazardFault extends Fault {
+  readonly code: HazardCode;
+}
+
+### build/index.d.ts#HazardList
+export interface HazardList {
+  readonly schema: typeof HAZARDS_SCHEMA;
+  readonly sources: Readonly<Record<string, Source>>;
+  readonly hazards: readonly Hazard[];
+}
+
+### build/index.d.ts#IsoDate
+export type IsoDate = string;
+
+### build/index.d.ts#License
+export interface License {
+  readonly name: string;
+  readonly url: string;
+}
+
+### build/index.d.ts#NO_LAW
+export declare const NO_LAW: NoLaw;
+
+### build/index.d.ts#NoLaw
+export interface NoLaw {
+  readonly read: false;
+  readonly reason: string;
+}
+
+### build/index.d.ts#Regions
+export interface Regions {
+  readonly scheme: string;
+  readonly codes: readonly string[];
+}
+
+### build/index.d.ts#SUPPLY_PARTS
+export declare const SUPPLY_PARTS: readonly Part[];
+
+### build/index.d.ts#Source
+export interface Source {
+  readonly name: string;
+  readonly url: string;
+  readonly publisher: string;
+  readonly license: License;
+  readonly updated?: IsoDate | undefined;
+  readonly read: IsoDate;
+  readonly regions?: Regions | undefined;
+}
+
+### build/index.d.ts#SupplyState
+export type SupplyState = {
+  readonly state: "cut";
+  readonly cut: HazardCut;
+} | {
+  readonly state: "no-read";
+};
+
+### build/index.d.ts#checkHazards
+export declare function checkHazards(list: HazardList, parts?: readonly Part[]): HazardFault[];
+
+### build/index.d.ts#hasHazardError
+export declare function hasHazardError(faults: readonly HazardFault[]): boolean;
+
+### build/index.d.ts#hazardCase
+export declare function hazardCase(list: HazardList, hazard: Hazard, options?: HazardCaseOptions): CaseCuts;
+
+### build/index.d.ts#hazardOf
+export declare function hazardOf(list: HazardList, code: string): Hazard | undefined;
+
+### build/index.d.ts#supplyState
+export declare function supplyState(hazard: Hazard, part: string): SupplyState;

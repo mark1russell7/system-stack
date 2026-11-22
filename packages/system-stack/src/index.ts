@@ -7,3 +7,4 @@ export * from "./join.ts";
 export * from "./dates.ts";
 export * from "./known.ts";
 export * from "./sample.ts";
+export * from "./cuts.ts";

@@ -1,7 +1,7 @@
 import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { dayNumber, type Fault, type Stack } from "@mark1russell7/system-stack";
+import { curveFault, dayNumber, type Fault, type Stack } from "@mark1russell7/system-stack";
 import { giftNeed, giftResource } from "./endurance.ts";
-import type { Converter, EnduranceLayer, Survival } from "./layer.ts";
+import type { Converter, EnduranceLayer } from "./layer.ts";
 
 // The gate of an endurance layer: the meaning of a layer with a correct form, for its base stack.
 
@@ -59,19 +59,7 @@ export interface EnduranceFault extends Fault {
   readonly code: EnduranceCode;
 }
 
-/** This function gives the first fault of a survival curve, or `undefined`. */
-export function curveFault(curve: Survival): string | undefined {
-  const first = curve[0];
-  if (first === undefined || first[0] !== 0 || first[1] !== 1) return "The curve does not start at [0, 1].";
-  for (let index = 1; index < curve.length; index += 1) {
-    const [t0, p0] = curve[index - 1] ?? [0, 1];
-    const [t1, p1] = curve[index] ?? [0, 0];
-    if (!(Number.isFinite(t1) && t1 > t0)) return `The days of the point ${String(index)} are not more than the days of the point before it.`;
-    if (!(p1 >= 0 && p1 <= p0)) return `The chance of the point ${String(index)} is not from 0 to the chance of the point before it.`;
-  }
-  if (curve[curve.length - 1]?.[1] !== 0) return "The curve does not end at a chance of 0.";
-  return undefined;
-}
+export { curveFault } from "@mark1russell7/system-stack";
 
 /**
  * This function gives each fault of an endurance layer. With a base stack, it also examines the `id` of each part. A list with no error tells that the gate passes.
