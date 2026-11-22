@@ -47,6 +47,24 @@ A part of a stack that needs a public supply names a reference id in its needs. 
 
 The data of 0.1.0 comes from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse. No source with a law of a duration is read yet, so each cut has no law.
 
+## The laws from outage records
+
+These functions make a law of a duration from the records of a source of outages. They do no fetch.
+
+| Function | What it does |
+| --- | --- |
+| `outageReader(options)` | It reads the counts of the customers out of power in each area at each time of the collection. It gives the events and a tally. |
+| `eagleLine(line)`, `eagleCustomers(text)`, `eagleRegion(area)` | They read a line of an outage file of EAGLE-I, the file of the customers of each county, and the state of a county. |
+| `outageCurves(events, region)` | It gives the Kaplan-Meier curve of the durations of each region, with its counts and its median. |
+| `survivalOf(curve)` | It gives a Kaplan-Meier curve in the form of the core, read at the days of `LAW_DAYS`, from 15 minutes to 90 days. |
+
+- An event is a run of the times of an area with a count at or above the threshold of the area. The threshold is a share of the customers of the area.
+- A gap of the collection, or the end of the data, censors an event. A run that starts at the start of the data or after a gap is not an event.
+- The order of the areas is free. A file in the order of the counties and a file in the order of the times give the same events.
+- An open tail is a curve that does not get to 0. Its last chance falls to 0 at two times the largest observed time.
+
+EAGLE-I is the dataset of the outages of each county of the United States from Oak Ridge National Laboratory. Its license is CC BY 4.0. A curve from it is a derived work, and it keeps the attribution of the source. The dataset does not reliably have outages of less than 15 minutes.
+
 ## The entries
 
 | Entry | What it has |
