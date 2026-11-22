@@ -257,6 +257,9 @@ importers:
       '@mark1russell7/collections':
         specifier: ^0.11.2
         version: 0.11.2(zod@4.6.7)
+      '@mark1russell7/rigor-generators':
+        specifier: ^0.2.0
+        version: 0.2.0
       '@mark1russell7/system-stack':
         specifier: workspace:*
         version: link:../system-stack
@@ -270,9 +273,6 @@ importers:
       '@mark1russell7/rigor-bench':
         specifier: ^0.3.2
         version: 0.3.2(esbuild@0.28.2)
-      '@mark1russell7/rigor-generators':
-        specifier: ^0.2.0
-        version: 0.2.0
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6

@@ -89,6 +89,16 @@ const year = yearShortfall(SAMPLE_ENDURANCE, "home", { at: "2026-12-01" });
 
 In the sample, the rice needs 2 L of water for each kg. The drinking water holds 6.667 days, and it keeps back all the water for these days. So the rice gives nothing, and the food holds 0.889 days on the cans.
 
+## The join
+
+`joinEndurance(pieces)` joins the endurance layers of the fragments of a stack, for example one file of stores for each owner.
+
+- Two fragments can declare one resource code. When the two records are equal, the joined layer has one record.
+- The join compares the records with canonical JSON (RFC 8785). Thus the order of the keys has no effect.
+- When the unit or a different field is not equal, the join has a fault. The message names the two fragments and the two records.
+- One key of a store, a draw, a direct use, a converter, a case or a prior in two fragments is a fault.
+- The levels are one setting. Each fragment with levels gives the same list.
+
 ## The gate
 
 `checkEndurance(layer, stack)` gives the faults of a layer. `ENDURANCE_CODES` lists the codes. The gate finds two records with one key, and an unknown level, resource or part. It also finds a value out of range, a bad date, an empty converter and a bad survival curve. Converters that make a resource from itself are a cycle, and the gate refuses them. A draw with no way to get its need is a warning, and a cut with no curve is a warning.
