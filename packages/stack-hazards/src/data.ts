@@ -50,6 +50,14 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   "ready.cybersecurity": ready("Cybersecurity", "cybersecurity", "2026-02-20", READ_CASES),
   "ready.financial-preparedness": ready("Financial preparedness", "financial-preparedness", "2026-03-13", READ_CASES),
   "ready.food": ready("Food", "food", "2026-03-12", READ_CASES),
+  "cdc.community-mitigation": {
+    name: "Community mitigation guidelines to prevent pandemic influenza, United States, 2017",
+    url: "https://www.cdc.gov/mmwr/volumes/66/rr/rr6601a1.htm",
+    publisher: "CDC (MMWR Recommendations and Reports)",
+    license: FEDERAL_WORK,
+    updated: "2017-04-21",
+    read: READ_CASES,
+  },
   "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
   "dhs.ai-framework": dhs(
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
@@ -258,7 +266,14 @@ export const HAZARD_LIST: HazardList = {
       examined: ["ready.radiation"],
       cuts: [{ part: "home.dwelling", title: "The home is damaged", claims: [said("ready.radiation", "The page tells that a building can collapse after a nuclear detonation.")], duration: NO_LAW }],
     },
-    { case: "health.outbreak.pandemic", title: "Severe pandemic", examined: ["ready.pandemic", "ready.financial-preparedness"], cuts: [] },
+    {
+      case: "health.outbreak.pandemic",
+      title: "Severe pandemic",
+      // The guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not
+      // public supplies, so they are not cuts of a reference part. The guidelines name no stop of a supply.
+      examined: ["ready.pandemic", "ready.financial-preparedness", "cdc.community-mitigation"],
+      cuts: [],
+    },
     {
       case: "infra.power.grid-collapse",
       title: "Long collapse of the power grid",
