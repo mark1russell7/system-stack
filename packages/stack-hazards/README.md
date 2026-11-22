@@ -70,7 +70,7 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 | `cbrne.emp` | Electromagnetic pulse | The CISA page on the electromagnetic pulse |
 | `geo.space-weather.geomagnetic-storm` | Solar storm | The Ready.gov page on space weather |
 
-- A case with no cut is a gap, and each of its supplies is no read. For each such case, the dataset read sources, and none of them names a cut. For the severe pandemic, the guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not public supplies. For civil unrest, Ready.gov has no page, and the pages on mass gatherings and on physical security name no cut. The text of FEMA CPG 201 does not have the words civil, riot or unrest.
+- A catastrophic case with no cut is a gap, and each of its supplies is no read. For each of these cases, the dataset read sources, and none of them names a cut. For the severe pandemic, the guidelines of CDC name the closure of schools, child care, workplaces and mass gatherings. These are not public supplies. For civil unrest, Ready.gov has no page, and the pages on mass gatherings and on physical security name no cut. The text of FEMA CPG 201 does not have the words civil, riot or unrest.
 - No cut of these cases has a law of its duration. The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid.
 
 ## The laws from outage records

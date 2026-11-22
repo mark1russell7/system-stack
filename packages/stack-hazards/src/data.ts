@@ -347,15 +347,15 @@ export const HAZARD_LIST: HazardList = {
     {
       case: "security.armed-conflict",
       title: "War",
-      // The advisory assesses that state actors are in the IT networks of four sectors, for attacks in a major conflict.
-      // A cut is a possible stop, so the claims keep the word of the source: an attack that can stop the supply.
+      // The advisory assesses that state actors are in the IT networks of four sectors, to disrupt the functions of
+      // their operational technology in a major crisis or conflict with the United States.
       examined: ["cisa.aa24-038a"],
       cuts: [
-        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
-        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
-        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
-        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
-        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
+        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
+        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
+        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, to disrupt its operations in a conflict with the United States.")], duration: NO_LAW },
       ],
     },
     { case: "cbrne.emp", title: "Electromagnetic pulse", examined: ["cisa.emp"], cuts: pulseCuts() },

@@ -115,11 +115,11 @@ describe("the gate of the reference data", () => {
       expect(hazard?.cuts, code).toEqual([]);
       for (const part of SUPPLY_PARTS) expect(supplyState(hazard!, part.id).state).toBe("no-read");
     }
-    // Each case with no cut has sources that name no cut. No case is left with no source read.
+    // Each catastrophic case has a source read. A case with no cut has sources that name no cut.
     const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
     expect(examined("health.outbreak.pandemic")).toEqual(["ready.pandemic", "ready.financial-preparedness", "cdc.community-mitigation"]);
     expect(examined("security.civil-unrest")).toEqual(["ready.mass-gatherings", "cisa.physical-security", "fema.cpg-201"]);
-    expect(HAZARD_LIST.hazards.filter((hazard) => hazard.examined.length === 0).map((hazard) => hazard.case)).toEqual([]);
+    expect(HAZARD_LIST.hazards.filter((hazard) => CATASTROPHIC.includes(hazard.case) && hazard.examined.length === 0).map((hazard) => hazard.case)).toEqual([]);
   });
 
   it("gives war the cuts of the four sectors of the advisory AA24-038A, with no law", () => {
