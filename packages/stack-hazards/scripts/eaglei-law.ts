@@ -60,14 +60,16 @@ export function eagleLaw(laws: EagleLaws): EagleLaw {
 
 /** This function gives the text of the module `src/eaglei-law.ts` for a source and a law. */
 export function lawModule({ source, law }: EagleLaw): string {
-  const curves = Object.entries(law.curves).map(([code, curve]) => `    ${JSON.stringify(code)}: ${JSON.stringify(curve)},`);
+  // The order of the codes of the source: an object puts the keys that look like integers ("10") before the others ("01").
+  const codes = source.regions?.codes ?? Object.keys(law.curves).sort();
+  const curves = codes.map((code) => `    ${JSON.stringify(code)}: ${JSON.stringify(law.curves[code] ?? [])},`);
   return [
     "// This module is made by `scripts/eaglei-law.ts` from the artifact `eaglei-laws` of the workflow `hazards-fit`. Do not change it by hand.",
     "// The curves are a derived work of the EAGLE-I dataset (CC BY 4.0). They read no outage under 15 minutes.",
     'import type { DurationLaw, Source } from "./hazard.ts";',
     "",
     "/** The source of the law of the grid cut: the county outage records of EAGLE-I. */",
-    `export const EAGLEI_SOURCE: Source = ${JSON.stringify(source, null, 2)};`,
+    `export const EAGLEI_SOURCE: Source = ${JSON.stringify(source, null, 2).replace(/"codes": \[[^\]]*\]/u, () => `"codes": ${JSON.stringify(source.regions?.codes ?? [])}`)};`,
     "",
     "/** The law of the duration of a stop of the grid, for all causes: one survival curve in days for each state. */",
     "export const EAGLEI_GRID_LAW: DurationLaw = {",
