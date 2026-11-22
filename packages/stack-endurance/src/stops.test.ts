@@ -26,6 +26,10 @@ describe("stackStops", () => {
   it("gives only the cuts of the supply when the supply does not work in the base stack, or is not in it", () => {
     const generated = stack([{ id: "a", kind: "x", needs: ["missing"] }, { id: "s", kind: "x", needs: ["a"] }]);
     expect(stackStops(generated, "s", ["a", "s"])).toEqual([[1]]);
+    // A part that needs itself does not work in the base stack, and the check gives the same sets.
+    const loop = stack([{ id: "p", kind: "x", needs: [{ all: ["p"] }] }]);
+    expect(stackStops(loop, "p", ["p"])).toEqual([[0]]);
+    expect(bruteStops(loop, "p", ["p"], [])).toEqual([[0]]);
     expect(stackStops(generated, "elsewhere", ["a", "elsewhere"])).toEqual([[1]]);
   });
 
@@ -57,6 +61,7 @@ describe("stackStops", () => {
 
   it("equals the sets of minimalStops for each generated stack of 10 cuts or fewer", () => {
     let compared = 0;
+    let downCut = 0;
     fc.assert(
       fc.property(generatedCase, ([generated, supply, parts, down]) => {
         const brute = bruteStops(generated, supply, parts, down);
@@ -64,10 +69,13 @@ describe("stackStops", () => {
         // stopCurves asks only when the parts of down do not stop the supply, and the cuts together do.
         if (stops([]) || !stops(parts)) return;
         compared += 1;
+        if (parts.some((part) => down.includes(part))) downCut += 1;
         expect(stackStops(generated, supply, parts, down)).toEqual(brute);
       }),
       { seed: 20261122, numRuns: 300 },
     );
     expect(compared).toBeGreaterThan(50);
+    // A cut of a part that is down for the full event is in no set. The generated cases must have it.
+    expect(downCut).toBeGreaterThan(20);
   });
 });

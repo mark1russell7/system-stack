@@ -349,7 +349,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
  * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
  * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
- * - With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core), so the count of cuts has no limit.
+ * - With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core), so the count of cuts has no limit of `MINIMAL_STOP_CUTS`.
  *   When that search passes its budget, `minimalStops` examines each set of up to `MINIMAL_STOP_CUTS` cuts.
  * - A cut with no `duration` gives no curve when it is in a minimal set, or when the query has no minimal sets.
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.

@@ -23,7 +23,8 @@ export function stackStops(stack: Stack, supply: string, parts: readonly string[
   const among = [...cutsOf.keys()].filter((part) => part !== supply);
   const found = stopSets(stack, supply, { down, among, size: among.length });
   if (found.kind === "budget") return undefined;
-  // The empty set: the supply does not work in the base stack, or it is not in it. Then only a cut of the supply stops it.
+  // The empty set: the supply is not in the stack, or it does not work in the base stack.
+  // In both, `stopped` of the core does not count it as stopped, so only a cut of the supply stops it.
   if (found.sets.some((set) => set.length === 0)) return own;
   const out = [...own];
   for (const set of found.sets) {
