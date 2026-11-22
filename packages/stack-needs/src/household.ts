@@ -107,8 +107,8 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
   readonly layer: HouseholdFragment;
   /**
    * The food energy of the household for one day, with a line for each person record. Its `read` covers the whole
-   * household, so it is false when a person is left out, or when a record with count 0 has no row. The flag of the
-   * draw is `needRead`.
+   * household. It is false when a person is left out, or when a record with count 0 has no row. The flag of the draw
+   * is `needRead`.
    */
   readonly need: CalorieNeedTotal;
   /** This field is true: the draw has a read for each of its users. */
