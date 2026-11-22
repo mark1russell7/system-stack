@@ -113,6 +113,8 @@ const REPORTS: readonly string[] = [
   "change() {",
   "  changes=$((changes + 1))",
   '  echo "change: $1"',
+  // The line on the standard error names the condition that fails. The line on the standard output keeps its form.
+  '  echo "check: $1: the condition $2 of the check fails" >&2',
   "}",
   "changed() {",
   "  changes=$((changes + 1))",
@@ -383,6 +385,14 @@ function commandCode(step: CommandStep): StepCode {
   return { helpers: [], check: [line(step.check)], apply: [`${run} || return 1`], tmp: false };
 }
 
+/**
+ * This function gives the texts that the check of a step reads. The `run` and the `input` of a command step are parts
+ * of the change, not of the check. Thus the mode `check` needs no value for a variable of them only.
+ */
+function checkTexts(step: Step): readonly SetupText[] {
+  return step.kind === "command" ? step.check : stepTexts(step);
+}
+
 /** This function gives the code of a step. */
 function stepCode(step: Step): StepCode {
   switch (step.kind) {
@@ -407,7 +417,8 @@ function stepCode(step: Step): StepCode {
 
 /**
  * This function gives the lines of one step: its two functions and the report.
- * The exit code of the check is the number of its first condition that fails. Thus a fault after the change names the condition, and it prints no value.
+ * The exit code of the check is the number of its first condition that fails. Thus a change in the mode `check` and a fault after the change name the condition.
+ * They print no value.
  */
 function stepLines(number: number, address: string, code: StepCode, aptSource: boolean): string[] {
   const check = `check_${String(number)}`;
@@ -422,10 +433,13 @@ function stepLines(number: number, address: string, code: StepCode, aptSource: b
     `${apply}() {`,
     ...code.apply.map((line) => `  ${line}`),
     "}",
-    `if ${check} >/dev/null 2>&1; then`,
+    // `||` keeps a failing check from a stop of `set -e`, and it keeps the exit code of the check.
+    "condition=0",
+    `${check} >/dev/null 2>&1 || condition=$?`,
+    'if [ "$condition" -eq 0 ]; then',
     `  ok ${at}`,
     'elif [ "$mode" = check ]; then',
-    `  change ${at}`,
+    `  change ${at} "$condition"`,
     "else",
     `  ${apply} >&2 || fail ${at} "the change failed"`,
     `  ${check} >/dev/null 2>&1 || fail ${at} "the condition $? of the check fails after the change"`,
@@ -445,6 +459,7 @@ function stepLines(number: number, address: string, code: StepCode, aptSource: b
  * - It exits with 64 for a usage fault. A usage fault is a mode that is not known, a start that is not root, or a variable with no value.
  * - Each step starts its check first. Only a step with a failing check makes its change, and then its check must pass.
  * - It reads the value of each variable from its environment. It names the variables of the steps of this host only.
+ * - The mode `check` needs the value of a variable only when a check reads it. The `input` of a command step is not a check.
  * - It holds no description of a record. Only names, paths and the texts of the steps are in it.
  *
  * The steps come in the order of `profileOrder`: a profile comes after each profile of the host whose part its part needs.
@@ -464,6 +479,7 @@ export function setupScript(layer: SetupLayer, stack: Stack, host: string): Setu
   const steps = profiles.flatMap((profile) => profile.steps.map((step) => ({ address: stepAddress(profile, step), step, code: stepCode(step) })));
   const variables: string[] = [];
   for (const { step } of steps) for (const text of stepTexts(step)) for (const name of textVariables(text)) if (!variables.includes(name)) variables.push(name);
+  const checked = new Set(steps.flatMap(({ step }) => checkTexts(step).flatMap((text) => textVariables(text))));
   const helpers = new Set(steps.flatMap(({ code }) => code.helpers));
   const tmp = steps.some(({ code }) => code.tmp);
   const lines: string[] = [
@@ -490,7 +506,8 @@ export function setupScript(layer: SetupLayer, stack: Stack, host: string): Setu
     "fi",
   ];
   for (const name of variables) {
-    lines.push(`if [ -z "\${${name}-}" ]; then`, `  echo "setup: the variable ${name} has no value" >&2`, `  exit ${String(SETUP_EXIT.usage)}`, "fi");
+    const test = `[ -z "\${${name}-}" ]`;
+    lines.push(`if ${checked.has(name) ? test : `[ "$mode" = apply ] && ${test}`}; then`, `  echo "setup: the variable ${name} has no value" >&2`, `  exit ${String(SETUP_EXIT.usage)}`, "fi");
   }
   lines.push("");
   if (tmp) lines.push('tmp=$(mktemp)', `trap 'rm -f "$tmp"' EXIT`, `trap 'exit ${String(SETUP_EXIT.failed)}' INT TERM HUP`);

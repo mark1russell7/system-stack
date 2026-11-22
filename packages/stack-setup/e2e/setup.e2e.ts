@@ -23,6 +23,7 @@ const OWNED = "/opt/stack-setup-e2e-owned";
 /** The values of the two variables. They are examples. */
 const TOKEN = "an-example-of-a-token";
 const GREETING = "a greeting with 'quotes', $dollars and `ticks`";
+const INPUT_TOKEN = "an-example-of-an-input";
 
 /** The license of this repository at a commit of its main branch, and the SHA-256 of that file. */
 const LICENSE_URL = "https://raw.githubusercontent.com/mark1russell7/system-stack/eef7f9f3a56e95c93944b3d0efb2d0b68c1d37a0/LICENSE";
@@ -51,7 +52,7 @@ const UNIT = ["[Unit]", "Description=The service of the end-to-end test of the s
 // The profile of the program comes first in the layer. Its part needs the host, so the script has the profile base first.
 const LAYER: SetupLayer = {
   schema: SETUP_SCHEMA,
-  variables: [{ name: "TOKEN", sensitive: true }, { name: "GREETING" }],
+  variables: [{ name: "TOKEN", sensitive: true }, { name: "GREETING" }, { name: "INPUT_TOKEN", sensitive: true }],
   profiles: [
     {
       name: "app",
@@ -65,7 +66,7 @@ const LAYER: SetupLayer = {
         { kind: "service", id: "service", name: USER, unit: UNIT },
         { kind: "command", id: "data", run: ["install", "-d", "-m", "755", "/srv/stack-setup-e2e"], check: ["test", "-d", "/srv/stack-setup-e2e"] },
         // The command reads the sensitive variable on its standard input, so no argument of a process holds it.
-        { kind: "command", id: "input", run: ["dd", `of=${INPUT}`, "status=none"], check: ["test", "-s", INPUT], input: { $var: "TOKEN" } },
+        { kind: "command", id: "input", run: ["dd", `of=${INPUT}`, "status=none"], check: ["test", "-s", INPUT], input: { $var: "INPUT_TOKEN" } },
         { kind: "command", id: "home-data", run: ["mkdir", "-p", `/home/${USER}/data`], check: ["test", "-d", `/home/${USER}/data`], as: USER },
       ],
     },
@@ -119,7 +120,7 @@ function start(program: string, args: readonly string[]): SpawnSyncReturns<strin
 }
 
 /** This function starts the setup script as root, with the values of the variables. */
-function setup(file: string, mode: string, values: Readonly<Record<string, string>> = { TOKEN, GREETING }): SpawnSyncReturns<string> {
+function setup(file: string, mode: string, values: Readonly<Record<string, string>> = { TOKEN, GREETING, INPUT_TOKEN }): SpawnSyncReturns<string> {
   return start("sudo", ["env", ...Object.entries(values).map(([name, value]) => `${name}=${value}`), "sh", file, mode]);
 }
 
@@ -164,6 +165,7 @@ after(() => {
 test("the script holds no value of a variable", () => {
   const text = scriptText(LAYER);
   assert.ok(!text.includes(TOKEN));
+  assert.ok(!text.includes(INPUT_TOKEN));
   assert.ok(!text.includes("a greeting"));
 });
 
@@ -176,11 +178,13 @@ test("the script refuses a usage fault and changes nothing", () => {
   assert.equal(start("sh", [script, "check"]).status, SETUP_EXIT.usage, "not root");
   assert.equal(setup(script, "repair").status, SETUP_EXIT.usage, "a mode that is not known");
   assert.equal(setup(script, "check", { TOKEN }).status, SETUP_EXIT.usage, "a variable with no value");
+  assert.equal(setup(script, "apply", { TOKEN, GREETING }).status, SETUP_EXIT.usage, "the mode apply needs the variable of an input");
   assert.equal(start("id", [USER]).status, 1, "the user is not there");
 });
 
 test("the mode check finds the changes and makes none", () => {
-  const run = setup(script, "check");
+  // The mode check needs no value for the input of a command, because no check reads it.
+  const run = setup(script, "check", { TOKEN, GREETING });
   assert.equal(run.status, SETUP_EXIT.changes, run.stdout + run.stderr);
   assert.ok(changes(run.stdout) > 0);
   assert.equal(start("id", [USER]).status, 1, "the user is not there");
@@ -217,7 +221,7 @@ test("the host has each record of the layer", () => {
   assert.equal(asRoot(["stat", "-c", "%a %U", ARCHIVE]), "755 root\n");
   assert.equal(start("test", ["-e", `${ARCHIVE}.setup-new`]).status, 1, "no new folder is left");
   assert.equal(start("test", ["-e", `${ARCHIVE}.setup-old`]).status, 1, "no old folder is left");
-  assert.equal(asRoot(["cat", INPUT]), TOKEN);
+  assert.equal(asRoot(["cat", INPUT]), INPUT_TOKEN);
   assert.equal(start("systemctl", ["is-active", USER]).stdout, "active\n");
   assert.equal(start("systemctl", ["is-enabled", USER]).stdout, "enabled\n");
   assert.ok(start("id", ["-nG", USER]).stdout.split(" ").map((group) => group.trim()).includes("adm"));
@@ -237,6 +241,7 @@ test("the script repairs a file that changed, and only that file", () => {
     reports(check.stdout).filter((line) => !line.startsWith("ok: ")),
     ["change: app.greeting"],
   );
+  assert.match(check.stderr, /^check: app\.greeting: the condition 2 of the check fails$/m);
   const apply = setup(script, "apply");
   assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
   assert.equal(changes(apply.stdout), 1);
@@ -251,6 +256,7 @@ test("the script extracts the archive again when a file of its folder has an own
     reports(check.stdout).filter((line) => !line.startsWith("ok: ")),
     ["change: app.node"],
   );
+  assert.match(check.stderr, /^check: app\.node: the condition 5 of the check fails$/m);
   const apply = setup(script, "apply");
   assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
   assert.equal(changes(apply.stdout), 1);
@@ -265,6 +271,7 @@ test("the script extracts the archive again when other users can write a file of
     reports(check.stdout).filter((line) => !line.startsWith("ok: ")),
     ["change: app.node"],
   );
+  assert.match(check.stderr, /^check: app\.node: the condition 6 of the check fails$/m);
   const apply = setup(script, "apply");
   assert.equal(apply.status, SETUP_EXIT.ok, apply.stdout + apply.stderr);
   assert.equal(changes(apply.stdout), 1);

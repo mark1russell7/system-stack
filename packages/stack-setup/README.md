@@ -142,7 +142,7 @@ The first argument of the script is the mode:
 - `apply` makes each change. It is the default.
 - `check` makes no change. It tells each step that has a change.
 
-Give the value of each variable in the environment of the script:
+Give the value of each variable in the environment of the script. The mode `check` needs only the variables that a check reads. It does not need the `input` of a command step.
 
 ```sh
 sudo env APP_TOKEN="$APP_TOKEN" sh setup.sh check
@@ -156,6 +156,8 @@ sudo env APP_TOKEN="$APP_TOKEN" sh setup.sh check
 | 64 | A usage fault: a mode that is not known, a start that is not root, or a variable with no value. |
 
 Each step writes one line: `ok`, `change` or `changed`, and the address of the step. The last line gives the count of the changes.
+
+In the mode `check`, a step with a change also writes one line on the standard error, for example `check: app.node: the condition 5 of the check fails`. The number is the code of `return` after the condition in the check function of the step.
 
 ## The test on a host
 

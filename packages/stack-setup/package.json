@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-setup",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The setup inside a host from the records of a system stack: typed steps, their order from the needs, a gate, and a POSIX shell script that checks before it changes. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
