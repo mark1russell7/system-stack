@@ -211,6 +211,11 @@ function fileCode(step: FileStep): StepCode {
   };
 }
 
+/** The count of times that a download starts again after a transient error. The waits between them are 1, 2, 4 and 8 seconds, or the Retry-After of the server. */
+const DOWNLOAD_RETRIES = 4;
+/** The largest time in seconds of the retries of one download. */
+const DOWNLOAD_RETRY_SECONDS = 120;
+
 function downloadCode(step: DownloadStep): StepCode {
   const path = q(step.path);
   const mode = modeText(step.mode ?? DEFAULT_MODE);
@@ -219,7 +224,8 @@ function downloadCode(step: DownloadStep): StepCode {
     helpers: [],
     check: [`[ -f ${path} ]`, `[ "$(sha256sum ${path} | cut -d' ' -f1)" = ${sha} ]`, `[ "$(stat -c '%a %U %G' ${path})" = ${q(`${mode} root root`)} ]`],
     apply: [
-      `curl -fsSL --proto =https --proto-redir =https --tlsv1.2 -o "$tmp" ${q(step.url)} || return 1`,
+      // curl tries again after a transient error (a time-out, or the HTTP status 408, 429, 500, 502, 503 or 504), and obeys Retry-After.
+      `curl -fsSL --proto =https --proto-redir =https --tlsv1.2 --retry ${DOWNLOAD_RETRIES} --retry-max-time ${DOWNLOAD_RETRY_SECONDS} -o "$tmp" ${q(step.url)} || return 1`,
       `if [ "$(sha256sum "$tmp" | cut -d' ' -f1)" != ${sha} ]; then`,
       '  echo "setup: the SHA-256 of the download does not agree" >&2',
       "  return 1",
