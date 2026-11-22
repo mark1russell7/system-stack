@@ -187,7 +187,8 @@ describe("setupScript", () => {
     );
     expect(script).toContain(`check_1() {\n  env tailscale status || return 1\n}`);
     expect(script).toContain(`printf '%s' "$KEY" | env tailscale up --auth-key=file:/dev/stdin || return 1`);
-    expect(script).toContain('if [ -z "${KEY-}" ]; then');
+    // Only the change reads the input, so only the mode apply needs its value.
+    expect(script).toContain('if [ "$mode" = apply ] && [ -z "${KEY-}" ]; then');
   });
 
   it("reads the lists of apt again after a change of a source or a key of apt", () => {
