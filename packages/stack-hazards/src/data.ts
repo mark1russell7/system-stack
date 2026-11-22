@@ -225,6 +225,7 @@ export const HAZARD_LIST: HazardList = {
     { case: "health.outbreak", title: "Outbreak or pandemic", examined: ["ready.pandemic"], cuts: [] },
     { case: "health.medical-emergency", title: "Medical emergency", examined: [], cuts: [] },
     // The catastrophic cases. A case with no source that names a cut has no cut: each of its supplies is no read.
+    // The list examined of a case tells the kind of the gap: the sources that name no cut, or an empty list when no source is read yet.
     {
       case: "civic.ai-collapse",
       title: "Collapse driven by AI",
@@ -296,7 +297,7 @@ export const HAZARD_LIST: HazardList = {
         {
           part: "cash.retail",
           title: "No banks and no cash machines",
-          claims: [defined("The case is a stop of the banks and of the payments."), said("ready.financial-preparedness", "The page tells that the ATMs and the credit cards may not work in a disaster.")],
+          claims: [defined("The case is a stop of the banks and of the payments."), said("ready.financial-preparedness", "The page tells that the ATMs and the credit cards can fail in a disaster.")],
           duration: NO_LAW,
         },
       ],

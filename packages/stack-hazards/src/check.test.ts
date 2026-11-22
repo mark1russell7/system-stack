@@ -114,6 +114,10 @@ describe("the gate of the reference data", () => {
       expect(hazard?.cuts, code).toEqual([]);
       for (const part of SUPPLY_PARTS) expect(supplyState(hazard!, part.id).state).toBe("no-read");
     }
+    // The two kinds of gap: sources that name no cut, or no source read yet.
+    const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
+    expect(examined("health.outbreak.pandemic")?.length).toBeGreaterThan(0);
+    expect([examined("security.civil-unrest"), examined("security.armed-conflict")]).toEqual([[], []]);
   });
 
   it("gives a long collapse of the grid the cuts of a power outage, with no law of EAGLE-I", () => {

@@ -60,17 +60,17 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 | `civic.ai-collapse` | Collapse driven by AI | The DHS framework for AI in critical infrastructure (2024) |
 | `security.nuclear-war` | Nuclear war | The CISA page on the electromagnetic pulse, the Ready.gov page on radiation emergencies |
 | `cbrne.nuclear-detonation` | Nuclear detonation | The Ready.gov page on radiation emergencies |
-| `health.outbreak.pandemic` | Severe pandemic | No cut |
+| `health.outbreak.pandemic` | Severe pandemic | No cut: 2 pages read, none names a cut |
 | `infra.power.grid-collapse` | Long collapse of the power grid | The definition, and the Ready.gov page on power outages |
 | `cyber.infrastructure-attack` | Cyberattack on the infrastructure | The Ready.gov page on cybersecurity |
 | `infra.supply-chain.food` | Failure of the food supply | The definition |
 | `civic.economy.collapse` | Financial collapse | The definition, and the Ready.gov page on financial preparedness |
-| `security.civil-unrest` | Civil unrest | No cut |
-| `security.armed-conflict` | War | No cut |
+| `security.civil-unrest` | Civil unrest | No cut: no source read yet |
+| `security.armed-conflict` | War | No cut: no source read yet |
 | `cbrne.emp` | Electromagnetic pulse | The CISA page on the electromagnetic pulse |
 | `geo.space-weather.geomagnetic-storm` | Solar storm | The Ready.gov page on space weather |
 
-- A case with no cut is a gap. No source that the dataset read names a cut of it, so each of its supplies is no read.
+- A case with no cut is a gap, and each of its supplies is no read. There are two kinds of gap. For the severe pandemic, the dataset read sources, and none of them names a cut. For civil unrest and for war, the dataset has read no source yet, so the list `examined` is empty.
 - No cut of these cases has a law of its duration. The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid.
 
 ## The laws from outage records
