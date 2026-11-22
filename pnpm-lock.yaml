@@ -254,6 +254,9 @@ importers:
 
   packages/stack-endurance:
     dependencies:
+      '@mark1russell7/collections':
+        specifier: ^0.11.2
+        version: 0.11.2(zod@4.6.7)
       '@mark1russell7/system-stack':
         specifier: workspace:*
         version: link:../system-stack
@@ -2161,7 +2164,7 @@ snapshots:
 
   '@mark1russell7/algebra@0.8.10(zod@4.6.7)':
     dependencies:
-      '@mark1russell7/quantity': 0.4.1(zod@4.6.7)
+      '@mark1russell7/quantity': 0.4.3(zod@4.6.7)
     optionalDependencies:
       zod: 4.6.7
 
@@ -2207,7 +2210,7 @@ snapshots:
     dependencies:
       '@mark1russell7/algebra': 0.8.10(zod@4.6.7)
       '@mark1russell7/optional': 1.2.0
-      '@mark1russell7/rigor-statistics': 0.2.9
+      '@mark1russell7/rigor-statistics': 0.2.13
     transitivePeerDependencies:
       - zod
 
