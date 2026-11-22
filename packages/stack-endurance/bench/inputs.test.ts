@@ -19,7 +19,7 @@ describe("the inputs of the bench", () => {
     }
   });
 
-  it("go up to the largest count that independentStop reads", () => {
+  it("go up to the largest count of the sum over the states of independentStop", () => {
     expect(Math.max(...BENCH_CUTS)).toBe(MINIMAL_STOP_CUTS);
     expect(() => independentInput(1)).toThrow(RangeError);
     expect(() => independentInput(MINIMAL_STOP_CUTS + 1)).toThrow(RangeError);
