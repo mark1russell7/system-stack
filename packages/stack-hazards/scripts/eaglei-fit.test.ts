@@ -111,8 +111,9 @@ describe("fitEagle", () => {
     expect(laws.skipped).toBe(2);
     expect(Object.keys(laws.regions)).toEqual(["99"]);
     expect(laws.regions["99"]).toMatchObject({ count: 1, censored: 0, open: 0, median: 5400 / 86_400 });
-    const store = asked.filter((url) => url.startsWith(STORE)).length;
-    expect(asked.filter((url) => url.includes("ndownloader")).length).toBe(store);
+    const hosts = asked.map((url) => new URL(url).host);
+    const store = hosts.filter((host) => host === new URL(STORE).host).length;
+    expect(hosts.filter((host) => host === "ndownloader.figshare.com").length).toBe(store);
     expect(store).toBeGreaterThan(3);
     expect(lawsTable(laws)).toContain("| 99 | 1 | 0 | 90 | 0.0000 |");
   });
