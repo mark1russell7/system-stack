@@ -8,9 +8,11 @@
 
 CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
 CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
+CLAIM_BASES: build/index.d.ts#CLAIM_BASES
 CauseOptions: build/index.d.ts#CauseOptions
 CauseTally: build/index.d.ts#CauseTally
 Claim: build/index.d.ts#Claim
+ClaimBasis: build/index.d.ts#ClaimBasis
 DurationLaw: build/index.d.ts#DurationLaw
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
@@ -75,6 +77,9 @@ export declare const CAUSE_AFTER = 10800;
 ### build/index.d.ts#CAUSE_BEFORE
 export declare const CAUSE_BEFORE = 3600;
 
+### build/index.d.ts#CLAIM_BASES
+export declare const CLAIM_BASES: readonly ["told", "assessed"];
+
 ### build/index.d.ts#CauseOptions
 export interface CauseOptions {
   readonly before?: number | undefined;
@@ -92,13 +97,18 @@ export interface CauseTally {
 ### build/index.d.ts#Claim
 export type Claim = {
   readonly source: string;
+  readonly basis: ClaimBasis;
   readonly definition?: never;
   readonly says: string;
 } | {
   readonly definition: true;
   readonly source?: never;
+  readonly basis?: never;
   readonly says: string;
 };
+
+### build/index.d.ts#ClaimBasis
+export type ClaimBasis = (typeof CLAIM_BASES)[number];
 
 ### build/index.d.ts#DurationLaw
 export interface DurationLaw {
@@ -149,6 +159,7 @@ export interface HazardCaseOptions {
     readonly code: string;
   } | undefined;
   readonly parts?: Readonly<Record<string, readonly string[]>> | undefined;
+  readonly assessed?: "keep" | "drop" | undefined;
 }
 
 ### build/index.d.ts#HazardCode
