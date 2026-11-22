@@ -12,6 +12,9 @@ const references: JoinReferences = { needs: NEEDS, parts: SUPPLY_PARTS };
 /** The type gate of the copy of the form: the direct uses are direct uses of stack-endurance. */
 const typed: readonly DirectUse[] = DIRECT_USES;
 
+/** The type gate of the supplies: the exact keys of NEED_SUPPLIES are a record of strings. */
+const supplies: Readonly<Record<string, string>> = NEED_SUPPLIES;
+
 /** The resource of the stored water of the catalog. The test resources are copies of it with a different code and unit. */
 const water = SUPPLY_CATALOG.resources.find((resource) => resource.code === STORED_WATER);
 if (water === undefined) throw new Error(`The catalog has no resource ${STORED_WATER}.`);
@@ -44,7 +47,7 @@ describe("the reference codes", () => {
 
   it("gives a supply part of stack-hazards for each need of NEED_SUPPLIES", () => {
     const parts = new Set(SUPPLY_PARTS.map((part) => part.id));
-    for (const [need, part] of Object.entries(NEED_SUPPLIES)) {
+    for (const [need, part] of Object.entries(supplies)) {
       expect(NEEDS.map((item) => item.code)).toContain(need);
       expect(parts.has(part)).toBe(true);
     }

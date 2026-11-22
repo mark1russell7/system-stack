@@ -27,11 +27,12 @@ export interface FragmentDirectUse {
 /**
  * The default reference part that supplies each need when no case stops it, by the code of the need.
  * The parts are `id` values of `SUPPLY_PARTS` of `@mark1russell7/stack-hazards`. A household with a well gives a different part.
+ * The type has the exact keys. The annotation replaces `as const`, because the package has isolated declarations.
  */
-export const NEED_SUPPLIES = {
+export const NEED_SUPPLIES: { readonly "hydration.drink": "water.main"; readonly "food.energy": "food.retail" } = {
   "hydration.drink": "water.main",
   "food.energy": "food.retail",
-} as const satisfies Readonly<Record<string, string>>;
+};
 
 /**
  * The direct uses of the resources of the buy list. Each use gives 1 unit of its need for each unit of its resource.
