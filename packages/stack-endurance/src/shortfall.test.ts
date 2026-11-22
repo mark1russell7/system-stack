@@ -5,7 +5,7 @@ import { enduranceOf } from "./endurance.ts";
 import type { CaseCuts, Survival } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 import { curveFault } from "./check.ts";
-import { caseShortfall, eventStop, longestStop, minimalStops, stopCurves, survivalAt, upperStop, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
+import { caseShortfall, eventStop, INDEPENDENT_TOLERANCE, independentStop, longestStop, minimalStops, stopCurves, survivalAt, upperStop, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
 
 const AT = "2026-12-01";
 const ROAD: Survival = [[0, 1], [1, 0.6], [3, 0.2], [10, 0]];
@@ -23,6 +23,14 @@ describe("the survival curve", () => {
     expect(survivalAt(ROAD, 2)).toBeCloseTo(0.4, 12);
     expect(survivalAt(ROAD, 10)).toBe(0);
     expect(survivalAt(ROAD, 11)).toBe(0);
+  });
+
+  it("gives the exact chance at each point, and never a rounding below the lower point", () => {
+    // Before 0.3.2, the line gave -1.1e-16 at the third point, and upperStop of this curve threw.
+    const curve: Survival = [[0, 1], [0.023448894038205687, 0.9999999999999987], [0.062489255095649725, 0], [1.3218730114693862, 0]];
+    for (const [days, chance] of curve) expect(survivalAt(curve, days)).toBe(chance);
+    for (const days of [0.01, 0.03, 0.05, 0.0624892550956497, 0.5]) expect(survivalAt(curve, days)).toBeGreaterThanOrEqual(0);
+    expect(survivalAt(upperStop([curve], [[0]]), 0.062489255095649725)).toBe(0);
   });
 
   it("gives the mean duration as the tail from 0, and the tail after a time", () => {
@@ -100,7 +108,13 @@ describe("caseShortfall", () => {
       expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(GRID, days), survivalAt(MAIN, days)), 9);
       expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(GRID, days) + survivalAt(MAIN, days)), 9);
     }
+    // Independent cuts in series: the stop lasts while either cut is on.
+    for (const days of [...TIMES, 0.37, 2.5, 6.1]) {
+      const either = 1 - (1 - survivalAt(GRID, days)) * (1 - survivalAt(MAIN, days));
+      expect(Math.abs(survivalAt(curves?.independent ?? [], days) - either), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
     const alone = stopCurves(storm, DRINK);
+    for (const days of TIMES) expect(survivalAt(alone?.independent ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
     for (const days of TIMES) expect(survivalAt(alone?.event ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
     for (const days of TIMES) expect(survivalAt(alone?.upper ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
     // Without the stack, the grid cut does not stop the water main.
@@ -116,11 +130,16 @@ describe("caseShortfall", () => {
       const pair = Math.min(survivalAt(GRID, days), survivalAt(road, days));
       expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(MAIN, days), pair), 9);
       expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + pair), 9);
+      // Independent cuts: the main is on, or the grid and the road are on together.
+      const both = survivalAt(GRID, days) * survivalAt(road, days);
+      const independent = 1 - (1 - survivalAt(MAIN, days)) * (1 - both);
+      expect(Math.abs(survivalAt(curves?.independent ?? [], days) - independent), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
     }
     // The road ends at 10 days, so the pair ends then: the grid cut alone does not stop the water after 10 days.
     expect(survivalAt(curves?.event ?? [], 12)).toBe(0);
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT, stack }), { stack });
     expect(shortfall.upper["life"] ?? 0).toBeGreaterThanOrEqual(shortfall.levels["life"] ?? 0);
+    expect(shortfall.upper["life"] ?? 0).toBeGreaterThanOrEqual((shortfall.independent["life"] ?? 0) - 1e-9);
     expect(shortfall.levels["life"] ?? 0).toBeGreaterThan(0.01);
   });
 
@@ -166,6 +185,53 @@ describe("eventStop and upperStop", () => {
     expect(eventStop([GRID, MAIN], () => false)).toEqual([[0, 0]]);
     const upper = upperStop([GRID, MAIN], undefined);
     for (const days of TIMES) expect(survivalAt(upper, days)).toBeCloseTo(Math.min(1, survivalAt(GRID, days) + survivalAt(MAIN, days)), 9);
+  });
+});
+
+describe("independentStop", () => {
+  const curve = fc
+    .array(fc.double({ min: 0.01, max: 5, noNaN: true }), { minLength: 1, maxLength: 3 })
+    .chain((gaps) => fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { minLength: gaps.length - 1, maxLength: gaps.length - 1 }).map((falls) => ({ gaps, falls })))
+    .map(({ gaps, falls }): Survival => {
+      const chances = [...falls.sort((x, y) => y - x), 0];
+      let days = 0;
+      return [[0, 1], ...gaps.map((gap, index): [number, number] => [(days += gap), chances[index] ?? 0])];
+    });
+
+  it("lies within the tolerance of the exact chance, and between the chance of one set and upperStop, for each curve and set", () => {
+    fc.assert(
+      fc.property(fc.array(curve, { minLength: 1, maxLength: 4 }), fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 4 }), (curves, rawSets) => {
+        const sets = [...new Set(rawSets.map((mask) => mask & ((1 << curves.length) - 1)).filter((mask) => mask > 0))].map((mask) =>
+          curves.flatMap((_, index) => ((mask >> index) & 1 ? [index] : [])),
+        );
+        if (sets.length === 0) return;
+        const independent = independentStop(curves, sets) ?? [];
+        const upper = upperStop(curves, sets);
+        expect(curveFault(independent)).toBeUndefined();
+        for (const days of [0, 0.3, 1, 2.2, 4, 7.5, 12, 20]) {
+          const on = curves.map((item) => survivalAt(item, days));
+          // The exact chance: sum over each state of the cuts that contains a set.
+          let exact = 0;
+          for (let mask = 0; mask < 1 << curves.length; mask += 1) {
+            if (!sets.some((set) => set.every((index) => (mask >> index) & 1))) continue;
+            exact += on.reduce((product, chance, index) => product * ((mask >> index) & 1 ? chance : 1 - chance), 1);
+          }
+          const value = survivalAt(independent, days);
+          expect(Math.abs(value - exact), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE * 1.01);
+          expect(value).toBeLessThanOrEqual(survivalAt(upper, days) + INDEPENDENT_TOLERANCE);
+          for (const set of sets) expect(value).toBeGreaterThanOrEqual(set.reduce((product, index) => product * (on[index] ?? 0), 1) - INDEPENDENT_TOLERANCE);
+        }
+      }),
+    );
+  });
+
+  it("gives a curve with no two points at one time when two bend times are next to each other", () => {
+    const curves: Survival[] = [[[0, 1], [0.18848476106898124, 0]], [[0, 1], [0.04644542849054632, 4.180786278414646e-219], [2.135038516073287, 0], [2.145846001067972, 0]], [[0, 1], [0.01, 0]]];
+    expect(curveFault(independentStop(curves, [[1], [0]]) ?? [])).toBeUndefined();
+  });
+
+  it("gives nothing with no sets for too many cuts", () => {
+    expect(independentStop([GRID, MAIN], undefined)).toBeUndefined();
   });
 });
 
@@ -239,6 +305,6 @@ describe("yearShortfall", () => {
   });
 
   it("gives 0 at a place with no prior", () => {
-    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], cases: [] });
+    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, independent: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], cases: [] });
   });
 });

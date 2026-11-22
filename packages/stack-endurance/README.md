@@ -49,7 +49,9 @@ The cuts of one case come from one event. `levels` takes each cut longer togethe
 
 `upper` is an upper limit for each dependence of the cuts (`upperStop`). At each time, its chance is the sum over the minimal sets of cuts of the smallest chance of the set, to 1 or less. A gate of a high level can use `upper`.
 
-Only the cuts of the supply, and of the parts that it needs through the stack, count. Past 12 such cuts, `upper` is the sum of their curves, and `coarse` names the need.
+`independent` is the shortfall when the cuts are independent (`independentStop`). At each time, the supply is stopped when the cuts that are still on contain a minimal set. The query adds the chance of each such state of the cuts. A stop of two cuts in series is then `1 - (1 - s1)(1 - s2)`, and a stop through a need of `any` of two parts is `s1 * s2`. `independent` is not more than `upper`. Between two bend times the chance is not linear, so the curve has more points, each within `1e-6` of the chance.
+
+Only the cuts of the supply, and of the parts that it needs through the stack, count. Past 12 such cuts, `upper` is the sum of their curves, `independent` is `upper`, and `coarse` names the need.
 
 ## The entries
 

@@ -20,6 +20,7 @@ EnduranceCode: build/index.d.ts#EnduranceCode
 EnduranceFault: build/index.d.ts#EnduranceFault
 EnduranceLayer: build/layer.chunk.d.ts#EnduranceLayer
 Gift: build/layer.chunk.d.ts#Gift
+INDEPENDENT_TOLERANCE: build/index.d.ts#INDEPENDENT_TOLERANCE
 IsoDate: build/layer.chunk.d.ts#IsoDate
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
 Prior: build/layer.chunk.d.ts#Prior
@@ -43,6 +44,7 @@ eventStop: build/index.d.ts#eventStop
 giftNeed: build/index.d.ts#giftNeed
 giftResource: build/index.d.ts#giftResource
 hasEnduranceError: build/index.d.ts#hasEnduranceError
+independentStop: build/index.d.ts#independentStop
 joinEndurance: build/index.d.ts#joinEndurance
 longestStop: build/index.d.ts#longestStop
 minimalStops: build/index.d.ts#minimalStops
@@ -89,6 +91,9 @@ export interface EnduranceFault extends Fault {
   readonly code: EnduranceCode;
 }
 
+### build/index.d.ts#INDEPENDENT_TOLERANCE
+export declare const INDEPENDENT_TOLERANCE = 1e-6;
+
 ### build/index.d.ts#MINIMAL_STOP_CUTS
 export declare const MINIMAL_STOP_CUTS = 12;
 
@@ -101,6 +106,7 @@ export declare const SAMPLE_ENDURANCE_STACK: Stack;
 ### build/index.d.ts#Shortfall
 export interface Shortfall {
   readonly levels: Readonly<Record<string, number>>;
+  readonly independent: Readonly<Record<string, number>>;
   readonly upper: Readonly<Record<string, number>>;
   readonly unread: readonly string[];
   readonly coarse: readonly string[];
@@ -114,6 +120,7 @@ export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
 ### build/index.d.ts#StopCurves
 export interface StopCurves {
   readonly event: Survival;
+  readonly independent: Survival;
   readonly upper: Survival;
   readonly coarse: boolean;
 }
@@ -161,6 +168,9 @@ export declare function giftResource(converter: Converter): string | undefined;
 
 ### build/index.d.ts#hasEnduranceError
 export declare function hasEnduranceError(faults: readonly EnduranceFault[]): boolean;
+
+### build/index.d.ts#independentStop
+export declare function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined;
 
 ### build/index.d.ts#joinEndurance
 export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;
