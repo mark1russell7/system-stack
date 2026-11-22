@@ -5,3 +5,4 @@ export * from "./case.ts";
 export * from "./outages.ts";
 export * from "./eaglei.ts";
 export * from "./law.ts";
+export * from "./storms.ts";

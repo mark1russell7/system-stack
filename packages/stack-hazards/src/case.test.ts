@@ -14,7 +14,7 @@ describe("a hazard case as the values of CaseCuts", () => {
     expect(hazardOf(HAZARD_LIST, "met.unknown")).toBeUndefined();
   });
 
-  it("gives a cut with no duration for a cut with no law, and the URLs of its claims as its source", () => {
+  it("gives no duration with no region, and the URLs of its claims as its source", () => {
     const cuts = hazardCase(HAZARD_LIST, STORM);
     expect(cuts.case).toBe("met.winter.storm");
     expect(cuts.cuts.map((cut) => cut.part)).toEqual(["power.grid", "phone.network", "road.local"]);
