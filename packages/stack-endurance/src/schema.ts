@@ -40,7 +40,7 @@ const point = z.tuple([z.number(), z.number()]).readonly();
 const cut = z.strictObject({
   part: id,
   title: id,
-  duration: z.array(point).readonly(),
+  duration: z.array(point).readonly().optional(),
   source: id,
 });
 

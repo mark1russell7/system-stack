@@ -67,8 +67,19 @@ describe("checkEndurance", () => {
     expect(codes(layer)).toContain("endurance-curve");
   });
 
+  it("warns about a cut with no curve, and does not refuse it", () => {
+    const storm = SAMPLE_ENDURANCE.cases?.[0];
+    if (storm === undefined) throw new Error("no case");
+    const { duration: _, ...bare } = storm.cuts[0] as (typeof storm.cuts)[number];
+    const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, cases: [{ ...storm, cuts: [bare, ...storm.cuts.slice(1)] }, ...(SAMPLE_ENDURANCE.cases ?? []).slice(1)] };
+    const faults = checkEndurance(layer, SAMPLE_ENDURANCE_STACK);
+    expect(faults.find((fault) => fault.code === "endurance-cut-no-curve")).toMatchObject({ level: "warning", at: `storm/${bare.part}` });
+    expect(faults.some((fault) => fault.code === "endurance-curve")).toBe(false);
+    expect(hasEnduranceError(faults)).toBe(false);
+  });
+
   it("has a code for each fault", () => {
-    expect(ENDURANCE_CODES).toHaveLength(11);
+    expect(ENDURANCE_CODES).toHaveLength(12);
   });
 });
 

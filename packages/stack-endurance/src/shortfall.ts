@@ -316,8 +316,13 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   const stops = (cuts: readonly number[]): boolean => stoppedOf(cuts.map((index) => relevant[index] ?? -1)).has(draw.supply);
   if (stops([])) return undefined;
   if (!stops(relevant.map((_, index) => index))) return undefined;
-  const curves = relevant.map((index) => caseCuts.cuts[index]?.duration ?? []);
-  const sets = minimalStops(curves.length, stops);
+  const given = relevant.map((index) => caseCuts.cuts[index]?.duration);
+  const sets = minimalStops(given.length, stops);
+  // The stop has no curve when a cut with no curve can be part of it. Past MINIMAL_STOP_CUTS, the query cannot tell.
+  const unsourced = given.flatMap((curve, index) => (curve === undefined ? [index] : []));
+  if (unsourced.length > 0 && (sets === undefined || sets.some((set) => set.some((index) => unsourced.includes(index))))) return undefined;
+  // A cut with no curve is in no minimal set here. Its curve of 0 changes no curve of the result.
+  const curves = given.map((curve): Survival => curve ?? [[0, 0]]);
   const upper = upperStop(curves, sets);
   return { event: eventStop(curves, stops), independent: independentStop(curves, sets) ?? upper, upper, coarse: sets === undefined };
 }
@@ -328,6 +333,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
  * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
  * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
+ * - A cut with no `duration` gives no curve when it is in a minimal set, or when there are more than `MINIMAL_STOP_CUTS` cuts that count.
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
  * - Past `MINIMAL_STOP_CUTS` cuts that count, `upper` is the sum of their curves, `independent` is `upper`, and `coarse` is true.
  */
