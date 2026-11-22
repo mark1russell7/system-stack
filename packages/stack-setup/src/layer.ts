@@ -1,5 +1,5 @@
 // The records of the setup add-on. They are one layer of a stack, with the key `setup/1` in `Stack.layers`.
-// Each record tells a step of the setup inside a host: a package, a user, a file, a download, a swap file, a service or a command.
+// Each record tells a step of the setup inside a host: a package, a user, a file, a download, an archive, a swap file, a service or a command.
 // The add-on knows no provider and no cloud. The host is a part of the stack, and the steps are data.
 
 /** The name of the format of a setup layer. It is the key of the layer in `Stack.layers`. */
@@ -24,7 +24,10 @@ export type SetupText = string | VariableRead | readonly (string | VariableRead)
 export interface Variable {
   /** The name: capital letters, digits and `_`, with a letter first. The script itself uses only lowercase names. */
   readonly name: string;
-  /** `true`: the value is a secret. The gate refuses it in a file that each user can read, and in a unit of a service. */
+  /**
+   * `true`: the value is a secret. The gate refuses it in a file that each user can read, in a unit of a service and in the
+   * arguments of a command. The input of a command can hold it.
+   */
   readonly sensitive?: boolean | undefined;
   readonly description?: string | undefined;
 }
@@ -89,6 +92,32 @@ export interface DownloadStep extends StepBase {
   readonly mode?: string | undefined;
 }
 
+/** A file of an archive that tells which archive is in the folder. */
+export interface ArchiveMark {
+  /** The absolute path of the file, in the folder of the archive. */
+  readonly path: string;
+  /** The SHA-256 of the file in the archive, as 64 lowercase hexadecimal digits. */
+  readonly sha256: string;
+}
+
+/**
+ * An archive from an HTTPS address, with its checksum, in a folder that root owns. The step extracts the archive into a new
+ * folder. Then it puts the new folder in the place of the old folder. A process that runs a program of the old folder keeps it.
+ */
+export interface ArchiveStep extends StepBase {
+  readonly kind: "archive";
+  /** The HTTPS address of the archive, for example a `.tar.xz` file. `tar` reads the compression from the file. */
+  readonly url: string;
+  /** The SHA-256 of the archive, as 64 lowercase hexadecimal digits. */
+  readonly sha256: string;
+  /** The absolute path of the folder, two or more segments deep, for example `/opt/node`. It is not a folder of the system. */
+  readonly into: string;
+  /** The count of the first folders of each path in the archive that the step removes, from 0 to 16. The default is 0. */
+  readonly strip?: number | undefined;
+  /** The file whose SHA-256 tells that the folder has the archive. The step does not keep the archive itself. */
+  readonly mark: ArchiveMark;
+}
+
 /** A swap file. The step makes the file, turns it on and adds it to `/etc/fstab`. */
 export interface SwapStep extends StepBase {
   readonly kind: "swap";
@@ -121,13 +150,27 @@ export interface CommandStep extends StepBase {
   readonly check: readonly SetupText[];
   /** The user of the two commands. The default is `root`. */
   readonly as?: string | undefined;
+  /**
+   * The text that the command `run` reads on its standard input. The check gets no input. A sensitive variable can be in this
+   * text, because other users cannot read the input of a process.
+   */
+  readonly input?: SetupText | undefined;
 }
 
 /** A step of the setup. */
-export type Step = PackageStep | UserStep | FileStep | DownloadStep | SwapStep | ServiceStep | CommandStep;
+export type Step = PackageStep | UserStep | FileStep | DownloadStep | ArchiveStep | SwapStep | ServiceStep | CommandStep;
 
 /** The kinds of a step. */
-export const STEP_KINDS: readonly ["package", "user", "file", "download", "swap", "service", "command"] = ["package", "user", "file", "download", "swap", "service", "command"];
+export const STEP_KINDS: readonly ["package", "user", "file", "download", "archive", "swap", "service", "command"] = [
+  "package",
+  "user",
+  "file",
+  "download",
+  "archive",
+  "swap",
+  "service",
+  "command",
+];
 
 /** A kind of a step. */
 export type StepKind = Step["kind"];
@@ -177,7 +220,7 @@ export function textVariables(text: SetupText): string[] {
   return names;
 }
 
-/** This function gives each text of a step, for a walk over its variables. */
+/** This function gives each text of a step, for a walk over its variables. The input of a command is the last text. */
 export function stepTexts(step: Step): readonly SetupText[] {
   switch (step.kind) {
     case "file":
@@ -185,7 +228,7 @@ export function stepTexts(step: Step): readonly SetupText[] {
     case "service":
       return [step.unit];
     case "command":
-      return [...step.run, ...step.check];
+      return step.input === undefined ? [...step.run, ...step.check] : [...step.run, ...step.check, step.input];
     default:
       return [];
   }
@@ -198,11 +241,22 @@ export function stepPaths(step: Step): string[] {
     case "download":
     case "swap":
       return [step.path];
+    case "archive":
+      return [step.into];
     case "service":
       return [unitPath(step.name)];
     default:
       return [];
   }
+}
+
+/** The folders of the sources and the keys of `apt`. A change of a file in them makes the next package step read the lists again. */
+export const APT_SOURCE_FOLDERS: readonly ["/etc/apt/", "/usr/share/keyrings/"] = ["/etc/apt/", "/usr/share/keyrings/"];
+
+/** This function tells if a step changes a source or a key of `apt`: a file or a download in a folder of `APT_SOURCE_FOLDERS`. */
+export function changesAptSources(step: Step): boolean {
+  if (step.kind !== "file" && step.kind !== "download") return false;
+  return APT_SOURCE_FOLDERS.some((folder) => step.path.startsWith(folder));
 }
 
 /** This function gives the path of the unit file of a service. */

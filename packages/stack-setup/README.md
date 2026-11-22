@@ -68,11 +68,28 @@ const layer: SetupLayer = {
 | `user` | It makes a user with a home folder. It sets the login shell, the groups and the SSH keys. | The user has the shell, each group and the keys. |
 | `file` | It writes a file with its text, its mode, its owner and its group. | The file has the text, the mode, the owner and the group. |
 | `download` | It downloads a file over HTTPS, and it compares the SHA-256. After a transient error, it tries again 4 times in 120 seconds or less. | The file has the SHA-256 and the mode. |
+| `archive` | It downloads an archive over HTTPS, and it compares the SHA-256. It extracts the archive into a new folder that only root can change, and puts this folder in the place of the old folder. | The mark file has its SHA-256. Root owns each file of the folder, and only root can change it and each folder above it. |
 | `swap` | It makes a swap file of a size in MiB. It turns it on and adds it to `/etc/fstab`. | The file has the size, the swap is on, and `/etc/fstab` has it. |
 | `service` | It writes the unit of a `systemd` service, and it enables and starts the service. | The unit has the text, and the service is enabled and active. |
-| `command` | It starts a program with its arguments, as root or as a user. | Its own check command passes. |
+| `command` | It starts a program with its arguments, as root or as a user. It can give a text on the standard input of the program. | Its own check command passes. |
 
 A `command` step starts its program through `env` or `runuser`. Thus no function or builtin of the shell is the program.
+
+The `input` of a `command` step goes to the program through the builtin `printf`. Other users cannot read the input of a process. Thus the input can hold a sensitive variable, for example a key to join a network.
+
+The output of each change goes to the standard error, and thus to the log of the run. A program that prints its input puts the value in the log. Do not start the script with `sh -x`: the trace shows the `printf` line with the value.
+
+The folder of an `archive` step is the folder of an app: `/opt/<name>`, `/srv/<name>` or `/usr/local/<name>`, or a folder in it. The FHS does not keep the name, so `/opt/lib` and `/usr/local/bin` are refused. The gate refuses each other folder, because the step replaces the whole folder.
+
+Before the download, the step makes sure that only root can change each folder above the folder. Root owns each of these folders, and its group and other users cannot write in it. Thus no other user can put a link in the path between two commands. The step makes a folder above that is not there, with the mode `755`.
+
+On some hosts, a group can write in `/opt` or `/usr/local`. For example, `/usr/local` of an old Debian host is `root:staff` with the mode `2775`. The step fails on such a host. To repair the host, start `chown root /usr/local` and `chmod go-w /usr/local` as root. Then the members of the group cannot write in the folder.
+
+The step removes the write of the group and of other users, and the set-user-ID and set-group-ID bits, from each file of the archive. No other step of the host writes a path in the folder.
+
+An `archive` step keeps a program of the old folder that operates. The old folder moves away before the new folder takes its place. The host needs `tar` and the program of the compression, for example `xz-utils` for a `.tar.xz` file.
+
+After a `file` or `download` step changes a file in `/etc/apt/` or `/usr/share/keyrings/`, the next `package` step reads the lists of `apt` again. Thus the `package` step must come after the source step. Put it later in the same profile, or in a profile whose part needs the part of the source step.
 
 ## The order
 
@@ -93,15 +110,16 @@ Two profiles whose parts need each other make a cycle. The gate gives the fault 
 | `setup-part` | error | The part of a profile is not a part of the stack. |
 | `setup-host` | error | A profile names no host, or a host that is not a part of the stack. |
 | `setup-variable` | error | A text reads a variable that the layer does not have. |
-| `setup-secret-exposed` | error | A sensitive variable is in a unit, in a command or in a file that each user can read. |
+| `setup-secret-exposed` | error | A sensitive variable is in a unit, in the arguments of a command or in a file that each user can read. |
 | `setup-text` | error | A text has the character NUL, or a key is not one line. |
 | `setup-path` | error | A path is not an absolute path of the safe characters. |
-| `setup-path-twice` | error | Two steps of one host write one path. |
+| `setup-path-twice` | error | Two steps of one host write one path, or a step writes a path in the folder of an `archive` step. |
 | `setup-user-twice` | error | Two steps of one host set up one user. |
 | `setup-mode` | error | A mode is not a mode in octal. |
 | `setup-url` | error | An address is not an HTTPS address with a host name. An address with a user or a password is a fault. |
 | `setup-sha256` | error | A SHA-256 is not 64 lowercase hexadecimal digits. |
 | `setup-swap-size` | error | The size of a swap file is not a whole number of MiB from 1 to 65536. |
+| `setup-archive` | error | The folder of an archive is not the folder of an app in `/opt`, `/srv` or `/usr/local`. Or its mark is not in the folder, or its count to strip is not 0 to 16. |
 | `setup-program` | error | A command is empty, or its first argument is not a literal program. |
 | `setup-cycle` | error | The parts of the profiles of one host need each other. |
 | `setup-variable-unused` | warning | No step reads a variable. |

@@ -9,7 +9,8 @@ describe("the root entry", () => {
     for (const name of ["stepAddress", "isVariableRead", "textParts", "textVariables", "stepTexts", "stepPaths", "unitPath", "setupHosts", "hostProfiles", "profilesBefore", "profileOrder", "checkSetup", "hasSetupError", "joinSetup", "shellWord", "setupScript"] as const) {
       expect(entry[name], name).toBeTypeOf("function");
     }
-    expect(entry.STEP_KINDS).toEqual(["package", "user", "file", "download", "swap", "service", "command"]);
+    expect(entry.STEP_KINDS).toEqual(["package", "user", "file", "download", "archive", "swap", "service", "command"]);
+    expect(entry.SETUP_CODES).toContain("setup-archive");
     expect(entry.SETUP_CODES).toContain("setup-secret-exposed");
     expect(entry.SETUP_EXIT).toEqual({ ok: 0, failed: 1, changes: 2, usage: 64 });
     expect(entry.SAMPLE_SETUP.schema).toBe(entry.SETUP_SCHEMA);

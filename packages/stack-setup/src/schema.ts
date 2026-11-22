@@ -73,6 +73,17 @@ const serviceStep = z.strictObject({
   enable: z.boolean().optional(),
 });
 
+const archiveStep = z.strictObject({
+  kind: z.literal("archive"),
+  id,
+  description,
+  url: id,
+  sha256: id,
+  into: id,
+  strip: z.number().optional(),
+  mark: z.strictObject({ path: id, sha256: id }),
+});
+
 const commandStep = z.strictObject({
   kind: z.literal("command"),
   id,
@@ -80,9 +91,10 @@ const commandStep = z.strictObject({
   run: z.array(text).readonly(),
   check: z.array(text).readonly(),
   as: id.optional(),
+  input: text.optional(),
 });
 
-const step = z.discriminatedUnion("kind", [packageStep, userStep, fileStep, downloadStep, swapStep, serviceStep, commandStep]);
+const step = z.discriminatedUnion("kind", [packageStep, userStep, fileStep, downloadStep, archiveStep, swapStep, serviceStep, commandStep]);
 
 const profile = z.strictObject({
   name: id,
