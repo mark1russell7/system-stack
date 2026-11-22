@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_SETS, neededParts } from "@mark1russell7/system-stack";
+import { DEFAULT_MAX_SETS, neededParts, type PathOptions } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 import { stackStops } from "./stops.ts";
@@ -43,16 +43,13 @@ export function tailDays(curve: Survival, from: number, to: number = Infinity): 
  * With a horizon of `h` days, the shortfall counts only the first `h` days of each cut. A draw that holds `h` days has no shortfall.
  * Thus a plan can aim at a target, for example 14 days and then 90 days.
  */
-/** The options of `stopCurves`. */
-export interface StopOptions extends Pick<CaseOptions, "stack" | "down"> {
-  /**
-   * With a stack, the largest count of sets in one step of the search of the needs, a whole number from 1 (`maxSets` of `stopSets`).
-   * When the search passes it, `minimalStops` gives the sets. The default is `DEFAULT_MAX_SETS` of the core, 4096.
-   */
-  readonly maxSets?: number | undefined;
-}
+/**
+ * The options of `stopCurves`. With a stack, `maxSets` is the budget of the search of the needs (`stopSets` of the core).
+ * When the search passes it, `minimalStops` gives the sets.
+ */
+export interface StopCurveOptions extends Pick<CaseOptions, "stack" | "down">, Pick<PathOptions, "maxSets"> {}
 
-export interface ShortfallOptions extends StopOptions {
+export interface ShortfallOptions extends StopCurveOptions {
   /** The horizon in days, more than 0. The default is no horizon. */
   readonly horizon?: number | undefined;
 }
@@ -63,7 +60,7 @@ function horizonOf(options: ShortfallOptions): number {
   return horizon;
 }
 
-function maxSetsOf(options: StopOptions): number {
+function maxSetsOf(options: StopCurveOptions): number {
   const maxSets = options.maxSets ?? DEFAULT_MAX_SETS;
   if (!Number.isInteger(maxSets) || maxSets < 1) throw new RangeError(`The option maxSets is ${String(options.maxSets)}: it is not a whole number from 1.`);
   return maxSets;
@@ -334,7 +331,7 @@ function supplyReach(supply: string, options: Pick<CaseOptions, "stack">): Set<s
   return reach;
 }
 
-function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopOptions, stoppedOf: StoppedOf): StopCurves | undefined {
+function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOptions, stoppedOf: StoppedOf): StopCurves | undefined {
   const reach = supplyReach(draw.supply, options);
   const relevant = caseCuts.cuts.flatMap((cut, index) => (reach.has(cut.part) ? [index] : []));
   const stops = (cuts: readonly number[]): boolean => stoppedOf(cuts.map((index) => relevant[index] ?? -1)).has(draw.supply);
@@ -371,7 +368,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopOptions, st
  * - With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` is true.
  * - When the minimal sets have more than `MINIMAL_STOP_CUTS` cuts, `independent` is `upper`, and `independentUpper` is true.
  */
-export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopOptions = {}): StopCurves | undefined {
+export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopCurveOptions = {}): StopCurves | undefined {
   maxSetsOf(options);
   return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
 }
