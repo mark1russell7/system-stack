@@ -110,16 +110,23 @@ describe("the gate of the reference data", () => {
     const codes = HAZARD_LIST.hazards.map((hazard) => hazard.case);
     expect(codes.filter((code) => CATASTROPHIC.includes(code))).toEqual(CATASTROPHIC);
     expect(new Set(codes).size).toBe(codes.length);
-    for (const code of ["security.civil-unrest", "security.armed-conflict", "health.outbreak.pandemic"]) {
+    for (const code of ["security.civil-unrest", "health.outbreak.pandemic"]) {
       const hazard = HAZARD_LIST.hazards.find((item) => item.case === code);
       expect(hazard?.cuts, code).toEqual([]);
       for (const part of SUPPLY_PARTS) expect(supplyState(hazard!, part.id).state).toBe("no-read");
     }
-    // The two kinds of gap: sources that name no cut, or no source read yet.
+    // Each case with no cut has sources that name no cut. No case is left with no source read.
     const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
     expect(examined("health.outbreak.pandemic")).toEqual(["ready.pandemic", "ready.financial-preparedness", "cdc.community-mitigation"]);
     expect(examined("security.civil-unrest")).toEqual(["ready.mass-gatherings", "cisa.physical-security", "fema.cpg-201"]);
-    expect(examined("security.armed-conflict")).toEqual([]);
+    expect(HAZARD_LIST.hazards.filter((hazard) => hazard.examined.length === 0).map((hazard) => hazard.case)).toEqual([]);
+  });
+
+  it("gives war the cuts of the four sectors of the advisory AA24-038A, with no law", () => {
+    const war = HAZARD_LIST.hazards.find((hazard) => hazard.case === "security.armed-conflict");
+    expect(war?.examined).toEqual(["cisa.aa24-038a"]);
+    expect(war?.cuts.map((cut) => cut.part)).toEqual(["power.grid", "phone.network", "road.local", "water.main", "sewer.main"]);
+    for (const cut of war?.cuts ?? []) expect(cut.duration.read, cut.part).toBe(false);
   });
 
   it("gives a long collapse of the grid the cuts of a power outage, with no law of EAGLE-I", () => {

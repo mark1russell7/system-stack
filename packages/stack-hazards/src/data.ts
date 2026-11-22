@@ -67,6 +67,15 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
     license: FEDERAL_WORK,
     read: READ_CASES,
   },
+  // A joint advisory: CISA, NSA and FBI, with US and foreign partners. The claims are facts in own words, not quotes.
+  "cisa.aa24-038a": {
+    name: "PRC state-sponsored actors compromise and maintain persistent access to U.S. critical infrastructure (AA24-038A)",
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a",
+    publisher: "CISA, NSA and FBI",
+    license: FEDERAL_WORK,
+    updated: "2024-02-07",
+    read: READ_CASES,
+  },
   "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
   "dhs.ai-framework": dhs(
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
@@ -335,7 +344,20 @@ export const HAZARD_LIST: HazardList = {
       examined: ["ready.mass-gatherings", "cisa.physical-security", "fema.cpg-201"],
       cuts: [],
     },
-    { case: "security.armed-conflict", title: "War", examined: [], cuts: [] },
+    {
+      case: "security.armed-conflict",
+      title: "War",
+      // The advisory assesses that state actors are in the IT networks of four sectors, for attacks in a major conflict.
+      // A cut is a possible stop, so the claims keep the word of the source: an attack that can stop the supply.
+      examined: ["cisa.aa24-038a"],
+      cuts: [
+        { part: "power.grid", title: "No power from the grid", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the energy sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+        { part: "phone.network", title: "No telephone service", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the communications sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+        { part: "road.local", title: "No transport", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the transportation sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+        { part: "water.main", title: "No water from the main", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the water sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+        { part: "sewer.main", title: "No public sewer", claims: [said("cisa.aa24-038a", "The advisory tells that state actors are in the networks of the wastewater sector, for attacks in a conflict with the United States.")], duration: NO_LAW },
+      ],
+    },
     { case: "cbrne.emp", title: "Electromagnetic pulse", examined: ["cisa.emp"], cuts: pulseCuts() },
     {
       case: "geo.space-weather.geomagnetic-storm",
