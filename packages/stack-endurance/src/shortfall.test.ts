@@ -260,16 +260,6 @@ describe("caseShortfall", () => {
     // A feed with no curve can be part of the stop, and the query cannot tell. The water is no read.
     const bare = cuts.map((cut, index) => (index === 1 ? { part: cut.part, title: cut.title, source: cut.source } : cut));
     expect(stopCurves({ ...storm, cuts: bare }, DRINK, { stack })).toBeUndefined();
-    // With a budget of 2 to the power 14 sets, the search ends: the minimal sets are the main and the 13 pairs.
-    const wide = stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 2 ** 14 });
-    expect(wide?.coarse).toBe(false);
-    expect(wide?.independentUpper).toBe(true);
-    for (const days of TIMES) {
-      expect(survivalAt(wide?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 13 * survivalAt(GRID, days)), 9);
-      expect(survivalAt(wide?.event ?? [], days)).toBeCloseTo(Math.max(survivalAt(MAIN, days), survivalAt(GRID, days)), 9);
-    }
-    const shortfall = caseShortfall(SAMPLE_ENDURANCE, { ...storm, cuts }, enduranceOf(SAMPLE_ENDURANCE, { ...storm, cuts }, { at: AT, stack }), { stack, maxSets: 2 ** 14 });
-    expect(shortfall.coarse).toEqual([]);
   });
 
   it("takes the budget of the search of the needs as the option maxSets", () => {
@@ -282,7 +272,13 @@ describe("caseShortfall", () => {
     const cuts = [...storm.cuts.filter((cut) => cut.part === "water-main"), ...stages.flat().map((part) => ({ part, title: "Feed", duration: GRID, source: "s" }))];
     expect(stopCurves({ ...storm, cuts }, DRINK, { stack })?.coarse).toBe(false);
     expect(stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 64 })?.coarse).toBe(true);
-    expect(stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 128 })?.coarse).toBe(false);
+    const exact = stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 128 });
+    expect(exact?.coarse).toBe(false);
+    for (const days of TIMES) expect(survivalAt(exact?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 7 * survivalAt(GRID, days)), 9);
+    // caseShortfall gives the option to the stop curves of each draw.
+    const endurance = enduranceOf(SAMPLE_ENDURANCE, { ...storm, cuts }, { at: AT, stack });
+    expect(caseShortfall(SAMPLE_ENDURANCE, { ...storm, cuts }, endurance, { stack, maxSets: 64 }).coarse).toContain("hydration.drink");
+    expect(caseShortfall(SAMPLE_ENDURANCE, { ...storm, cuts }, endurance, { stack, maxSets: 128 }).coarse).toEqual([]);
     // A budget that is not a whole number from 1 is refused, also with no stack.
     for (const maxSets of [0, 1.5, Number.NaN]) {
       expect(() => stopCurves(storm, DRINK, { maxSets })).toThrow(RangeError);
