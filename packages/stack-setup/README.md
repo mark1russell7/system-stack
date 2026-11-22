@@ -67,7 +67,7 @@ const layer: SetupLayer = {
 | `package` | It installs the packages with `apt-get`. | Each package is installed. |
 | `user` | It makes a user with a home folder. It sets the login shell, the groups and the SSH keys. | The user has the shell, each group and the keys. |
 | `file` | It writes a file with its text, its mode, its owner and its group. | The file has the text, the mode, the owner and the group. |
-| `download` | It downloads a file over HTTPS, and it compares the SHA-256. | The file has the SHA-256 and the mode. |
+| `download` | It downloads a file over HTTPS, and it compares the SHA-256. After a transient error, it tries again 4 times in 120 seconds or less. | The file has the SHA-256 and the mode. |
 | `swap` | It makes a swap file of a size in MiB. It turns it on and adds it to `/etc/fstab`. | The file has the size, the swap is on, and `/etc/fstab` has it. |
 | `service` | It writes the unit of a `systemd` service, and it enables and starts the service. | The unit has the text, and the service is enabled and active. |
 | `command` | It starts a program with its arguments, as root or as a user. | Its own check command passes. |

@@ -81,7 +81,7 @@ describe("setupScript", () => {
     expect(script).toContain("[ \"$(stat -c '%s %a %U' /swapfile)\" = '1073741824 600 root' ]");
     expect(script).toContain("useradd --create-home --shell /usr/sbin/nologin alerts || return 1");
     expect(script).toContain("usermod -aG systemd-journal alerts || return 1");
-    expect(script).toContain('curl -fsSL --proto =https --proto-redir =https --tlsv1.2 -o "$tmp" https://example.org/alerts/1.4.0/alerts || return 1');
+    expect(script).toContain('curl -fsSL --proto =https --proto-redir =https --tlsv1.2 --retry 4 --retry-max-time 120 -o "$tmp" https://example.org/alerts/1.4.0/alerts || return 1');
     expect(script).toContain('install -D -m 755 -o root -g root "$tmp" /opt/alerts/alerts || return 1');
     expect(script).toContain("file_is /etc/alerts/env 600 root root");
     expect(script).toContain("env install -d -o alerts -g alerts /var/lib/alerts || return 1");
