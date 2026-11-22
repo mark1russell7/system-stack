@@ -332,6 +332,9 @@ importers:
         specifier: workspace:*
         version: link:../system-stack
     devDependencies:
+      '@mark1russell7/alerts':
+        specifier: ^0.1.5
+        version: 0.1.5
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -794,6 +797,10 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@mark1russell7/alerts@0.1.5':
+    resolution: {integrity: sha512-JdGbmS0qOkeReVXH3k15M36LRZT/JH684p5oyLttULGy6oTusfku7q2N4zmbBMqV2/8jIXN+wa0pDhcjJS4r5A==}
+    engines: {node: '>=22'}
+
   '@mark1russell7/algebra@0.8.10':
     resolution: {integrity: sha512-+BrWHJHSMF/BTOegejCY14W2/3B4gmNhrSwLxitgQF0OYb7NcaovLILnDrDjNtTFgxuuA5Gd2jtlLJprTUO5Yw==}
     engines: {node: '>=22.19'}
@@ -857,9 +864,21 @@ packages:
     resolution: {integrity: sha512-Pb978ZnvlAxzcdWtRtqTGb7mZFCvlNrdKnpZqhxQ7gafzeNGf1JqYFuB4RWiLbJzRuFUWjEoAVG5f2TndCIlSg==}
     engines: {node: '>=22'}
 
+  '@mark1russell7/geo@0.5.4':
+    resolution: {integrity: sha512-HHlt/0QqP5yOswCNOmPxDnduEN//I6KUJpcC0z3RG/Xi1Q6v/+4d1CkzWUWtV8glKP5R6MvJfGpVfc98m+6XXQ==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/interval@0.1.0':
+    resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
+    engines: {node: '>=22'}
+
   '@mark1russell7/optional@1.5.0':
     resolution: {integrity: sha512-QpVjyHD/1JYriLVVJr4P6QpDJJN9q2BiM6CFu0q1hnyEEaH5RlrIMQSsrsKKzyED29VnT08xmliR65WbTkNTFw==}
     engines: {node: '>=22.12'}
+
+  '@mark1russell7/predicates@0.1.5':
+    resolution: {integrity: sha512-WXgTOliDm5650i3adkTjAj85Uzp22LD7KQFqwhETlQWG4CK3pDnd4I4ef9YrOAfzik1uTdChVk8RZaqdeP+YxA==}
+    engines: {node: '>=22'}
 
   '@mark1russell7/quantity@0.4.1':
     resolution: {integrity: sha512-L3yZOBpJ1ZMd9CWSLVhz/pJOAQVnN68xpg2sAzHdQiyeOsgG8D3sTDIRIVJ4mTjasJfPQfgcpu8y2txQcS6u4w==}
@@ -2361,6 +2380,19 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.3
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@mark1russell7/alerts@0.1.5':
+    dependencies:
+      '@mark1russell7/algebra': 0.9.10(zod@4.6.7)
+      '@mark1russell7/collections': 0.11.2(zod@4.6.7)
+      '@mark1russell7/geo': 0.5.4
+      '@mark1russell7/interval': 0.1.0
+      '@mark1russell7/optional': 1.5.0
+      '@mark1russell7/quantity': 0.4.3(zod@4.6.7)
+      '@mark1russell7/rigor-generators': 0.1.19
+      '@mark1russell7/rigor-statistics': 0.2.19
+      '@mark1russell7/text': 0.0.17
+      zod: 4.6.7
+
   '@mark1russell7/algebra@0.8.10(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.3(zod@4.6.7)
@@ -2422,7 +2454,16 @@ snapshots:
 
   '@mark1russell7/files@0.0.4': {}
 
+  '@mark1russell7/geo@0.5.4':
+    dependencies:
+      '@mark1russell7/optional': 1.5.0
+      '@mark1russell7/predicates': 0.1.5
+
+  '@mark1russell7/interval@0.1.0': {}
+
   '@mark1russell7/optional@1.5.0': {}
+
+  '@mark1russell7/predicates@0.1.5': {}
 
   '@mark1russell7/quantity@0.4.1(zod@4.6.7)':
     dependencies:
