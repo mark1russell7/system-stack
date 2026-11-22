@@ -34,7 +34,7 @@ HouseholdFragmentResult: build/index.d.ts#HouseholdFragmentResult
 HouseholdStoresResult: build/index.d.ts#HouseholdStoresResult
 JOIN_CODES: build/index.d.ts#JOIN_CODES
 JoinCode: build/index.d.ts#JoinCode
-JoinFault: build/index.d.ts#JoinFault
+JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
 NEED_SUPPLIES: build/index.d.ts#NEED_SUPPLIES
@@ -189,7 +189,8 @@ export interface HouseholdFragmentInput {
   readonly activity: ActivityLevel;
   readonly catalog: SupplyCatalog;
   readonly units: Readonly<Record<string, number>>;
-  readonly supply: string;
+  readonly supply?: string | undefined;
+  readonly uses?: readonly FragmentDirectUse[] | undefined;
   readonly level: string;
   readonly levels?: readonly string[] | undefined;
   readonly table?: CalorieTable | undefined;
@@ -225,18 +226,13 @@ export interface HouseholdStoresResult {
 }
 
 ### build/index.d.ts#JOIN_CODES
-export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-supply-need", "join-supply-part"];
+export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part"];
 
 ### build/index.d.ts#JoinCode
 export type JoinCode = (typeof JOIN_CODES)[number];
 
-### build/index.d.ts#JoinFault
-export interface JoinFault {
-  readonly level: "error";
-  readonly code: JoinCode;
-  readonly at: string;
-  readonly message: string;
-}
+### build/index.d.ts#JoinFinding
+export type JoinFinding = Finding<JoinCode, "use" | "supply">;
 
 ### build/index.d.ts#JoinReferences
 export interface JoinReferences {
@@ -248,7 +244,10 @@ export interface JoinReferences {
 export declare const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value"];
 
 ### build/index.d.ts#NEED_SUPPLIES
-export declare const NEED_SUPPLIES: Readonly<Record<string, string>>;
+export declare const NEED_SUPPLIES: {
+  readonly "hydration.drink": "water.main";
+  readonly "food.energy": "food.retail";
+};
 
 ### build/index.d.ts#NO_COOK
 export declare const NO_COOK = "food.no-cook";
@@ -297,7 +296,7 @@ export declare function calorieRow(table: CalorieTable, sex: CalorieSex, ageMont
 export declare function checkCalorieTable(table: CalorieTable, options?: GateOptions): NeedsFinding[];
 
 ### build/index.d.ts#checkJoins
-export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFault[];
+export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFinding[];
 
 ### build/index.d.ts#hasNeedsError
 export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;
