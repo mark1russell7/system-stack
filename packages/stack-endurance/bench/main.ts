@@ -16,8 +16,8 @@ import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
-/** The rounds of one job: 4 times the count of arms, so the order of `armOrder` is balanced. */
-export const JOB_ROUNDS = 16;
+/** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
+export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
 /** The longest time of one child, in milliseconds. */
 const CHILD_MS = 120_000;
 

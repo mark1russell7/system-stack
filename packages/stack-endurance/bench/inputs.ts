@@ -3,17 +3,20 @@
  *
  * Each cut has a survival curve with `CURVE_POINTS` points between day 0 and day `CURVE_DAYS`.
  * The cuts are in two feeds, `a` and `b`. The supply stops when one cut of each feed is on.
- * Thus each cut is in a minimal set, and a state of `independentStop` has `m` bits.
+ * Thus each cut is in a minimal set, and the minimal sets are the pairs of a cut of `a` and a cut of `b`.
+ * Up to 12 cuts, `independentStop` sums the `2^m` states. Past 12 cuts, the pairs are one group, so it uses the expansion.
  * The curves fall over the same days, so the count of points is near its limit of approximately `m / sqrt(7.2e-6)`.
  */
 import { random } from "@mark1russell7/rigor-generators";
 import type { Survival } from "../src/layer.ts";
-import { minimalStops } from "../src/shortfall.ts";
 
 /** The seed of each input of the bench. A change of the seed is a change of the measure. */
 export const BENCH_SEED = "stack-endurance/independent-stop/1";
-/** The counts of cuts of the cases of the bench. 12 is `MINIMAL_STOP_CUTS`, the largest count of the sum over the states of `independentStop`. */
-export const BENCH_CUTS = [4, 8, 12] as const;
+/**
+ * The counts of cuts of the cases of the bench. 12 is `MINIMAL_STOP_CUTS`, the largest count of the sum over the states of `independentStop`.
+ * The case of 14 cuts measures the Shannon expansion of `pathSetReliability`. 14 is the largest count of this input in `INDEPENDENT_MAX_WORK`.
+ */
+export const BENCH_CUTS = [4, 8, 12, 14] as const;
 /** The points of each curve after `[0, 1]`. */
 export const CURVE_POINTS = 6;
 /** The last day of each curve. */
@@ -38,6 +41,8 @@ export function cutsOf(id: string): number | undefined {
 /**
  * This function gives the seeded input of `cuts` cuts. The same seed and count give the same input.
  *
+ * The sets come in the order of `minimalStops`: by the larger cut, then by the smaller cut.
+ *
  * @throws RangeError when the count is less than 2, because one feed then has no cut
  */
 export function independentInput(cuts: number, seed: string = BENCH_SEED): IndependentInput {
@@ -47,9 +52,8 @@ export function independentInput(cuts: number, seed: string = BENCH_SEED): Indep
   // Cut 0 is in feed a and cut 1 is in feed b, so each feed has a cut. The other cuts go to a feed at random.
   const feeds = rng.fork("feeds");
   const inFeedA = Array.from({ length: cuts }, (_, index) => (index < 2 ? index === 0 : feeds.chance(0.5)));
-  const stops = (on: readonly number[]): boolean => on.some((index) => inFeedA[index]) && on.some((index) => !inFeedA[index]);
-  const sets = minimalStops(cuts, stops);
-  if (sets === undefined) throw new RangeError(`The bench reads at most 12 cuts, not ${String(cuts)}.`);
+  const sets: number[][] = [];
+  for (let high = 1; high < cuts; high += 1) for (let low = 0; low < high; low += 1) if (inFeedA[low] !== inFeedA[high]) sets.push([low, high]);
   return { cuts, curves, sets };
 }
 
