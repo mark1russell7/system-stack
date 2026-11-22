@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, eagleFiles, fitEagle, lawsTable, linesOf, ranges, yearsOf, type FitContext } from "./eaglei-fit.ts";
+import { EAGLE_ARTICLE, RANGE_TRIES, eagleFiles, fitEagle, lawsTable, linesOf, ranges, yearsOf, type FitContext } from "./eaglei-fit.ts";
 
 // A made-up article on fake hosts. The code 99 is not the code of a state.
 const API = `https://api.figshare.com/v2/articles/${String(EAGLE_ARTICLE)}`;
@@ -43,8 +43,15 @@ function article(change: (file: Record<string, unknown>) => Record<string, unkno
   };
 }
 
-function fake(record: unknown, options: { redirect?: number } = {}): { transport: Transport; asked: string[] } {
+/** The options of the fake: the status of each redirect, and a fault for some requests of the storage, by their number from 1. */
+interface FakeOptions {
+  readonly redirect?: number;
+  readonly faults?: Readonly<Record<number, number | "cut">>;
+}
+
+function fake(record: unknown, options: FakeOptions = {}): { transport: Transport; asked: string[] } {
   const asked: string[] = [];
+  let stored = 0;
   const reply = (status: number, headers: Record<string, string>, body: string, bytes?: Uint8Array): Reply => ({ status, statusText: "", headers, body, bytes });
   const transport: Transport = (exchange: Exchange) => {
     asked.push(exchange.url);
@@ -54,6 +61,10 @@ function fake(record: unknown, options: { redirect?: number } = {}): { transport
       const name = NAMES[Number(url.pathname.split("/").pop()) - 1] ?? "";
       return Promise.resolve(reply(options.redirect ?? 302, { location: `${STORE}/${name}?X-Amz-Signature=abc` }, ""));
     }
+    stored += 1;
+    const fault = options.faults?.[stored];
+    if (fault === "cut") return Promise.reject(new TypeError("terminated"));
+    if (fault !== undefined) return Promise.resolve(reply(fault, {}, ""));
     const data = Buffer.from(FILES[decodeURIComponent(url.pathname.slice(1))] ?? "");
     const range = /^bytes=(\d+)-(\d+)$/.exec(exchange.headers["range"] ?? "");
     const start = Number(range?.[1]);
@@ -63,11 +74,11 @@ function fake(record: unknown, options: { redirect?: number } = {}): { transport
   return { transport, asked };
 }
 
-function context(transport: Transport, chunkBytes = 7): FitContext {
+function context(transport: Transport, chunkBytes = 7, log: (line: string) => void = () => undefined): FitContext {
   let now = 0;
   const scheduler = new HostScheduler({ now: () => now, sleep: (ms) => Promise.resolve(void (now += ms)) }, 1);
   const pace: Pace = { scheduler, now: () => now };
-  return { pace, transport, chunkBytes, log: () => undefined };
+  return { pace, transport, chunkBytes, log };
 }
 
 describe("the parts of the fit job", () => {
@@ -116,6 +127,24 @@ describe("fitEagle", () => {
     expect(hosts.filter((host) => host === "ndownloader.figshare.com").length).toBe(store);
     expect(store).toBeGreaterThan(3);
     expect(lawsTable(laws)).toContain("| 99 | 1 | 0 | 90 | 0.0000 |");
+  });
+
+  it("tries a range again after a cut and a 503, with a new redirect, and gives the same curves", async () => {
+    const lines: string[] = [];
+    const { transport, asked } = fake(article(), { faults: { 2: "cut", 3: 503 } });
+    const laws = await fitEagle(context(transport, 7, (line) => lines.push(line)), { now: () => new Date("2026-11-22T00:00:00Z") });
+    expect(laws.regions["99"]).toMatchObject({ count: 1, censored: 0, median: 5400 / 86_400 });
+    expect(lines.filter((line) => line.includes("It comes again"))).toHaveLength(2);
+    const hosts = asked.map((url) => new URL(url).host);
+    expect(hosts.filter((host) => host === "ndownloader.figshare.com").length).toBe(hosts.filter((host) => host === new URL(STORE).host).length);
+  });
+
+  it("stops at once at a 404, and after RANGE_TRIES cuts of one range", async () => {
+    const missing = fake(article(), { faults: { 1: 404 } });
+    await expect(fitEagle(context(missing.transport), { now: () => new Date() })).rejects.toThrow(/404/);
+    expect(missing.asked.filter((url) => new URL(url).host === new URL(STORE).host)).toHaveLength(1);
+    const cuts = Object.fromEntries(Array.from({ length: RANGE_TRIES }, (_, index) => [index + 1, "cut" as const]));
+    await expect(fitEagle(context(fake(article(), { faults: cuts }).transport), { now: () => new Date() })).rejects.toThrow(/gave no answer/);
   });
 
   it("refuses a file with a wrong MD5, and a download with no redirect", async () => {

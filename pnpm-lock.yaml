@@ -341,6 +341,9 @@ importers:
       '@mark1russell7/stack-endurance':
         specifier: workspace:*
         version: link:../stack-endurance
+      '@mark1russell7/text':
+        specifier: ^0.0.17
+        version: 0.0.17
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.6
