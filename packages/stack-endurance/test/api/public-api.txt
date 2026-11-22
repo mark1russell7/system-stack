@@ -30,6 +30,7 @@ SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
 Shortfall: build/index.d.ts#Shortfall
 ShortfallOptions: build/index.d.ts#ShortfallOptions
 StopCurves: build/index.d.ts#StopCurves
+StopOptions: build/index.d.ts#StopOptions
 Store: build/layer.chunk.d.ts#Store
 type Survival: @mark1russell7/system-stack#Survival (external)
 YearShortfall: build/index.d.ts#YearShortfall
@@ -114,7 +115,7 @@ export interface Shortfall {
 }
 
 ### build/index.d.ts#ShortfallOptions
-export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
+export interface ShortfallOptions extends StopOptions {
   readonly horizon?: number | undefined;
 }
 
@@ -125,6 +126,11 @@ export interface StopCurves {
   readonly upper: Survival;
   readonly coarse: boolean;
   readonly independentUpper: boolean;
+}
+
+### build/index.d.ts#StopOptions
+export interface StopOptions extends Pick<CaseOptions, "stack" | "down"> {
+  readonly maxSets?: number | undefined;
 }
 
 ### build/index.d.ts#YearShortfall
@@ -181,7 +187,7 @@ export declare function longestStop(curves: readonly Survival[]): Survival;
 export declare function minimalStops(count: number, stops: (cuts: readonly number[]) => boolean): number[][] | undefined;
 
 ### build/index.d.ts#stopCurves
-export declare function stopCurves(caseCuts: CaseCuts, draw: Draw, options?: Pick<CaseOptions, "stack" | "down">): StopCurves | undefined;
+export declare function stopCurves(caseCuts: CaseCuts, draw: Draw, options?: StopOptions): StopCurves | undefined;
 
 ### build/index.d.ts#storeAmounts
 export declare function storeAmounts(layer: EnduranceLayer, at: IsoDate, stoppedParts?: ReadonlySet<string>): Map<string, number>;

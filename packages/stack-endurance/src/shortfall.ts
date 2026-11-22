@@ -1,4 +1,4 @@
-import { neededParts } from "@mark1russell7/system-stack";
+import { DEFAULT_MAX_SETS, neededParts } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 import { stackStops } from "./stops.ts";
@@ -43,7 +43,16 @@ export function tailDays(curve: Survival, from: number, to: number = Infinity): 
  * With a horizon of `h` days, the shortfall counts only the first `h` days of each cut. A draw that holds `h` days has no shortfall.
  * Thus a plan can aim at a target, for example 14 days and then 90 days.
  */
-export interface ShortfallOptions extends Pick<CaseOptions, "stack" | "down"> {
+/** The options of `stopCurves`. */
+export interface StopOptions extends Pick<CaseOptions, "stack" | "down"> {
+  /**
+   * With a stack, the largest count of sets in one step of the search of the needs, a whole number from 1 (`maxSets` of `stopSets`).
+   * When the search passes it, `minimalStops` gives the sets. The default is `DEFAULT_MAX_SETS` of the core, 4096.
+   */
+  readonly maxSets?: number | undefined;
+}
+
+export interface ShortfallOptions extends StopOptions {
   /** The horizon in days, more than 0. The default is no horizon. */
   readonly horizon?: number | undefined;
 }
@@ -52,6 +61,12 @@ function horizonOf(options: ShortfallOptions): number {
   const horizon = options.horizon ?? Infinity;
   if (!(horizon > 0)) throw new RangeError(`The horizon ${String(options.horizon)} is not a number of days more than 0.`);
   return horizon;
+}
+
+function maxSetsOf(options: StopOptions): number {
+  const maxSets = options.maxSets ?? DEFAULT_MAX_SETS;
+  if (!Number.isInteger(maxSets) || maxSets < 1) throw new RangeError(`The option maxSets is ${String(options.maxSets)}: it is not a whole number from 1.`);
+  return maxSets;
 }
 
 /**
@@ -319,7 +334,7 @@ function supplyReach(supply: string, options: Pick<CaseOptions, "stack">): Set<s
   return reach;
 }
 
-function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down">, stoppedOf: StoppedOf): StopCurves | undefined {
+function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopOptions, stoppedOf: StoppedOf): StopCurves | undefined {
   const reach = supplyReach(draw.supply, options);
   const relevant = caseCuts.cuts.flatMap((cut, index) => (reach.has(cut.part) ? [index] : []));
   const stops = (cuts: readonly number[]): boolean => stoppedOf(cuts.map((index) => relevant[index] ?? -1)).has(draw.supply);
@@ -328,7 +343,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   const given = relevant.map((index) => caseCuts.cuts[index]?.duration);
   // With a stack, the needs give the minimal sets. When their search passes its budget, the sets of each list of cuts are the check.
   const parts = relevant.map((index) => caseCuts.cuts[index]?.part ?? "");
-  const structural = options.stack === undefined ? undefined : stackStops(options.stack, draw.supply, parts, options.down);
+  const structural = options.stack === undefined ? undefined : stackStops(options.stack, draw.supply, parts, options.down, maxSetsOf(options));
   const sets = structural ?? minimalStops(given.length, stops);
   // The stop has no curve when a cut with no curve can be part of it. With no minimal sets, the query cannot tell.
   const unsourced = given.flatMap((curve, index) => (curve === undefined ? [index] : []));
@@ -350,13 +365,14 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
  * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
  * - With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core), so the count of cuts has no limit of `MINIMAL_STOP_CUTS`.
- *   When that search passes its budget, `minimalStops` examines each set of up to `MINIMAL_STOP_CUTS` cuts.
+ *   When that search passes its budget (the option `maxSets`), `minimalStops` examines each set of up to `MINIMAL_STOP_CUTS` cuts.
  * - A cut with no `duration` gives no curve when it is in a minimal set, or when the query has no minimal sets.
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
  * - With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` is true.
  * - When the minimal sets have more than `MINIMAL_STOP_CUTS` cuts, `independent` is `upper`, and `independentUpper` is true.
  */
-export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): StopCurves | undefined {
+export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopOptions = {}): StopCurves | undefined {
+  maxSetsOf(options);
   return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
 }
 
@@ -394,10 +410,11 @@ function zeroLevels(layer: EnduranceLayer): Record<string, number> {
  * @param caseCuts - The case
  * @param endurance - The endurance of the case, from `enduranceOf`
  * @param options - The stack or the parts that are also down, as for `enduranceOf`, and the horizon
- * @throws RangeError when the horizon is not a number more than 0
+ * @throws RangeError when the horizon is not a number more than 0, or `maxSets` is not a whole number from 1
  */
 export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options: ShortfallOptions = {}): Shortfall {
   const horizon = horizonOf(options);
+  maxSetsOf(options);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
@@ -440,10 +457,11 @@ export interface YearShortfall extends Shortfall {
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
  * @param options - The date, the stack or the parts that are also down, and the horizon
- * @throws RangeError when the date is not `YYYY-MM-DD`, or when the horizon is not a number more than 0
+ * @throws RangeError for a bad date, horizon or `maxSets`: refer to `caseShortfall` and `enduranceOf`
  */
 export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
   horizonOf(options);
+  maxSetsOf(options);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
