@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "@mark1russell7/stack-needs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The need rates of draws as reference data: the daily food energy of each person by age, sex and activity, from the Dietary Guidelines for Americans, with its source. An add-on of system-stack.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark1russell7/system-stack.git",
+    "directory": "packages/stack-needs"
+  },
+  "homepage": "https://mark1russell7.github.io/system-stack/",
+  "bugs": {
+    "url": "https://github.com/mark1russell7/system-stack/issues"
+  },
+  "keywords": [
+    "needs",
+    "calories",
+    "food-energy",
+    "dietary-guidelines",
+    "reference-data",
+    "no-read",
+    "endurance",
+    "system-stack"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@mark1russell7/guidebook": "^0.1.1",
+    "@mark1russell7/market": "^0.3.1",
+    "@mark1russell7/quantity": "^0.4.3"
+  },
+  "devDependencies": {
+    "@mark1russell7/cue": "^2.0.0",
+    "@mark1russell7/stack-endurance": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.3",
+    "fast-check": "^4.10.2",
+    "tsdown": "^0.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/index.js",
+    "types": "./build/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/index.d.ts",
+        "import": "./build/index.js",
+        "default": "./build/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}
