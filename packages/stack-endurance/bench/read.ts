@@ -18,7 +18,7 @@ export const LIMITS_SCHEMA = "stack-endurance/independent-limits/1";
 export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
 export const RULE = "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min)";
-/** The case of the A/A pair: the largest case, with a second arm of the same child. */
+/** The case of the A/A pair: the largest case of the sum over the states, with a second arm of the same child. */
 export const AA_CASE = caseId(12);
 /** The id of the second arm of the A/A pair. */
 export const AA_ARM = `${AA_CASE}#aa`;

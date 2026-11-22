@@ -1,4 +1,4 @@
-# The cost of independentStop of stack-endurance at 4, 8 and 12 cuts (packages/stack-endurance/bench/README.md).
+# The cost of independentStop of stack-endurance at 4, 8, 12 and 14 cuts (packages/stack-endurance/bench/README.md).
 # Each job times each case in fresh child processes with the A/A arm of 12 cuts, and uploads its raw records.
 # The job read reads the records of all jobs: the value of each case, the gate against bench/limits.json, and
 # the candidate limits of these jobs (runLimit: the worst value of 5 runs or more plus their spread).
@@ -86,7 +86,7 @@ jobs:
         working-directory: packages/stack-endurance
         run: |
           node bench/main.ts run --out "$RUNNER_TEMP/bench" --job "$GITHUB_RUN_ID-$RUN" \
-            --round-offset "$(( (RUN - 1) * 16 ))" --commit "$COMMIT" --run "$GITHUB_RUN_ID"
+            --job-index "$RUN" --commit "$COMMIT" --run "$GITHUB_RUN_ID"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

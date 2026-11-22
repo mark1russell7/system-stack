@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { curveFault } from "../src/check.ts";
-import { independentStop, MINIMAL_STOP_CUTS } from "../src/shortfall.ts";
+import { independentStop, MINIMAL_STOP_CUTS, minimalStops } from "../src/shortfall.ts";
 import { BENCH_CUTS, caseId, cutsOf, independentInput } from "./inputs.ts";
 
 describe("the inputs of the bench", () => {
@@ -19,17 +19,27 @@ describe("the inputs of the bench", () => {
     }
   });
 
-  it("go up to the largest count of the sum over the states of independentStop", () => {
-    expect(Math.max(...BENCH_CUTS)).toBe(MINIMAL_STOP_CUTS);
+  it("give the sets of minimalStops up to 12 cuts, in its order, and have cases past 12 cuts", () => {
+    for (const cuts of BENCH_CUTS.filter((count) => count <= MINIMAL_STOP_CUTS)) {
+      const input = independentInput(cuts);
+      const stops = (on: readonly number[]): boolean => input.sets.some((set) => set.every((index) => on.includes(index)));
+      expect(minimalStops(cuts, stops), String(cuts)).toEqual(input.sets);
+    }
+    expect(BENCH_CUTS).toContain(MINIMAL_STOP_CUTS);
+    expect(Math.max(...BENCH_CUTS)).toBeGreaterThan(MINIMAL_STOP_CUTS);
     expect(() => independentInput(1)).toThrow(RangeError);
-    expect(() => independentInput(MINIMAL_STOP_CUTS + 1)).toThrow(RangeError);
   });
 
-  it("give a curve of independentStop at 4 cuts", () => {
-    const input = independentInput(4);
-    const curve = independentStop(input.curves, input.sets);
-    expect(curve).toBeDefined();
-    expect(curveFault(curve ?? [])).toBeUndefined();
+  it("give a curve of independentStop up to 15 cuts, and pass the default budget at 16 cuts", () => {
+    // At 16 cuts, the expansion has 17662 steps at more than 4000 points of the curve, so it passes INDEPENDENT_MAX_WORK.
+    const wide = independentInput(16);
+    expect(independentStop(wide.curves, wide.sets)).toBeUndefined();
+    for (const cuts of [4, 14, 15]) {
+      const input = independentInput(cuts);
+      const curve = independentStop(input.curves, input.sets);
+      expect(curve, String(cuts)).toBeDefined();
+      expect(curveFault(curve ?? [])).toBeUndefined();
+    }
   });
 
   it("name each case by its count of cuts", () => {

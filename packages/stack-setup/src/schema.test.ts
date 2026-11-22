@@ -23,6 +23,8 @@ describe("parseSetup", () => {
             { kind: "file", id: "two", path: "/b", text: { $var: "A" } },
             { kind: "file", id: "three", path: "/c", text: ["x=", { $var: "A" }] },
             { kind: "command", id: "four", run: ["true"], check: ["true"], as: "app" },
+            { kind: "command", id: "five", run: ["login"], check: ["true"], input: { $var: "A" } },
+            { kind: "archive", id: "six", url: "https://example.org/a.tar.xz", sha256: "a", into: "/opt/a", strip: 1, mark: { path: "/opt/a/m", sha256: "b" } },
           ],
         },
       ],

@@ -1,7 +1,8 @@
 /**
  * The bench of `independentStop`. It is for CI: a timed run on a shared computer does not give a valid value.
  *
- * - `node bench/main.ts run --out <folder> --job <label> [--round-offset <n>] [--commit <sha>] [--run <id>]` times each case in fresh children and writes `records.json`.
+ * - `node bench/main.ts run --out <folder> --job <label> [--job-index <n>] [--commit <sha>] [--run <id>]` times each case in fresh children and writes `records.json`.
+ *   The job of index `n` (from 1) starts its rounds at `(n - 1) * JOB_ROUNDS`, so the jobs of a run turn the order on.
  * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
  *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
  *
@@ -16,12 +17,20 @@ import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
-/** The rounds of one job: 4 times the count of arms, so the order of `armOrder` is balanced. */
-export const JOB_ROUNDS = 16;
+/** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
+export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
 /** The longest time of one child, in milliseconds. */
 const CHILD_MS = 120_000;
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/** This function gives the first round of the job of an index from 1: `(index - 1) * JOB_ROUNDS`. With no index, it is 0. */
+function roundOffset(index: string | boolean | undefined): number {
+  if (index === undefined) return 0;
+  const value = Number(index);
+  if (!Number.isInteger(value) || value < 1) throw new RangeError(`The option --job-index is ${String(index)}: it is not a whole number from 1.`);
+  return (value - 1) * JOB_ROUNDS;
+}
 
 async function run(args: Record<string, string | boolean | undefined>): Promise<void> {
   const out = String(args["out"] ?? "");
@@ -34,7 +43,7 @@ async function run(args: Record<string, string | boolean | undefined>): Promise<
     command: [process.execPath, join(here, "child.ts")],
     aa: [AA_CASE, AA_ARM],
     rounds,
-    roundOffset: Number(args["round-offset"] ?? 0),
+    roundOffset: roundOffset(args["job-index"]),
     timeoutMs: CHILD_MS,
     job,
     warmUp: 1,
@@ -119,7 +128,7 @@ const { positionals, values } = parseArgs({
     out: { type: "string" },
     job: { type: "string" },
     rounds: { type: "string" },
-    "round-offset": { type: "string" },
+    "job-index": { type: "string" },
     commit: { type: "string" },
     run: { type: "string" },
     in: { type: "string" },

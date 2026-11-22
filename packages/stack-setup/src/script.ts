@@ -3,12 +3,14 @@ import { escapeShell } from "@mark1russell7/text/shell";
 import { checkSetup, hasSetupError, type SetupFault } from "./check.ts";
 import { DEFAULT_MODE, DEFAULT_SHELL, modeText } from "./forms.ts";
 import {
+  changesAptSources,
   stepAddress,
   stepTexts,
   textParts,
   textVariables,
   unitPath,
   SETUP_SCHEMA,
+  type ArchiveStep,
   type CommandStep,
   type DownloadStep,
   type FileStep,
@@ -36,7 +38,7 @@ export const SETUP_MODES: readonly ["apply", "check"] = ["apply", "check"];
 export type SetupScript = { readonly ok: true; readonly script: string } | { readonly ok: false; readonly faults: readonly SetupFault[] };
 
 /** The shell functions that the steps use. The script has only the functions that its steps use. */
-type Helper = "installed" | "apt_install" | "in_group" | "login_shell" | "user_home" | "file_is" | "swap_on" | "in_fstab";
+type Helper = "installed" | "apt_install" | "in_group" | "login_shell" | "user_home" | "file_is" | "swap_on" | "in_fstab" | "root_folder";
 
 const HELPERS: readonly (readonly [Helper, readonly string[]])[] = [
   [
@@ -91,6 +93,15 @@ const HELPERS: readonly (readonly [Helper, readonly string[]])[] = [
       "}",
     ],
   ],
+  [
+    "root_folder",
+    [
+      "# This function tells if only root can change the folder $1: root owns it, it is not a link, and its group and other users cannot write in it.",
+      "root_folder() {",
+      '  [ -d "$1" ] && [ ! -L "$1" ] && [ -z "$(find "$1" -maxdepth 0 \\( ! -user root -o -perm /022 \\) -print)" ]',
+      "}",
+    ],
+  ],
 ];
 
 /** The shell functions that report a step. */
@@ -102,6 +113,8 @@ const REPORTS: readonly string[] = [
   "change() {",
   "  changes=$((changes + 1))",
   '  echo "change: $1"',
+  // The line on the standard error names the condition that fails. The line on the standard output keeps its form.
+  '  echo "check: $1: the condition $2 of the check fails" >&2',
   "}",
   "changed() {",
   "  changes=$((changes + 1))",
@@ -236,6 +249,71 @@ function downloadCode(step: DownloadStep): StepCode {
   };
 }
 
+/** This function gives the folders above a path, from `/`: for `/opt/a/b`, they are `/`, `/opt` and `/opt/a`. */
+function foldersAbove(path: string): string[] {
+  const segments = path.split("/").slice(1, -1);
+  return ["/", ...segments.map((_, index) => `/${segments.slice(0, index + 1).join("/")}`)];
+}
+
+/**
+ * The code of an archive. First the change makes sure that only root can change each folder above the folder. Thus no other
+ * user can put a link or a folder in the path between two commands. Then it extracts the archive into a new folder next to the
+ * folder, as root, with no owner from the archive. It removes the write of the group and of other users, and the set-user-ID
+ * and set-group-ID bits. Then it renames the old folder and the new folder. A process that runs a program of the old folder keeps its file.
+ * The check examines that the folder is a folder and not a link. It also examines the mark, the owner and the mode of each file, and the folders above it.
+ */
+function archiveCode(step: ArchiveStep): StepCode {
+  const into = q(step.into);
+  const fresh = q(`${step.into}.setup-new`);
+  const old = q(`${step.into}.setup-old`);
+  const mark = q(step.mark.path);
+  const sha = q(step.sha256);
+  const above = foldersAbove(step.into).map((folder) => q(folder));
+  return {
+    helpers: ["root_folder"],
+    check: [
+      `[ -d ${into} ]`,
+      `[ ! -L ${into} ]`,
+      `[ -f ${mark} ]`,
+      `[ "$(sha256sum ${mark} | cut -d' ' -f1)" = ${q(step.mark.sha256)} ]`,
+      `[ -z "$(find ${into} \\( ! -user root -o ! -group root \\) -print -quit)" ]`,
+      `[ -z "$(find ${into} ! -type l -perm /6022 -print -quit)" ]`,
+      ...above.map((folder) => `root_folder ${folder}`),
+    ],
+    apply: [
+      // From `/` down, each folder above is a folder that only root can change. A folder that is not there gets the mode 755.
+      `for above in ${above.join(" ")}; do`,
+      '  if [ ! -e "$above" ] && [ ! -L "$above" ]; then',
+      '    mkdir -m 755 "$above" || return 1',
+      "  fi",
+      '  if ! root_folder "$above"; then',
+      '    echo "setup: only root can change the folder $above above the archive" >&2',
+      "    return 1",
+      "  fi",
+      "done",
+      `curl -fsSL --proto =https --proto-redir =https --tlsv1.2 --retry ${String(DOWNLOAD_RETRIES)} --retry-max-time ${String(DOWNLOAD_RETRY_SECONDS)} -o "$tmp" ${q(step.url)} || return 1`,
+      `if [ "$(sha256sum "$tmp" | cut -d' ' -f1)" != ${sha} ]; then`,
+      '  echo "setup: the SHA-256 of the archive does not agree" >&2',
+      "  return 1",
+      "fi",
+      `rm -rf ${fresh} ${old} || return 1`,
+      // No -p: a path that is there makes mkdir fail. The mode 700 keeps other users out until the modes are correct.
+      `mkdir -m 700 ${fresh} || return 1`,
+      `tar -xf "$tmp" -C ${fresh} --strip-components=${String(step.strip ?? 0)} --no-same-owner || return 1`,
+      `chown -R -h root:root ${fresh} || return 1`,
+      // As root, tar keeps the modes of the archive. chmod removes the write of other users and the set-ID bits, so no file gives a user the rights of root.
+      `chmod -R go-w,ug-s ${fresh} || return 1`,
+      `chmod 755 ${fresh} || return 1`,
+      `if [ -e ${into} ]; then`,
+      `  mv ${into} ${old} || return 1`,
+      "fi",
+      `mv ${fresh} ${into} || return 1`,
+      `rm -rf ${old} || return 1`,
+    ],
+    tmp: true,
+  };
+}
+
 function swapCode(step: SwapStep): StepCode {
   const path = q(step.path);
   const form = q(`${String(step.mib * 1048576)} 600 root`);
@@ -302,7 +380,17 @@ function commandCode(step: CommandStep): StepCode {
   // `env` starts the program from the PATH, so no function, builtin or keyword of the shell is the program.
   const start = step.as === undefined || step.as === "root" ? "env" : `runuser -u ${q(step.as)} --`;
   const line = (command: readonly SetupText[]): string => [start, ...command.map(shellWord)].join(" ");
-  return { helpers: [], check: [line(step.check)], apply: [`${line(step.run)} || return 1`], tmp: false };
+  // printf is a builtin of the shell, so the input is not in the arguments of a process.
+  const run = step.input === undefined ? line(step.run) : `printf '%s' ${shellWord(step.input)} | ${line(step.run)}`;
+  return { helpers: [], check: [line(step.check)], apply: [`${run} || return 1`], tmp: false };
+}
+
+/**
+ * This function gives the texts that the check of a step reads. The `run` and the `input` of a command step are parts
+ * of the change, not of the check. Thus the mode `check` needs no value for a variable of them only.
+ */
+function checkTexts(step: Step): readonly SetupText[] {
+  return step.kind === "command" ? step.check : stepTexts(step);
 }
 
 /** This function gives the code of a step. */
@@ -316,6 +404,8 @@ function stepCode(step: Step): StepCode {
       return fileCode(step);
     case "download":
       return downloadCode(step);
+    case "archive":
+      return archiveCode(step);
     case "swap":
       return swapCode(step);
     case "service":
@@ -327,9 +417,10 @@ function stepCode(step: Step): StepCode {
 
 /**
  * This function gives the lines of one step: its two functions and the report.
- * The exit code of the check is the number of its first condition that fails. Thus a fault after the change names the condition, and it prints no value.
+ * The exit code of the check is the number of its first condition that fails. Thus a change in the mode `check` and a fault after the change name the condition.
+ * They print no value.
  */
-function stepLines(number: number, address: string, code: StepCode): string[] {
+function stepLines(number: number, address: string, code: StepCode, aptSource: boolean): string[] {
   const check = `check_${String(number)}`;
   const apply = `apply_${String(number)}`;
   const at = q(address);
@@ -342,14 +433,19 @@ function stepLines(number: number, address: string, code: StepCode): string[] {
     `${apply}() {`,
     ...code.apply.map((line) => `  ${line}`),
     "}",
-    `if ${check} >/dev/null 2>&1; then`,
+    // `||` keeps a failing check from a stop of `set -e`, and it keeps the exit code of the check.
+    "condition=0",
+    `${check} >/dev/null 2>&1 || condition=$?`,
+    'if [ "$condition" -eq 0 ]; then',
     `  ok ${at}`,
     'elif [ "$mode" = check ]; then',
-    `  change ${at}`,
+    `  change ${at} "$condition"`,
     "else",
     `  ${apply} >&2 || fail ${at} "the change failed"`,
     `  ${check} >/dev/null 2>&1 || fail ${at} "the condition $? of the check fails after the change"`,
     `  changed ${at}`,
+    // A new source or key of apt needs new lists, so the next package step reads them again.
+    ...(aptSource ? ["  apt_updated=0"] : []),
     "fi",
   ];
 }
@@ -363,6 +459,7 @@ function stepLines(number: number, address: string, code: StepCode): string[] {
  * - It exits with 64 for a usage fault. A usage fault is a mode that is not known, a start that is not root, or a variable with no value.
  * - Each step starts its check first. Only a step with a failing check makes its change, and then its check must pass.
  * - It reads the value of each variable from its environment. It names the variables of the steps of this host only.
+ * - The mode `check` needs the value of a variable only when a check reads it. The `input` of a command step is not a check.
  * - It holds no description of a record. Only names, paths and the texts of the steps are in it.
  *
  * The steps come in the order of `profileOrder`: a profile comes after each profile of the host whose part its part needs.
@@ -382,6 +479,7 @@ export function setupScript(layer: SetupLayer, stack: Stack, host: string): Setu
   const steps = profiles.flatMap((profile) => profile.steps.map((step) => ({ address: stepAddress(profile, step), step, code: stepCode(step) })));
   const variables: string[] = [];
   for (const { step } of steps) for (const text of stepTexts(step)) for (const name of textVariables(text)) if (!variables.includes(name)) variables.push(name);
+  const checked = new Set(steps.flatMap(({ step }) => checkTexts(step).flatMap((text) => textVariables(text))));
   const helpers = new Set(steps.flatMap(({ code }) => code.helpers));
   const tmp = steps.some(({ code }) => code.tmp);
   const lines: string[] = [
@@ -408,7 +506,8 @@ export function setupScript(layer: SetupLayer, stack: Stack, host: string): Setu
     "fi",
   ];
   for (const name of variables) {
-    lines.push(`if [ -z "\${${name}-}" ]; then`, `  echo "setup: the variable ${name} has no value" >&2`, `  exit ${String(SETUP_EXIT.usage)}`, "fi");
+    const test = `[ -z "\${${name}-}" ]`;
+    lines.push(`if ${checked.has(name) ? test : `[ "$mode" = apply ] && ${test}`}; then`, `  echo "setup: the variable ${name} has no value" >&2`, `  exit ${String(SETUP_EXIT.usage)}`, "fi");
   }
   lines.push("");
   if (tmp) lines.push('tmp=$(mktemp)', `trap 'rm -f "$tmp"' EXIT`, `trap 'exit ${String(SETUP_EXIT.failed)}' INT TERM HUP`);
@@ -416,7 +515,8 @@ export function setupScript(layer: SetupLayer, stack: Stack, host: string): Setu
   if (helpers.has("apt_install")) lines.push("apt_updated=0");
   for (const [name, text] of HELPERS) if (helpers.has(name)) lines.push("", ...text);
   if (steps.length > 0) lines.push("", ...REPORTS);
-  steps.forEach(({ address, code }, index) => lines.push("", ...stepLines(index + 1, address, code)));
+  const apt = helpers.has("apt_install");
+  steps.forEach(({ address, step, code }, index) => lines.push("", ...stepLines(index + 1, address, code, apt && changesAptSources(step))));
   lines.push(
     "",
     'echo "changes: $changes"',
