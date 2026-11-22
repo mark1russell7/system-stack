@@ -6,6 +6,7 @@
 
 ## . (build/index.d.ts): names
 
+BasisOptions: build/index.d.ts#BasisOptions
 CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
 CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
 CLAIM_BASES: build/index.d.ts#CLAIM_BASES
@@ -37,6 +38,7 @@ NO_FOLLOW_LAW: build/index.d.ts#NO_FOLLOW_LAW
 NO_GEOMAGNETIC_LAW: build/index.d.ts#NO_GEOMAGNETIC_LAW
 NO_LAW: build/index.d.ts#NO_LAW
 NO_STORM_LAW: build/index.d.ts#NO_STORM_LAW
+NO_TOLD_LAW: build/index.d.ts#NO_TOLD_LAW
 NoLaw: build/index.d.ts#NoLaw
 OutageCount: build/index.d.ts#OutageCount
 OutageEvent: build/index.d.ts#OutageEvent
@@ -70,6 +72,11 @@ survivalOf: build/index.d.ts#survivalOf
 zoneCounties: build/index.d.ts#zoneCounties
 
 ## Declarations
+
+### build/index.d.ts#BasisOptions
+export interface BasisOptions {
+  readonly assessed?: "keep" | "drop" | undefined;
+}
 
 ### build/index.d.ts#CAUSE_AFTER
 export declare const CAUSE_AFTER = 10800;
@@ -153,13 +160,12 @@ export interface Hazard {
 }
 
 ### build/index.d.ts#HazardCaseOptions
-export interface HazardCaseOptions {
+export interface HazardCaseOptions extends BasisOptions {
   readonly region?: {
     readonly scheme: string;
     readonly code: string;
   } | undefined;
   readonly parts?: Readonly<Record<string, readonly string[]>> | undefined;
-  readonly assessed?: "keep" | "drop" | undefined;
 }
 
 ### build/index.d.ts#HazardCode
@@ -217,6 +223,9 @@ export declare const NO_LAW: NoLaw;
 
 ### build/index.d.ts#NO_STORM_LAW
 export declare const NO_STORM_LAW: NoLaw;
+
+### build/index.d.ts#NO_TOLD_LAW
+export declare const NO_TOLD_LAW: NoLaw;
 
 ### build/index.d.ts#NoLaw
 export interface NoLaw {
@@ -369,7 +378,7 @@ export declare function stormCauses(classes: Readonly<Record<string, readonly st
 export declare function stormLine(line: string): StormRow | undefined;
 
 ### build/index.d.ts#supplyState
-export declare function supplyState(hazard: Hazard, part: string): SupplyState;
+export declare function supplyState(hazard: Hazard, part: string, options?: BasisOptions): SupplyState;
 
 ### build/index.d.ts#survivalOf
 export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;
