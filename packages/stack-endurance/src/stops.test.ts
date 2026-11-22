@@ -40,8 +40,10 @@ describe("stackStops", () => {
     expect(stackStops(generated, "s", copies.flat())).toBeUndefined();
     // With the cuts of one stage only, the other copies work, and the search is small.
     expect(stackStops(generated, "s", ["a0", "b0"])).toEqual([[0, 1]]);
-    // A larger budget ends the search: each stage is a minimal set.
-    expect(stackStops(generated, "s", copies.flat(), [], 2 ** 14)).toEqual(copies.map((_, stage) => [2 * stage, 2 * stage + 1]));
+    // With the cuts of 7 stages, 2 to the power 7 path sets pass a budget of 64. A budget of 128 ends the search: each stage is a minimal set.
+    const seven = copies.slice(0, 7);
+    expect(stackStops(generated, "s", seven.flat(), [], 64)).toBeUndefined();
+    expect(stackStops(generated, "s", seven.flat(), [], 128)).toEqual(seven.map((_, stage) => [2 * stage, 2 * stage + 1]));
   });
 
   it("keeps the sets of cuts in the budget", () => {
