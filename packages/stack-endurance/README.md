@@ -45,7 +45,7 @@ With the option `horizon` of `h` days, the shortfall counts only the first `h` d
 
 A draw that only the parts of `down` stop has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
 
-A cut can have no `duration`, as before a source gives its curve. Then each draw whose stop the cut can be part of goes in `unread`. A draw whose minimal stop sets do not have the cut keeps its curves. Past 12 cuts that count, the query cannot tell, so the draw goes in `unread`. The gate gives the warning `endurance-cut-no-curve` for each such cut.
+A cut can have no `duration`, as before a source gives its curve. Then each draw whose stop the cut can be part of goes in `unread`. A draw whose minimal stop sets do not have the cut keeps its curves. When the query has no minimal sets, it cannot tell, so the draw goes in `unread`. The gate gives the warning `endurance-cut-no-curve` for each such cut.
 
 The cuts of one case come from one event. `levels` takes each cut longer together with the event (`eventStop`). Then a stop with two cuts lasts as long as the longer cut. A stop through a need of `any` of two parts ends with the shorter cut. `levels` is not a limit: when the cuts are independent, the true stop can be longer or shorter.
 
@@ -53,7 +53,9 @@ The cuts of one case come from one event. `levels` takes each cut longer togethe
 
 `independent` is the shortfall when the cuts are independent (`independentStop`). At each time, the supply is stopped when the cuts that are still on contain a minimal set. The query adds the chance of each such state of the cuts. A stop of two cuts in series is then `1 - (1 - s1)(1 - s2)`, and a stop through a need of `any` of two parts is `s1 * s2`. `independent` is not more than `upper`. Between two bend times the chance is not linear, so the curve has more points, each within `1e-6` of the chance.
 
-Only the cuts of the supply, and of the parts that it needs through the stack, count. Past 12 such cuts, `upper` is the sum of their curves, `independent` is `upper`, and `coarse` names the need.
+Only the cuts of the supply, and of the parts that it needs through the stack, count. With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core, with the cut parts as `among`). Thus a case with more than 12 such cuts has exact sets. When that search passes its budget, the query examines each set of 12 cuts or fewer. With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` names the need.
+
+The independent stop examines 2 to the power of the count of cuts in the minimal sets. Past 12 such cuts, `independent` is `upper`, and `independentUpper` names the need.
 
 ## The entries
 

@@ -119,6 +119,20 @@ describe("stopSets", () => {
     expect(stops.kind === "exact" && stops.sets.length).toBe(15);
   });
 
+  it("gives only the sets of the parts of among, and takes each other part as working", () => {
+    expect(stopSets(SAMPLE_STACK, "alert", { size: 2, among: ["card", "push", "call", "phone"] })).toEqual(exact([["phone"], ["card", "push"], ["push", "call"]]));
+    expect(stopSets(SAMPLE_STACK, "alert", { size: 2, among: ["home-power"] })).toEqual(exact([]));
+    expect(stopSets(SAMPLE_STACK, "alert", { among: [] })).toEqual(exact([]));
+    expect(stopSets(SAMPLE_STACK, "alert", { down: ["phone"], among: [] })).toEqual(exact([[]]));
+  });
+
+  it("finds the stop sets of a few cut parts where the full path family passes maxSets", () => {
+    // 13 groups of 2 of 3 copies have 3 to the power 13 path sets. Only the copies of group 0 can fail.
+    const among = ["a0", "b0", "c0"];
+    expect(pathSets(twoOfThree(13), "f")).toEqual({ kind: "budget" });
+    expect(stopSets(twoOfThree(13), "f", { size: 3, among })).toEqual(exact([["a0", "b0"], ["a0", "c0"], ["b0", "c0"]]));
+  });
+
   it("throws for a size that is not a whole number from 0", () => {
     expect(() => stopSets(SAMPLE_STACK, "alert", { size: -1 })).toThrow(RangeError);
     expect(() => stopSets(SAMPLE_STACK, "alert", { size: 0.5 })).toThrow(RangeError);
@@ -199,6 +213,19 @@ describe("the path sets and the stop sets of generated stacks", () => {
         }
       }),
       { seed: 20261116, numRuns: 400 },
+    );
+  });
+
+  it("keep with among each stop set of the parts of among, and no other set", () => {
+    fc.assert(
+      fc.property(caseArbitrary, fc.subarray(IDS), ([generated, root, down], among) => {
+        const stops = stopSets(generated, root, { down, size: IDS.length });
+        const some = stopSets(generated, root, { down, size: IDS.length, among });
+        if (stops.kind !== "exact") throw new Error("A small stack gave no result.");
+        // A smallest set of the parts of among is a smallest set of all parts. Thus among keeps the sets that it holds.
+        expect(some).toEqual({ kind: "exact", sets: stops.sets.filter((set) => within(set, among)) });
+      }),
+      { seed: 20261122, numRuns: 400 },
     );
   });
 });

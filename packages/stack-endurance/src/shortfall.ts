@@ -1,6 +1,7 @@
 import { neededParts } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
+import { stackStops } from "./stops.ts";
 
 // The shortfall: the user-days in which a draw does not get its need, for one case and for one year.
 
@@ -149,8 +150,8 @@ export function longestStop(curves: readonly Survival[]): Survival {
 }
 
 /**
- * The largest count of cuts for which `minimalStops` examines each set.
- * `stopCurves` counts only the cuts that can reach the supply. Past this count, its `upper` is coarse.
+ * The largest count of cuts for which `minimalStops` examines each set, and for which `independentStop` examines each state.
+ * With a stack, `stopCurves` finds the minimal sets from the needs, so a larger count of cuts can have exact sets.
  */
 export const MINIMAL_STOP_CUTS = 12;
 
@@ -221,8 +222,10 @@ export const INDEPENDENT_TOLERANCE = 1e-6;
  *   Thus `|f''| <= (sum |s'|)^2 - sum s'^2`, and the line of a piece of length `h` is within `h^2 |f''| / 8` of the chance.
  *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. With a margin of 10 %, the count of points is less than `n / sqrt(7.2 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
  *
+ * The count of states is 2 to the power of the count of cuts in the sets. Past `MINIMAL_STOP_CUTS` such cuts, the result is `undefined`.
+ *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
- * @param sets - The minimal sets of `minimalStops`. With `undefined`, as for too many cuts, the result is `undefined`. With no sets, it is `[[0, 0]]`
+ * @param sets - The minimal sets of the cuts. With `undefined`, as for too many cuts, the result is `undefined`. With no sets, it is `[[0, 0]]`
  * @throws RangeError when a curve does not end at a chance of 0
  */
 export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined {
@@ -231,6 +234,7 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
   if (sets.length === 0) return [[0, 0]];
   // Only the cuts of a set change the chance. Their place in `used` is their bit in a state.
   const used = [...new Set(sets.flat())].sort((x, y) => x - y);
+  if (used.length > MINIMAL_STOP_CUTS) return undefined;
   const usedCurves = used.map((index) => curves[index] ?? []);
   const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << used.indexOf(index)), 0));
   const stopping = Array.from({ length: 1 << used.length }, (_, mask) => setMasks.some((set) => (set & mask) === set));
@@ -280,11 +284,16 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
  */
 export interface StopCurves {
   readonly event: Survival;
-  /** The stop when the cuts are independent (`independentStop`). When `coarse` is true, it is `upper`. */
+  /** The stop when the cuts are independent (`independentStop`). When `independentUpper` is true, it is `upper`. */
   readonly independent: Survival;
   readonly upper: Survival;
-  /** This is true when `upper` is the sum of the curves of the cuts that can reach the supply, because there are more than `MINIMAL_STOP_CUTS`. */
+  /**
+   * This is true when `upper` is the sum of the curves of the cuts that count, because the query has no minimal sets.
+   * With a stack, the search of the needs passed its budget. With no stack, more than `MINIMAL_STOP_CUTS` cuts count.
+   */
   readonly coarse: boolean;
+  /** This is true when `independent` is `upper`: `coarse` is true, or the minimal sets have more than `MINIMAL_STOP_CUTS` cuts. */
+  readonly independentUpper: boolean;
 }
 
 /** This function gives the parts of the stack that are down for a list of cut indexes. A case uses one memo for each of its draws. */
@@ -317,8 +326,11 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   if (stops([])) return undefined;
   if (!stops(relevant.map((_, index) => index))) return undefined;
   const given = relevant.map((index) => caseCuts.cuts[index]?.duration);
-  const sets = minimalStops(given.length, stops);
-  // The stop has no curve when a cut with no curve can be part of it. Past MINIMAL_STOP_CUTS, the query cannot tell.
+  // With a stack, the needs give the minimal sets. When their search passes its budget, the sets of each list of cuts are the check.
+  const parts = relevant.map((index) => caseCuts.cuts[index]?.part ?? "");
+  const structural = options.stack === undefined ? undefined : stackStops(options.stack, draw.supply, parts, options.down);
+  const sets = structural ?? minimalStops(given.length, stops);
+  // The stop has no curve when a cut with no curve can be part of it. With no minimal sets, the query cannot tell.
   const unsourced = given.flatMap((curve, index) => (curve === undefined ? [index] : []));
   if (unsourced.length > 0 && (sets === undefined || sets.some((set) => set.some((index) => unsourced.includes(index))))) return undefined;
   // A cut with no curve is in no minimal set here, so it does not change a stop. The curves do not include it.
@@ -327,7 +339,8 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
   const keptStops = (cuts: readonly number[]): boolean => stops(cuts.map((index) => kept[index] ?? -1));
   const keptSets = sets?.map((set) => set.map((index) => kept.indexOf(index)));
   const upper = upperStop(curves, keptSets);
-  return { event: eventStop(curves, keptStops), independent: independentStop(curves, keptSets) ?? upper, upper, coarse: keptSets === undefined };
+  const independent = independentStop(curves, keptSets);
+  return { event: eventStop(curves, keptStops), independent: independent ?? upper, upper, coarse: keptSets === undefined, independentUpper: independent === undefined };
 }
 
 /**
@@ -336,9 +349,12 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOption
  * - A set of cuts stops the supply when the supply cannot work without the cut parts, through the needs of the stack.
  * - Only the cuts of the supply, and of the parts that it needs through the stack, count. Another cut does not change the curves.
  * - The parts of `down` are down for the full event. When they stop the supply with no cut, the query has no curve.
- * - A cut with no `duration` gives no curve when it is in a minimal set, or when there are more than `MINIMAL_STOP_CUTS` cuts that count.
+ * - With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core), so the count of cuts has no limit of `MINIMAL_STOP_CUTS`.
+ *   When that search passes its budget, `minimalStops` examines each set of up to `MINIMAL_STOP_CUTS` cuts.
+ * - A cut with no `duration` gives no curve when it is in a minimal set, or when the query has no minimal sets.
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
- * - Past `MINIMAL_STOP_CUTS` cuts that count, `upper` is the sum of their curves, `independent` is `upper`, and `coarse` is true.
+ * - With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` is true.
+ * - When the minimal sets have more than `MINIMAL_STOP_CUTS` cuts, `independent` is `upper`, and `independentUpper` is true.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: Pick<CaseOptions, "stack" | "down"> = {}): StopCurves | undefined {
   return stopCurvesWith(caseCuts, draw, options, stoppedMemo(caseCuts, options));
@@ -362,6 +378,8 @@ export interface Shortfall {
   readonly unread: readonly string[];
   /** The needs of the draws whose `upper` is coarse (`StopCurves.coarse`). A gate on `upper` shows them. */
   readonly coarse: readonly string[];
+  /** The needs of the draws whose `independent` is `upper` (`StopCurves.independentUpper`). A gate on `independent` shows them. */
+  readonly independentUpper: readonly string[];
 }
 
 function zeroLevels(layer: EnduranceLayer): Record<string, number> {
@@ -385,6 +403,7 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
   const upper = zeroLevels(layer);
   const unread: string[] = [];
   const coarse: string[] = [];
+  const independentUpper: string[] = [];
   const stoppedOf = stoppedMemo(caseCuts, options);
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
     const held = endurance.needs[draw.need];
@@ -394,12 +413,13 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
       continue;
     }
     if (curves.coarse) coarse.push(draw.need);
+    if (curves.independentUpper) independentUpper.push(draw.need);
     const users = draw.users ?? 1;
     levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curves.event, held.days, horizon) * users;
     independent[draw.level] = (independent[draw.level] ?? 0) + tailDays(curves.independent, held.days, horizon) * users;
     upper[draw.level] = (upper[draw.level] ?? 0) + tailDays(curves.upper, held.days, horizon) * users;
   }
-  return { levels, independent, upper, unread, coarse };
+  return { levels, independent, upper, unread, coarse, independentUpper };
 }
 
 /** The shortfall of one year at one place, with the part of each case. */
@@ -415,7 +435,7 @@ export interface YearShortfall extends Shortfall {
  *
  * - The expected count of a case is `perYear * reach`, from the first prior of the case at the place. Thus the result is the expected user-days of one year.
  * - A case with no prior at the place is not in the sum.
- * - `unread` is the union of the needs that a case cannot read, in the order of the cases. `coarse` is the union of the coarse needs.
+ * - `unread` is the union of the needs that a case cannot read, in the order of the cases. `coarse` and `independentUpper` are unions too.
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
@@ -429,6 +449,7 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
   const upper = zeroLevels(layer);
   const unread: string[] = [];
   const coarse: string[] = [];
+  const independentUpper: string[] = [];
   const cases: YearShortfall["cases"][number][] = [];
   for (const caseCuts of layer.cases ?? []) {
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
@@ -441,7 +462,8 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     for (const [level, days] of Object.entries(shortfall.upper)) upper[level] = (upper[level] ?? 0) + rate * days;
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
     for (const need of shortfall.coarse) if (!coarse.includes(need)) coarse.push(need);
+    for (const need of shortfall.independentUpper) if (!independentUpper.includes(need)) independentUpper.push(need);
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
-  return { place, levels, independent, upper, unread, coarse, cases };
+  return { place, levels, independent, upper, unread, coarse, independentUpper, cases };
 }
