@@ -8,6 +8,8 @@
 
 Claim: build/index.d.ts#Claim
 DurationLaw: build/index.d.ts#DurationLaw
+EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
+EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
 Fit: build/index.d.ts#Fit
 HAZARDS_SCHEMA: build/index.d.ts#HAZARDS_SCHEMA
 HAZARD_CODES: build/index.d.ts#HAZARD_CODES
@@ -20,18 +22,33 @@ HazardCut: build/index.d.ts#HazardCut
 HazardFault: build/index.d.ts#HazardFault
 HazardList: build/index.d.ts#HazardList
 IsoDate: build/index.d.ts#IsoDate
+LAW_DAYS: build/index.d.ts#LAW_DAYS
 License: build/index.d.ts#License
 NO_LAW: build/index.d.ts#NO_LAW
 NoLaw: build/index.d.ts#NoLaw
+OutageCount: build/index.d.ts#OutageCount
+OutageEvent: build/index.d.ts#OutageEvent
+OutageOptions: build/index.d.ts#OutageOptions
+OutageReader: build/index.d.ts#OutageReader
+OutageRuns: build/index.d.ts#OutageRuns
+OutageTally: build/index.d.ts#OutageTally
+RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/index.d.ts#Regions
 SUPPLY_PARTS: build/index.d.ts#SUPPLY_PARTS
 Source: build/index.d.ts#Source
 SupplyState: build/index.d.ts#SupplyState
+SurvivalOptions: build/index.d.ts#SurvivalOptions
 checkHazards: build/index.d.ts#checkHazards
+eagleCustomers: build/index.d.ts#eagleCustomers
+eagleLine: build/index.d.ts#eagleLine
+eagleRegion: build/index.d.ts#eagleRegion
 hasHazardError: build/index.d.ts#hasHazardError
 hazardCase: build/index.d.ts#hazardCase
 hazardOf: build/index.d.ts#hazardOf
+outageCurves: build/index.d.ts#outageCurves
+outageReader: build/index.d.ts#outageReader
 supplyState: build/index.d.ts#supplyState
+survivalOf: build/index.d.ts#survivalOf
 
 ## Declarations
 
@@ -54,6 +71,12 @@ export interface DurationLaw {
   readonly scheme: string;
   readonly curves: Readonly<Record<string, Survival>>;
 }
+
+### build/index.d.ts#EAGLE_INTERVAL
+export declare const EAGLE_INTERVAL = 900;
+
+### build/index.d.ts#EAGLE_SCHEME
+export declare const EAGLE_SCHEME = "us-state-fips";
 
 ### build/index.d.ts#Fit
 export interface Fit {
@@ -117,6 +140,9 @@ export interface HazardList {
 ### build/index.d.ts#IsoDate
 export type IsoDate = string;
 
+### build/index.d.ts#LAW_DAYS
+export declare const LAW_DAYS: readonly number[];
+
 ### build/index.d.ts#License
 export interface License {
   readonly name: string;
@@ -130,6 +156,60 @@ export declare const NO_LAW: NoLaw;
 export interface NoLaw {
   readonly read: false;
   readonly reason: string;
+}
+
+### build/index.d.ts#OutageCount
+export interface OutageCount {
+  readonly area: string;
+  readonly out: number;
+  readonly time: number;
+}
+
+### build/index.d.ts#OutageEvent
+export interface OutageEvent {
+  readonly area: string;
+  readonly start: number;
+  readonly seconds: number;
+  readonly peak: number;
+  readonly censored: boolean;
+}
+
+### build/index.d.ts#OutageOptions
+export interface OutageOptions {
+  readonly customers: ReadonlyMap<string, number>;
+  readonly share?: number | undefined;
+  readonly least?: number | undefined;
+  readonly interval?: number | undefined;
+}
+
+### build/index.d.ts#OutageReader
+export interface OutageReader {
+  add(count: OutageCount): void;
+  finish(): OutageRuns;
+}
+
+### build/index.d.ts#OutageRuns
+export interface OutageRuns {
+  readonly events: readonly OutageEvent[];
+  readonly tally: OutageTally;
+}
+
+### build/index.d.ts#OutageTally
+export interface OutageTally {
+  readonly counts: number;
+  readonly times: number;
+  readonly repeats: number;
+  readonly unknown: number;
+  readonly truncated: number;
+}
+
+### build/index.d.ts#RegionCurve
+export interface RegionCurve {
+  readonly curve: Survival;
+  readonly count: number;
+  readonly censored: number;
+  readonly open: number;
+  readonly median: number | undefined;
 }
 
 ### build/index.d.ts#Regions
@@ -160,8 +240,23 @@ export type SupplyState = {
   readonly state: "no-read";
 };
 
+### build/index.d.ts#SurvivalOptions
+export interface SurvivalOptions {
+  readonly days?: readonly number[] | undefined;
+  readonly end?: number | undefined;
+}
+
 ### build/index.d.ts#checkHazards
 export declare function checkHazards(list: HazardList, parts?: readonly Part[]): HazardFault[];
+
+### build/index.d.ts#eagleCustomers
+export declare function eagleCustomers(text: string): Map<string, number>;
+
+### build/index.d.ts#eagleLine
+export declare function eagleLine(line: string): OutageCount | undefined;
+
+### build/index.d.ts#eagleRegion
+export declare function eagleRegion(area: string): string;
 
 ### build/index.d.ts#hasHazardError
 export declare function hasHazardError(faults: readonly HazardFault[]): boolean;
@@ -172,5 +267,14 @@ export declare function hazardCase(list: HazardList, hazard: Hazard, options?: H
 ### build/index.d.ts#hazardOf
 export declare function hazardOf(list: HazardList, code: string): Hazard | undefined;
 
+### build/index.d.ts#outageCurves
+export declare function outageCurves(events: readonly OutageEvent[], region: (area: string) => string, options?: SurvivalOptions): Readonly<Record<string, RegionCurve>>;
+
+### build/index.d.ts#outageReader
+export declare function outageReader(options: OutageOptions): OutageReader;
+
 ### build/index.d.ts#supplyState
 export declare function supplyState(hazard: Hazard, part: string): SupplyState;
+
+### build/index.d.ts#survivalOf
+export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;

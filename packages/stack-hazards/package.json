@@ -40,6 +40,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@mark1russell7/rigor-statistics": "^0.2.19",
     "@mark1russell7/system-stack": "workspace:*"
   },
   "devDependencies": {
