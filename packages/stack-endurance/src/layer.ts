@@ -83,8 +83,12 @@ export interface Cut {
   readonly part: string;
   /** The printed name of the cut, for example "Power outage". */
   readonly title: string;
-  readonly duration: Survival;
-  /** The source of the curve. */
+  /**
+   * The survival curve of the duration of the cut. A cut can have no curve, as before a source gives one.
+   * Then each draw whose stop the cut can be part of is no read in the shortfall (`stopCurves`), not a pass.
+   */
+  readonly duration?: Survival | undefined;
+  /** The source of the curve, or of the cut when it has no curve. */
   readonly source: string;
 }
 

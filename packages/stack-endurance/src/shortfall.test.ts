@@ -143,6 +143,33 @@ describe("caseShortfall", () => {
     expect(shortfall.levels["life"] ?? 0).toBeGreaterThan(0.01);
   });
 
+  it("gives a draw as no read when a cut with no curve can be part of its stop, and reads it when the cut cannot", () => {
+    const bare = (part: string): CaseCuts => ({ ...storm, cuts: storm.cuts.map((cut) => (cut.part === part ? { part: cut.part, title: cut.title, source: cut.source } : cut)) });
+    // The water main has no curve: the drinking water is no read, with and without the stack.
+    for (const options of [{}, { stack: MAIN_NEEDS_GRID }]) {
+      expect(stopCurves(bare("water-main"), DRINK, options)).toBeUndefined();
+      const shortfall = caseShortfall(SAMPLE_ENDURANCE, bare("water-main"), enduranceOf(SAMPLE_ENDURANCE, bare("water-main"), { at: AT, ...options }), options);
+      expect(shortfall.unread).toContain("hydration.drink");
+      expect(shortfall.levels["life"]).toBe(0);
+    }
+    // The grid has no curve. The power is no read. Without the stack, the grid cannot stop the water, so the water keeps its curves.
+    const noGrid = caseShortfall(SAMPLE_ENDURANCE, bare("grid"), enduranceOf(SAMPLE_ENDURANCE, bare("grid"), { at: AT }));
+    expect(noGrid.unread).toEqual(["power.electric"]);
+    expect(stopCurves(bare("grid"), DRINK)).toEqual(stopCurves(storm, DRINK));
+    // With the stack, the grid cut alone stops the water: the water is no read.
+    expect(stopCurves(bare("grid"), DRINK, { stack: MAIN_NEEDS_GRID })).toBeUndefined();
+    // The water main needs the grid or the road, and the case does not cut the road. The grid is in no minimal set, so the water is read.
+    const stack: Stack = { ...SAMPLE_ENDURANCE_STACK, parts: SAMPLE_ENDURANCE_STACK.parts.map((part) => (part.id === "water-main" ? { ...part, needs: [{ any: ["grid", "road"] }] } : part)) };
+    const noRoad = (caseCuts: CaseCuts): CaseCuts => ({ ...caseCuts, cuts: caseCuts.cuts.filter((cut) => cut.part !== "road") });
+    const read = stopCurves(noRoad(bare("grid")), DRINK, { stack });
+    expect(read).toBeDefined();
+    for (const days of TIMES) {
+      expect(survivalAt(read?.event ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
+      expect(survivalAt(read?.independent ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
+      expect(survivalAt(read?.upper ?? [], days)).toBeCloseTo(survivalAt(MAIN, days), 9);
+    }
+  });
+
   it("gives a draw that only a part of down stops as no read", () => {
     const none: CaseCuts = { case: "none", title: "None", cuts: [] };
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, none, enduranceOf(SAMPLE_ENDURANCE, none, { at: AT, down: ["water-main"] }), { down: ["water-main"] });
