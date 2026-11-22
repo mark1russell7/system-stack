@@ -34,7 +34,27 @@ describe("outageReader", () => {
       ]),
     );
     expect(events).toEqual([{ area: "A", start: at(2), seconds: 4 * 900, peak: 80, censored: false }]);
-    expect(tally).toEqual({ counts: 15, times: 11, repeats: 0, unknown: 0, truncated: 0 });
+    expect(tally).toEqual({ counts: 15, times: 11, repeats: 0, unknown: 0, missing: 0, truncated: 0 });
+  });
+
+  it("censors a run at a line with no count, and does not give a run at the next time of the area", () => {
+    const a = (step: number, out: number | undefined): OutageCount => ({ area: "A", out, time: at(step) });
+    // "A" is out at the steps 2 to 4, has no count at 5 and is out at 6 and 7. A count under the threshold at 8 gives a known start at 9.
+    const list = [...counts(steps(0, 12), []), a(2, 50), a(3, 50), a(4, 50), a(5, undefined), a(6, 50), a(7, 50), a(8, 0), a(9, 50), a(10, 50)];
+    const { events, tally } = read(list);
+    expect(events).toEqual([
+      { area: "A", start: at(2), seconds: 3 * 900, peak: 50, censored: true },
+      { area: "A", start: at(9), seconds: 2 * 900, peak: 50, censored: false },
+    ]);
+    expect(tally).toEqual({ counts: 21, times: 13, repeats: 0, unknown: 0, missing: 1, truncated: 1 });
+    expect(read([...list].sort((left, right) => left.time - right.time)).events).toEqual(events);
+    // A time of the collection with no line of "A" after the line with no count gives a known start again.
+    const later = read([...counts(steps(0, 10), []), a(2, 50), a(3, 50), a(4, undefined), a(6, 50), a(7, 50)]);
+    expect(later.events.map((event) => [event.start, event.censored])).toEqual([
+      [at(2), true],
+      [at(6), false],
+    ]);
+    expect(later.tally.truncated).toBe(0);
   });
 
   it("censors an event at a gap of the collection and at the end of the data", () => {

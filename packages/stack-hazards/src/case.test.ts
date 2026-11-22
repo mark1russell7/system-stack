@@ -2,6 +2,7 @@ import { checkEndurance, SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK, stopCurves, t
 import { describe, expect, it } from "vitest";
 import { hazardCase, hazardOf, supplyState } from "./case.ts";
 import { HAZARD_LIST } from "./data.ts";
+import { EAGLEI_GRID_LAW } from "./eaglei-law.ts";
 import { HAZARDS_SCHEMA, type HazardList } from "./hazard.ts";
 
 const STORM = hazardOf(HAZARD_LIST, "met.winter.storm")!;
@@ -29,6 +30,14 @@ describe("a hazard case as the values of CaseCuts", () => {
   it("tells no read for a supply that no source names, never a pass", () => {
     expect(supplyState(STORM, "power.grid").state).toBe("cut");
     expect(supplyState(STORM, "water.main")).toEqual({ state: "no-read" });
+  });
+
+  it("gives the curve of EAGLE-I of a state for the grid cut of a power outage, and no duration for the other cuts", () => {
+    const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
+    const cuts = hazardCase(HAZARD_LIST, outage, { region: { scheme: "us-state-fips", code: "48" } }).cuts;
+    expect(cuts.find((cut) => cut.part === "power.grid")?.duration).toEqual(EAGLEI_GRID_LAW.curves["48"]);
+    expect(cuts.filter((cut) => cut.duration !== undefined).map((cut) => cut.part)).toEqual(["power.grid"]);
+    expect(hazardCase(HAZARD_LIST, outage).cuts.every((cut) => cut.duration === undefined)).toBe(true);
   });
 
   it("gives the curve of the region of the user, and no curve for another region", () => {

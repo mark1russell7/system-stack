@@ -45,7 +45,9 @@ A part of a stack that needs a public supply names a reference id in its needs. 
 
 ## The sources
 
-The data of 0.1.0 comes from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse. No source with a law of a duration is read yet, so each cut has no law.
+The claims of 0.1.0 come from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse.
+
+The law of the grid cut of a power outage comes from EAGLE-I of Oak Ridge National Laboratory (CC BY 4.0, DOI `10.6084/m9.figshare.24237376`). It has one curve for each state, the District of Columbia, Puerto Rico and the US Virgin Islands. The curves are a derived work. The law is for all causes, so the grid cuts of the storm cases have no law yet. Each other cut has no law.
 
 ## The laws from outage records
 
@@ -60,12 +62,13 @@ These functions make a law of a duration from the records of a source of outages
 
 - An event is a run of the times of an area with a count at or above the threshold of the area. The threshold is a share of the customers of the area.
 - A gap of the collection, or the end of the data, censors an event. A run that starts at the start of the data or after a gap is not an event.
+- A line of an area with no count stops the observation of that area. It censors an open event, and a run at the next time of the area is not an event.
 - The order of the areas is free. A file in the order of the counties and a file in the order of the times give the same events.
 - An open tail is a curve that does not get to 0. Its last chance falls to 0 at two times the largest observed time.
 
 EAGLE-I is the dataset of the outages of each county of the United States from Oak Ridge National Laboratory. Its license is CC BY 4.0. A curve from it is a derived work, and it keeps the attribution of the source. The dataset does not reliably have outages of less than 15 minutes.
 
-The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. The script `scripts/eaglei-fit.ts` reads each file in range requests through `polite-crawler` and examines its MD5. The output is the artifact `eaglei-laws`. The package on npm does not have the script.
+The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. The script `scripts/eaglei-fit.ts` reads each file in range requests through `polite-crawler` and examines its MD5. The output is the artifact `eaglei-laws`. Then the script `scripts/eaglei-law.ts` makes the module `src/eaglei-law.ts` from the artifact. A state with fewer than 30 events gets no curve. The package on npm does not have the scripts.
 
 ## The entries
 

@@ -12,7 +12,8 @@ import { createInterface } from "node:readline";
 import { Readable } from "node:stream";
 import { parseArgs } from "node:util";
 import { arrayOf, numberOf, recordOf, textOf } from "@mark1russell7/optional/read";
-import { fetchTransport, send, statusLine, type Pace, type Reply, type Transport } from "polite-crawler/api";
+import { errorMessage } from "@mark1russell7/text";
+import { ApiError, fetchTransport, send, statusLine, type Pace, type Reply, type Transport } from "polite-crawler/api";
 import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
@@ -115,23 +116,55 @@ async function get(context: FitContext, url: string, what: string, headers: Read
   return answer.reply;
 }
 
+/** The tries of one range. The scheduler of the host waits its backoff before each new try. */
+export const RANGE_TRIES = 4;
+
+/** A fault of one try that a new try can correct: a status 429 or 5xx, or a part that is too short. */
+class TryFault extends Error {}
+
+/** This function tells if a new try can correct a status. */
+const passing = (status: number): boolean => status === 429 || status >= 500;
+
+/** This function gives the bytes of one range of a file, in one try: a fresh redirect, then the range request. */
+async function rangeTry(context: FitContext, file: DatasetFile, start: number, end: number): Promise<Uint8Array> {
+  const redirect = await get(context, file.url, `the place of ${file.name}`);
+  const location = redirect.headers["location"];
+  if (passing(redirect.status)) throw new TryFault(`The download of ${file.name} gave ${statusLine(redirect)}.`);
+  if (!(redirect.status >= 300 && redirect.status < 400 && location !== undefined)) throw new Error(`The download of ${file.name} gave ${statusLine(redirect)}, not a redirect.`);
+  const reply = await get(context, new URL(location, file.url).href, `the bytes ${String(start)} to ${String(end)} of ${file.name}`, { range: `bytes=${String(start)}-${String(end)}` }, "bytes");
+  const whole = reply.status === 200 && start === 0 && end === file.size - 1;
+  if (passing(reply.status)) throw new TryFault(`The storage gave ${statusLine(reply)} for a range of ${file.name}.`);
+  if (reply.status !== 206 && !whole) throw new Error(`The storage gave ${statusLine(reply)} for a range of ${file.name}.`);
+  const bytes = reply.bytes ?? new Uint8Array();
+  if (bytes.length !== end - start + 1) throw new TryFault(`The storage gave ${String(bytes.length)} bytes for a range of ${String(end - start + 1)} bytes of ${file.name}.`);
+  return bytes;
+}
+
 /**
- * This function gives the bytes of a file in range requests. Each range has its own redirect, because a signed URL of the storage lasts for seconds only.
+ * This function gives the bytes of one range of a file. A try with no answer, a status 429 or 5xx, or a short part comes again.
+ * After `RANGE_TRIES` tries, the last fault stops the read. Each other fault stops it at once.
+ */
+async function rangeOf(context: FitContext, file: DatasetFile, start: number, end: number): Promise<Uint8Array> {
+  for (let count = 1; ; count += 1) {
+    try {
+      return await rangeTry(context, file, start, end);
+    } catch (error) {
+      if (count >= RANGE_TRIES || !(error instanceof TryFault || error instanceof ApiError)) throw error;
+      context.log(`${file.name}: try ${String(count)} of the bytes ${String(start)} to ${String(end)} failed (${errorMessage(error)}). It comes again.`);
+    }
+  }
+}
+
+/**
+ * This function gives the bytes of a file in range requests. Each try of a range has its own redirect, because a signed URL of the storage lasts for seconds only.
  * After the last range, it examines the MD5 of the file.
  *
- * @throws Error when an answer is not a redirect or a part of the file, or when a part or the MD5 is wrong
+ * @throws Error when an answer is not a redirect or a part, when a range fails `RANGE_TRIES` times, or when the MD5 is wrong
  */
 export async function* fileChunks(context: FitContext, file: DatasetFile): AsyncGenerator<Uint8Array> {
   const hash = createHash("md5");
   for (const [start, end] of ranges(file.size, context.chunkBytes)) {
-    const redirect = await get(context, file.url, `the place of ${file.name}`);
-    const location = redirect.headers["location"];
-    if (!(redirect.status >= 300 && redirect.status < 400 && location !== undefined)) throw new Error(`The download of ${file.name} gave ${statusLine(redirect)}, not a redirect.`);
-    const reply = await get(context, new URL(location, file.url).href, `the bytes ${String(start)} to ${String(end)} of ${file.name}`, { range: `bytes=${String(start)}-${String(end)}` }, "bytes");
-    const whole = reply.status === 200 && start === 0 && end === file.size - 1;
-    if (reply.status !== 206 && !whole) throw new Error(`The storage gave ${statusLine(reply)} for a range of ${file.name}.`);
-    const bytes = reply.bytes ?? new Uint8Array();
-    if (bytes.length !== end - start + 1) throw new Error(`The storage gave ${String(bytes.length)} bytes for a range of ${String(end - start + 1)} bytes of ${file.name}.`);
+    const bytes = await rangeOf(context, file, start, end);
     hash.update(bytes);
     yield bytes;
   }

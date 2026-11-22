@@ -1,3 +1,4 @@
+import { EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { HAZARDS_SCHEMA, type Claim, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
@@ -31,9 +32,10 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   "nws.flood": nws("Flood safety", "flood"),
   "nws.wildfire": nws("Wildfire safety", "wildfire"),
   "nws.heat": nws("Heat safety", "heat"),
+  "eaglei.outages": EAGLEI_SOURCE,
 };
 
-/** The duration of each cut of the reference data. No source with a law of a duration is read yet. */
+/** The duration of each cut with no law yet. Only the grid cut of a power outage has a law, from EAGLE-I, for all causes. */
 export const NO_LAW: NoLaw = { read: false, reason: "No source with a law of the duration of this cut is read yet." };
 
 const said = (source: string, says: string): Claim => ({ source, says });
@@ -50,13 +52,13 @@ export const HAZARD_LIST: HazardList = {
     {
       case: "infra.power.outage",
       title: "Power outage",
-      examined: ["ready.power-outages"],
+      examined: ["ready.power-outages", "eaglei.outages"],
       cuts: [
         {
           part: "power.grid",
           title: "No power from the grid",
           claims: [defined("The case is a stop of the power from the grid."), said("ready.power-outages", "The page tells that the electrical power goes out.")],
-          duration: NO_LAW,
+          duration: EAGLEI_GRID_LAW,
         },
         { part: "phone.network", title: "No telephone service", claims: [said("ready.power-outages", "The page tells that a power outage can stop communications.")], duration: NO_LAW },
         { part: "water.main", title: "No water from the main", claims: [said("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration: NO_LAW },
