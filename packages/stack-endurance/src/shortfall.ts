@@ -1,3 +1,4 @@
+import { type OrderedRing, pathSetReliability, stronglyConnectedComponents } from "@mark1russell7/collections/graph";
 import { DEFAULT_MAX_SETS, neededParts, type PathOptions } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
@@ -162,7 +163,7 @@ export function longestStop(curves: readonly Survival[]): Survival {
 }
 
 /**
- * The largest count of cuts for which `minimalStops` examines each set, and for which `independentStop` examines each state.
+ * The largest count of cuts for which `minimalStops` examines each set, and for which `independentStop` adds the chance of each state.
  * With a stack, `stopCurves` finds the minimal sets from the needs, so a larger count of cuts can have exact sets.
  */
 export const MINIMAL_STOP_CUTS = 12;
@@ -221,6 +222,13 @@ export function upperStop(curves: readonly Survival[], sets: readonly (readonly 
 export const INDEPENDENT_TOLERANCE = 1e-6;
 
 /**
+ * The default budget of `independentStop` for a group of more than `MINIMAL_STOP_CUTS` cuts.
+ * The budget counts the steps of the expansion times the count of points of the curve.
+ * It is near the work of the sum over the states of 12 cuts.
+ */
+export const INDEPENDENT_MAX_WORK: number = 2 ** 26;
+
+/**
  * This function gives the curve of a stop of some cuts when the cuts are independent.
  * At each time `t`, the supply is stopped when the cuts that are still on contain a minimal set.
  * Its chance is a sum over each set of cuts that stops the supply.
@@ -234,47 +242,66 @@ export const INDEPENDENT_TOLERANCE = 1e-6;
  *   Thus `|f''| <= (sum |s'|)^2 - sum s'^2`, and the line of a piece of length `h` is within `h^2 |f''| / 8` of the chance.
  *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. With a margin of 10 %, the count of points is less than `n / sqrt(7.2 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
  *
- * The count of states is 2 to the power of the count of cuts in the sets. Past `MINIMAL_STOP_CUTS` such cuts, the result is `undefined`.
+ * - Up to `MINIMAL_STOP_CUTS` cuts in the sets, the function adds the chance of each of the 2 to the power of that count of states.
+ * - Two groups of cuts that share no set are independent, so the chance that the supply works is the product over the groups.
+ *   For example, 20 stages of 2 feeds give 20 groups of 2 cuts.
+ * - In a group of more than `MINIMAL_STOP_CUTS` cuts, it uses the Shannon expansion of `pathSetReliability` of collections.
+ *   The expansion merges two states with the same sets left, and it drops a set that holds another set.
+ * - The expansion is exponential in the worst case. When its steps times the count of points of the curve pass `maxWork`, the result is `undefined`.
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
- * @param sets - The minimal sets of the cuts. With `undefined`, as for too many cuts, the result is `undefined`. With no sets, it is `[[0, 0]]`
- * @throws RangeError when a curve does not end at a chance of 0
+ * @param sets - The minimal sets of the cuts. With `undefined`, as for no minimal sets, the result is `undefined`. With no sets, it is `[[0, 0]]`
+ * @param maxWork - The budget of the expansion of a group of more than `MINIMAL_STOP_CUTS` cuts, a whole number from 1. The default is `INDEPENDENT_MAX_WORK`
+ * @throws RangeError when a curve does not end at a chance of 0, or for a bad `maxWork`
  */
-export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined {
+export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined, maxWork: number = INDEPENDENT_MAX_WORK): Survival | undefined {
+  if (!Number.isInteger(maxWork) || maxWork < 1) throw new RangeError(`The budget maxWork is ${String(maxWork)}: it is not a whole number from 1.`);
   if (sets === undefined) return undefined;
   // With no set, no cuts stop the supply, as for `eventStop` and `upperStop`.
   if (sets.length === 0) return [[0, 0]];
-  // Only the cuts of a set change the chance. Their place in `used` is their bit in a state.
+  // Only the cuts of a set change the chance. Their place in `used` is their index in the sets of the cuts that count.
   const used = [...new Set(sets.flat())].sort((x, y) => x - y);
-  if (used.length > MINIMAL_STOP_CUTS) return undefined;
   const usedCurves = used.map((index) => curves[index] ?? []);
-  const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << used.indexOf(index)), 0));
-  const stopping = Array.from({ length: 1 << used.length }, (_, mask) => setMasks.some((set) => (set & mask) === set));
-  const states = new Float64Array(1 << used.length);
-  const chanceAt = (days: number): number => {
-    // The chance of each state of the cuts, one cut at a time. Bit k of a state is 1 when cut k is on.
-    states[0] = 1;
-    let length = 1;
-    for (const curve of usedCurves) {
-      const on = survivalAt(curve, days);
-      for (let mask = 0; mask < length; mask += 1) {
-        const chance = states[mask] ?? 0;
-        states[mask + length] = chance * on;
-        states[mask] = chance * (1 - on);
-      }
-      length *= 2;
+  const usedSets = sets.map((set) => set.map((index) => used.indexOf(index)));
+  const points = independentPoints(usedCurves);
+  // Two groups of cuts that share no set are independent: the supply works when it works in each group.
+  const groupChances: ((days: number) => number)[] = [];
+  for (const group of cutGroups(used.length, usedSets)) {
+    const curvesOf = group.map((index) => usedCurves[index] ?? []);
+    const setsOf = usedSets.filter((set) => group.includes(set[0] ?? -1)).map((set) => set.map((index) => group.indexOf(index)));
+    // Up to MINIMAL_STOP_CUTS cuts, the sum over the states is exact with a fixed cost. Past them, the expansion is exact within its budget.
+    if (group.length <= MINIMAL_STOP_CUTS) {
+      groupChances.push(stateChance(curvesOf, setsOf));
+      continue;
     }
-    let total = 0;
-    for (let mask = 0; mask < length; mask += 1) if (stopping[mask]) total += states[mask] ?? 0;
-    return Math.min(1, Math.max(0, total));
-  };
-  const times = [...new Set(usedCurves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
+    const chances = expandedChances(curvesOf, setsOf, points, maxWork);
+    if (chances === undefined) return undefined;
+    const chanceOf = new Map(points.map((days, index) => [days, chances[index] ?? 0]));
+    groupChances.push((days) => chanceOf.get(days) ?? 0);
+  }
+  return curveFrom(points, (days) => Math.min(1, Math.max(0, 1 - groupChances.reduce((works, chanceAt) => works * (1 - chanceAt(days)), 1))));
+}
+
+/** The groups of the cuts `0` to `count - 1`: two cuts are in one group when a chain of sets joins them. Each set has its cuts in one group. */
+function cutGroups(count: number, sets: readonly (readonly number[])[]): number[][] {
+  const next = Array.from({ length: count }, () => new Set<number>());
+  // A cycle through the cuts of each set joins them both ways, so the strongly connected components are the groups.
+  for (const set of sets) for (const [at, index] of set.entries()) next[index]?.add(set[(at + 1) % set.length] ?? index);
+  return stronglyConnectedComponents(
+    Array.from({ length: count }, (_, index) => index),
+    (index) => next[index] ?? [],
+  );
+}
+
+/** The times of `independentStop`: the points of the curves, and the pieces that keep each line within `INDEPENDENT_TOLERANCE`. */
+function independentPoints(curves: readonly Survival[]): number[] {
+  const times = [...new Set(curves.flatMap((curve) => curve.map(([days]) => days)))].sort((x, y) => x - y);
   const points: number[] = [];
   for (const [index, t1] of times.entries()) {
     const t0 = times[index - 1];
     if (t0 !== undefined) {
       const h = t1 - t0;
-      const slopes = usedCurves.map((curve) => Math.abs(survivalAt(curve, t1) - survivalAt(curve, t0)) / h);
+      const slopes = curves.map((curve) => Math.abs(survivalAt(curve, t1) - survivalAt(curve, t0)) / h);
       const sum = slopes.reduce((total, slope) => total + slope, 0);
       const bound = Math.max(0, sum * sum - slopes.reduce((total, slope) => total + slope * slope, 0));
       // A margin of 10 % keeps the rounding of the chance under the tolerance.
@@ -287,7 +314,83 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
     }
     points.push(t1);
   }
-  return curveFrom(points, chanceAt);
+  return points;
+}
+
+/** The chance of a stop at a time, as the sum over each state of `MINIMAL_STOP_CUTS` cuts or fewer. Bit k of a state is 1 when cut k is on. */
+function stateChance(curves: readonly Survival[], sets: readonly (readonly number[])[]): (days: number) => number {
+  const setMasks = sets.map((set) => set.reduce((mask, index) => mask | (1 << index), 0));
+  const stopping = Array.from({ length: 1 << curves.length }, (_, mask) => setMasks.some((set) => (set & mask) === set));
+  const states = new Float64Array(1 << curves.length);
+  return (days) => {
+    // The chance of each state of the cuts, one cut at a time.
+    states[0] = 1;
+    let length = 1;
+    for (const curve of curves) {
+      const on = survivalAt(curve, days);
+      for (let mask = 0; mask < length; mask += 1) {
+        const chance = states[mask] ?? 0;
+        states[mask + length] = chance * on;
+        states[mask] = chance * (1 - on);
+      }
+      length *= 2;
+    }
+    let total = 0;
+    for (let mask = 0; mask < length; mask += 1) if (stopping[mask]) total += states[mask] ?? 0;
+    return Math.min(1, Math.max(0, total));
+  };
+}
+
+/** The count of times in one expansion of `expandedChances`: the length of the vectors of its ring. */
+const EXPANSION_WIDTH = 64;
+
+/**
+ * The ring of the vectors of `width` chances, one for each time, for `pathSetReliability` of collections.
+ * Each operation is on each time alone. In the order, `a` is less than `b` when it is less or equal at each time, and not equal.
+ */
+function vectorRing(width: number): OrderedRing<Float64Array> {
+  const zip = (a: Float64Array, b: Float64Array, op: (x: number, y: number) => number): Float64Array => {
+    const out = new Float64Array(width);
+    for (let index = 0; index < width; index += 1) out[index] = op(a[index] ?? 0, b[index] ?? 0);
+    return out;
+  };
+  return {
+    zero: new Float64Array(width),
+    one: new Float64Array(width).fill(1),
+    add: (a, b) => zip(a, b, (x, y) => x + y),
+    sub: (a, b) => zip(a, b, (x, y) => x - y),
+    mul: (a, b) => zip(a, b, (x, y) => x * y),
+    compare: (a, b) => {
+      let less = false;
+      let more = false;
+      for (let index = 0; index < width; index += 1) {
+        const [x, y] = [a[index] ?? 0, b[index] ?? 0];
+        if (x < y) less = true;
+        else if (x > y) more = true;
+        else if (x !== y) return Number.NaN;
+      }
+      return less ? (more ? Number.NaN : -1) : more ? 1 : 0;
+    },
+  };
+}
+
+/**
+ * The chance of a stop at each point, from the Shannon expansion of `pathSetReliability`. A set works when each of its cuts is on.
+ * One call gives `EXPANSION_WIDTH` points. When the steps of one expansion times the count of points pass `maxWork`, the result is `undefined`.
+ */
+function expandedChances(curves: readonly Survival[], sets: readonly (readonly number[])[], points: readonly number[], maxWork: number): number[] | undefined {
+  const maxSteps = Math.floor(maxWork / points.length);
+  if (maxSteps < 1) return undefined;
+  const out: number[] = [];
+  for (let start = 0; start < points.length; start += EXPANSION_WIDTH) {
+    const times = points.slice(start, start + EXPANSION_WIDTH);
+    const chances = curves.map((curve) => Float64Array.from(times, (days) => survivalAt(curve, days)));
+    const result = pathSetReliability(sets, chances, vectorRing(times.length), { maxSteps });
+    // Each call has the same sets, so the first call tells if the expansion is in the budget.
+    if (result.kind === "budget") return undefined;
+    for (const chance of result.value) out.push(Math.min(1, Math.max(0, chance)));
+  }
+  return out;
 }
 
 /**
@@ -304,7 +407,7 @@ export interface StopCurves {
    * With a stack, the search of the needs passed its budget. With no stack, more than `MINIMAL_STOP_CUTS` cuts count.
    */
   readonly coarse: boolean;
-  /** This is true when `independent` is `upper`: `coarse` is true, or the minimal sets have more than `MINIMAL_STOP_CUTS` cuts. */
+  /** This is true when `independent` is `upper`: `coarse` is true, or the expansion of `independentStop` passed its budget. */
   readonly independentUpper: boolean;
 }
 
@@ -366,7 +469,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
  * - A cut with no `duration` gives no curve when it is in a minimal set, or when the query has no minimal sets.
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
  * - With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` is true.
- * - When the minimal sets have more than `MINIMAL_STOP_CUTS` cuts, `independent` is `upper`, and `independentUpper` is true.
+ * - When the expansion of `independentStop` passes its budget, `independent` is `upper`, and `independentUpper` is true.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopCurveOptions = {}): StopCurves | undefined {
   maxSetsOf(options);

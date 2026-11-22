@@ -12,7 +12,7 @@ import { minimalStops } from "../src/shortfall.ts";
 
 /** The seed of each input of the bench. A change of the seed is a change of the measure. */
 export const BENCH_SEED = "stack-endurance/independent-stop/1";
-/** The counts of cuts of the cases of the bench. 12 is `MINIMAL_STOP_CUTS`, the largest count that `independentStop` reads. */
+/** The counts of cuts of the cases of the bench. 12 is `MINIMAL_STOP_CUTS`, the largest count of the sum over the states of `independentStop`. */
 export const BENCH_CUTS = [4, 8, 12] as const;
 /** The points of each curve after `[0, 1]`. */
 export const CURVE_POINTS = 6;

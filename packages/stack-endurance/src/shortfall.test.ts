@@ -177,7 +177,7 @@ describe("caseShortfall", () => {
     expect(shortfall.levels["life"]).toBe(0);
   });
 
-  it("counts only the cuts that can reach the supply, and names an independent stop that is the upper limit", () => {
+  it("counts only the cuts that can reach the supply, and gives an exact independent stop past 12 cuts", () => {
     // Thirteen cuts of parts that the water main does not need do not change its curves.
     const others = Array.from({ length: 13 }, (_, index) => ({ part: `other-${String(index)}`, title: "Other", duration: GRID, source: "s" }));
     const wide: CaseCuts = { ...storm, cuts: [...storm.cuts, ...others] };
@@ -185,7 +185,7 @@ describe("caseShortfall", () => {
     expect(stopCurves(wide, DRINK, { stack: MAIN_NEEDS_GRID })?.coarse).toBe(false);
     expect(caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT }), {}).coarse).toEqual([]);
     // When the water main needs each of 13 feeds, 14 cuts count. Each cut stops it alone, so upper is the sum of their curves.
-    // The 14 cuts are more than MINIMAL_STOP_CUTS, so independent is upper. Before 0.5.0, upper was coarse here.
+    // Before 0.5.0, upper was coarse here. Before 0.6.0, the 14 cuts were more than MINIMAL_STOP_CUTS, so independent was upper.
     const feeds = others.map((cut) => cut.part);
     const stack: Stack = {
       ...SAMPLE_ENDURANCE_STACK,
@@ -193,12 +193,15 @@ describe("caseShortfall", () => {
     };
     const curves = stopCurves(wide, DRINK, { stack });
     expect(curves?.coarse).toBe(false);
-    expect(curves?.independentUpper).toBe(true);
-    expect(curves?.independent).toEqual(curves?.upper);
-    for (const days of TIMES) expect(survivalAt(curves?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 13 * survivalAt(GRID, days)), 9);
+    expect(curves?.independentUpper).toBe(false);
+    for (const days of TIMES) {
+      const [grid, main] = [survivalAt(GRID, days), survivalAt(MAIN, days)];
+      expect(survivalAt(curves?.upper ?? [], days)).toBeCloseTo(Math.min(1, main + 13 * grid), 9);
+      expect(Math.abs(survivalAt(curves?.independent ?? [], days) - (1 - (1 - main) * (1 - grid) ** 13)), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
     const shortfall = caseShortfall(SAMPLE_ENDURANCE, wide, enduranceOf(SAMPLE_ENDURANCE, wide, { at: AT, stack }), { stack });
     expect(shortfall.coarse).toEqual([]);
-    expect(shortfall.independentUpper).toEqual(["hydration.drink"]);
+    expect(shortfall.independentUpper).toEqual([]);
   });
 
   it("gives exact curves from the needs of the stack past 12 cuts that count", () => {
@@ -221,7 +224,7 @@ describe("caseShortfall", () => {
     }
   });
 
-  it("gives an exact upper limit for 7 pairs of feeds, and the upper limit as the independent stop", () => {
+  it("gives an exact upper limit and an exact independent stop for 7 pairs of feeds", () => {
     // The water main needs 7 stages, and each stage needs 1 of 2 feeds. A stop needs the main, or the two feeds of a stage.
     const stages = Array.from({ length: 7 }, (_, index) => [`a-${String(index)}`, `b-${String(index)}`]);
     const stack: Stack = {
@@ -237,11 +240,13 @@ describe("caseShortfall", () => {
     ];
     const curves = stopCurves({ ...storm, cuts }, DRINK, { stack });
     expect(curves?.coarse).toBe(false);
-    expect(curves?.independentUpper).toBe(true);
+    expect(curves?.independentUpper).toBe(false);
     for (const days of TIMES) {
-      const pair = Math.min(survivalAt(GRID, days), survivalAt(ROAD, days));
-      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 7 * pair), 9);
-      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(survivalAt(MAIN, days), pair), 9);
+      const [grid, road, main] = [survivalAt(GRID, days), survivalAt(ROAD, days), survivalAt(MAIN, days)];
+      const pair = Math.min(grid, road);
+      expect(survivalAt(curves?.upper ?? [], days), String(days)).toBeCloseTo(Math.min(1, main + 7 * pair), 9);
+      expect(survivalAt(curves?.event ?? [], days), String(days)).toBeCloseTo(Math.max(main, pair), 9);
+      expect(Math.abs(survivalAt(curves?.independent ?? [], days) - (1 - (1 - main) * (1 - grid * road) ** 7)), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
     }
   });
 
@@ -274,8 +279,8 @@ describe("caseShortfall", () => {
     expect(stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 64 })?.coarse).toBe(true);
     const exact = stopCurves({ ...storm, cuts }, DRINK, { stack, maxSets: 128 });
     expect(exact?.coarse).toBe(false);
-    // The 15 cuts of the sets are more than MINIMAL_STOP_CUTS, so independent is upper.
-    expect(exact?.independentUpper).toBe(true);
+    // The 15 cuts of the sets are more than MINIMAL_STOP_CUTS, and the expansion of independentStop is in its budget.
+    expect(exact?.independentUpper).toBe(false);
     for (const days of TIMES) expect(survivalAt(exact?.upper ?? [], days)).toBeCloseTo(Math.min(1, survivalAt(MAIN, days) + 7 * survivalAt(GRID, days)), 9);
     // caseShortfall gives the option to the stop curves of each draw.
     const endurance = enduranceOf(SAMPLE_ENDURANCE, { ...storm, cuts }, { at: AT, stack });
@@ -377,12 +382,67 @@ describe("independentStop", () => {
     expect(worst).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
   });
 
-  it("gives nothing with no sets or past 12 cuts in the sets, and a chance of 0 with an empty list of sets", () => {
+  it("gives nothing with no sets, and a chance of 0 with an empty list of sets", () => {
     expect(independentStop([GRID, MAIN], undefined)).toBeUndefined();
-    const thirteen = Array.from({ length: 13 }, () => GRID);
-    expect(independentStop(thirteen, [thirteen.map((_, index) => index)])).toBeUndefined();
-    expect(curveFault(independentStop(thirteen, [[0], [12]]) ?? [])).toBeUndefined();
     expect(independentStop([GRID, MAIN], [])).toEqual(eventStop([GRID, MAIN], () => false));
+    expect(curveFault(independentStop(Array.from({ length: 13 }, () => GRID), [[0], [12]]) ?? [])).toBeUndefined();
+  });
+
+  it("past 12 cuts, lies within the tolerance of the exact chance for each curve and set", () => {
+    fc.assert(
+      fc.property(fc.array(curve, { minLength: 13, maxLength: 13 }), fc.array(fc.integer({ min: 1, max: (1 << 13) - 1 }), { minLength: 1, maxLength: 5 }), (curves, rawMasks) => {
+        // The set of all cuts puts each cut in a set, so the 13 cuts are past MINIMAL_STOP_CUTS.
+        const masks = [...new Set([...rawMasks, (1 << 13) - 1])];
+        const sets = masks.map((mask) => curves.flatMap((_, index) => ((mask >> index) & 1 ? [index] : [])));
+        const independent = independentStop(curves, sets) ?? [];
+        expect(curveFault(independent)).toBeUndefined();
+        const stopping = Array.from({ length: 1 << 13 }, (_, state) => masks.some((mask) => (mask & state) === mask));
+        const reads: [number, number][] = [0, 0.3, 1, 2.2, 4, 7.5, 12, 20].map((days) => [days, survivalAt(independent, days)]);
+        // The middle of each 50th piece of the result, with the value of its line.
+        for (let index = 0; index + 1 < independent.length; index += 50) {
+          const [[t0, c0], [t1, c1]] = [independent[index] ?? [0, 1], independent[index + 1] ?? [0, 0]];
+          reads.push([(t0 + t1) / 2, (c0 + c1) / 2]);
+        }
+        let worst = 0;
+        for (const [days, value] of reads) {
+          const on = curves.map((item) => survivalAt(item, days));
+          let exact = 0;
+          for (const [state, stops] of stopping.entries()) {
+            if (stops) exact += on.reduce((product, chance, index) => product * ((state >> index) & 1 ? chance : 1 - chance), 1);
+          }
+          worst = Math.max(worst, Math.abs(value - exact));
+        }
+        expect(worst).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+      }),
+      { numRuns: 25 },
+    );
+  }, 60_000);
+
+  it("past 12 cuts, gives the closed forms of a set of all cuts, of pairs from two feeds and of 20 stages", () => {
+    const all = independentStop(Array.from({ length: 13 }, () => GRID), [Array.from({ length: 13 }, (_, index) => index)]) ?? [];
+    // Two feeds of 7 cuts: a stop needs one cut of each feed, so the 49 sets are each pair (a, b).
+    const feeds = [...Array.from({ length: 7 }, () => GRID), ...Array.from({ length: 7 }, () => ROAD)];
+    const pairs = independentStop(feeds, Array.from({ length: 49 }, (_, index) => [Math.floor(index / 7), 7 + (index % 7)])) ?? [];
+    // 20 stages of 2 feeds: a stop needs the two feeds of one stage.
+    const stages = Array.from({ length: 40 }, (_, index) => (index % 2 === 0 ? GRID : ROAD));
+    const wide = independentStop(stages, Array.from({ length: 20 }, (_, index) => [2 * index, 2 * index + 1])) ?? [];
+    for (const days of [...TIMES, 0.37, 2.5, 6.1]) {
+      const [grid, road] = [survivalAt(GRID, days), survivalAt(ROAD, days)];
+      expect(Math.abs(survivalAt(all, days) - grid ** 13), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+      expect(Math.abs(survivalAt(pairs, days) - (1 - (1 - grid) ** 7) * (1 - (1 - road) ** 7)), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+      expect(Math.abs(survivalAt(wide, days) - (1 - (1 - grid * road) ** 20)), String(days)).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
+    }
+  });
+
+  it("gives nothing when the expansion of a group past 12 cuts passes the budget maxWork, and refuses a bad budget", () => {
+    const feeds = [...Array.from({ length: 7 }, () => GRID), ...Array.from({ length: 7 }, () => ROAD)];
+    const pairs = Array.from({ length: 49 }, (_, index) => [Math.floor(index / 7), 7 + (index % 7)]);
+    expect(independentStop(feeds, pairs)).toBeDefined();
+    expect(independentStop(feeds, pairs, 1)).toBeUndefined();
+    // 7 stages of 2 feeds are 7 groups of 2 cuts, so the sum over the states needs no budget.
+    const stages = Array.from({ length: 7 }, (_, index) => [2 * index, 2 * index + 1]);
+    expect(independentStop(feeds, stages, 1)).toBeDefined();
+    for (const maxWork of [0, 1.5, Number.NaN]) expect(() => independentStop(feeds, pairs, maxWork)).toThrow(RangeError);
   });
 });
 

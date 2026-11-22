@@ -20,6 +20,7 @@ EnduranceCode: build/index.d.ts#EnduranceCode
 EnduranceFault: build/index.d.ts#EnduranceFault
 EnduranceLayer: build/layer.chunk.d.ts#EnduranceLayer
 Gift: build/layer.chunk.d.ts#Gift
+INDEPENDENT_MAX_WORK: build/index.d.ts#INDEPENDENT_MAX_WORK
 INDEPENDENT_TOLERANCE: build/index.d.ts#INDEPENDENT_TOLERANCE
 IsoDate: build/layer.chunk.d.ts#IsoDate
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
@@ -91,6 +92,9 @@ export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
 export interface EnduranceFault extends Fault {
   readonly code: EnduranceCode;
 }
+
+### build/index.d.ts#INDEPENDENT_MAX_WORK
+export declare const INDEPENDENT_MAX_WORK: number;
 
 ### build/index.d.ts#INDEPENDENT_TOLERANCE
 export declare const INDEPENDENT_TOLERANCE = 1e-6;
@@ -173,7 +177,7 @@ export declare function giftResource(converter: Converter): string | undefined;
 export declare function hasEnduranceError(faults: readonly EnduranceFault[]): boolean;
 
 ### build/index.d.ts#independentStop
-export declare function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined;
+export declare function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined, maxWork?: number): Survival | undefined;
 
 ### build/index.d.ts#joinEndurance
 export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;

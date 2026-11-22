@@ -55,7 +55,7 @@ The cuts of one case come from one event. `levels` takes each cut longer togethe
 
 Only the cuts of the supply, and of the parts that it needs through the stack, count. With a stack, the minimal sets come from the paths of the needs (`stopSets` of the core, with the cut parts as `among`). Thus a case with more than 12 such cuts has exact sets. When that search passes its budget, the query examines each set of 12 cuts or fewer. The option `maxSets` sets the budget: the largest count of sets in one step of the search. The default is 4096. With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` names the need.
 
-The independent stop examines 2 to the power of the count of cuts in the minimal sets. Past 12 such cuts, `independent` is `upper`, and `independentUpper` names the need.
+Two groups of cuts that share no minimal set are independent, so the independent stop takes the product over the groups. In a group of up to 12 cuts, it adds the chance of each state of the cuts. In a larger group, it uses the Shannon expansion of `pathSetReliability` (`@mark1russell7/collections`). The expansion merges two states with the same sets left, so sets with few shared cuts give a small expansion. The expansion is exponential in the worst case. When it passes its budget (`INDEPENDENT_MAX_WORK`), `independent` is `upper`, and `independentUpper` names the need.
 
 ## The entries
 
