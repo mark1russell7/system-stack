@@ -64,13 +64,19 @@ describe("setupScript", () => {
     expect(script).toContain('if [ -z "${ALERTS_TOKEN-}" ]; then');
   });
 
+  it("names the condition that fails in the mode check, on the standard error", () => {
+    expect(script).toContain('change() {\n  changes=$((changes + 1))\n  echo "change: $1"\n  echo "check: $1: the condition $2 of the check fails" >&2\n}');
+  });
+
   it("holds no value of a variable and no description", () => {
     expect(script).toContain(`printf '%s' ALERTS_TOKEN="$ALERTS_TOKEN"'\n' >"$tmp"`);
     expect(script).not.toContain("The token of the push service");
   });
 
   it("checks each step before its change, and the check again after the change", () => {
-    expect(script).toContain('if check_1 >/dev/null 2>&1; then\n  ok base.packages\nelif [ "$mode" = check ]; then\n  change base.packages\nelse');
+    expect(script).toContain(
+      'condition=0\ncheck_1 >/dev/null 2>&1 || condition=$?\nif [ "$condition" -eq 0 ]; then\n  ok base.packages\nelif [ "$mode" = check ]; then\n  change base.packages "$condition"\nelse',
+    );
     expect(script).toContain('  apply_1 >&2 || fail base.packages "the change failed"\n  check_1 >/dev/null 2>&1 || fail base.packages "the condition $? of the check fails after the change"');
     expect(script).toContain(`echo "changes: $changes"\nif [ "$mode" = check ] && [ "$changes" -gt 0 ]; then\n  exit ${String(SETUP_EXIT.changes)}\nfi\n`);
   });
@@ -181,7 +187,8 @@ describe("setupScript", () => {
     );
     expect(script).toContain(`check_1() {\n  env tailscale status || return 1\n}`);
     expect(script).toContain(`printf '%s' "$KEY" | env tailscale up --auth-key=file:/dev/stdin || return 1`);
-    expect(script).toContain('if [ -z "${KEY-}" ]; then');
+    // Only the change reads the input, so only the mode apply needs its value.
+    expect(script).toContain('if [ "$mode" = apply ] && [ -z "${KEY-}" ]; then');
   });
 
   it("reads the lists of apt again after a change of a source or a key of apt", () => {
@@ -207,6 +214,21 @@ describe("setupScript", () => {
     expect(unit).toContain("systemctl daemon-reload");
     expect(unit).not.toContain("systemctl enable");
     expect(unit).not.toContain("unit_new");
+  });
+
+  it("needs the value of a variable that only a change reads in the mode apply only", () => {
+    const script = scriptOf(
+      [
+        { kind: "file", id: "env", path: "/etc/app/env", text: ["TOKEN=", { $var: "TOKEN" }, "\n"], mode: "600" },
+        { kind: "command", id: "join", run: ["app", "join"], input: { $var: "KEY" }, check: ["app", "status"] },
+      ],
+      [
+        { name: "TOKEN", sensitive: true },
+        { name: "KEY", sensitive: true },
+      ],
+    );
+    expect(script).toContain('if [ -z "${TOKEN-}" ]; then');
+    expect(script).toContain('if [ "$mode" = apply ] && [ -z "${KEY-}" ]; then');
   });
 
   it("names only the variables of the steps of the host", () => {
