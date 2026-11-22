@@ -258,8 +258,9 @@ describe("independentStop", () => {
     expect(worst).toBeLessThanOrEqual(INDEPENDENT_TOLERANCE);
   });
 
-  it("gives nothing with no sets for too many cuts", () => {
+  it("gives nothing with no sets for too many cuts, and a chance of 0 with an empty list of sets", () => {
     expect(independentStop([GRID, MAIN], undefined)).toBeUndefined();
+    expect(independentStop([GRID, MAIN], [])).toEqual(eventStop([GRID, MAIN], () => false));
   });
 });
 

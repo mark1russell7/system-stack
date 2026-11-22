@@ -219,14 +219,16 @@ export const INDEPENDENT_TOLERANCE = 1e-6;
  * - Between two points of the curves the chance is a polynomial, not a line. The function splits each such segment into equal pieces.
  *   The chance is linear in each `s`, and each mixed second derivative is between -1 and 1.
  *   Thus `|f''| <= (sum |s'|)^2 - sum s'^2`, and the line of a piece of length `h` is within `h^2 |f''| / 8` of the chance.
- *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. The count of points is less than `n / sqrt(8 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
+ *   The count of pieces keeps each line within `INDEPENDENT_TOLERANCE`. With a margin of 10 %, the count of points is less than `n / sqrt(7.2 * INDEPENDENT_TOLERANCE)` plus the segments, for `n` cuts.
  *
  * @param curves - The curves of the cuts, each one good for `checkEndurance`
- * @param sets - The minimal sets of `minimalStops`. With `undefined`, as for too many cuts, the result is `undefined`
+ * @param sets - The minimal sets of `minimalStops`. With `undefined`, as for too many cuts, the result is `undefined`. With no sets, it is `[[0, 0]]`
  * @throws RangeError when a curve does not end at a chance of 0
  */
 export function independentStop(curves: readonly Survival[], sets: readonly (readonly number[])[] | undefined): Survival | undefined {
   if (sets === undefined) return undefined;
+  // With no set, no cuts stop the supply, as for `eventStop` and `upperStop`.
+  if (sets.length === 0) return [[0, 0]];
   // Only the cuts of a set change the chance. Their place in `used` is their bit in a state.
   const used = [...new Set(sets.flat())].sort((x, y) => x - y);
   const usedCurves = used.map((index) => curves[index] ?? []);
