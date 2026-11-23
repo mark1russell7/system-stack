@@ -1,0 +1,252 @@
+# The public API of @mark1russell7/stack-needs
+#
+# The names of each entry of the exports field, and the declaration of each name, without comments
+# and private members. The command `api-report check` compares this file with the built .d.ts files.
+# To accept a change of the API, start the build, then `api-report update`, and review the diff.
+
+## . (build/index.d.ts): names
+
+ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
+ActivityLevel: build/index.d.ts#ActivityLevel
+CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
+CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
+CalorieNeed: build/index.d.ts#CalorieNeed
+CalorieNeedLine: build/index.d.ts#CalorieNeedLine
+CalorieNeedTotal: build/index.d.ts#CalorieNeedTotal
+CalorieRow: build/index.d.ts#CalorieRow
+CalorieSex: build/index.d.ts#CalorieSex
+CalorieTable: build/index.d.ts#CalorieTable
+DGA_CALORIES: build/index.d.ts#DGA_CALORIES
+DGA_SOURCE: build/index.d.ts#DGA_SOURCE
+FOOD_NEED: build/index.d.ts#FOOD_NEED
+FragmentDirectUse: build/index.d.ts#FragmentDirectUse
+FragmentDraw: build/index.d.ts#FragmentDraw
+FragmentResource: build/index.d.ts#FragmentResource
+FragmentStore: build/index.d.ts#FragmentStore
+GiftNoRead: build/index.d.ts#GiftNoRead
+HashedSource: build/index.d.ts#HashedSource
+HouseholdFragment: build/index.d.ts#HouseholdFragment
+HouseholdFragmentInput: build/index.d.ts#HouseholdFragmentInput
+HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
+HouseholdFragmentRead: build/index.d.ts#HouseholdFragmentRead
+HouseholdFragmentResult: build/index.d.ts#HouseholdFragmentResult
+HouseholdStoresResult: build/index.d.ts#HouseholdStoresResult
+NEEDS_CODES: build/index.d.ts#NEEDS_CODES
+NO_COOK: build/index.d.ts#NO_COOK
+NeedsCode: build/index.d.ts#NeedsCode
+NeedsFinding: build/index.d.ts#NeedsFinding
+NoRowAction: build/index.d.ts#NoRowAction
+Person: build/index.d.ts#Person
+calorieNeed: build/index.d.ts#calorieNeed
+calorieRow: build/index.d.ts#calorieRow
+checkCalorieTable: build/index.d.ts#checkCalorieTable
+hasNeedsError: build/index.d.ts#hasNeedsError
+householdFragment: build/index.d.ts#householdFragment
+isActivityLevel: build/index.d.ts#isActivityLevel
+
+## Declarations
+
+### build/index.d.ts#ACTIVITY_LEVELS
+export declare const ACTIVITY_LEVELS: readonly ["sedentary", "moderately-active", "active"];
+
+### build/index.d.ts#ActivityLevel
+export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
+
+### build/index.d.ts#CALORIE_SEXES
+export declare const CALORIE_SEXES: readonly ["female", "male"];
+
+### build/index.d.ts#CALORIE_TABLES
+export declare const CALORIE_TABLES: readonly CalorieTable[];
+
+### build/index.d.ts#CalorieNeed
+export type CalorieNeed = {
+  readonly levels: Readonly<Record<ActivityLevel, Quantity>>;
+  readonly each?: never;
+} | {
+  readonly each: Quantity;
+  readonly levels?: never;
+};
+
+### build/index.d.ts#CalorieNeedLine
+export type CalorieNeedLine = {
+  readonly person: Person;
+  readonly read: true;
+  readonly level: ActivityLevel;
+  readonly row: string;
+  readonly need: Quantity;
+} | {
+  readonly person: Person;
+  readonly read: false;
+  readonly why: string;
+};
+
+### build/index.d.ts#CalorieNeedTotal
+export interface CalorieNeedTotal {
+  readonly lines: readonly CalorieNeedLine[];
+  readonly read: boolean;
+  readonly need: Quantity;
+  readonly persons: number;
+}
+
+### build/index.d.ts#CalorieRow
+export interface CalorieRow {
+  readonly sex: CalorieSex;
+  readonly age: string;
+  readonly from: number;
+  readonly to?: number | undefined;
+  readonly need: CalorieNeed;
+}
+
+### build/index.d.ts#CalorieSex
+export type CalorieSex = (typeof CALORIE_SEXES)[number];
+
+### build/index.d.ts#CalorieTable
+export interface CalorieTable {
+  readonly id: string;
+  readonly title: string;
+  readonly source: HashedSource;
+  readonly locator: string;
+  readonly rows: readonly CalorieRow[];
+}
+
+### build/index.d.ts#DGA_CALORIES
+export declare const DGA_CALORIES: CalorieTable;
+
+### build/index.d.ts#DGA_SOURCE
+export declare const DGA_SOURCE: HashedSource;
+
+### build/index.d.ts#FOOD_NEED
+export declare const FOOD_NEED = "food.energy";
+
+### build/index.d.ts#FragmentDirectUse
+export interface FragmentDirectUse {
+  readonly resource: string;
+  readonly need: string;
+  readonly amount: number;
+}
+
+### build/index.d.ts#FragmentDraw
+export interface FragmentDraw {
+  readonly need: string;
+  readonly level: string;
+  readonly perDay: number;
+  readonly users: number;
+  readonly supply: string;
+}
+
+### build/index.d.ts#FragmentResource
+export interface FragmentResource {
+  readonly code: string;
+  readonly unit: string;
+}
+
+### build/index.d.ts#FragmentStore
+export interface FragmentStore {
+  readonly id: string;
+  readonly resource: string;
+  readonly amount: number;
+}
+
+### build/index.d.ts#GiftNoRead
+export interface GiftNoRead {
+  readonly product: string;
+  readonly resource: string;
+  readonly why: string;
+}
+
+### build/index.d.ts#HashedSource
+export type HashedSource = Source & {
+  readonly sha256?: string;
+};
+
+### build/index.d.ts#HouseholdFragment
+export interface HouseholdFragment {
+  readonly schema: "endurance/1";
+  readonly levels: readonly string[];
+  readonly resources: readonly FragmentResource[];
+  readonly stores: readonly FragmentStore[];
+  readonly draws: readonly FragmentDraw[];
+  readonly direct: readonly FragmentDirectUse[];
+}
+
+### build/index.d.ts#HouseholdFragmentInput
+export interface HouseholdFragmentInput {
+  readonly persons: readonly Person[];
+  readonly activity: ActivityLevel;
+  readonly catalog: SupplyCatalog;
+  readonly units: Readonly<Record<string, number>>;
+  readonly supply: string;
+  readonly level: string;
+  readonly levels?: readonly string[] | undefined;
+  readonly table?: CalorieTable | undefined;
+  readonly prefix?: string | undefined;
+  readonly noRow?: NoRowAction | undefined;
+}
+
+### build/index.d.ts#HouseholdFragmentNoRead
+export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
+  readonly layer: undefined;
+  readonly need: CalorieNeedTotal | undefined;
+  readonly needRead: false;
+  readonly noRow: readonly Person[];
+  readonly why: string;
+}
+
+### build/index.d.ts#HouseholdFragmentRead
+export interface HouseholdFragmentRead extends HouseholdStoresResult {
+  readonly layer: HouseholdFragment;
+  readonly need: CalorieNeedTotal;
+  readonly needRead: true;
+  readonly leftOut: readonly Person[];
+}
+
+### build/index.d.ts#HouseholdFragmentResult
+export type HouseholdFragmentResult = HouseholdFragmentRead | HouseholdFragmentNoRead;
+
+### build/index.d.ts#HouseholdStoresResult
+export interface HouseholdStoresResult {
+  readonly energy: BuyListEnergy;
+  readonly noReads: readonly GiftNoRead[];
+  readonly storesRead: boolean;
+}
+
+### build/index.d.ts#NEEDS_CODES
+export declare const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value"];
+
+### build/index.d.ts#NO_COOK
+export declare const NO_COOK = "food.no-cook";
+
+### build/index.d.ts#NeedsCode
+export type NeedsCode = (typeof NEEDS_CODES)[number];
+
+### build/index.d.ts#NeedsFinding
+export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | "row">;
+
+### build/index.d.ts#NoRowAction
+export type NoRowAction = "leave-out";
+
+### build/index.d.ts#Person
+export interface Person {
+  readonly sex: CalorieSex;
+  readonly ageMonths: number;
+  readonly count: number;
+  readonly level?: ActivityLevel | undefined;
+}
+
+### build/index.d.ts#calorieNeed
+export declare function calorieNeed(table: CalorieTable, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal;
+
+### build/index.d.ts#calorieRow
+export declare function calorieRow(table: CalorieTable, sex: CalorieSex, ageMonths: number): CalorieRow | undefined;
+
+### build/index.d.ts#checkCalorieTable
+export declare function checkCalorieTable(table: CalorieTable, options?: GateOptions): NeedsFinding[];
+
+### build/index.d.ts#hasNeedsError
+export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;
+
+### build/index.d.ts#householdFragment
+export declare function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult;
+
+### build/index.d.ts#isActivityLevel
+export declare function isActivityLevel(level: unknown): level is ActivityLevel;

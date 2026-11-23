@@ -6,8 +6,6 @@ It is an add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). I
 
 Each function is a plain function with no clock, no network and no file.
 
-This package is not on npm yet. Other packages of this repository use it with `workspace:*`.
-
 ## The records
 
 | Record | What it tells |
