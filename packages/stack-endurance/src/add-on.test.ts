@@ -64,6 +64,56 @@ describe("joinEndurance", () => {
     expect(joinEndurance([{ from: "a", layer: water }, { from: "b", layer: { ...food, levels: ["other"] } }]).ok).toBe(false);
   });
 
+  const bare: EnduranceLayer = { ...food, stores: [] };
+
+  it("joins two equal resources of two fragments into one resource", () => {
+    const tank: EnduranceLayer = { ...bare, resources: [{ code: "water.stored", unit: "L" }], stores: [{ id: "tank", resource: "water.stored", amount: 200 }] };
+    const list: EnduranceLayer = { ...bare, resources: [{ unit: "L", code: "water.stored" }, { code: "food.no-cook", unit: "kcal" }] };
+    const joined = joinEndurance([
+      { from: "list", layer: list },
+      { from: "tank", layer: tank },
+    ]);
+    expect(joined.ok && joined.layer.resources).toEqual([
+      { code: "water.stored", unit: "L" },
+      { code: "food.no-cook", unit: "kcal" },
+    ]);
+    expect(joined.ok && joined.layer.stores.map((store) => store.id)).toEqual(["tank"]);
+    const all = joinEndurance([
+      { from: "a", layer: water },
+      { from: "b", layer: { ...food, resources: water.resources } },
+    ]);
+    expect(all.ok && all.layer.resources).toEqual(water.resources);
+  });
+
+  it("refuses one resource code with a different unit, and names the two fragments", () => {
+    const joined = joinEndurance([
+      { from: "list", layer: { ...bare, resources: [{ code: "water.stored", unit: "L" }] } },
+      { from: "tank", layer: { ...bare, resources: [{ code: "water.stored", unit: "gal" }] } },
+    ]);
+    expect(joined).toEqual({
+      ok: false,
+      errors: ['The fragment "list" has the resource {"code":"water.stored","unit":"L"}, and the fragment "tank" has {"code":"water.stored","unit":"gal"}.'],
+    });
+  });
+
+  it("keeps a code that one fragment has two times, so the gate finds it", () => {
+    const twice: EnduranceLayer = { ...bare, resources: [{ code: "water.stored", unit: "L" }, { code: "water.stored", unit: "L" }] };
+    const joined = joinEndurance([
+      { from: "a", layer: { ...bare, resources: [{ code: "water.stored", unit: "L" }] } },
+      { from: "b", layer: twice },
+    ]);
+    expect(joined.ok && joined.layer.resources).toHaveLength(2);
+  });
+
+  it("refuses one store id in two fragments, also with equal resources", () => {
+    const tank: EnduranceLayer = { ...bare, resources: [{ code: "water.stored", unit: "L" }], stores: [{ id: "tank", resource: "water.stored", amount: 200 }] };
+    const joined = joinEndurance([
+      { from: "a", layer: tank },
+      { from: "b", layer: tank },
+    ]);
+    expect(joined).toEqual({ ok: false, errors: ['The fragments "a", "b" each have the store "tank".'] });
+  });
+
   it("joins the stack documents of two owners through the core", () => {
     const joined = joinStacks(
       [

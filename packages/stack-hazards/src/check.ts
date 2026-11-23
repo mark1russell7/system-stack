@@ -1,7 +1,8 @@
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
-import { SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
+// Each claim of a source has a basis.
 
 /**
  * These are the codes of the gate. Each code is an error, except `hazards-no-law`, which is a warning.
@@ -11,6 +12,7 @@ import { SUPPLY_PARTS, type DurationLaw, type HazardList, type Source } from "./
  * - `hazards-no-claim`: a cut has no claim.
  * - `hazards-source`: a claim, a law or the list `examined` names a source that the table does not have.
  *   Or a source has no name, no URL, no publisher or a wrong date.
+ *   Or a claim of a source has no basis of `CLAIM_BASES`, or a claim of the definition has a basis.
  * - `hazards-license`: a source has no license name or no license URL.
  * - `hazards-law-region`: the source of a law has no regions, or the law has another scheme.
  *   Or the law has no curve for a region of its source.
@@ -70,12 +72,27 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
       cut.add(item.part);
       if (!known.has(item.part)) add("error", "hazards-part-unknown", at, `The cut "${at}" names a part that is not a reference part.`);
       if (item.claims.length === 0) add("error", "hazards-no-claim", at, `The cut "${at}" has no claim.`);
-      for (const claim of item.claims) if (claim.source !== undefined) sourceAt(at, claim.source);
+      for (const claim of item.claims) {
+        if (claim.source !== undefined) sourceAt(at, claim.source);
+        const fault = basisFault(claim);
+        if (fault !== undefined) add("error", "hazards-source", at, `A claim of the cut "${at}" ${fault}.`);
+      }
       if (item.duration.read) for (const [code, message] of lawFaults(item.duration, list.sources)) add("error", code, at, `The law of the cut "${at}": ${message}`);
       else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
     }
   }
   return faults;
+}
+
+/**
+ * This function gives the fault of the basis of a claim as the end of a sentence, or `undefined`.
+ * A claim of a source has a basis of `CLAIM_BASES`. A claim of the definition has no basis.
+ */
+function basisFault(claim: Claim): string | undefined {
+  const basis: unknown = claim.basis;
+  if (claim.definition === true) return basis === undefined ? undefined : "is the definition of the case, and has a basis of a source";
+  if (basis === undefined) return `names the source "${claim.source}" with no basis`;
+  return (CLAIM_BASES as readonly unknown[]).includes(basis) ? undefined : `has the basis "${String(basis)}", which is not one of ${CLAIM_BASES.join(", ")}`;
 }
 
 /** This function gives the faults of the fields of a source, as the ends of sentences. */

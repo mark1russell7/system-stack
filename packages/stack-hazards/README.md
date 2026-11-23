@@ -12,7 +12,8 @@ Each function is a plain function with no clock, no network and no file.
 | --- | --- |
 | `SUPPLY_PARTS` | The reference parts: the public supplies that a case can stop, for example `power.grid` and `water.main`. Each one is a failure domain of many stacks. |
 | `Source` | A public page or dataset: its URL, its publisher, its license, the date of its last change and the date of the read. |
-| `Claim` | The reason for a cut: a source that tells that the case can stop the part, or the definition of the case. The text is in own words, not a quote. |
+| `Claim` | The reason for a cut: a source that tells that the case can stop the part, or the definition of the case. The text is in own words, not a quote. A claim of a source has a basis. |
+| `ClaimBasis` | The basis of a claim of a source. `told`: what the event does when it happens. `assessed`: a judgment about the threat itself. |
 | `DurationLaw` | A survival curve of the duration for each region of its source, with its fit. |
 | `NoLaw` | No law is read yet. The cut has no curve, so its draws are no read. |
 | `Hazard` | A case: its code, its name, its cuts and the sources that the dataset examined for it. |
@@ -22,10 +23,13 @@ Each function is a plain function with no clock, no network and no file.
 1. A cut is in a case only when a source names it, or when the case is the stop of the part by definition.
 2. A supply with no cut in a case is no read, not a pass. `supplyState` tells it.
 3. Each cut has a law with its source, its license and its fit, or an explicit no read.
-4. A regional law covers each region of its source, not only one chosen region. The region of the user is input data.
-5. The fits come from `@mark1russell7/rigor-statistics`. The fetches of a source go through `polite-crawler`.
+4. Each claim of a source has a basis of `CLAIM_BASES`. A claim of the definition has no basis, because the definition is its basis.
+5. A regional law covers each region of its source, not only one chosen region. The region of the user is input data.
+6. The fits come from `@mark1russell7/rigor-statistics`. The fetches of a source go through `polite-crawler`.
 
 `checkHazards` is the gate of the rules. It refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law.
+
+The gate refuses a claim of a source with no basis or with a basis that is not in `CLAIM_BASES`. It also refuses a claim of the definition with a basis. Each of these faults has the code `hazards-source`.
 
 ## A first look
 
@@ -42,6 +46,32 @@ if (storm !== undefined) {
 ```
 
 A part of a stack that needs a public supply names a reference id in its needs. Or the option `parts` maps each reference id to the ids of the stack. An empty list tells that the stack does not have the supply.
+
+## Told effects and assessed risks
+
+A told claim and an assessed claim are not equal. The axis is the object of the claim: the effect of the event, or the threat.
+
+- `told`: the source tells what the event does when it happens, as a fact of past events or of physics. A flood washes bridges away.
+- `assessed`: the source gives a judgment about the threat itself: the intent of an actor, a prepositioning, or a chance. The advisory AA24-038A assesses that state actors prepare to disrupt four sectors in a conflict.
+
+A source that hedges an effect, for example with the word "potential", is assessed. The record does not make a hedge into a fact.
+
+With the option `assessed: "drop"`, a cut keeps its told claims, its claims of the definition and its law. Its source drops the URLs of the assessed claims.
+
+A cut with only assessed claims stays in the case with no `duration` and with the sources of its claims. Thus its draws are no read in the shortfall, not 0 user-days. A case with no cut stops no supply, and that is a false pass. `supplyState` takes the same option and gives the same cut.
+
+```ts
+const war = hazardOf(HAZARD_LIST, "security.armed-conflict");
+if (war !== undefined) {
+  const cuts = hazardCase(HAZARD_LIST, war, { assessed: "drop" }).cuts;
+  console.log(cuts.length); // 5
+  console.log(cuts.filter((cut) => cut.duration === undefined).length); // 5: each cut is no read
+}
+```
+
+With no option, or with `assessed: "keep"`, the output is the same as before the option.
+
+Only three sources have assessed claims: the DHS framework for AI, the CISA page on the electromagnetic pulse and the advisory AA24-038A. The CISA page tells only a potential of damage from an attack. Each other claim of a source is told.
 
 ## The sources
 
