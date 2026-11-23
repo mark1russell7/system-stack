@@ -259,7 +259,7 @@ importers:
         version: 0.11.2(zod@4.6.7)
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.0
+        version: 0.2.1
       '@mark1russell7/system-stack':
         specifier: workspace:*
         version: link:../system-stack
@@ -958,8 +958,8 @@ packages:
     resolution: {integrity: sha512-WIo/zJhj8RRRdNCz8JKEXOMZ4iPSh1h3igFGiWgRoAZGgETPuW7bP2oBgKVbMKEHn66c+hoXuCnwrIjguBaByA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.2.0':
-    resolution: {integrity: sha512-eTyJhK4Nowx1KQ3QrsQqLiAlhFoL+8m1OT6He+X0Lf0G/0f9OyQC8ponQLViQKRkP/ef10B6oACFjtjnKErobg==}
+  '@mark1russell7/rigor-generators@0.2.1':
+    resolution: {integrity: sha512-bWhgmh1I74o1KuNRycv43pZFseddTWTrvEAQjLWnMeiM3p9sB2ACvBiWradssLhCBhIrz2UxY9+5K34fZoUBnA==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.29':
@@ -2467,7 +2467,7 @@ snapshots:
   '@mark1russell7/coeval@0.38.1(zod@4.6.7)':
     dependencies:
       '@mark1russell7/collections': 0.11.2(zod@4.6.7)
-      '@mark1russell7/rigor-generators': 0.2.0
+      '@mark1russell7/rigor-generators': 0.2.1
     transitivePeerDependencies:
       - zod
 
@@ -2529,7 +2529,7 @@ snapshots:
 
   '@mark1russell7/rigor-bench@0.3.3(esbuild@0.28.2)':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.0
+      '@mark1russell7/rigor-generators': 0.2.1
       '@mark1russell7/rigor-statistics': 0.2.19
       '@mark1russell7/text': 0.0.17
     optionalDependencies:
@@ -2537,7 +2537,7 @@ snapshots:
 
   '@mark1russell7/rigor-generators@0.1.19': {}
 
-  '@mark1russell7/rigor-generators@0.2.0': {}
+  '@mark1russell7/rigor-generators@0.2.1': {}
 
   '@mark1russell7/rigor-statistics@0.1.29':
     dependencies:
@@ -2545,7 +2545,7 @@ snapshots:
 
   '@mark1russell7/rigor-statistics@0.2.19':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.0
+      '@mark1russell7/rigor-generators': 0.2.1
 
   '@mark1russell7/service@0.8.20(zod@4.6.7)':
     dependencies:
@@ -2571,12 +2571,12 @@ snapshots:
 
   '@mark1russell7/strategy-search@0.1.2':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.0
+      '@mark1russell7/rigor-generators': 0.2.1
       '@mark1russell7/strategy-space': 0.1.1
 
   '@mark1russell7/strategy-space@0.1.1':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.2.0
+      '@mark1russell7/rigor-generators': 0.2.1
       '@mark1russell7/rigor-statistics': 0.2.19
 
   '@mark1russell7/template-cli@0.1.9':
