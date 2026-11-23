@@ -1,17 +1,12 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
 import { calorieNeed, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type Person } from "./calorie.ts";
 import { DGA_CALORIES } from "./data.ts";
+import { DIRECT_USES, FOOD_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: one draw of food energy and the stores of the list.
 // The records have the form of the records of `@mark1russell7/stack-endurance`. An add-on does not import a different add-on, so the form is a copy.
 // A test assigns the layer to `EnduranceLayer` of stack-endurance. That test is the type gate of the copy.
 // The fragment has no converter. No cited source gives the water and the fuel to cook 1 kg of dry food, and a number with no source is not data.
-
-/** The code of the need of the food draw: food energy, in `kcal` for each day. */
-export const FOOD_NEED = "food.energy";
-
-/** The resource of the food to eat with no water and no fuel, in `kcal`. It has a direct use for the food draw. */
-export const NO_COOK = "food.no-cook";
 
 /** A resource of a store, with its unit. */
 export interface FragmentResource {
@@ -35,13 +30,6 @@ export interface FragmentDraw {
   /** The count of the persons of the draw. */
   readonly users: number;
   readonly supply: string;
-}
-
-/** The direct use of a resource for a need: 1 unit of the resource gives `amount` of the need. */
-export interface FragmentDirectUse {
-  readonly resource: string;
-  readonly need: string;
-  readonly amount: number;
 }
 
 /** A fragment of an endurance layer, with the form of `EnduranceLayer` of `@mark1russell7/stack-endurance`. It has no converter. */
@@ -68,8 +56,10 @@ export interface HouseholdFragmentInput {
   readonly catalog: SupplyCatalog;
   /** The count of units of each product of the buy list, by the `id` of the product. */
   readonly units: Readonly<Record<string, number>>;
-  /** The `id` of the part of the stack that supplies the food when no case stops it, for example `food.retail`. */
-  readonly supply: string;
+  /** The `id` of the part of the stack that supplies the food when no case stops it. The default is `NEED_SUPPLIES["food.energy"]`, `food.retail`. */
+  readonly supply?: string | undefined;
+  /** The direct uses. The fragment takes each use for the need `food.energy`. The default is `DIRECT_USES`. */
+  readonly uses?: readonly FragmentDirectUse[] | undefined;
   /** The level of the food draw. It is one of the levels of the joined layer. */
   readonly level: string;
   /** The levels of the fragment. The default is no levels: a different fragment of the stack gives them. */
@@ -133,11 +123,16 @@ export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
 export type HouseholdFragmentResult = HouseholdFragmentRead | HouseholdFragmentNoRead;
 
 /** This function gives the stores of the buy list, its resources and its gifts with no read. */
-function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]; resources: FragmentResource[]; parts: HouseholdStoresResult } {
+function buyListStores(
+  input: HouseholdFragmentInput,
+  foodUses: readonly FragmentDirectUse[],
+): { stores: FragmentStore[]; resources: FragmentResource[]; parts: HouseholdStoresResult } {
   const { catalog, units } = input;
   const energy = buyListEnergy(catalog, units);
   const unitOf = new Map(catalog.resources.map((resource) => [resource.code, resource.unit]));
-  if (unitOf.get(NO_COOK) !== "kcal") throw new RangeError(`The catalog has no resource "${NO_COOK}" in kcal.`);
+  for (const use of foodUses) {
+    if (unitOf.get(use.resource) !== "kcal") throw new RangeError(`The catalog has no resource "${use.resource}" in kcal for the food use.`);
+  }
   const prefix = input.prefix ?? "buy";
   const stores: FragmentStore[] = [];
   const noReads: GiftNoRead[] = [];
@@ -147,7 +142,7 @@ function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]
       else if (gift.amount > 0) stores.push({ id: `${prefix}:${product}:${gift.resource}`, resource: gift.resource, amount: gift.amount });
     }
   }
-  const codes = [...new Set([...stores.map((store) => store.resource), NO_COOK])];
+  const codes = [...new Set([...stores.map((store) => store.resource), ...foodUses.map((use) => use.resource)])];
   const resources = codes.map((code) => ({ code, unit: unitOf.get(code) ?? "" }));
   return { stores, resources, parts: { energy, noReads, storesRead: noReads.length === 0 } };
 }
@@ -157,8 +152,9 @@ function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]
  *
  * - The fragment has one draw of food energy. Its rate is the need of the persons for one day, and its users are the persons.
  * - Each gift of the buy list with a read is one store, with the `id` `<prefix>:<product>:<resource>`. A gift with no read has no store.
- * - The resources are the resources of the stores and `food.no-cook`, with the units of the catalog.
- * - The direct use of `food.no-cook` gives 1 kcal of the need for each kcal.
+ * - The direct uses are the food uses: each use of `uses` for the need `food.energy`. The default `DIRECT_USES` gives `food.no-cook`, 1 kcal for each kcal.
+ * - The resources are the resources of the stores and of the food uses, with the units of the catalog.
+ * - The supply part of the draw is `supply`. Its default is the part of `NEED_SUPPLIES` for `food.energy`.
  * - The fragment has no converter. A caller adds converters for the dry food, with the water and the fuel of each run.
  *
  * A person with no row in the table gives no layer, because a low rate gives too many days.
@@ -168,10 +164,11 @@ function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]
  * @param input - The persons, the activity level, the catalog and the buy list, the supply part and the level of the draw
  * @returns The fragment or a no read of the draw, with the energy of the list and the gifts with no read
  * @throws RangeError for the errors of `calorieNeed`, `giftsOf` and `buyListEnergy`, except a household with no person
- * @throws RangeError when the catalog has no resource `food.no-cook` in `kcal`
+ * @throws RangeError when the catalog has no resource in `kcal` for a food use
  */
 export function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult {
-  const { stores, resources, parts } = buyListStores(input);
+  const foodUses = (input.uses ?? DIRECT_USES).filter((use) => use.need === FOOD_NEED);
+  const { stores, resources, parts } = buyListStores(input, foodUses);
   if (input.persons.every((person) => person.count === 0)) {
     return { ...parts, layer: undefined, need: undefined, needRead: false, noRow: [], why: "The household has no person, so the draw is 0 kcal." };
   }
@@ -188,7 +185,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   if (users === 0 || need.need.value <= 0) {
     return { ...parts, layer: undefined, need, needRead: false, noRow, why: "No person of the draw has a row in the table, so the draw is 0 kcal." };
   }
-  const draw: FragmentDraw = { need: FOOD_NEED, level: input.level, perDay: need.need.value, users, supply: input.supply };
+  const draw: FragmentDraw = { need: FOOD_NEED, level: input.level, perDay: need.need.value, users, supply: input.supply ?? NEED_SUPPLIES[FOOD_NEED] };
   return {
     ...parts,
     layer: {
@@ -197,7 +194,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
       resources,
       stores,
       draws: [draw],
-      direct: [{ resource: NO_COOK, need: FOOD_NEED, amount: 1 }],
+      direct: foodUses.map((use) => ({ ...use })),
     },
     need,
     needRead: true,
