@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
 import { DGA_CALORIES, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER, NASEM_INFANT_CALORIES } from "./data.ts";
 import { FORMULA_DRAW_MONTHS, householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
-import { FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK } from "./uses.ts";
+import { BOTTLED_WATER, FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK, STORED_WATER } from "./uses.ts";
 
 /** Two made-up adults of 33 years. Sedentary, they need 2400 + 1800 = 4200 kcal each day. */
 const adults: Person[] = [
@@ -107,11 +107,23 @@ describe("the household fragment", () => {
   });
 
   it("gives stores of water in L and of each dry food in kg", () => {
-    const result = fragmentOf({ ...input, units: { "water.jug-1gal": 2, "food.pasta-dry-1kg": 1, "food.flour-white-1kg": 3 } });
+    const result = fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2, "water.container-1gal": 1, "food.pasta-dry-1kg": 1, "food.flour-white-1kg": 3 } });
     const amounts = Object.fromEntries(result.layer.stores.map((store) => [store.resource, store.amount]));
-    expect(amounts["water.stored"]).toBeCloseTo(2 * 3.785411784, 6);
+    expect(amounts[BOTTLED_WATER]).toBeCloseTo(2 * 3.785411784, 6);
+    expect(amounts[STORED_WATER]).toBeCloseTo(3.785411784, 6);
     expect(amounts).toMatchObject({ "food.pasta-dry": 1, "food.flour": 3 });
-    expect(result.layer.resources.find((resource) => resource.code === "water.stored")?.unit).toBe("L");
+    expect(result.layer.resources.find((resource) => resource.code === STORED_WATER)?.unit).toBe("L");
+    expect(result.layer.resources.find((resource) => resource.code === BOTTLED_WATER)?.unit).toBe("L");
+  });
+
+  it("gives the subset converter of the bottled water, so a draw of stored water also uses it", () => {
+    const result = fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2 } });
+    expect(result.layer.converters).toEqual([{ id: `buy:subset:${BOTTLED_WATER}`, takes: [{ resource: BOTTLED_WATER, amount: 1 }], gives: { resource: STORED_WATER, amount: 1 } }]);
+    // The gift of the converter is a resource of the layer, also with no store of it.
+    expect(result.layer.resources.map((resource) => resource.code)).toContain(STORED_WATER);
+    expect(hasEnduranceError(checkEndurance(result.layer))).toBe(false);
+    expect(fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.container-1gal": 2 } }).layer.converters).toEqual([]);
+    expect(fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2 }, subsets: [] }).layer.converters).toEqual([]);
   });
 
   it("gives an infant the need of the infant table by default", () => {

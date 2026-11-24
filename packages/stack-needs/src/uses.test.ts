@@ -1,10 +1,25 @@
 import { NEEDS } from "@mark1russell7/alerts";
 import { SUPPLY_CATALOG, type SupplyCatalog } from "@mark1russell7/market/supplies";
-import type { DirectUse } from "@mark1russell7/stack-endurance";
+import type { Converter, DirectUse } from "@mark1russell7/stack-endurance";
 import { SUPPLY_PARTS } from "@mark1russell7/stack-hazards";
 import { describe, expect, it } from "vitest";
 import { householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
-import { checkJoins, DIRECT_USES, FOOD_NEED, FORMULA_NEED, FORMULA_READY, JOIN_CODES, NEED_SUPPLIES, NO_COOK, STORED_WATER, WATER_NEED, type JoinReferences } from "./uses.ts";
+import {
+  BOTTLED_WATER,
+  checkJoins,
+  DIRECT_USES,
+  FOOD_NEED,
+  FORMULA_NEED,
+  FORMULA_READY,
+  JOIN_CODES,
+  NEED_SUPPLIES,
+  NO_COOK,
+  RESOURCE_SUBSETS,
+  STORED_WATER,
+  subsetConverters,
+  WATER_NEED,
+  type JoinReferences,
+} from "./uses.ts";
 
 /** The real reference lists: the needs of alerts and the reference parts of stack-hazards. */
 const references: JoinReferences = { needs: NEEDS, parts: SUPPLY_PARTS };
@@ -29,6 +44,13 @@ const CATALOG: SupplyCatalog = {
     { ...water, code: "food.test-ration", unit: "kcal" },
   ],
 };
+
+/** These subsets have one break each: an unknown resource, one resource two times, and units that do not convert. */
+const BAD_SUBSETS = [
+  { resource: "water.unknown", of: STORED_WATER },
+  { resource: STORED_WATER, of: STORED_WATER },
+  { resource: NO_COOK, of: STORED_WATER },
+];
 
 /** This function gives the codes, the records and the ids of the findings of a call. */
 function codesOf(...args: Parameters<typeof checkJoins>): [string, string, string][] {
@@ -101,7 +123,7 @@ describe("checkJoins", () => {
     expect(codesOf(SUPPLY_CATALOG, [], { [WATER_NEED]: "part.unknown" }, references)).toEqual([["join-supply-part", "supply", WATER_NEED]]);
   });
 
-  it("gives each finding as an error, in the order of the uses and then the supplies", () => {
+  it("gives each finding as an error, in the order of the uses, the supplies and the subsets", () => {
     const uses = [
       { resource: "water.unknown", need: WATER_NEED, amount: 1 },
       { resource: STORED_WATER, need: "need.unknown", amount: 1 },
@@ -109,10 +131,29 @@ describe("checkJoins", () => {
       { resource: STORED_WATER, need: WATER_NEED, amount: 2 },
     ];
     const supplies = { [WATER_NEED]: "part.unknown", "need.unknown": "water.main" };
-    const findings = checkJoins(SUPPLY_CATALOG, uses, supplies, references);
-    expect(findings.map((finding) => finding.code)).toEqual(["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-part", "join-supply-need"]);
+    const findings = checkJoins(SUPPLY_CATALOG, uses, supplies, references, BAD_SUBSETS);
+    expect(findings.map((finding) => finding.code)).toEqual([
+      "join-use-resource",
+      "join-use-need",
+      "join-use-unit",
+      "join-use-amount",
+      "join-supply-part",
+      "join-supply-need",
+      "join-subset-resource",
+      "join-subset-same",
+      "join-subset-unit",
+    ]);
     expect(new Set(findings.map((finding) => finding.code))).toEqual(new Set(JOIN_CODES));
     for (const finding of findings) expect(finding.level).toBe("error");
+  });
+
+  it("finds each break of a subset, so subsetConverters does not throw for a catalog that passes", () => {
+    expect(codesOf(SUPPLY_CATALOG, [], {}, references, BAD_SUBSETS)).toEqual([
+      ["join-subset-resource", "subset", "water.unknown"],
+      ["join-subset-same", "subset", STORED_WATER],
+      ["join-subset-unit", "subset", NO_COOK],
+    ]);
+    expect(codesOf(SUPPLY_CATALOG, [], {}, references, [])).toEqual([]);
   });
 
   it("uses only the reference lists of the call", () => {
@@ -166,5 +207,39 @@ describe("householdFragment", () => {
   it("refuses a food use whose resource is not in the catalog in kcal", () => {
     const uses = [{ resource: STORED_WATER, need: FOOD_NEED, amount: 1 }];
     expect(() => householdFragment({ ...input, uses })).toThrow(RangeError);
+  });
+});
+
+describe("subsetConverters", () => {
+  /** The catalog with test resources. The reference catalog has `water.bottled` since market 0.9.0. */
+  const bottledCatalog: SupplyCatalog = CATALOG;
+
+  it("makes bottled water a subset of stored water, as a definition", () => {
+    expect(RESOURCE_SUBSETS).toEqual([{ resource: BOTTLED_WATER, of: STORED_WATER }]);
+  });
+
+  it("gives a converter of 1 L of bottled water into 1 L of stored water, with no device and no limit", () => {
+    const converters = subsetConverters(bottledCatalog, [BOTTLED_WATER, NO_COOK]);
+    // The type gate of the copy of the form: each converter is a converter of stack-endurance.
+    const typedConverters: readonly Converter[] = converters;
+    expect(typedConverters).toEqual([{ id: `buy:subset:${BOTTLED_WATER}`, takes: [{ resource: BOTTLED_WATER, amount: 1 }], gives: { resource: STORED_WATER, amount: 1 } }]);
+    expect(subsetConverters(bottledCatalog, [BOTTLED_WATER], RESOURCE_SUBSETS, "owner")[0]?.id).toBe(`owner:subset:${BOTTLED_WATER}`);
+  });
+
+  it("gives no converter when the stores have no resource of a subset", () => {
+    expect(subsetConverters(bottledCatalog, [STORED_WATER, NO_COOK])).toEqual([]);
+    expect(subsetConverters(SUPPLY_CATALOG, [])).toEqual([]);
+  });
+
+  it("converts the units of a subset with the factor of the units", () => {
+    const converters = subsetConverters(bottledCatalog, ["water.test-gal"], [{ resource: "water.test-gal", of: STORED_WATER }]);
+    expect(converters[0]?.gives).toEqual({ resource: STORED_WATER, amount: 3.785411784 });
+  });
+
+  it("throws for a subset of a resource that is not in the catalog, of units that do not convert, or of one resource two times", () => {
+    expect(() => subsetConverters(bottledCatalog, ["water.unknown"], [{ resource: "water.unknown", of: STORED_WATER }])).toThrow(/water\.unknown/u);
+    expect(() => subsetConverters(bottledCatalog, [BOTTLED_WATER], [{ resource: BOTTLED_WATER, of: "water.unknown" }])).toThrow(/water\.unknown/u);
+    expect(() => subsetConverters(bottledCatalog, ["test.dose"], [{ resource: "test.dose", of: STORED_WATER }])).toThrow(/does not convert/u);
+    expect(() => subsetConverters(bottledCatalog, [STORED_WATER], [{ resource: STORED_WATER, of: STORED_WATER }])).toThrow(/two times/u);
   });
 });

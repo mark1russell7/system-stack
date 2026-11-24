@@ -2,12 +2,13 @@ import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "
 import { canonicalUnit, quantity, valueIn } from "@mark1russell7/quantity";
 import { calorieChange, calorieNeed, INFANT_FEEDINGS, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type CalorieTables, type Person } from "./calorie.ts";
 import { CALORIE_CHAIN, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER } from "./data.ts";
-import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
+import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, RESOURCE_SUBSETS, subsetConverters, type FragmentDirectUse, type ResourceSubset, type SubsetConverter } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: a draw of food energy, a draw of infant formula and the stores of the list.
 // The records have the form of the records of `@mark1russell7/stack-endurance`. An add-on does not import a different add-on, so the form is a copy.
 // A test assigns the layer to `EnduranceLayer` of stack-endurance. That test is the type gate of the copy.
-// The fragment has no converter. `cookFragment` gives the converters of the dry food, with the water and the fuel of each pot.
+// The only converters of the fragment are the subsets of its stores, for example bottled water as stored water.
+// `cookFragment` gives the converters of the dry food, with the water and the fuel of each pot.
 // `formulaMixFragment` gives the converter of the infant formula powder, with its water.
 
 /** A resource of a store, with its unit. */
@@ -34,7 +35,10 @@ export interface FragmentDraw {
   readonly supply: string;
 }
 
-/** A fragment of an endurance layer, with the form of `EnduranceLayer` of `@mark1russell7/stack-endurance`. It has no converter. */
+/**
+ * A fragment of an endurance layer, with the form of `EnduranceLayer` of `@mark1russell7/stack-endurance`.
+ * Its only converters are the converters of the subsets of its stores (`subsetConverters`).
+ */
 export interface HouseholdFragment {
   /** The format of an endurance layer, `endurance/1`. */
   readonly schema: "endurance/1";
@@ -43,6 +47,8 @@ export interface HouseholdFragment {
   readonly stores: readonly FragmentStore[];
   readonly draws: readonly FragmentDraw[];
   readonly direct: readonly FragmentDirectUse[];
+  /** The converters of the subsets of the resources of the stores, for example `water.bottled` to `water.stored`. */
+  readonly converters: readonly SubsetConverter[];
 }
 
 /** The age in months below which a person record must have a `feeding`: 12, the first month of the guidelines. */
@@ -78,6 +84,8 @@ export interface HouseholdFragmentInput {
   readonly supply?: string | undefined;
   /** The direct uses. The fragment takes each use for the need of one of its draws. The default is `DIRECT_USES`. */
   readonly uses?: readonly FragmentDirectUse[] | undefined;
+  /** The subsets of the resources. The fragment gives a converter for each subset of a resource of its stores. The default is `RESOURCE_SUBSETS`. */
+  readonly subsets?: readonly ResourceSubset[] | undefined;
   /** The level of the draws. It is one of the levels of the joined layer. */
   readonly level: string;
   /** The levels of the fragment. The default is no levels: a different fragment of the stack gives them. */
@@ -203,16 +211,16 @@ function buyListStores(input: HouseholdFragmentInput): { stores: FragmentStore[]
 }
 
 /**
- * This function gives the resources of the stores and of the uses, with the units of the catalog.
+ * This function gives the resources of the stores, of the uses and of the gifts of the converters, with the units of the catalog.
  *
  * @throws RangeError when the resource of a use is not in the catalog in kcal
  */
-function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[], uses: readonly FragmentDirectUse[]): FragmentResource[] {
+function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[], uses: readonly FragmentDirectUse[], converters: readonly SubsetConverter[]): FragmentResource[] {
   const unitOf = new Map(catalog.resources.map((resource) => [resource.code, resource.unit]));
   for (const use of uses) {
     if (unitOf.get(use.resource) !== "kcal") throw new RangeError(`The catalog has no resource "${use.resource}" in kcal for the use of ${use.need}.`);
   }
-  const codes = [...new Set([...stores.map((store) => store.resource), ...uses.map((use) => use.resource)])];
+  const codes = [...new Set([...stores.map((store) => store.resource), ...uses.map((use) => use.resource), ...converters.map((converter) => converter.gives.resource)])];
   return codes.map((code) => ({ code, unit: unitOf.get(code) ?? "" }));
 }
 
@@ -277,7 +285,9 @@ function openedStores(
  *   `food.no-cook` feeds the food draw, and `food.infant-formula-ready` feeds the formula draw.
  * - The resources are the resources of the stores and of the direct uses, with the units of the catalog.
  * - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw.
- * - The fragment has no converter. `cookFragment` gives the converters for the dry food, with the water and the fuel of each pot.
+ * - The only converters are the subsets of the resources of the stores (`subsetConverters` with `subsets`). The default `RESOURCE_SUBSETS`
+ *   makes `water.bottled` also `water.stored`, so a drinking draw and a cook converter also use the bottled water.
+ *   `cookFragment` gives the converters for the dry food, with the water and the fuel of each pot.
  *   `formulaMixFragment` gives the converter of `food.infant-formula-powder`. The powder has a store, and no direct use.
  * - With no cold storage (the default), an opened container of formula serves one feed. The store has only the energy of the feeds,
  *   and `waste` gives the rest. The smallest feed is the smallest need of an infant of the draw, divided by `FORMULA_FEEDS`.
@@ -305,6 +315,7 @@ function openedStores(
  * @throws RangeError for the errors of `calorieNeed`, `giftsOf` and `buyListEnergy`, except a household with no person
  * @throws RangeError when the catalog has no resource in `kcal` for the direct use of a draw
  * @throws RangeError when a product with opened containers gives a resource that feeds no formula draw, with no cold storage
+ * @throws RangeError for the errors of `subsetConverters`
  * @throws RangeError when a record below `INFANT_MONTHS` has no `feeding`, or when a `feeding` is not a way of `INFANT_FEEDINGS`
  * @throws RangeError for `breast-milk` and `formula` from `INFANT_MONTHS`
  * @throws RangeError when an infant drinks only breast milk and no person of the household has a stage of lactation
@@ -402,6 +413,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   const uses = (input.uses ?? DIRECT_USES).filter((use) => needs.has(use.need));
   const feed = formulaUsers > 0 && formulaPerDay > 0 ? formulaLeast / FORMULA_FEEDS.perDay : undefined;
   const opened = openedStores(input, stores, parts.noReads, feed);
+  const converters = subsetConverters(input.catalog, opened.stores.map((store) => store.resource), input.subsets ?? RESOURCE_SUBSETS, input.prefix ?? "buy");
   return {
     ...parts,
     noReads: opened.noReads,
@@ -409,10 +421,11 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
     layer: {
       schema: "endurance/1",
       levels: [...(input.levels ?? [])],
-      resources: layerResources(input.catalog, opened.stores, uses),
+      resources: layerResources(input.catalog, opened.stores, uses, converters),
       stores: opened.stores,
       draws,
       direct: uses.map((use) => ({ ...use })),
+      converters,
     },
     need,
     needRead: true,
