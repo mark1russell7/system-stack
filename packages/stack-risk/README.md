@@ -180,6 +180,23 @@ const chance = worksChance(SAMPLE_RISK, SAMPLE_STACK, "alert");
 
 The sample shows where work helps most. The two copies of the program and the two message services have a small importance. The reader and the phone have a large one.
 
+### A shared part from measured chances
+
+Two copies of a program fail together more often than two independent copies. A part that they share causes it, for example a release or a host. `sharedCauseFit(group)` gives the chance of that shared part from the measured chances of the group.
+
+```ts
+import { sharedCauseFit } from "@mark1russell7/stack-risk";
+
+// Each copy works 0.95 of the time, and one or more copies work 0.97 of the time.
+const fit = sharedCauseFit({ works: [0.95, 0.95], anyWorks: 0.97 });
+// => { shared: 0.9704..., own: [0.9789..., 0.9789...] }
+```
+
+- A part of the group works when the shared part and its own part work. Measure each chance in the same window of time.
+- Put the shared part in the stack as a need of each part of the group, with the chance `shared`. Give each part its `own` chance.
+- For two parts the value is exact. For 3 or more parts, halvings of the interval find the one value that fits.
+- When the parts fail together less often than independent parts, `shared` is 1 and each `own` chance is the measured chance.
+
 ### The chance within a limit of time
 
 `worksChance(layer, stack, part, { within })` gives the chance that a part works and ends its work within `within` seconds of the event.
