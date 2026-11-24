@@ -351,7 +351,7 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 | `warmth.shelter` | `kWh` | household | no read |
 
 - `alert.watch` comes from two pages of the National Weather Service (read on 2026-11-24). Many receivers have a muted standby mode that turns on when a warning comes. Warnings also come at night. Thus a receiver stays on and listens at all hours, so 24 hours each day. One receiver for each home is a choice of this model, not of the pages. The pages are in the public domain (the license `us-public-domain`).
-- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device.
+- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device. `lightNeed` gives a read from the point of the home and its awake window.
 - `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need.
 - A user gives each no read as input data.
 - The rate of a device is a fact of the device, not of the need. An example is the watts of a radio in standby.
@@ -372,8 +372,22 @@ The gate refuses an empty code and two needs with one code (`daily-need-id`). It
 - With the input `draws`, each need of a device gives one draw at the daily rate of the need. A need with no read of its rate gives no draw, and a no read.
 - The fragment has no store. The cells come from the stores of the buy list, for example the product `power.aa-alkaline` of the catalog.
 
+## The hours of light
+
+`lightHours` gives the dark hours of the awake window of a household on each date of a plan. `lightNeed` changes them into a read of the need `light.see`.
+
+- The input is the point of the home, the awake window in local time, the first date and the count of days. The point and the window are input data of the household.
+- The light is the time from the sunrise to the sunset of `sunDay` of `@mark1russell7/geo`. A polar day is light, and a polar night is dark.
+- The awake window is a `TimeWindow` of `@mark1russell7/algebra/clock`. It follows the wall clock, also at a change of the clock.
+- A local date is the time from its local midnight to the next local midnight. A window across midnight gives its hours to each date by the clock.
+- The result gives each day, the most of the worst day and the mean.
+- The rate of `lightNeed` is the most. One light that is on in those hours is a choice of this model, not of the sources.
+- The sources are the pages "Position of the Sun" and "Sunrise equation" of Wikipedia (license `cc-by-sa-4.0`). The code uses their formulas, not their text.
+
+The read goes into `deviceFragment` through the input `needs`. Then the need of light gets a draw.
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, the daily needs, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, `lightHours`, `lightNeed`, the daily needs, the uses, the supply parts and `checkJoins`. |
