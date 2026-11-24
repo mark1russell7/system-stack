@@ -195,7 +195,10 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
 - A county with no event in any case is not observed (`withoutSilentAreas`), so the prior of its state applies to it. The fit of 2026-02-25 has 76 such counties, but the laws of the states expect 5.4 of them. Thus most of them are counties that the files do not see, for example a county with the counts of one small utility. Many of them have a largest count out of 0 to 300 customers in 7 to 12 years. A pooled rate made a low rate from such a gap: 0.2% to 23% of the mean of the state. No test of one county can tell a gap from a low rate.
 
   The holdout cannot score such a county, because a county with no event has no event in the two halves. A test holds the gate: the laws expect at most 10% of the silent counties.
-- The table of the states keeps its raw rates. A state that the table observes with no event of a case has a prior of 0 in that table. Its counties have a pooled rate above 0 in the table of the counties, so give a county first. A region that the table does not observe has no prior: that is no read.
+- The rate of a state is pooled toward the states of the nation (`regionCounts`, `regionObservation` and `pooledRates` with one group). The states in a case have a gamma law of their rates.
+  The events of a state are the events of its counties. Its years are the plain mean of the years of its counties. Thus a state with no event of a case gets a rate near 0, not 0.
+
+  Before 0.6.4, the table of the states kept its raw rates. Then 35 priors of states were 0, for example 29 states in the case `met.tropical.hurricane`. A region that the table does not observe has no prior: that is no read.
 - The place of each prior is the option `place`, for example `hazardPriors(list, { region, place: "home" })`. With no option, the place is the region of the table, for example `us-state-fips:01` after the fall back from a county. `yearShortfall` of stack-endurance finds a prior by its place, so give the place that it reads.
 - The gate refuses two tables with the same scheme, case and region (`priorTableOverlaps`). `hazardPriors` takes the first table, so the second table gives no prior there.
 - `EAGLEI_COUNTY_POOLING` of the entry `county-priors` has the law of each state in each case, and a holdout. The holdout puts each event of a county in one of two halves, each with the chance 1/2 (seed 20261124). The rates come from one half, and the other half scores them. Each score is the mean of 5 such splits.
@@ -203,10 +206,15 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   In each case, the pooled rates have a higher Poisson log-likelihood than one rate for each state. On the counties with events in the fit half, they also have a higher log-likelihood than the raw rates. They also have the smallest squared error. A test holds this gate.
 
   The holdout also scores the reach of the counties with no event in the fit half and events in the score half. In 5 of the 6 cases, the plain mean of the counties has less bias than the mean over the events of the state. In the case `met.heat.extreme`, the two biases are near 0 (0.006 and 0.005). The mean absolute errors are equal to within 3%. A test holds this gate. In each case, the error of the plain mean is at most 5% above the other error. Its sum of the absolute bias over the cases is smaller. The 8 counties above the limit are in the laws and in the holdout, but not in the table.
+- `EAGLEI_STATE_POOLING` has the law of the states in each case, and a holdout of the same kind, with each state as one area.
+
+  In each case, the pooled score is finite and higher than the score of one rate for the nation. The raw rates lose a state in 4 cases: it has no event in the fit half and events in the score half. Thus their score is `-Infinity`.
+
+  On the states with events in the fit half, the pooled score is at most 0.3% under the raw score. The pooled squared error is lower in 4 cases, and at most 2.1% higher in the other 2 cases. A test holds the gate with the limits 1% and 5%.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 - The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING`.
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING`, and the state module has `EAGLEI_STATE_POOLING`.
 
 The state module also has `EAGLEI_NATION_CUSTOMERS`, the sum of the customers of each observed county. A county in a state over the limit of the table is also in the sum. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
