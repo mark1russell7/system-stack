@@ -1,5 +1,6 @@
 import { kaplanMeier } from "@mark1russell7/rigor-statistics";
-import type { DurationLaw, HazardSource } from "./hazard.ts";
+import { EAGLEI_NATION_CUSTOMERS } from "./eaglei-state-priors.ts";
+import type { DurationLaw, HazardSource, PriorTable } from "./hazard.ts";
 import { survivalOf, type SurvivalOptions } from "./law.ts";
 import { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS } from "./oe417-events.ts";
 
@@ -110,10 +111,10 @@ export function oe417Hours(event: Oe417Event): number | undefined {
  * @param options - The form of the curve
  */
 export function oe417AttackLaw(events: readonly Oe417Event[], options: SurvivalOptions = {}): DurationLaw {
-  const homes = events.filter((event) => oe417Count(event.customers) > 0);
+  const homes = oe417LawEvents(events);
   const ends = homes.flatMap((event) => {
     const hours = oe417Hours(event);
-    return hours !== undefined && hours >= OE417_LEAST_HOURS ? [hours / 24] : [];
+    return hours !== undefined ? [hours / 24] : [];
   });
   if (ends.length === 0) throw new RangeError("oe417AttackLaw: no event with customers has a duration of 15 minutes or more.");
   const longest = Math.max(...ends);
@@ -134,5 +135,65 @@ export function oe417AttackLaw(events: readonly Oe417Event[], options: SurvivalO
 
 /** The law of the time for which the customers of a physical attack on the grid have no power. It reads the events of the summaries with customers. */
 export const OE417_ATTACK_LAW: DurationLaw = oe417AttackLaw(OE417_ATTACK_EVENTS);
+
+/**
+ * This function gives the events that the law reads. Each has more than 0 customers. Each has a duration of 15 minutes or more, or no time of the restoration.
+ * The prior counts the same events, so the prior and the law tell of one kind of event.
+ */
+export function oe417LawEvents(events: readonly Oe417Event[]): Oe417Event[] {
+  return events.filter((event) => {
+    if (!(oe417Count(event.customers) > 0)) return false;
+    const hours = oe417Hours(event);
+    return (hours !== undefined && hours >= OE417_LEAST_HOURS) || (event.began !== null && event.restored === null);
+  });
+}
+
+/** The options of `oe417AttackPrior`. */
+export interface Oe417PriorOptions {
+  /** The first year of the rate. */
+  readonly first: number;
+  /** The last year of the rate. */
+  readonly last: number;
+  /** The customers of the nation, for example `EAGLEI_NATION_CUSTOMERS`. */
+  readonly customers: number;
+}
+
+/** The case of a physical attack on the grid. */
+export const OE417_ATTACK_CASE = "infra.power.physical-attack";
+
+/**
+ * This function gives the yearly prior of a physical attack on the grid for the nation. The table has the scheme `us-nation` and the one code `US`.
+ *
+ * - `perYear` is the count of the events of `oe417LawEvents` from the year `first` to the year `last`, over the count of the years.
+ * - `reach` is the mean of the customers of those events over the customers of the nation. Thus `perYear * reach` is the expected events at one customer in one year.
+ * - A year with no event in the summaries counts as a year with no event.
+ *
+ * @throws RangeError when the years are not whole numbers in order, when the customers are not above 0, or when the years have no event
+ */
+export function oe417AttackPrior(events: readonly Oe417Event[], options: Oe417PriorOptions): PriorTable {
+  const { first, last, customers } = options;
+  if (!Number.isInteger(first) || !Number.isInteger(last) || first > last) throw new RangeError(`oe417AttackPrior: the years ${String(first)} to ${String(last)} are not whole numbers in order.`);
+  if (!Number.isFinite(customers) || customers <= 0) throw new RangeError(`oe417AttackPrior: the customers are ${String(customers)}. They are a finite number above 0.`);
+  const kept = oe417LawEvents(events).filter((event) => event.year >= first && event.year <= last);
+  if (kept.length === 0) throw new RangeError(`oe417AttackPrior: no event with customers is in the years ${String(first)} to ${String(last)}.`);
+  const years = last - first + 1;
+  const reach = kept.reduce((sum, event) => sum + oe417Count(event.customers), 0) / kept.length / customers;
+  return {
+    source: OE417_SOURCE.id,
+    asOf: `${String(last)}-12-31`,
+    scheme: "us-nation",
+    method:
+      `perYear is the count of the events of a physical attack, vandalism, sabotage or theft with customers in the OE-417 annual summaries of ${String(first)} to ${String(last)}, over ${String(years)} years: ${String(kept.length)} events. ` +
+      "An event is in the count when the law of its duration reads it: more than 0 customers, and a duration of 15 minutes or more or no time of the restoration. " +
+      `reach is the mean of the customers of an event over ${String(customers)} customers of the nation, the sum of the customers of the counties of the states of EAGLE-I (CC BY 4.0). ` +
+      "The summaries of 2000 to 2010 list no such event, and their counts of all events are lower. That can be a change of the form or of the reports, so the rate does not read those years. " +
+      "An event with no count of customers is not in the count, and that makes the rate too low.",
+    codes: ["US"],
+    rates: { [OE417_ATTACK_CASE]: { US: [kept.length / years, reach] } },
+  };
+}
+
+/** The yearly prior of a physical attack on the grid for the nation, from the summaries of 2011 to 2023. */
+export const OE417_NATION_PRIORS: PriorTable = oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, customers: EAGLEI_NATION_CUSTOMERS });
 
 export { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS };

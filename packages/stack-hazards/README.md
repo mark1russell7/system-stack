@@ -194,8 +194,9 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
 - The place of each prior is the option `place`, for example `hazardPriors(list, { region, place: "home" })`. With no option, the place is the region of the table, for example `us-state-fips:01` after the fall back from a county. `yearShortfall` of stack-endurance finds a prior by its place, so give the place that it reads.
 - A county prior of 0 comes before the prior of its state. Many counties have 0 for a rare case, for example a hurricane, and many tornado rates come from one event. A pooled rate of a county and its state is a next step.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
+- The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the next section. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The state module also has `EAGLEI_NATION_CUSTOMERS`, the sum of the customers of the counties of its states. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
 ## The law of a physical attack
 
@@ -211,6 +212,9 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `oe417Hours(event)` | It gives the hours from the start of an event to its restoration, from the local times of the summary. |
 | `oe417AttackLaw(events)` | It gives the law of the time for which the customers have no power, with one Kaplan-Meier curve for the nation. |
 | `OE417_ATTACK_LAW` | The law of the 70 events with customers: 62 ends of 15 minutes or more and 8 open events. |
+| `oe417LawEvents(events)` | It gives the events that the law reads. The prior counts the same events. |
+| `oe417AttackPrior(events, { first, last, customers })` | It gives the table of the prior of a physical attack for the nation, from the events of the years `first` to `last`. |
+| `OE417_NATION_PRIORS` | The prior of 2011 to 2023: 70 events in 13 years, with the customers `EAGLEI_NATION_CUSTOMERS`. |
 
 The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
 
@@ -221,6 +225,15 @@ The law reads only the events with more than 0 customers. The question of a home
 - The summary of 2023 prints 32 events two times, the second time with no start. The set and the counts read each such event one time.
 - The times are local times. An event across a change of the clock can be one hour off.
 - The case `infra.power.physical-attack` uses this law on its grid cut. Its other cuts are the cuts of a power outage, with no law.
+
+The prior of a physical attack is one rate for the nation:
+
+- `perYear` is 70 events in the 13 years of 2011 to 2023, 5.4 events in one year.
+- `reach` is the mean of the customers of an event over the customers of the counties of the states of EAGLE-I.
+- Thus one customer has an event once in approximately 4,000 years (`perYear * reach` is 2.5e-4). The 5 years of 2019 to 2023 give 2.6e-4.
+- The summaries of 2000 to 2010 list no such event, and their counts of all events are lower. That can be a change of the form or of the reports, so the rate does not read those years. With them, the rate is lower, and a lower rate is not safe for a plan.
+- An event with no count of customers is not in the rate. That makes the rate too low.
+- The rate is for the nation. A state or a county can have a higher rate, and the summaries name places in words that are not codes.
 
 The open events change the tail of the law:
 

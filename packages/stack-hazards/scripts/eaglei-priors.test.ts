@@ -83,11 +83,13 @@ describe("priorModules", () => {
       expect(text).toContain("// The run of the fit: https://example.org/runs/1 attempt 3.");
       expect(text).toContain("EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.0000/test.1");
       expect(text).toContain("share 0.01, interval 900 s");
-      const script = text.replace(/^import .*$/mu, "").replaceAll(/export const (\w+): PriorTable =/gu, "out.$1 =");
+      const script = text.replace(/^import .*$/mu, "").replaceAll(/export const (\w+)(?:: PriorTable)? =/gu, "out.$1 =");
       // The module is plain data, so its text with no types runs as a script.
       new Function("out", script)(out);
     }
     expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
     expect(out["EAGLEI_STATE_PRIORS"]).toEqual(tables.state);
+    expect(out["EAGLEI_NATION_CUSTOMERS"]).toBe(tables.nation);
+    expect(tables.nation).toBeGreaterThan(0);
   });
 });

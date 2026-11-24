@@ -23,6 +23,8 @@ const DIGITS = 4;
 export interface EaglePriorTables {
   readonly county: PriorTable;
   readonly state: PriorTable;
+  /** The sum of the customers of the observed counties of the states of the table `state`: the customers of the nation for a reach. */
+  readonly nation: number;
 }
 
 /** The share of the customers of a county that starts an event, when the fit has no option `share`: the default of `outageReader`. */
@@ -69,13 +71,19 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
       rates: Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
     };
   };
+  const state = table(
+    laws.scheme,
+    eagleRegion,
+    "perYear is the sum of the events of each county of a state over its years. reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year.",
+  );
+  const states = new Set(state.codes);
+  const nation = observedRegions(priors.observation, (area) => area)
+    .filter((area) => states.has(eagleRegion(area)))
+    .reduce((sum, area) => sum + (priors.observation.customers[area] ?? 0), 0);
   return {
     county: table(COUNTY_SCHEME, (area) => area, "perYear is the events of a county over its years. reach is the mean of the largest count of customers out of each event over the customers of the county."),
-    state: table(
-      laws.scheme,
-      eagleRegion,
-      "perYear is the sum of the events of each county of a state over its years. reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year.",
-    ),
+    state,
+    nation,
   };
 }
 
@@ -118,7 +126,14 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
   ];
   return {
     "eaglei-county-priors.ts": [...head, ...tableLines("EAGLEI_COUNTY_PRIORS", "The yearly priors of the power outage and of each storm case in each county, from the outages of EAGLE-I.", tables.county), ""].join("\n"),
-    "eaglei-state-priors.ts": [...head, ...tableLines("EAGLEI_STATE_PRIORS", "The yearly priors of the power outage and of each storm case in each state, from the outages of the counties of the state.", tables.state), ""].join("\n"),
+    "eaglei-state-priors.ts": [
+      ...head,
+      ...tableLines("EAGLEI_STATE_PRIORS", "The yearly priors of the power outage and of each storm case in each state, from the outages of the counties of the state.", tables.state),
+      "",
+      "/** The sum of the customers of the observed counties of the states of `EAGLEI_STATE_PRIORS`. A table of priors for the nation divides by it for a reach. */",
+      `export const EAGLEI_NATION_CUSTOMERS = ${String(tables.nation)};`,
+      "",
+    ].join("\n"),
   };
 }
 
@@ -129,7 +144,8 @@ if (import.meta.main) {
   const laws = JSON.parse(readFileSync(file, "utf8")) as EagleLaws;
   const tables = eaglePriors(laws);
   for (const [name, text] of Object.entries(priorModules(tables, laws, values.run))) writeFileSync(join(values.out, name), text);
-  for (const [name, table] of Object.entries(tables) as [string, PriorTable][]) {
+  for (const [name, table] of [["county", tables.county], ["state", tables.state]] as const) {
     console.log(`${name}: ${String(table.codes.length)} regions; ${Object.entries(table.rates).map(([code, rates]) => `${code} ${String(Object.keys(rates).length)}`).join(", ")}.`);
   }
+  console.log(`nation: ${String(tables.nation)} customers.`);
 }
