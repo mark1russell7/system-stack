@@ -226,3 +226,13 @@ export interface CountyPooling {
   /** The counties with no event in any case, which are not observed (`withoutSilentAreas`), and the count of such counties that the laws expect. */
   readonly silent: { readonly areas: number; readonly expected: number };
 }
+
+/**
+ * The pooling of the state rates of one fit: the law of the states of the nation in each case, and the holdout. The holdout is the gate of the pooled rates.
+ * In the holdout, each state is an area of the one group of the nation. Thus the field `state` of each score is one rate for each state: the rate of the nation.
+ */
+export interface StatePooling {
+  /** The law of the rates of the states in each case, by the code of the case. */
+  readonly laws: Readonly<Record<string, PoolLaw>>;
+  readonly holdout: PoolHoldout;
+}

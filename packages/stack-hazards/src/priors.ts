@@ -92,6 +92,50 @@ export function regionRates(counts: Readonly<Record<string, AreaCount>>, observa
   return rates;
 }
 
+/**
+ * This function gives the observation of the regions: each region with one observed area or more is an area of its own.
+ * - The years of a region are the plain mean of the years of its observed areas. Thus the events of a region over its years are its events in one year.
+ * - The customers of a region are the sum of the customers of its observed areas.
+ * Give the result and `regionCounts` to `pooledRates` to pool the regions, for example the states toward the nation.
+ */
+export function regionObservation(observation: Observation, region: (area: string) => string): Observation {
+  const sums = new Map<string, { years: number; customers: number; areas: number }>();
+  for (const area of observedAreas(observation)) {
+    const code = region(area);
+    const sum = sums.get(code) ?? { years: 0, customers: 0, areas: 0 };
+    sum.years += observation.years[area] ?? 0;
+    sum.customers += observation.customers[area] ?? 0;
+    sum.areas += 1;
+    sums.set(code, sum);
+  }
+  const codes = [...sums.keys()].sort();
+  const sumOf = (code: string): { years: number; customers: number; areas: number } => sums.get(code) ?? { years: 0, customers: 0, areas: 1 };
+  return {
+    years: Object.fromEntries(codes.map((code) => [code, sumOf(code).years / sumOf(code).areas])),
+    customers: Object.fromEntries(codes.map((code) => [code, sumOf(code).customers])),
+  };
+}
+
+/**
+ * This function gives the counts of the events of each region with one observed area or more, in the order of the codes.
+ * - `events` of a region is the sum of the events of its observed areas.
+ * - `share` of a region is the sum of the peak share of each event over the customers of the region.
+ *   One event reaches its share of its area, times the customers of the area over the customers of the region.
+ */
+export function regionCounts(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, AreaCount> {
+  const regions = regionObservation(observation, region);
+  const sums = new Map<string, { events: number; share: number }>();
+  for (const area of observedAreas(observation)) {
+    const code = region(area);
+    const count = counts[area] ?? { events: 0, share: 0 };
+    const sum = sums.get(code) ?? { events: 0, share: 0 };
+    sum.events += count.events;
+    sum.share += (count.share * (observation.customers[area] ?? 0)) / (regions.customers[code] ?? 1);
+    sums.set(code, sum);
+  }
+  return Object.fromEntries([...sums.keys()].sort().map((code) => [code, sums.get(code) ?? { events: 0, share: 0 }]));
+}
+
 /** The pooled rates of the areas, and the law of each group. */
 export interface PooledRates {
   /** The rates `[perYear, reach]` of each area with a pooled rate of more than 0, by the code of the area in its order. */
