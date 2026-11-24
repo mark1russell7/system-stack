@@ -29,6 +29,7 @@ CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
 CitedFormulaMix: build/index.d.ts#CitedFormulaMix
 CitedFormulaWater: build/index.d.ts#CitedFormulaWater
 CitedMilk: build/index.d.ts#CitedMilk
+CookCheck: build/index.d.ts#CookCheck
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
 CookFragmentInput: build/index.d.ts#CookFragmentInput
@@ -107,6 +108,7 @@ NASEM_INFANT_CALORIES: build/index.d.ts#NASEM_INFANT_CALORIES
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
 NEED_SUPPLIES: build/index.d.ts#NEED_SUPPLIES
 NIST_SI_GUIDE_SOURCE: build/index.d.ts#NIST_SI_GUIDE_SOURCE
+NIST_WEBBOOK_WATER_SOURCE: build/index.d.ts#NIST_WEBBOOK_WATER_SOURCE
 NO_COOK: build/index.d.ts#NO_COOK
 NWS_ALARMS_SOURCE: build/index.d.ts#NWS_ALARMS_SOURCE
 NWS_RECEIVERS_SOURCE: build/index.d.ts#NWS_RECEIVERS_SOURCE
@@ -308,6 +310,13 @@ export interface CitedMilk {
   readonly locator: string;
 }
 
+### build/index.d.ts#CookCheck
+export interface CookCheck {
+  readonly source: Source;
+  readonly locator: string;
+  readonly note: string;
+}
+
 ### build/index.d.ts#CookConstant
 export interface CookConstant {
   readonly value: number;
@@ -315,6 +324,7 @@ export interface CookConstant {
   readonly source: Source;
   readonly locator: string;
   readonly note: string;
+  readonly check?: CookCheck;
 }
 
 ### build/index.d.ts#CookFragment
@@ -803,6 +813,9 @@ export declare const NEED_SUPPLIES: {
 
 ### build/index.d.ts#NIST_SI_GUIDE_SOURCE
 export declare const NIST_SI_GUIDE_SOURCE: Source;
+
+### build/index.d.ts#NIST_WEBBOOK_WATER_SOURCE
+export declare const NIST_WEBBOOK_WATER_SOURCE: Source;
 
 ### build/index.d.ts#NO_COOK
 export declare const NO_COOK = "food.no-cook";
