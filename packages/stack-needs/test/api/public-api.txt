@@ -275,7 +275,7 @@ export interface CookStart {
 export declare const DAILY_NEEDS: readonly DailyNeed[];
 
 ### build/index.d.ts#DAILY_NEED_CODES
-export declare const DAILY_NEED_CODES: readonly ["daily-need-id", "daily-need-rate"];
+export declare const DAILY_NEED_CODES: readonly ["daily-need-id", "daily-need-unit", "daily-need-rate"];
 
 ### build/index.d.ts#DGA_CALORIES
 export declare const DGA_CALORIES: CalorieTable;
