@@ -5,9 +5,9 @@ import type { PriorTable } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
 import { observedRegions, regionRates } from "../src/priors.ts";
 import { LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
+import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 
 export { PRIOR_LIMIT };
-import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 
 // The step after the fit job: the counts of the priors in the artifact eaglei-laws become the modules
 // src/eaglei-county-priors.ts and src/eaglei-state-priors.ts. A person runs this script and commits the modules.

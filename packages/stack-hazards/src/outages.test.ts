@@ -17,6 +17,11 @@ function counts(times: readonly number[], a: readonly (readonly [number, number]
   return [...times.map((step) => ({ area: "Z", out: 1, time: at(step) })), ...a.map(([step, out]) => ({ area: "A", out, time: at(step) }))];
 }
 
+/** This function adds a line of "A" with no count at each of `missed`, and sorts the counts by their times. */
+function withMiss(list: readonly OutageCount[], ...missed: number[]): OutageCount[] {
+  return [...list, ...missed.map((step) => ({ area: "A", out: undefined, time: at(step) }))].sort((x, y) => x.time - y.time);
+}
+
 function read(list: readonly OutageCount[], options: OutageOptions = OPTIONS): OutageRuns {
   const reader = outageReader(options);
   for (const count of list) reader.add(count);
@@ -159,26 +164,61 @@ describe("outageReader", () => {
     expect(() => reader.add({ area: "A", out: 1, time: 0 })).toThrow(Error);
   });
 
-  it("joins the near runs of an area into one event with the option join, but not across a gap, a stop or a run with no known start", () => {
+  it("joins the near runs of an area into one event with the option join, also across a gap or a line with no count", () => {
     // Three runs of "A": steps 2-3, steps 5-6 and steps 10-11. A count under the threshold is between them.
     const a = [[2, 50], [3, 50], [4, 5], [5, 90], [6, 90], [7, 5], [10, 40], [11, 40], [12, 5]] as const;
     const third = { area: "A", start: at(10), seconds: 2 * 900, peak: 40, censored: false };
+    const whole = { area: "A", start: at(2), seconds: 10 * 900, peak: 90, censored: false };
     expect(read(counts(steps(0, 20), a)).events).toHaveLength(3);
     // A join time of two intervals joins the first two runs. The third run starts four intervals after the second run.
     const near = read(counts(steps(0, 20), a), { ...OPTIONS, join: 2 * 900 });
     expect(near.events).toEqual([{ area: "A", start: at(2), seconds: 5 * 900, peak: 90, censored: false }, third]);
     expect(near.tally.joined).toBe(1);
-    expect(read(counts(steps(0, 20), a), { ...OPTIONS, join: 4 * 900 }).events).toEqual([{ area: "A", start: at(2), seconds: 10 * 900, peak: 90, censored: false }]);
-    // The collection has no time at step 4, so the first run has no observed end and the second run has no known start.
-    // The third run joins the second run, so the event of the two runs has no known start either.
+    expect(read(counts(steps(0, 20), a), { ...OPTIONS, join: 4 * 900 }).events).toEqual([whole]);
+    // The collection has no time at step 4. The gap is inside the event, and the start of the first run is known.
     const gap = read(counts(steps(0, 20).filter((step) => step !== 4), a.filter(([step]) => step !== 4)), { ...OPTIONS, join: 4 * 900 });
-    expect(gap.events).toEqual([{ area: "A", start: at(2), seconds: 2 * 900, peak: 50, censored: true }]);
-    expect(gap.tally).toMatchObject({ truncated: 1, joined: 1 });
-    // A line with no count at step 4 stops the first run. The second run has no known start.
-    const stopped = read([...counts(steps(0, 20), a.filter(([step]) => step !== 4)), { area: "A", out: undefined, time: at(4) }].sort((x, y) => x.time - y.time), { ...OPTIONS, join: 2 * 900 });
-    expect(stopped.events).toEqual([{ area: "A", start: at(2), seconds: 2 * 900, peak: 50, censored: true }, third]);
-    expect(stopped.tally).toMatchObject({ truncated: 1, joined: 0 });
+    expect(gap.events).toEqual([whole]);
+    expect(gap.tally).toMatchObject({ truncated: 0, joined: 2 });
+    // A line with no count at step 4 stops the first run, and the second run has no known start. The line is inside the event.
+    const stopped = read(withMiss(counts(steps(0, 20), a.filter(([step]) => step !== 4)), 4), { ...OPTIONS, join: 2 * 900 });
+    expect(stopped.events).toEqual([{ area: "A", start: at(2), seconds: 5 * 900, peak: 90, censored: false }, third]);
+    expect(stopped.tally).toMatchObject({ truncated: 0, joined: 1 });
     expect(() => outageReader({ ...OPTIONS, join: -1 })).toThrow(RangeError);
     expect(() => outageReader({ ...OPTIONS, join: Number.NaN })).toThrow(RangeError);
+  });
+
+  it("observes the end of an event only when the collection observes the area for the join time after it", () => {
+    // The run of "A" is at steps 2-3, and the join time is 8 intervals. Each result is the start, the intervals and the censored flag.
+    const join = { ...OPTIONS, join: 8 * 900 };
+    const short = (list: readonly OutageCount[], options: OutageOptions = join): [number, number, boolean][] =>
+      read(list, options).events.map((event) => [(event.start - at(0)) / 900, event.seconds / 900, event.censored]);
+    const run = [[2, 50], [3, 50], [4, 5]] as const;
+    // The data end 2 steps after the run, so a later run within the join time is possible.
+    expect(short(counts(steps(0, 5), run))).toEqual([[2, 2, true]]);
+    expect(short(counts(steps(0, 5), run), OPTIONS)).toEqual([[2, 2, false]]);
+    // A gap of the collection at step 5, and a run at step 9: the two runs are 6 steps apart, so they are one event.
+    expect(short(counts(steps(0, 20).filter((step) => step !== 5), [...run, [9, 50], [10, 5]]))).toEqual([[2, 8, false]]);
+    // A gap of the collection in the join time after the last run censors the event.
+    expect(short(counts(steps(0, 20).filter((step) => step !== 8), run))).toEqual([[2, 2, true]]);
+    // A low count at step 4, no count at step 5 and a run at steps 6-7 with no known start: one event.
+    expect(short(withMiss(counts(steps(0, 20), [...run, [6, 50], [7, 50], [8, 5]]), 5))).toEqual([[2, 6, false]]);
+    // No count at step 4, a low count at step 5 and a run at steps 6-7: one event.
+    expect(short(withMiss(counts(steps(0, 20), [[2, 50], [3, 50], [5, 5], [6, 50], [7, 50], [8, 5]]), 4))).toEqual([[2, 6, false]]);
+    // A line with no count in the join time after the last run censors the event. With no join time, it is after the end.
+    const late = withMiss(counts(steps(0, 20), run), 8);
+    expect(short(late)).toEqual([[2, 2, true]]);
+    expect(short(late, OPTIONS)).toEqual([[2, 2, false]]);
+    expect(short(withMiss(counts(steps(0, 20), run), 12))).toEqual([[2, 2, false]]);
+  });
+
+  it("gives the events of each join time from one read", () => {
+    const a = [[2, 50], [3, 50], [4, 5], [5, 90], [6, 90], [7, 5], [10, 40], [11, 40], [12, 5]] as const;
+    const reader = outageReader(OPTIONS);
+    for (const count of counts(steps(0, 20), a)) reader.add(count);
+    const each = reader.finishEach([4 * 900, 0, 2 * 900]);
+    expect(each).toEqual([4 * 900, 0, 2 * 900].map((join) => read(counts(steps(0, 20), a), { ...OPTIONS, join })));
+    expect(each.map((runs) => runs.events.length)).toEqual([1, 3, 2]);
+    expect(() => reader.finishEach([0])).toThrow(Error);
+    expect(() => outageReader(OPTIONS).finishEach([-1])).toThrow(RangeError);
   });
 });
