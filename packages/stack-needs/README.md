@@ -211,14 +211,17 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | A boil yield with the bound `most`, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
+| A cited soak rate that does not convert to `L/kg`, for example a rate for each volume with no bulk mass | The soak water. The resource then has no converter. |
 | No food energy of the product | The energy. |
 | A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
 
 A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
 
-Market gives the soak water of a dry food with `soakWater`. This function does not take it. Thus the water of a food with a soak, for example dry beans, is a lower limit. The cook water of beans and pasta gives their converters.
+The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water: the market fact `usda.refried-beans-soak` cites the USDA recipe, which tells to discard it. Thus the soak adds to the water take, and it adds no heat and no fuel.
+For example, the dry beans of the catalog take 3.65 L/kg of soak water and 3.65 L/kg of cook water. A product with no cited soak takes no soak water.
 
 The cook water and the drinking water are one store, `water.stored`. A cook can use tap water. The subset converter of `householdFragment` also gives the bottled water of the buy list as `water.stored`, so a cook takes the two. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
+`jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.
 
 The cited constants:
 
@@ -379,8 +382,8 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 | `warmth.shelter` | `kWh` | household | no read |
 
 - `alert.watch` comes from two pages of the National Weather Service (read on 2026-11-24). Many receivers have a muted standby mode that turns on when a warning comes. Warnings also come at night. Thus a receiver stays on and listens at all hours, so 24 hours each day. One receiver for each home is a choice of this model, not of the pages. The pages are in the public domain (the license `us-public-domain`).
-- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device.
-- `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need.
+- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device. `lightNeed` gives a read from the point of the home and its awake window.
+- `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need. `warmthNeed` gives a read from the facts of the building and the temperatures.
 - A user gives each no read as input data.
 - The rate of a device is a fact of the device, not of the need. An example is the watts of a radio in standby.
 
@@ -388,8 +391,45 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 
 The gate refuses an empty code and two needs with one code (`daily-need-id`). It refuses a unit that `@mark1russell7/quantity` does not read (`daily-need-unit`). It also refuses a bad read or a no read with no reason (`daily-need-rate`). A bad read has no source. Or its amount is not a finite number of 0 or more in the unit of the need for each day.
 
+## The devices of the kit
+
+`deviceFragment` gives the devices of a buy list that run on cells, as converters of an endurance layer. Examples are a radio and a flashlight.
+
+- Each device of the catalog of market with a cited run time gives one converter. The field `device` of a product gives its need, its cells and its run time.
+- One run takes one cell, and gives the hours of the need for each cell. For example, 48 h on 3 cells gives 16 h for each cell.
+- One device gives its need for 24 hours in a day or less. Thus the limit `perDay` is `HOURS_IN_DAY` divided by the hours for each cell. The count of devices is the count of whole units.
+- The input `runs` gives the run time of a device of the caller, with its citation. It replaces the run time of the catalog.
+- A device with no run time gives no converter, and a no read. The radio and the flashlight of the catalog are no one model, so their run time is a no read.
+- With the input `draws`, each need of a device gives one draw at the daily rate of the need. A need with no read of its rate gives no draw, and a no read.
+- The fragment has no store. The cells come from the stores of the buy list, for example the product `power.aa-alkaline` of the catalog.
+
+## The hours of light
+
+`lightHours` gives the dark hours of the awake window of a household on each date of a plan. `lightNeed` changes them into a read of the need `light.see`.
+
+- The input is the point of the home, the awake window in local time, the first date and the count of days. The point and the window are input data of the household.
+- The light is the time from the sunrise to the sunset of `sunDay` of `@mark1russell7/geo`. A polar day is light, and a polar night is dark.
+- The awake window is a `TimeWindow` of `@mark1russell7/algebra/clock`. It follows the wall clock, also at a change of the clock.
+- A local date is the time from its local midnight to the next local midnight. A window across midnight gives its hours to each date by the clock.
+- The result gives each day, the most of the worst day and the mean.
+- The rate of `lightNeed` is the most. One light that is on in those hours is a choice of this model, not of the sources.
+- The sources are the pages "Position of the Sun" and "Sunrise equation" of Wikipedia (license `cc-by-sa-4.0`). The code uses their formulas, not their text.
+
+The read goes into `deviceFragment` through the input `needs`. Then the need of light gets a draw.
+
+## The heat of a home
+
+`warmthHeat` gives the space heat that a home needs on each day of a plan. `warmthNeed` changes it into a read of the need `warmth.shelter`.
+
+- The heat loss coefficient of the home is in watts for each kelvin. `heatLossOf` sums the area times the U-value of each element of the envelope.
+- `heatLossFromUse` gives the same coefficient from the heat of a past period, divided by its degree days times 24 hours. The heat is the energy of the heaters, not the fuel.
+- The heat flow of a day is the coefficient times the indoor temperature minus the outdoor temperature, minus the gains of the persons. A flow of 0 or less needs no heat.
+- The indoor target, the outdoor temperature of each day and the facts of the building are input data of the household. The package has no default target.
+- The rate of `warmthNeed` is the heat of the worst day, in `kWh/d`.
+- The sources are the pages "Thermal transmittance" and "Degree day" of Wikipedia (license `cc-by-sa-4.0`).
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment`, `FORMULA_MIX` and `FORMULA_WATER`, the uses, `RESOURCE_SUBSETS` and `subsetConverters`, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment`, `FORMULA_MIX` and `FORMULA_WATER`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, `RESOURCE_SUBSETS` and `subsetConverters`, the supply parts and `checkJoins`. |

@@ -34,22 +34,6 @@ function withContainer(grams: number): SupplyCatalog {
   return { ...SUPPLY_CATALOG, products };
 }
 
-/**
- * This function gives the catalog with the change of market 0.9.0: the resource `water.bottled`, and the jug of 1 gal gives it.
- * When stack-needs takes market 0.9.0, the copy has no effect.
- */
-function withBottled(base: SupplyCatalog): SupplyCatalog {
-  const water = base.resources.find((resource) => resource.code === STORED_WATER);
-  if (water === undefined) throw new Error(`The catalog has no resource ${STORED_WATER}.`);
-  const resources = base.resources.some((resource) => resource.code === BOTTLED_WATER)
-    ? base.resources
-    : [...base.resources, { ...water, code: BOTTLED_WATER, title: "Drinking water, commercially bottled and sealed" }];
-  const products = base.products.map((product) =>
-    product.id === "water.jug-1gal" ? { ...product, gives: product.gives.map((gift) => (gift.resource === STORED_WATER ? { ...gift, resource: BOTTLED_WATER } : gift)) } : product,
-  );
-  return { ...base, resources, products };
-}
-
 /** This function gives the fragment of a call, and fails the test when the call gives no layer. */
 function fragmentOf(of: HouseholdFragmentInput): HouseholdFragmentRead {
   const result = householdFragment(of);
@@ -123,7 +107,7 @@ describe("the household fragment", () => {
   });
 
   it("gives stores of water in L and of each dry food in kg", () => {
-    const result = fragmentOf({ ...input, catalog: withBottled(SUPPLY_CATALOG), units: { "water.jug-1gal": 2, "water.container-1gal": 1, "food.pasta-dry-1kg": 1, "food.flour-white-1kg": 3 } });
+    const result = fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2, "water.container-1gal": 1, "food.pasta-dry-1kg": 1, "food.flour-white-1kg": 3 } });
     const amounts = Object.fromEntries(result.layer.stores.map((store) => [store.resource, store.amount]));
     expect(amounts[BOTTLED_WATER]).toBeCloseTo(2 * 3.785411784, 6);
     expect(amounts[STORED_WATER]).toBeCloseTo(3.785411784, 6);
@@ -133,13 +117,13 @@ describe("the household fragment", () => {
   });
 
   it("gives the subset converter of the bottled water, so a draw of stored water also uses it", () => {
-    const result = fragmentOf({ ...input, catalog: withBottled(SUPPLY_CATALOG), units: { "water.jug-1gal": 2 } });
+    const result = fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2 } });
     expect(result.layer.converters).toEqual([{ id: `buy:subset:${BOTTLED_WATER}`, takes: [{ resource: BOTTLED_WATER, amount: 1 }], gives: { resource: STORED_WATER, amount: 1 } }]);
     // The gift of the converter is a resource of the layer, also with no store of it.
     expect(result.layer.resources.map((resource) => resource.code)).toContain(STORED_WATER);
     expect(hasEnduranceError(checkEndurance(result.layer))).toBe(false);
-    expect(fragmentOf({ ...input, catalog: withBottled(SUPPLY_CATALOG), units: { "water.container-1gal": 2 } }).layer.converters).toEqual([]);
-    expect(fragmentOf({ ...input, catalog: withBottled(SUPPLY_CATALOG), units: { "water.jug-1gal": 2 }, subsets: [] }).layer.converters).toEqual([]);
+    expect(fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.container-1gal": 2 } }).layer.converters).toEqual([]);
+    expect(fragmentOf({ ...input, catalog: SUPPLY_CATALOG, units: { "water.jug-1gal": 2 }, subsets: [] }).layer.converters).toEqual([]);
   });
 
   it("gives an infant the need of the infant table by default", () => {

@@ -211,10 +211,8 @@ describe("householdFragment", () => {
 });
 
 describe("subsetConverters", () => {
-  /** The catalog with the resource `water.bottled` of market 0.9.0. The copy has no effect on a catalog that has it. */
-  const bottledCatalog: SupplyCatalog = SUPPLY_CATALOG.resources.some((resource) => resource.code === BOTTLED_WATER)
-    ? CATALOG
-    : { ...CATALOG, resources: [...CATALOG.resources, { ...water, code: BOTTLED_WATER, title: "Drinking water, commercially bottled and sealed" }] };
+  /** The catalog with test resources. The reference catalog has `water.bottled` since market 0.9.0. */
+  const bottledCatalog: SupplyCatalog = CATALOG;
 
   it("makes bottled water a subset of stored water, as a definition", () => {
     expect(RESOURCE_SUBSETS).toEqual([{ resource: BOTTLED_WATER, of: STORED_WATER }]);

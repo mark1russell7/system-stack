@@ -39,6 +39,7 @@ CookRead: build/index.d.ts#CookRead
 CookStart: build/index.d.ts#CookStart
 DAILY_NEEDS: build/index.d.ts#DAILY_NEEDS
 DAILY_NEED_CODES: build/index.d.ts#DAILY_NEED_CODES
+DEGREE_DAY_SOURCE: build/index.d.ts#DEGREE_DAY_SOURCE
 DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
 DIRECT_USES: build/index.d.ts#DIRECT_USES
@@ -48,6 +49,16 @@ DailyNeedFinding: build/index.d.ts#DailyNeedFinding
 DailyNeedUsers: build/index.d.ts#DailyNeedUsers
 DailyRateNoRead: build/index.d.ts#DailyRateNoRead
 DailyRateRead: build/index.d.ts#DailyRateRead
+DeviceConverter: build/index.d.ts#DeviceConverter
+DeviceDraws: build/index.d.ts#DeviceDraws
+DeviceFragment: build/index.d.ts#DeviceFragment
+DeviceFragmentInput: build/index.d.ts#DeviceFragmentInput
+DeviceFragmentResult: build/index.d.ts#DeviceFragmentResult
+DeviceLine: build/index.d.ts#DeviceLine
+DeviceNoRead: build/index.d.ts#DeviceNoRead
+DeviceRead: build/index.d.ts#DeviceRead
+DeviceRun: build/index.d.ts#DeviceRun
+EnvelopeElement: build/index.d.ts#EnvelopeElement
 FDC_SR_LEGACY_SOURCE: build/index.d.ts#FDC_SR_LEGACY_SOURCE
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
@@ -68,6 +79,7 @@ FragmentDraw: build/index.d.ts#FragmentDraw
 FragmentResource: build/index.d.ts#FragmentResource
 FragmentStore: build/index.d.ts#FragmentStore
 GiftNoRead: build/index.d.ts#GiftNoRead
+HOURS_IN_DAY: build/index.d.ts#HOURS_IN_DAY
 HouseholdFragment: build/index.d.ts#HouseholdFragment
 HouseholdFragmentInput: build/index.d.ts#HouseholdFragmentInput
 HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
@@ -82,6 +94,11 @@ JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
 LIGHT_NEED: build/index.d.ts#LIGHT_NEED
+LightDay: build/index.d.ts#LightDay
+LightHours: build/index.d.ts#LightHours
+LightHoursInput: build/index.d.ts#LightHoursInput
+MAX_LIGHT_DAYS: build/index.d.ts#MAX_LIGHT_DAYS
+MAX_WARMTH_DAYS: build/index.d.ts#MAX_WARMTH_DAYS
 MILK_LATER: build/index.d.ts#MILK_LATER
 MixConverter: build/index.d.ts#MixConverter
 MixFragment: build/index.d.ts#MixFragment
@@ -103,8 +120,11 @@ ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
 ResourceSubset: build/index.d.ts#ResourceSubset
 STORED_WATER: build/index.d.ts#STORED_WATER
+SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
+SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
 StoveShare: build/index.d.ts#StoveShare
 SubsetConverter: build/index.d.ts#SubsetConverter
+THERMAL_TRANSMITTANCE_SOURCE: build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
@@ -112,6 +132,9 @@ WATER_DENSITY_MIN: build/index.d.ts#WATER_DENSITY_MIN
 WATER_NEED: build/index.d.ts#WATER_NEED
 WATER_SPECIFIC_HEAT: build/index.d.ts#WATER_SPECIFIC_HEAT
 WIC_INFANT_SOURCE: build/index.d.ts#WIC_INFANT_SOURCE
+WarmthDay: build/index.d.ts#WarmthDay
+WarmthHeat: build/index.d.ts#WarmthHeat
+WarmthInput: build/index.d.ts#WarmthInput
 calorieChange: build/index.d.ts#calorieChange
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
@@ -121,13 +144,20 @@ checkCalorieTable: build/index.d.ts#checkCalorieTable
 checkDailyNeeds: build/index.d.ts#checkDailyNeeds
 checkJoins: build/index.d.ts#checkJoins
 cookFragment: build/index.d.ts#cookFragment
+deviceFragment: build/index.d.ts#deviceFragment
 formulaMixCheck: build/index.d.ts#formulaMixCheck
 formulaMixFragment: build/index.d.ts#formulaMixFragment
 formulaMixWater: build/index.d.ts#formulaMixWater
 hasNeedsError: build/index.d.ts#hasNeedsError
+heatLossFromUse: build/index.d.ts#heatLossFromUse
+heatLossOf: build/index.d.ts#heatLossOf
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
+lightHours: build/index.d.ts#lightHours
+lightNeed: build/index.d.ts#lightNeed
 subsetConverters: build/index.d.ts#subsetConverters
+warmthHeat: build/index.d.ts#warmthHeat
+warmthNeed: build/index.d.ts#warmthNeed
 
 ## Declarations
 
@@ -326,6 +356,7 @@ export interface CookLine {
   readonly resource: string;
   readonly energy: CookRead;
   readonly water: CookRead;
+  readonly soak: CookRead;
   readonly heat: CookRead;
   readonly minutes: CookRead;
   readonly fuel: CookRead;
@@ -358,6 +389,9 @@ export declare const DAILY_NEEDS: readonly DailyNeed[];
 
 ### build/index.d.ts#DAILY_NEED_CODES
 export declare const DAILY_NEED_CODES: readonly ["daily-need-id", "daily-need-unit", "daily-need-rate"];
+
+### build/index.d.ts#DEGREE_DAY_SOURCE
+export declare const DEGREE_DAY_SOURCE: Source;
 
 ### build/index.d.ts#DGA_CALORIES
 export declare const DGA_CALORIES: CalorieTable;
@@ -397,6 +431,94 @@ export interface DailyRateRead {
   readonly perDay: Quantity;
   readonly sources: readonly Source[];
   readonly note: string;
+}
+
+### build/index.d.ts#DeviceConverter
+export interface DeviceConverter extends FragmentConverter {
+  readonly perDay: number;
+  readonly devices: number;
+}
+
+### build/index.d.ts#DeviceDraws
+export interface DeviceDraws {
+  readonly level: string;
+  readonly supply: string;
+}
+
+### build/index.d.ts#DeviceFragment
+export interface DeviceFragment {
+  readonly schema: "endurance/1";
+  readonly levels: readonly string[];
+  readonly resources: readonly FragmentResource[];
+  readonly stores: readonly never[];
+  readonly draws: readonly FragmentDraw[];
+  readonly converters: readonly DeviceConverter[];
+}
+
+### build/index.d.ts#DeviceFragmentInput
+export interface DeviceFragmentInput {
+  readonly catalog: SupplyCatalog;
+  readonly units: Readonly<Record<string, number>>;
+  readonly runs?: Readonly<Record<string, DeviceRun>> | undefined;
+  readonly parts?: Readonly<Record<string, string>> | undefined;
+  readonly draws?: DeviceDraws | undefined;
+  readonly needs?: readonly DailyNeed[] | undefined;
+  readonly prefix?: string | undefined;
+}
+
+### build/index.d.ts#DeviceFragmentResult
+export interface DeviceFragmentResult {
+  readonly layer: DeviceFragment;
+  readonly lines: readonly DeviceLine[];
+  readonly noReads: readonly DeviceNoRead[];
+  readonly read: boolean;
+}
+
+### build/index.d.ts#DeviceLine
+export interface DeviceLine {
+  readonly product: string;
+  readonly need: string;
+  readonly battery: string;
+  readonly devices: number;
+  readonly hours: DeviceRead;
+}
+
+### build/index.d.ts#DeviceNoRead
+export type DeviceNoRead = {
+  readonly product: string;
+  readonly need?: never;
+  readonly why: string;
+} | {
+  readonly need: string;
+  readonly product?: never;
+  readonly why: string;
+};
+
+### build/index.d.ts#DeviceRead
+export type DeviceRead = {
+  readonly read: true;
+  readonly value: number;
+  readonly unit: string;
+} | {
+  readonly read: false;
+  readonly why: string;
+};
+
+### build/index.d.ts#DeviceRun
+export interface DeviceRun {
+  readonly amount: number;
+  readonly unit: string;
+  readonly per: {
+    readonly amount: number;
+    readonly unit: string;
+  };
+  readonly cite: string;
+}
+
+### build/index.d.ts#EnvelopeElement
+export interface EnvelopeElement {
+  readonly areaM2: number;
+  readonly uWm2K: number;
 }
 
 ### build/index.d.ts#FDC_SR_LEGACY_SOURCE
@@ -514,6 +636,9 @@ export interface GiftNoRead {
   readonly why: string;
 }
 
+### build/index.d.ts#HOURS_IN_DAY
+export declare const HOURS_IN_DAY: number;
+
 ### build/index.d.ts#HouseholdFragment
 export interface HouseholdFragment {
   readonly schema: "endurance/1";
@@ -585,13 +710,13 @@ export declare const INFANT_MONTHS = 12;
 export type InfantFeeding = (typeof INFANT_FEEDINGS)[number];
 
 ### build/index.d.ts#JOIN_CODES
-export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part"];
+export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part", "join-subset-resource", "join-subset-same", "join-subset-unit"];
 
 ### build/index.d.ts#JoinCode
 export type JoinCode = (typeof JOIN_CODES)[number];
 
 ### build/index.d.ts#JoinFinding
-export type JoinFinding = Finding<JoinCode, "use" | "supply">;
+export type JoinFinding = Finding<JoinCode, "use" | "supply" | "subset">;
 
 ### build/index.d.ts#JoinReferences
 export interface JoinReferences {
@@ -601,6 +726,35 @@ export interface JoinReferences {
 
 ### build/index.d.ts#LIGHT_NEED
 export declare const LIGHT_NEED = "light.see";
+
+### build/index.d.ts#LightDay
+export interface LightDay {
+  readonly date: CivilDate;
+  readonly awakeHours: number;
+  readonly darkHours: number;
+}
+
+### build/index.d.ts#LightHours
+export interface LightHours {
+  readonly days: readonly LightDay[];
+  readonly most: number;
+  readonly mean: number;
+}
+
+### build/index.d.ts#LightHoursInput
+export interface LightHoursInput {
+  readonly point: LatLon;
+  readonly awake: TimeWindow;
+  readonly from: CivilDate;
+  readonly days: number;
+  readonly altitudeDeg?: number | undefined;
+}
+
+### build/index.d.ts#MAX_LIGHT_DAYS
+export declare const MAX_LIGHT_DAYS = 1096;
+
+### build/index.d.ts#MAX_WARMTH_DAYS
+export declare const MAX_WARMTH_DAYS = 1096;
 
 ### build/index.d.ts#MILK_LATER
 export declare const MILK_LATER: CitedMilk;
@@ -712,6 +866,12 @@ export interface ResourceSubset {
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
 
+### build/index.d.ts#SUNRISE_EQUATION_SOURCE
+export declare const SUNRISE_EQUATION_SOURCE: Source;
+
+### build/index.d.ts#SUN_POSITION_SOURCE
+export declare const SUN_POSITION_SOURCE: Source;
+
 ### build/index.d.ts#StoveShare
 export interface StoveShare {
   readonly value: number;
@@ -731,6 +891,9 @@ export interface SubsetConverter {
     readonly amount: number;
   };
 }
+
+### build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
+export declare const THERMAL_TRANSMITTANCE_SOURCE: Source;
 
 ### build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 export declare const USGS_WATER_DENSITY_SOURCE: Source;
@@ -752,6 +915,27 @@ export declare const WATER_SPECIFIC_HEAT: CookConstant;
 
 ### build/index.d.ts#WIC_INFANT_SOURCE
 export declare const WIC_INFANT_SOURCE: Source;
+
+### build/index.d.ts#WarmthDay
+export interface WarmthDay {
+  readonly outdoorC: number;
+  readonly heatKWh: number;
+}
+
+### build/index.d.ts#WarmthHeat
+export interface WarmthHeat {
+  readonly days: readonly WarmthDay[];
+  readonly most: number;
+  readonly mean: number;
+}
+
+### build/index.d.ts#WarmthInput
+export interface WarmthInput {
+  readonly heatLossWK: number;
+  readonly indoorC: number;
+  readonly outdoorC: readonly number[];
+  readonly gainsW?: number | undefined;
+}
 
 ### build/index.d.ts#calorieChange
 export declare function calorieChange(table: CalorieTable, sex: CalorieSex, stage: string): CalorieChange | undefined;
@@ -778,10 +962,13 @@ export declare function checkCalorieTable(table: CalorieTable, options?: GateOpt
 export declare function checkDailyNeeds(needs: readonly DailyNeed[], options?: GateOptions): DailyNeedFinding[];
 
 ### build/index.d.ts#checkJoins
-export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFinding[];
+export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences, subsets?: readonly ResourceSubset[]): JoinFinding[];
 
 ### build/index.d.ts#cookFragment
 export declare function cookFragment(input: CookFragmentInput): CookFragmentResult;
+
+### build/index.d.ts#deviceFragment
+export declare function deviceFragment(input: DeviceFragmentInput): DeviceFragmentResult;
 
 ### build/index.d.ts#formulaMixCheck
 export declare function formulaMixCheck(mix?: CitedFormulaMix): FormulaMixCheck;
@@ -795,11 +982,29 @@ export declare function formulaMixWater(powderKcalPerKg: number, mix?: CitedForm
 ### build/index.d.ts#hasNeedsError
 export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;
 
+### build/index.d.ts#heatLossFromUse
+export declare function heatLossFromUse(heatKWh: number, degreeDaysKd: number): number;
+
+### build/index.d.ts#heatLossOf
+export declare function heatLossOf(elements: readonly EnvelopeElement[]): number;
+
 ### build/index.d.ts#householdFragment
 export declare function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult;
 
 ### build/index.d.ts#isActivityLevel
 export declare function isActivityLevel(level: unknown): level is ActivityLevel;
 
+### build/index.d.ts#lightHours
+export declare function lightHours(input: LightHoursInput): LightHours;
+
+### build/index.d.ts#lightNeed
+export declare function lightNeed(hours: LightHours): DailyNeed;
+
 ### build/index.d.ts#subsetConverters
 export declare function subsetConverters(catalog: SupplyCatalog, resources: Iterable<string>, subsets?: readonly ResourceSubset[], prefix?: string): SubsetConverter[];
+
+### build/index.d.ts#warmthHeat
+export declare function warmthHeat(input: WarmthInput): WarmthHeat;
+
+### build/index.d.ts#warmthNeed
+export declare function warmthNeed(heat: WarmthHeat): DailyNeed;

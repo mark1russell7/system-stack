@@ -9,9 +9,6 @@ import { householdFragment } from "./household.ts";
 import { formulaMixCheck, formulaMixFragment, formulaMixWater } from "./mix.ts";
 import { BOTTLED_WATER, FORMULA_NEED, FORMULA_POWDER, FORMULA_READY, STORED_WATER, WATER_NEED } from "./uses.ts";
 
-// `withBottled` copies the change of market 0.9.0: the resource `water.bottled`, and the jug of 1 gal gives it.
-// When stack-needs takes market 0.9.0, the copy has no effect, and the tests can use SUPPLY_CATALOG.
-
 const POWDER_ID = "food.infant-formula-powder-1kg";
 /** The powder product of 1 kg of the reference catalog. The tests copy it to make test products. */
 const powder: SupplyProduct = (() => {
@@ -30,18 +27,7 @@ const JUG = "water.jug-1gal";
 const TAP = "water.container-1gal";
 const GALLON = 3.785411784;
 
-/** This function gives a catalog with the resource `water.bottled` of market 0.9.0, and the jug of 1 gal that gives it. */
-function withBottled(base: SupplyCatalog): SupplyCatalog {
-  const resources = base.resources.some((resource) => resource.code === BOTTLED_WATER)
-    ? base.resources
-    : [...base.resources, { code: BOTTLED_WATER, unit: "L", title: "Drinking water, commercially bottled and sealed", kind: "water" as const }];
-  const products = base.products.map((product) =>
-    product.id === JUG ? { ...product, gives: product.gives.map((gift) => (gift.resource === STORED_WATER ? { ...gift, resource: BOTTLED_WATER } : gift)) } : product,
-  );
-  return { ...base, resources, products };
-}
-
-const catalog = withBottled(withPowder());
+const catalog = withPowder();
 /** The water of 1 kg of powder: 5240 / 630 - 1 kg, at 1 kg/L. */
 const WATER = 5240 / 630 - 1;
 
@@ -122,7 +108,7 @@ describe("the mix fragment", () => {
 
   it("gives no converter and the reason for a powder with no read of its energy", () => {
     const blind: SupplyProduct = { ...powder, id: "test.powder-blind", energy: { read: false, why: "Test: no label." } };
-    const result = formulaMixFragment({ catalog: withBottled(withPowder(blind)), units: { [POWDER_ID]: 1, "test.powder-blind": 1 } });
+    const result = formulaMixFragment({ catalog: withPowder(blind), units: { [POWDER_ID]: 1, "test.powder-blind": 1 } });
     expect(result.read).toBe(false);
     expect(result.layer.converters).toEqual([]);
     expect(result.why).toContain("test.powder-blind: The food energy of the product test.powder-blind is a no read: Test: no label.");
@@ -131,7 +117,7 @@ describe("the mix fragment", () => {
   it("takes the most water and the least energy of two powders", () => {
     // TEST VALUES: a made-up powder of 4800 kcal/kg.
     const lean: SupplyProduct = { ...powder, id: "test.powder-lean", energy: { read: true, amount: 4800, unit: "kcal", definition: "Test data." } };
-    const result = formulaMixFragment({ catalog: withBottled(withPowder(lean)), units: { [POWDER_ID]: 1, "test.powder-lean": 1 } });
+    const result = formulaMixFragment({ catalog: withPowder(lean), units: { [POWDER_ID]: 1, "test.powder-lean": 1 } });
     const converter = result.layer.converters[0];
     expect(converter?.takes[1]).toEqual({ resource: BOTTLED_WATER, amount: expect.closeTo(WATER, 9) });
     expect(converter?.gives).toEqual({ resource: FORMULA_READY, amount: 4800 });
@@ -139,7 +125,7 @@ describe("the mix fragment", () => {
 
   it("gives a no read for a powder with no more energy than the ready-to-feed item", () => {
     const thin: SupplyProduct = { ...powder, id: "test.powder-thin", energy: { read: true, amount: 600, unit: "kcal", definition: "Test data." } };
-    const result = formulaMixFragment({ catalog: withBottled(withPowder(thin)), units: { "test.powder-thin": 1 } });
+    const result = formulaMixFragment({ catalog: withPowder(thin), units: { "test.powder-thin": 1 } });
     expect(result.read).toBe(false);
     expect(result.why).toContain("not more than the 630 kcal/kg");
   });

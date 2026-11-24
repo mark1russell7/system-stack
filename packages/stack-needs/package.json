@@ -40,8 +40,10 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@mark1russell7/algebra": "^0.9.11",
+    "@mark1russell7/geo": "^0.5.13",
     "@mark1russell7/guidebook": "^0.4.0",
-    "@mark1russell7/market": "^0.8.9",
+    "@mark1russell7/market": "^0.9.0",
     "@mark1russell7/quantity": "^0.4.4"
   },
   "devDependencies": {

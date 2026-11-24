@@ -200,7 +200,7 @@ export interface JoinReferences {
  * - The unit of the resource of each direct use converts to the unit of its need.
  * - The amount of each direct use is the factor of that conversion. A direct use is a definition, so a different rate is a converter with a cited source.
  * - Each supply names a reference need and a reference part.
- * - The two resources of each subset are different resources of the catalog, and the unit of the subset converts to the unit of the wider resource.
+ * - The two resources of each subset are different resources of the catalog. The unit of the subset converts to the unit of the wider resource.
  *   Thus `subsetConverters` does not throw for a buy list of the catalog.
  *
  * The findings are in the order of the uses, then of the supplies, then of the subsets. The function is pure.

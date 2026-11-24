@@ -29,6 +29,7 @@ Each function is a plain function with no clock, no network and no file. The uni
 - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
 - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
 - The take order is a rule, not the best share. The days are the days of this order. `takes` gives the amount of each resource that a draw takes.
+- `jointDays` gives the best share for a set of draws. Refer to the section on the joint days.
 - A store gives nothing on its due date and after it. A store or a converter whose part stops gives nothing.
 - A converter can have a limit `perDay`, the most runs of one device in a day, and a count `devices` (default 1). Over `T` days, the converters of one device use `devices` times `T` days of the device or less. One run uses `1 / perDay` of a day of the device. A maker and its taker on one device share these days.
 - The higher draws use the days of a device first. Each higher draw keeps back its part of each day for all the days of a lower draw. This is the safe side.
@@ -60,11 +61,45 @@ Only the cuts of the supply, and of the parts that it needs through the stack, c
 
 Two groups of cuts that share no minimal set are independent, so the independent stop takes the product over the groups. In a group of up to 12 cuts, it adds the chance of each state of the cuts. In a larger group, it uses the Shannon expansion of `pathSetReliability` (`@mark1russell7/collections`). The expansion merges two states with the same sets left, so sets with few shared cuts give a small expansion. The expansion is exponential in the worst case. The groups share one budget, `INDEPENDENT_MAX_WORK`, and the option `maxWork` changes it. When the expansions pass the budget, `independent` is `upper`, and `independentUpper` names the need.
 
+## The joint days
+
+`jointDays(layer, caseCuts, options, needs)` gives the joint days of a set of draws. These are the largest count of days `d` at which each draw of the set holds `d` days together.
+
+- The function finds the best share of the stores and of the runs of the converters. It does not use the take order.
+- It solves a linear program with exact rationals (`@mark1russell7/linear`). Only the change back to a number rounds.
+- The variables are the days, the take of each direct use, the runs of each converter, and the share of each stock for each draw.
+- Each draw of the set gets `d` times its demand. The takes of a resource are not more than its stock plus the gifts of its makers.
+- The runs of a converter with a limit `perDay` are not more than `perDay` times `devices` times `d`. The converters of one device share the limit.
+- After the largest `d`, the program takes the smallest sum of the shares of the stocks. Thus the takes have no waste.
+- A third objective takes the fewest device-days of the converters. Thus the runs are not more than the plan uses.
+- The draws that are not in the set are outside this plan. They take nothing.
+- A draw of the set whose supply works, or whose demand is 0, holds without end. It goes in `holds`, as `enduranceOf` leaves it out.
+- A need code that is not the need of a draw is an error, a `RangeError`.
+- A store gives all of its amount when its due date is after the date of the query. This is the rule of `enduranceOf`.
+- `binding` gives the resources with a store that the optimum uses up. `takes` gives the takes of each draw. `runs` gives the runs of each converter.
+- `capped` gives the converters of the plan whose limit `perDay` stops more runs at the optimum. A maker that the plan does not use is not in the list.
+
+An example: a tank holds 20 L of water. The drink takes 3 L each day, at the higher level. Only a cook feeds the food, 2000 kcal each day. One run of the cook takes 1 L of water, 0.5 kg of grain and 0.125 kg of fuel, and gives 2000 kcal.
+
+```ts
+import { enduranceOf, jointDays } from "@mark1russell7/stack-endurance";
+
+const ordered = enduranceOf(layer, dry, { at: "2026-12-01" });
+// ordered.needs.drink.days is 6.667, and ordered.needs.food.days is 0.
+const joint = jointDays(layer, dry, { at: "2026-12-01" }, ["drink", "food"]);
+// joint.days is 5, and joint.binding is ["water"].
+// joint.takes is { drink: { water: 15 }, food: { water: 5, grain: 2.5, fuel: 0.625 } }.
+```
+
+The take order gives the drink 6.667 days. The drink keeps back all the water for these days, so the food gets 0 days. Together, the two draws take 4 L each day. Thus the water holds 5 days for the two.
+
+The joint days are not more than the days of each draw alone. The take order tells the days of a rule of priority. The joint days tell the days of the best share.
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-endurance` | The records of a layer, the endurance and shortfall queries, the gate, the join and a sample. |
+| `@mark1russell7/stack-endurance` | The records of a layer, the endurance, joint days and shortfall queries, the gate, the join and a sample. |
 | `@mark1russell7/stack-endurance/schema` | `enduranceSchema`, the zod schema of a layer, with `parseEndurance`. |
 | `@mark1russell7/stack-endurance/add-on` | `enduranceAddOn`, the add-on in the form of the layer contract of the core. |
 
