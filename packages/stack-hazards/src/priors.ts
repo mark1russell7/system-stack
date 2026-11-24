@@ -253,28 +253,40 @@ export interface HazardPriorOptions extends Pick<HazardCaseOptions, "region"> {
 }
 
 /**
- * This function gives the yearly prior of each case of a list at the region of the user, as the records `Prior` of the core.
+ * A prior of `hazardPriors`: the record `Prior` of the core, and the region of the table that gives its rate.
+ * A page can thus tell "the rate of your state, not of your county" with one call, also with the option `place`.
+ */
+export interface HazardPrior extends Prior {
+  /** The scheme and the code of the region of the table that gives the rate, for example `us-state-fips:01` after a fall back from a county. */
+  readonly region: string;
+}
+
+/**
+ * This function gives the yearly prior of each case of a list at the region of the user.
+ * Each prior is a record `Prior` of the core with the field `region`.
  * For each case, the first region of the option with a table of the case in its scheme gives the prior. A region that the table observes with no event of the case has a prior of 0.
  * A case with no table for a region of the option has no prior. That is no read, not a prior of 0.
  * The place of a prior is the option `place`. With no option, it is the scheme and the code of its region, for example `us-county-fips:37183`.
  * After a fall back to a larger region, that default is the larger region, not the place of the user. Thus a caller that finds a prior by its place gives the option.
+ * The field `region` is always the scheme and the code of the region that gives the rate, also with the option `place`.
  * The function is pure.
  *
  * @throws RangeError when the option `place` is empty or has a space at an end
  */
-export function hazardPriors(list: HazardList, options: HazardPriorOptions = {}): Prior[] {
+export function hazardPriors(list: HazardList, options: HazardPriorOptions = {}): HazardPrior[] {
   const { place } = options;
   if (place !== undefined && (place === "" || place !== place.trim())) throw new RangeError(`The place "${place}" is empty or has a space at an end.`);
   const regions = hazardRegions(options.region);
   const tables = list.priors ?? [];
-  const priors: Prior[] = [];
+  const priors: HazardPrior[] = [];
   for (const hazard of list.hazards) {
     for (const region of regions) {
       const table = tables.find((item) => item.scheme === region.scheme && item.rates[hazard.case] !== undefined && item.codes.includes(region.code));
       if (table === undefined) continue;
       const [perYear, reach] = table.rates[hazard.case]?.[region.code] ?? [0, 0];
       const source = list.sources[table.source]?.url ?? table.source;
-      priors.push({ case: hazard.case, place: place ?? `${region.scheme}:${region.code}`, perYear, reach, source, asOf: table.asOf });
+      const code = `${region.scheme}:${region.code}`;
+      priors.push({ case: hazard.case, place: place ?? code, region: code, perYear, reach, source, asOf: table.asOf });
       break;
     }
   }

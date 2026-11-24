@@ -26,7 +26,7 @@ Each function is a plain function with no clock, no network and no file.
 2. An age with no row in the tables gives a line with no read for that person, not an error. The total of `calorieNeed` is then a lower limit, and `read` is false.
 3. The activity level is an explicit input. The package has no default level.
 4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. The change comes from the table of the row. A stage that this table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw. One stage holds for each day of a call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
-5. The cook converters come from the cited cook facts of the catalog, a cited stove share and cited constants. A missing fact gives a no read, not a figure. Refer to the section on the water and the fuel of a cook.
+5. The cook converters come from the cited cook facts of the catalog and cited constants. The boil fuel comes from a cited stove share or a cited boil yield. A missing fact gives a no read, not a figure. Refer to the section on the water and the fuel of a cook.
 
 `checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). The source of a table must have a publisher (`by`), a page of its terms and a hash, and HTTPS addresses (the options `require` and `https` of the gate). A missing field gives `missing-field`. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex have no gap between two rows (`needs-gap`). A table can start after month 0 and end at a closed row. Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
 
@@ -187,6 +187,10 @@ The model of one pot:
 1. The cook water is `cookWater` of `@mark1russell7/market` times the dry mass. It takes `water.stored`, the resource of the drinking water.
 2. The heat to boil is the mass times 4.19002 kJ/(kg.K) times the rise to the boil (100 °C). The mass is the water and the dry food. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat. The dry food takes the specific heat of water, which is higher than its own. This term holds the heat above the true value.
 3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the water and the food. The heat of the pot itself is in the losses. It is a cited input with its heating value. It has no default.
+   A boil yield of the stove (`boil` of market) also gives the boil fuel, with no share and no fuel energy. The boil fuel is then the heat of the pot over the heat that 1 kg of fuel put into the test water.
+   The test water takes `WATER_DENSITY_MIN` (0.95865 kg/L at 100 °C, from the USGS table). The rise goes from the cited start to the cited end of the test.
+   Each choice gives the most fuel. At a high place the test water boils below 100 °C, so the end has no default.
+   The boil time is then the boil fuel over the mass rate. When the share and the yield both give a boil fuel, the line takes the most.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
 5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
@@ -200,7 +204,8 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | No cited cook time | The stove time and the fuel. |
 | No cited stove rate, or a rate that is not an energy or a mass in a time | The stove time and the fuel. |
 | A stove rate with a bound, for example `bound: "least"` of market | The stove time and the fuel. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel. |
-| No cited stove share | The stove time and the fuel. The water and the heat keep their reads. |
+| No cited stove share, and no boil yield with a read | The stove time and the fuel. The water and the heat keep their reads. |
+| A boil yield with the bound `most`, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
 | No food energy of the product | The energy. |
@@ -210,7 +215,7 @@ A dry resource with a no read in a line has no converter. It is in `noReads`, an
 
 The catalog of market gives no soak water. Thus a food that needs a soak, for example dry beans, has no soak draw. The beans of the catalog have no cited cook water, so they have no converter.
 
-The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water. `jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.
+The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
 
 The cited constants:
 

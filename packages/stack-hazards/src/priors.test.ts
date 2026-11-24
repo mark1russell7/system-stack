@@ -52,6 +52,8 @@ describe("the priors of the reference list", () => {
     // A code that is not a county falls back to the table of the state.
     const state = hazardPriors(withCounties, { region: [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] });
     expect(new Set(state.map((prior) => prior.place))).toEqual(new Set(["us-state-fips:01"]));
+    expect(county.find((prior) => prior.case === "infra.power.outage")?.region).toBe("us-county-fips:01001");
+    expect(new Set(state.map((prior) => prior.region))).toEqual(new Set(["us-state-fips:01"]));
     expect(hazardPriors(HAZARD_LIST, {})).toEqual([]);
   });
 
@@ -60,6 +62,8 @@ describe("the priors of the reference list", () => {
     const home = hazardPriors(withCounties, { region, place: "home" });
     const plain = hazardPriors(withCounties, { region });
     expect(home).toEqual(plain.map((prior) => ({ ...prior, place: "home" })));
+    // The option place changes the place, not the region: the page still tells that the rate is the rate of the state.
+    expect(new Set(home.map((prior) => prior.region))).toEqual(new Set(["us-state-fips:01"]));
     // The cuts of the sample storm, as the outage case of the list. With the default place, the place of the user finds no prior.
     const [storm] = SAMPLE_ENDURANCE.cases ?? [];
     if (storm === undefined) throw new Error("The sample layer has no case.");
@@ -283,8 +287,8 @@ describe("hazardPriors", () => {
 
   it("gives the prior of the first region of the option with a table of the case", () => {
     expect(hazardPriors(list, { region: [{ scheme: "test-county", code: "A1" }, { scheme: "test-region", code: "A" }] })).toEqual([
-      { case: "infra.power.outage", place: "test-county:A1", perYear: 2, reach: 0.25, source: "https://data.example.net/outages", asOf: "2026-02-25" },
-      { case: "met.flood", place: "test-county:A1", perYear: 0.5, reach: 0.5, source: "https://data.example.net/outages", asOf: "2026-02-25" },
+      { case: "infra.power.outage", place: "test-county:A1", region: "test-county:A1", perYear: 2, reach: 0.25, source: "https://data.example.net/outages", asOf: "2026-02-25" },
+      { case: "met.flood", place: "test-county:A1", region: "test-county:A1", perYear: 0.5, reach: 0.5, source: "https://data.example.net/outages", asOf: "2026-02-25" },
     ]);
     expect(hazardPriors(list, { region: [{ scheme: "test-region", code: "A" }, { scheme: "test-county", code: "A1" }] })[0]?.place).toBe("test-region:A");
   });

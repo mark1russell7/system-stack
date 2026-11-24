@@ -85,7 +85,7 @@ export interface CaseOptions {
 }
 
 ### build/index.d.ts#ENDURANCE_CODES
-export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-no-way", "endurance-cut-no-curve"];
+export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-device-mix", "endurance-no-way", "endurance-cut-no-curve"];
 
 ### build/index.d.ts#EnduranceCode
 export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
