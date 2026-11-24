@@ -329,8 +329,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0
       '@mark1russell7/rigor-statistics':
-        specifier: ^0.2.22
-        version: 0.2.22
+        specifier: ^0.2.23
+        version: 0.2.23
       '@mark1russell7/system-stack':
         specifier: workspace:*
         version: link:../system-stack
@@ -972,12 +972,20 @@ packages:
     resolution: {integrity: sha512-bWhgmh1I74o1KuNRycv43pZFseddTWTrvEAQjLWnMeiM3p9sB2ACvBiWradssLhCBhIrz2UxY9+5K34fZoUBnA==}
     engines: {node: '>=22'}
 
+  '@mark1russell7/rigor-generators@0.2.2':
+    resolution: {integrity: sha512-X2kd6HZY9B5p5muNO5O1hJJXmnSC+J/22Jfz9M2iAcb8NaoNsVST4ly4g+N5Cyeb6qCKrUvsK14mZkyG5aAGPQ==}
+    engines: {node: '>=22'}
+
   '@mark1russell7/rigor-statistics@0.1.29':
     resolution: {integrity: sha512-Wh91NJIwxIRN3+a5V2bqUkMhdPcjHI+gVZBCnohf12ZegdSTNqGlpqS2WXYmrRVjasF9EBgm1lC8GQNYpBSg7Q==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.22':
     resolution: {integrity: sha512-+80zAMr//n2tN0VqNIaBF/y/xeh8S60MUggwEHtrjft4UQO0DNVLQvsYiNaTh2c8iB29FSiddvkIX5/Ce3cAhg==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-statistics@0.2.23':
+    resolution: {integrity: sha512-r0Jmly70hWU925T6U+WUrJTm64CBTVIdr472QfLzjENTAuCeHSCZ8e1brtvzXLS4GPwK4GxT9cN/tW9zGbPB9g==}
     engines: {node: '>=22'}
 
   '@mark1russell7/service@0.8.20':
@@ -2441,7 +2449,7 @@ snapshots:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.1.19
-      '@mark1russell7/rigor-statistics': 0.2.22
+      '@mark1russell7/rigor-statistics': 0.2.23
       '@mark1russell7/text': 0.0.17
       zod: 4.6.7
 
@@ -2467,7 +2475,7 @@ snapshots:
   '@mark1russell7/algebra@0.9.10(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
-      '@mark1russell7/rigor-statistics': 0.2.22
+      '@mark1russell7/rigor-statistics': 0.2.23
     optionalDependencies:
       zod: 4.6.7
 
@@ -2506,7 +2514,7 @@ snapshots:
     dependencies:
       '@mark1russell7/algebra': 0.8.10(zod@4.6.7)
       '@mark1russell7/optional': 1.5.0
-      '@mark1russell7/rigor-statistics': 0.2.22
+      '@mark1russell7/rigor-statistics': 0.2.23
     transitivePeerDependencies:
       - zod
 
@@ -2563,6 +2571,8 @@ snapshots:
 
   '@mark1russell7/rigor-generators@0.2.1': {}
 
+  '@mark1russell7/rigor-generators@0.2.2': {}
+
   '@mark1russell7/rigor-statistics@0.1.29':
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.19
@@ -2570,6 +2580,10 @@ snapshots:
   '@mark1russell7/rigor-statistics@0.2.22':
     dependencies:
       '@mark1russell7/rigor-generators': 0.2.1
+
+  '@mark1russell7/rigor-statistics@0.2.23':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.2.2
 
   '@mark1russell7/service@0.8.20(zod@4.6.7)':
     dependencies:
