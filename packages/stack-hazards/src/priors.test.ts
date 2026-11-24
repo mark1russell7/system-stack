@@ -7,7 +7,7 @@ import { HAZARD_LIST } from "./data.ts";
 import { EAGLEI_COUNTY_POOLING, EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
 import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_NATION_PRIORS } from "./oe417.ts";
-import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionRates, type Observation } from "./priors.ts";
+import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionRates, withoutSilentAreas, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
 const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, seconds: 3600, peak, censored: false });
@@ -141,14 +141,16 @@ describe("the pooled rates of the areas", () => {
     expect(rates["97001"]).toBeUndefined();
   });
 
-  it("gives a state with no event its pooled rate toward the states with events, and the mean reach of all events", () => {
+  it("gives a state with no event its pooled rate toward the states with events, and the plain mean reach of all counties with events", () => {
     const { rates, laws } = pooledRates(counts, observation, state);
     const law = laws["98"];
     expect(law).toMatchObject({ shape: Number.POSITIVE_INFINITY, areas: 2, events: 0, from: "nation" });
     expect(law?.mean).toBeGreaterThan(0);
     // The raw rate of the state 99 is 2. The rate of a state with no event is far under it.
     expect(law?.mean).toBeLessThan(1);
-    expect(rates["98001"]).toEqual([law?.mean, 1.5 / 12]);
+    // The reach of 99001 is 0.1 and of 99003 is 0.2. Their plain mean is 0.15. The mean over the events is 1.5 / 12 = 0.125.
+    expect(rates["98001"]?.[0]).toBe(law?.mean);
+    expect(rates["98001"]?.[1]).toBeCloseTo(0.15, 12);
     expect(rates["98002"]).toEqual(rates["98001"]);
   });
 
@@ -156,6 +158,13 @@ describe("the pooled rates of the areas", () => {
     expect(pooledRates({}, observation, state).rates).toEqual({});
     const one = pooledRates({ "99001": { events: 2, share: 0.5 } }, observation, state).rates;
     expect(one["99003"]?.[1]).toBe(0.25);
+  });
+
+  it("gives an area with no event the plain mean of the reach of the areas of its state with events, not the mean over the events", () => {
+    const three: Observation = { years: { "99001": 1, "99003": 1, "99005": 1 }, customers: { "99001": 10, "99003": 10, "99005": 10 } };
+    // The reach of 99001 is 0.5 in 1 event, and of 99003 is 0.1 in 3 events. The plain mean is 0.3. The mean over the events is 0.8 / 4 = 0.2.
+    const { rates } = pooledRates({ "99001": { events: 1, share: 0.5 }, "99003": { events: 3, share: 0.3 } }, three, state);
+    expect(rates["99005"]?.[1]).toBeCloseTo(0.3, 12);
   });
 
   it("holds the gate of the committed table: in each case, the pooled rates score above the raw rates and the state rates on the held-out events", () => {
@@ -168,9 +177,40 @@ describe("the pooled rates of the areas", () => {
       // The raw score is -Infinity when a county with no event in the fit half has an event in the score half. Thus the finite scores of the counties with events compare pooled with raw.
       expect(score?.seen.pooled, name).toBeGreaterThan(score?.seen.raw ?? Number.POSITIVE_INFINITY);
       expect(score?.squared.pooled, name).toBeLessThan(Math.min(score?.squared.raw ?? 0, score?.squared.state ?? 0));
+      // The gate of the reach of the counties with no event in the fit half: the plain mean has a mean absolute error within 5% of the mean over the events.
+      expect(score?.reach.plain.error, name).toBeLessThanOrEqual(1.05 * (score?.reach.events.error ?? 0));
       // Each state with an observed county has a law in each case.
       expect(Object.keys(EAGLEI_COUNTY_POOLING.laws[name] ?? {}).length, name).toBeGreaterThanOrEqual(50);
     }
+  });
+});
+
+describe("the silent areas", () => {
+  const observation: Observation = { years: { "99001": 3, "99003": 1, "98001": 2, "97001": 5 }, customers: { "99001": 3000, "99003": 1000, "98001": 10 } };
+
+  it("takes the observed areas with no event in any case out of the observation, and gives the count that the laws expect", () => {
+    const counts = { "case.a": { "99001": { events: 6, share: 0.6 } }, "case.b": { "98001": { events: 1, share: 0.5 } } };
+    const { observation: kept, silent, expected } = withoutSilentAreas(counts, observation, state);
+    expect(silent).toEqual(["99003"]);
+    expect(kept).toEqual({ years: { "99001": 3, "98001": 2, "97001": 5 }, customers: { "99001": 3000, "98001": 10 } });
+    // Each state has one area with events, so each law has the shape Infinity: the chance of 0 is exp(-mean * years) in each case.
+    // case.a: the mean of 99 is 2 and of 98 is its pooled rate toward 99. case.b: the mean of 98 is 0.5 and of 99 is its pooled rate toward 98.
+    const a = pooledRates(counts["case.a"], observation, state).laws;
+    const b = pooledRates(counts["case.b"], observation, state).laws;
+    const chance = (area: string, years: number) => Math.exp(-((a[state(area)]?.mean ?? 0) + (b[state(area)]?.mean ?? 0)) * years);
+    expect(expected).toBeCloseTo(chance("99001", 3) + chance("99003", 1) + chance("98001", 2), 12);
+    // With no silent area, the observation does not change.
+    expect(withoutSilentAreas({ "case.a": { "99001": { events: 1, share: 1 }, "99003": { events: 1, share: 1 }, "98001": { events: 1, share: 1 } } }, observation, state).silent).toEqual([]);
+  });
+
+  it("holds the gate of the committed table: the laws expect at most 10% of the silent counties, so most of them are gaps of the files", () => {
+    const { areas, expected } = EAGLEI_COUNTY_POOLING.silent;
+    expect(areas).toBeGreaterThan(0);
+    expect(expected).toBeLessThanOrEqual(0.1 * areas);
+    // The sum of the absolute bias of the reach over the cases is smaller with the plain mean than with the mean over the events.
+    const scores = Object.values(EAGLEI_COUNTY_POOLING.holdout.cases);
+    const bias = (method: "plain" | "events") => scores.reduce((sum, score) => sum + Math.abs(score.reach[method].bias / Math.max(1, score.reach.areas)), 0);
+    expect(bias("plain")).toBeLessThan(bias("events"));
   });
 });
 
