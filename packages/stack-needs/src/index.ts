@@ -4,4 +4,5 @@ export * from "./check.ts";
 export * from "./household.ts";
 export * from "./uses.ts";
 export * from "./cook.ts";
+export * from "./mix.ts";
 export * from "./daily.ts";

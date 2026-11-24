@@ -21,6 +21,11 @@ export const NO_COOK = "food.no-cook";
 
 /** The resource of the ready-to-feed infant formula, in `kcal`. It has a direct use for the formula need. It needs no water and no fuel. */
 export const FORMULA_READY = "food.infant-formula-ready";
+/**
+ * The resource of the infant formula powder, in `kg`. It has no direct use. `formulaMixFragment` mixes it with
+ * `STORED_WATER` into `FORMULA_READY`. `cookFragment` does not cook it.
+ */
+export const FORMULA_POWDER = "food.infant-formula-powder";
 /** The resource of the stored drinking water, in `L`. It has a direct use for the water need. */
 export const STORED_WATER = "water.stored";
 
