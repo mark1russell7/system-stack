@@ -43,7 +43,8 @@ export interface CookConstant {
 
 /**
  * The mean specific heat of liquid water from 0 °C to 100 °C: 4.19002 kJ/(kg.K).
- * The NIST Guide to the SI gives 4.190 02 J for the calorie (mean). That is the mean of the calorie over this range. Its footnote 10 tells that the calorie is the energy to raise 1 g of water
+ * The NIST Guide to the SI gives 4.190 02 J for the calorie (mean). The common definition of that calorie is the mean over this range.
+ * SP 811 does not state the range. Its footnote 10 tells that the calorie is the energy to raise 1 g of water
  * by 1 kelvin. For the default start (0 °C), the value is the mean of the rise. For a warmer start, the mean of the
  * rise can be a little higher. The model also heats the dry food with this value, above the specific heat of a dry food.
  * That term holds the heat of the pot above the true value.
@@ -53,7 +54,7 @@ export const WATER_SPECIFIC_HEAT: CookConstant = {
   unit: "kJ/(kg.K)",
   source: NIST_SI_GUIDE_SOURCE,
   locator: "Appendix B.8, row calorie (mean): 4.190 02 E+00 J. Footnotes, footnote 10: the energy to raise 1 gram of water by 1 °C.",
-  note: "The calorie (mean) in joules, for 1 g of water and 1 K. The mean is over the range from 0 °C to 100 °C.",
+  note: "The calorie (mean) in joules, for 1 g of water and 1 K. By its common definition, the mean is over the range from 0 °C to 100 °C. SP 811 does not state the range.",
 };
 
 /**
@@ -110,7 +111,7 @@ export interface CookFragmentInput {
   readonly stove: string | StoveFacts;
   /**
    * The dry mass of the food of one pot, for example `{ "value": 0.5, "unit": "kg" }`. It is a plan of the caller. It has no default.
-   * Give the smallest pot that the cook makes. A batch above the real pot gives too little fuel, because each pot takes its own boil.
+   * Give the smallest pot that the cook makes. A batch above the real pot gives too little fuel, because each pot takes its own cook time.
    */
   readonly batch: Quantity;
   /** The stove share. Without it, the fuel of the boil is a no read, so each fuel is a no read. It has no default. */
@@ -219,6 +220,7 @@ interface StoveContext {
 /**
  * This function gives the cook line of one dry food. Each missing fact gives a no read with its reason.
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
+ * At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
  */
 function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
   const { stove, batchKg, share, startC, fuelEnergy } = context;
@@ -310,7 +312,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - The heat to boil is the mass of the water and the dry food times `WATER_SPECIFIC_HEAT` times the rise from the start to `BOIL_CELSIUS`.
  *   The water mass takes `WATER_DENSITY_MAX`. The dry food takes the specific heat of water, which is higher than its own.
  * - The boil time is the heat divided by the stove rate times the share. The time of the stove is the boil time plus the high end of the cook time.
- * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time.
+ * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
+ *   The model does not give that time, so there the fuel is not an upper limit.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
  * A dry food is a gift of a food resource in a unit of mass. Each missing fact gives a line with no read and its reasons, not a figure.
@@ -322,7 +325,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * A product that gives more than one food has no energy for each food, so its energy is a no read.
  *
  * The cook water is `water.stored`, the store of the drinking water. A drinking draw at a higher level of the same store takes
- * its water first, by the take order of `enduranceOf`. Then the cook gets the water only when the drink is safe to the end.
+ * its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store.
+ * Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
  *
  * The function is pure.
  *
