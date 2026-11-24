@@ -132,6 +132,7 @@ describe("jointDays", () => {
 
   it("gives a free maker only the runs that the plan uses, and does not name it in capped", () => {
     // A loop of two makers gives water back for each liter that it takes, so its runs cost no stock. The gate refuses such a loop.
+    // Only such a loop has runs with no cost, so only the third objective decides its runs. The simplex also gives 0 runs without it.
     // A still with a limit of 0 makes a resource that the plan does not use.
     const layer: EnduranceLayer = {
       ...POT,
@@ -149,6 +150,18 @@ describe("jointDays", () => {
     expect(joint.runs).toEqual({ cook: 5 });
     expect(joint.capped).toEqual([]);
     expect(joint.takes).toEqual({ drink: { water: 15 }, food: { water: 5, grain: 2.5, fuel: 0.625 } });
+  });
+
+  it("does not run a converter that takes nothing, as enduranceOf does", () => {
+    // A catcher with no inputs could give water at no cost. canRun refuses it, so a free maker cannot run in the program.
+    const layer: EnduranceLayer = {
+      ...POT,
+      converters: [...(POT.converters ?? []), { id: "catch", device: "roof", perDay: 100, takes: [], gives: { resource: "water", amount: 1 } }],
+    };
+    const joint = jointDays(layer, DRY, { at: AT }, ["drink", "food"]);
+    expect(joint.days).toBe(5);
+    expect(joint.runs).toEqual({ cook: 5 });
+    expect(joint.capped).toEqual([]);
   });
 
   it("does not use a converter whose device stops", () => {
