@@ -131,7 +131,7 @@ describe("hazardPriors", () => {
   const region: PriorTable = { ...county, scheme: "test-region", codes: ["A"], rates: { "infra.power.outage": { A: [40, 0.01] } } };
   const list: HazardList = {
     schema: HAZARDS_SCHEMA,
-    sources: { outages: { name: "Outages", url: "https://data.example.net/outages", publisher: "An agency", license: { name: "Public domain", url: "https://data.example.net/terms" }, read: "2026-11-21" } },
+    sources: { outages: { id: "outages", title: "Outages", url: "https://data.example.net/outages", by: "An agency", license: "public-domain", terms: "https://data.example.net/terms", checked: "2026-11-21" } },
     hazards: [
       { case: "infra.power.outage", title: "Power outage", examined: ["outages"], cuts: [] },
       { case: "met.flood", title: "Flood", examined: ["outages"], cuts: [] },

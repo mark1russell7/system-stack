@@ -1,3 +1,4 @@
+import type { Source } from "@mark1russell7/guidebook";
 import type { Part, Survival } from "@mark1russell7/system-stack";
 
 // The model of the hazard cases: the reference parts of the public supplies, the sources, the cuts and the laws of their durations.
@@ -25,14 +26,6 @@ export const SUPPLY_PARTS: readonly Part[] = [
   { id: "home.dwelling", kind: "dwelling", name: "The home and the things in it" },
 ];
 
-/** The license of a source. */
-export interface License {
-  /** The name of the license, for example "Public domain". */
-  readonly name: string;
-  /** The page that tells the terms of the reuse. */
-  readonly url: string;
-}
-
 /** The regions of a source: the scheme of the codes and each code that the source covers. */
 export interface Regions {
   /** The scheme of the codes, for example `us-state`. */
@@ -40,21 +33,15 @@ export interface Regions {
   readonly codes: readonly string[];
 }
 
-/** A source: a public page or a public dataset. */
-export interface Source {
-  /** A short name of the source. */
-  readonly name: string;
-  readonly url: string;
-  /** The organization that publishes the source. */
-  readonly publisher: string;
-  readonly license: License;
-  /** The date that the source shows as its last change. */
-  readonly updated?: IsoDate | undefined;
-  /** The date of the read of the source. */
-  readonly read: IsoDate;
+/**
+ * A source: a public page or a public dataset. It is the source record of `@mark1russell7/guidebook`, with the regions of the source.
+ * The field `by` is the organization that publishes the source. The field `checked` is the date of the read of the source.
+ * The field `license` is a license of the guidebook, and the field `terms` is the page that tells the terms of the reuse.
+ */
+export type HazardSource = Source & {
   /** The regions that the source covers. A source of a law of a duration must have its regions. */
   readonly regions?: Regions | undefined;
-}
+};
 
 /**
  * The bases of a claim of a source, in a fixed order. The axis is the object of the claim: the effect of the event, or the threat.
@@ -98,7 +85,7 @@ export interface Fit {
  */
 export interface DurationLaw {
   readonly read: true;
-  /** The id of the source of the law. The source must have a license and regions. */
+  /** The id of the source of the law. The license of the source must permit a fact, and the source must have regions. */
   readonly source: string;
   readonly fit: Fit;
   /** The scheme of the region codes. It is the scheme of the regions of the source. */
@@ -145,7 +132,7 @@ export interface Hazard {
  * `reach` is the mean share of the region that one event reaches.
  */
 export interface PriorTable {
-  /** The id of the source. The source must have a license. */
+  /** The id of the source. The license of the source must permit a fact. */
   readonly source: string;
   /** The date of the data of the source. */
   readonly asOf: IsoDate;
@@ -160,13 +147,13 @@ export interface PriorTable {
 }
 
 /** The name of the format of a list of hazard cases. */
-export const HAZARDS_SCHEMA = "hazards/1";
+export const HAZARDS_SCHEMA = "hazards/2";
 
 /** A list of hazard cases with the table of its sources. */
 export interface HazardList {
   readonly schema: typeof HAZARDS_SCHEMA;
-  /** The sources, by id. */
-  readonly sources: Readonly<Record<string, Source>>;
+  /** The sources, by id. The field `id` of each source is its key. */
+  readonly sources: Readonly<Record<string, HazardSource>>;
   readonly hazards: readonly Hazard[];
   /** The tables of the yearly priors of the cases. A case with no table for the region of the user has no prior. */
   readonly priors?: readonly PriorTable[] | undefined;

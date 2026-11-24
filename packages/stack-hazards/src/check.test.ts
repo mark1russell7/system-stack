@@ -4,7 +4,7 @@ import { checkHazards, hasHazardError } from "./check.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_EVENT_LAW, NO_FOLLOW_LAW, NO_GEOMAGNETIC_LAW, NO_LAW } from "./data.ts";
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { STORM_CLASSES } from "./storms.ts";
-import { CLAIM_BASES, HAZARDS_SCHEMA, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { CLAIM_BASES, HAZARDS_SCHEMA, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
 import { supplyState } from "./case.ts";
 
 /** The catastrophic cases, in the order of the list. */
@@ -23,12 +23,14 @@ const CATASTROPHIC = [
   "geo.space-weather.geomagnetic-storm",
 ];
 
-const SOURCE: Source = {
-  name: "A dataset of outages",
+const SOURCE: HazardSource = {
+  id: "outages",
+  title: "A dataset of outages",
   url: "https://data.example.net/outages",
-  publisher: "An agency",
-  license: { name: "Public domain", url: "https://data.example.net/terms" },
-  read: "2026-11-21",
+  by: "An agency",
+  license: "public-domain",
+  terms: "https://data.example.net/terms",
+  checked: "2026-11-21",
   regions: { scheme: "test-region", codes: ["A", "B"] },
 };
 const CURVE = [
@@ -39,7 +41,7 @@ const CURVE = [
 const LAW: DurationLaw = { read: true, source: "outages", fit: { family: "lognormal", method: "maximum likelihood", count: 40 }, scheme: "test-region", curves: { A: CURVE, B: CURVE } };
 
 /** This function gives a list with one case that cuts the grid with a law. */
-function withLaw(law: DurationLaw, source: Source = SOURCE): HazardList {
+function withLaw(law: DurationLaw, source: HazardSource = SOURCE): HazardList {
   return {
     schema: HAZARDS_SCHEMA,
     sources: { outages: source },
@@ -80,7 +82,7 @@ describe("the gate of the reference data", () => {
       const grid = HAZARD_LIST.hazards.find((hazard) => hazard.case === name)?.cuts.find((cut) => cut.part === "power.grid");
       expect(grid?.duration).toBe(law);
       expect(HAZARD_SOURCES[law.source]).toBe(source);
-      expect([law.source, law.scheme, source?.license.name]).toEqual([`eaglei.${name}`, "us-state-fips", "CC BY 4.0"]);
+      expect([law.source, law.scheme, source?.license, source?.id]).toEqual([`eaglei.${name}`, "us-state-fips", "cc-by-4.0", law.source]);
       expect(Object.keys(law.curves).sort()).toEqual([...(source?.regions?.codes ?? [])].sort());
       expect(law.fit.method).toContain("a storm event of the case");
       for (const code of Object.keys(law.curves)) expect(EAGLEI_SOURCE.regions?.codes).toContain(code);
@@ -90,7 +92,7 @@ describe("the gate of the reference data", () => {
   it("has the law of EAGLE-I on the grid cut, with a curve for each region of its source", () => {
     const law = EAGLEI_GRID_LAW;
     const codes = EAGLEI_SOURCE.regions?.codes ?? [];
-    expect([law.source, law.scheme, EAGLEI_SOURCE.license.name]).toEqual(["eaglei.outages", "us-state-fips", "CC BY 4.0"]);
+    expect([law.source, law.scheme, EAGLEI_SOURCE.license, EAGLEI_SOURCE.id]).toEqual(["eaglei.outages", "us-state-fips", "cc-by-4.0", "eaglei.outages"]);
     expect(HAZARD_SOURCES["eaglei.outages"]).toBe(EAGLEI_SOURCE);
     expect(codes.length).toBeGreaterThanOrEqual(51);
     expect(Object.keys(law.curves).sort()).toEqual([...codes].sort());
@@ -169,7 +171,7 @@ describe("the gate of the reference data", () => {
     expect(examined("infra.power.grid-collapse")).toEqual(["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21", "doe.oe-417"]);
     expect(examined("cyber.infrastructure-attack")).toEqual(["ready.cybersecurity", "cisa.ir-alert-h-16-056-01", "doe.oe-417"]);
     expect(examined("geo.space-weather.geomagnetic-storm")).toEqual(["ready.space-weather", "swpc.electric-power", "doe.oe-417"]);
-    for (const id of ["doe.maria-2017-10-23", "doe.maria-2018-02-21", "cisa.ir-alert-h-16-056-01", "swpc.electric-power", "doe.oe-417"]) expect(HAZARD_SOURCES[id]?.license.url, id).toContain("copyright.gov");
+    for (const id of ["doe.maria-2017-10-23", "doe.maria-2018-02-21", "cisa.ir-alert-h-16-056-01", "swpc.electric-power", "doe.oe-417"]) expect([HAZARD_SOURCES[id]?.license, HAZARD_SOURCES[id]?.terms], id).toEqual(["us-public-domain", expect.stringContaining("copyright.gov")]);
   });
 
   it("has a code of the alert taxonomy for each case, so that an alert can reach each case", () => {
@@ -210,9 +212,17 @@ describe("the gate of a law", () => {
     expect(codes(withLaw({ ...LAW, source: "unknown" }))).toEqual(["hazards-source"]);
   });
 
-  it("refuses a law whose source has no license", () => {
-    expect(codes(withLaw(LAW, { ...SOURCE, license: { name: "", url: "" } }))).toEqual(["hazards-license", "hazards-license"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, license: { name: "Public domain", url: " " } }))).toContain("hazards-license");
+  it("refuses a law whose source has a license that the guidebook does not know, or a license that permits no fact", () => {
+    const unknown = "Public domain" as unknown as HazardSource["license"];
+    expect(codes(withLaw(LAW, { ...SOURCE, license: unknown }))).toEqual(["hazards-license", "hazards-license"]);
+    expect(checkHazards(withLaw(LAW, { ...SOURCE, license: unknown }))[0]?.message).toContain("(unknown-license)");
+    expect(codes(withLaw(LAW, { ...SOURCE, license: "link-only" }))).toEqual(["hazards-license", "hazards-license"]);
+    // The license of the test fixtures of the guidebook is not a real license, so a list of hazards refuses it.
+    expect(codes(withLaw(LAW, { ...SOURCE, license: "invented" }))).toEqual(["hazards-license", "hazards-license"]);
+  });
+
+  it("passes a law whose source has a license with a credit line", () => {
+    expect(checkHazards(withLaw(LAW, { ...SOURCE, license: "cc-by-4.0", terms: "https://creativecommons.org/licenses/by/4.0/" }))).toEqual([]);
   });
 
   it("refuses a law of one chosen region: it must cover each region of its source", () => {
@@ -253,11 +263,23 @@ describe("the gate of the cuts and the sources", () => {
     expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [] }] }] })).toEqual(["hazards-no-claim"]);
   });
 
-  it("refuses a claim or an examined id with no source, and a source with no HTTPS URL or a wrong date", () => {
+  it("refuses a claim or an examined id with no source, and a source that the source gate of the guidebook refuses", () => {
     expect(codes({ ...base, hazards: [{ ...hazard, examined: ["unknown"] }] })).toEqual(["hazards-source"]);
     expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "unknown", basis: "told", says: "A page tells it." }] }] }] })).toEqual(["hazards-source"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, url: "http://data.example.net" }))).toEqual(["hazards-source"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, read: "21.11.2026" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, url: "ftp://data.example.net" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: "the terms" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, title: " " }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, checked: "21.11.2026" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, updated: "2026-11-22" }))).toEqual(["hazards-source"]);
+    const [fault] = checkHazards(withLaw(LAW, { ...SOURCE, url: "ftp://data.example.net" }));
+    expect(fault).toMatchObject({ level: "error", at: "sources.outages" });
+    expect(fault?.message).toMatch(/\(bad-url\)$/u);
+  });
+
+  it("refuses a source whose id is not its key in the table, and two sources with one id", () => {
+    expect(codes(withLaw(LAW, { ...SOURCE, id: "other" }))).toEqual(["hazards-source"]);
+    const twice = { ...base, sources: { outages: SOURCE, copy: SOURCE } };
+    expect(codes(twice)).toEqual(["hazards-source", "hazards-source"]);
   });
 
   it("passes a claim of a source with each basis of the set", () => {

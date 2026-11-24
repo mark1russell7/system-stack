@@ -1,5 +1,5 @@
 import { kaplanMeier } from "@mark1russell7/rigor-statistics";
-import type { DurationLaw, Source } from "./hazard.ts";
+import type { DurationLaw, HazardSource } from "./hazard.ts";
 import { survivalOf, type SurvivalOptions } from "./law.ts";
 import { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS } from "./oe417-events.ts";
 
@@ -65,12 +65,14 @@ export const OE417_SPACE_WEATHER_TERMS: RegExp = /geomag|solar|space weather|mag
 export const OE417_LEAST_HOURS = 0.25;
 
 /** The source of the law of a physical attack: the OE-417 annual summaries of 2000 to 2023. */
-export const OE417_SOURCE: Source = {
-  name: "Electric Disturbance Events (OE-417) annual summaries, 2000 to 2023",
+export const OE417_SOURCE: HazardSource = {
+  id: "doe.oe-417",
+  title: "Electric Disturbance Events (OE-417) annual summaries, 2000 to 2023",
   url: "https://www.oe.netl.doe.gov/OE417_annual_summary.aspx",
-  publisher: "U.S. Department of Energy, Office of Cybersecurity, Energy Security, and Emergency Response",
-  license: { name: "Public domain (a work of the United States federal government)", url: "https://www.copyright.gov/title17/92chap1.html#105" },
-  read: "2026-11-24",
+  by: "U.S. Department of Energy, Office of Cybersecurity, Energy Security, and Emergency Response",
+  license: "us-public-domain",
+  terms: "https://www.copyright.gov/title17/92chap1.html#105",
+  checked: "2026-11-24",
   regions: { scheme: "us-nation", codes: ["US"] },
 };
 

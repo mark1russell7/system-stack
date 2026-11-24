@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "../src/check.ts";
-import { HAZARDS_SCHEMA, type PriorTable } from "../src/hazard.ts";
+import { HAZARDS_SCHEMA, type HazardSource, type PriorTable } from "../src/hazard.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { COUNTY_SCHEME, eaglePriors, PRIOR_LIMIT, priorModules } from "./eaglei-priors.ts";
@@ -40,7 +40,7 @@ describe("eaglePriors", () => {
 
   it("passes the gate with the cases and the source of the dataset", () => {
     const { county, state } = eaglePriors(record());
-    const source = { name: "EAGLE-I", url: "https://doi.org/10.0000/test.1", publisher: "A laboratory", license: { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/" }, read: "2026-11-22" };
+    const source: HazardSource = { id: EAGLEI_SOURCE_ID, title: "EAGLE-I", url: "https://doi.org/10.0000/test.1", by: "A laboratory", license: "cc-by-4.0", terms: "https://creativecommons.org/licenses/by/4.0/", checked: "2026-11-22" };
     const hazards = [OUTAGE_CASE, "met.tornado"].map((code) => ({ case: code, title: code, examined: [EAGLEI_SOURCE_ID], cuts: [] }));
     expect(checkHazards({ schema: HAZARDS_SCHEMA, sources: { [EAGLEI_SOURCE_ID]: source }, hazards, priors: [county, state] })).toEqual([]);
   });
