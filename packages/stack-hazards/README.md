@@ -95,15 +95,17 @@ The format of the list is `hazards/2`. Each source is the source record of `@mar
 | --- | --- |
 | `id` | The id of the source. It is the key of the source in the table `sources`. |
 | `title` | A short name of the source. |
-| `url` | The address of the page or the dataset. |
-| `by` | The organization that publishes the source. |
+| `url` | The HTTPS address of the page or the dataset. |
+| `by` | The organization that publishes the source. A list of hazards must have it, because it is the credit of a CC BY source. |
 | `license` | A license of the guidebook, for example `us-public-domain` or `cc-by-4.0`. |
-| `terms` | The page that tells the terms of the reuse. |
+| `terms` | The HTTPS address of the page that tells the terms of the reuse. A list of hazards must have it, because it is the evidence of the license. |
 | `updated` | The date that the source shows as its last change. It is not after the date `checked`. |
 | `checked` | The date of the read of the source. |
 | `regions` | The regions that the source covers. A source of a law of a duration must have its regions. This field is the extension of stack-hazards. |
 
 The gate gives the code `hazards-license` for a license that the guidebook does not know. It also gives this code for a license that does not permit a summary, because the claims are summaries in own words. The license of the source of a law or a table of priors must permit a fact. Each other fault of the source gate has the code `hazards-source`, and its message ends with the code of the guidebook.
+
+The list has three rules that the source gate of the guidebook does not have at this time. A source has an HTTPS address and a publisher (`by`), else the code is `hazards-source`. A source has an HTTPS page of its terms, else the code is `hazards-license`. A source with a fault of its license gives one finding: its laws and tables of priors give no second finding.
 
 In the format `hazards/1`, a source had the fields `name`, `publisher`, `read` and a license with a name and a URL. The format `hazards/2` has the fields `title`, `by`, `checked`, `license` and `terms` in their place.
 

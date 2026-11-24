@@ -1,4 +1,4 @@
-import { checkSources, LICENSES, permits, type FindingCode, type Use } from "@mark1russell7/guidebook";
+import { checkSources, isWebAddress, LICENSES, permits, type FindingCode, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults } from "./priors.ts";
@@ -69,10 +69,19 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     if (knownLicense(source) && !permits(source.license, "summary")) {
       add("error", "hazards-license", at, `The license "${source.license}" of the source "${id}" does not permit a summary, so the list can only link to it.`);
     }
+    // Three rules of the list that the source gate of the guidebook does not have at this time. They move to options of that gate.
+    // A web address that is not HTTPS: the source gate gives the fault of an address that is not a web address, also for an empty page of the terms.
+    if (isWebAddress(source.url) && !source.url.startsWith("https://")) add("error", "hazards-source", at, `The source "${id}" has no HTTPS URL.`);
+    if (typeof source.by !== "string" || source.by.trim() === "") add("error", "hazards-source", at, `The source "${id}" has no publisher (by).`);
+    if (typeof source.terms !== "string") add("error", "hazards-license", at, `The source "${id}" has no page of its terms.`);
+    else if (isWebAddress(source.terms) && !source.terms.startsWith("https://")) add("error", "hazards-license", at, `The page of the terms of the source "${id}" has no HTTPS URL.`);
   }
-  for (const finding of checkSources(entries.map(([, source]) => source))) {
+  // The gate of the guidebook gets the key of each source as its id, so the path of each finding is a key of the table.
+  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })))) {
     add(finding.level, sourceCode(finding.code), `sources.${finding.id}`, `${finding.message} (${finding.code})`);
   }
+  // A source with a fault of its license gives one finding. The laws and the tables of priors of that source give no second finding.
+  const badLicense = new Set(faults.filter((fault) => fault.code === "hazards-license").map((fault) => fault.at.slice("sources.".length)));
   const sourceAt = (at: string, id: string): void => {
     if (list.sources[id] === undefined) add("error", "hazards-source", at, `"${at}" names the source "${id}", and the table of the sources does not have it.`);
   };
@@ -94,7 +103,11 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
         const fault = basisFault(claim);
         if (fault !== undefined) add("error", "hazards-source", at, `A claim of the cut "${at}" ${fault}.`);
       }
-      if (item.duration.read) for (const [code, message] of lawFaults(item.duration, list.sources)) add("error", code, at, `The law of the cut "${at}": ${message}`);
+      if (item.duration.read) {
+        for (const [code, message] of lawFaults(item.duration, list.sources)) {
+          if (code !== "hazards-license" || !badLicense.has(item.duration.source)) add("error", code, at, `The law of the cut "${at}": ${message}`);
+        }
+      }
       else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
     }
   }
@@ -102,7 +115,7 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     const at = `priors.${String(index)}`;
     const source = list.sources[table.source];
     if (source === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" names the source "${table.source}", and the table of the sources does not have it.`);
-    else if (!permitsUse(source, "fact")) add("error", "hazards-prior", at, `The license of the source "${table.source}" of the table of priors "${at}" does not permit a fact.`);
+    else if (!badLicense.has(table.source) && !permitsUse(source, "fact")) add("error", "hazards-prior", at, `The license of the source "${table.source}" of the table of priors "${at}" does not permit a fact.`);
     if (dayNumber(table.asOf) === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" has a date that is not a date YYYY-MM-DD.`);
     for (const fault of priorTableFaults(table, cases)) add("error", "hazards-prior", at, `The table of priors "${at}" ${fault}.`);
   }

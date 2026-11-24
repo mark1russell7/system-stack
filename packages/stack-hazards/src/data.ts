@@ -73,6 +73,7 @@ export const HAZARD_SOURCES: Readonly<Record<string, HazardSource>> = byId([
     title: "PRC state-sponsored actors compromise and maintain persistent access to U.S. critical infrastructure (AA24-038A)",
     url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a",
     by: "CISA, NSA and FBI",
+    note: "A joint advisory with agencies of other countries. The list uses only a summary of it, not a quote.",
     updated: "2024-02-07",
     checked: READ_CASES,
   }),

@@ -214,11 +214,11 @@ describe("the gate of a law", () => {
 
   it("refuses a law whose source has a license that the guidebook does not know, or a license that permits no fact", () => {
     const unknown = "Public domain" as unknown as HazardSource["license"];
-    expect(codes(withLaw(LAW, { ...SOURCE, license: unknown }))).toEqual(["hazards-license", "hazards-license"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, license: unknown }))).toEqual(["hazards-license"]);
     expect(checkHazards(withLaw(LAW, { ...SOURCE, license: unknown }))[0]?.message).toContain("(unknown-license)");
-    expect(codes(withLaw(LAW, { ...SOURCE, license: "link-only" }))).toEqual(["hazards-license", "hazards-license"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, license: "link-only" }))).toEqual(["hazards-license"]);
     // The license of the test fixtures of the guidebook is not a real license, so a list of hazards refuses it.
-    expect(codes(withLaw(LAW, { ...SOURCE, license: "invented" }))).toEqual(["hazards-license", "hazards-license"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, license: "invented" }))).toEqual(["hazards-license"]);
   });
 
   it("passes a law whose source has a license with a credit line", () => {
@@ -268,6 +268,13 @@ describe("the gate of the cuts and the sources", () => {
     expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "unknown", basis: "told", says: "A page tells it." }] }] }] })).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, url: "ftp://data.example.net" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, terms: "the terms" }))).toEqual(["hazards-source"]);
+    // The rules of the list: an HTTPS address, a publisher and a page of the terms.
+    expect(codes(withLaw(LAW, { ...SOURCE, url: "http://data.example.net" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, by: " " }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, by: undefined as unknown as string }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: undefined as unknown as string }))).toEqual(["hazards-license"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: "" }))).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: "http://data.example.net/terms" }))).toEqual(["hazards-license"]);
     expect(codes(withLaw(LAW, { ...SOURCE, title: " " }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, checked: "21.11.2026" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, updated: "2026-11-22" }))).toEqual(["hazards-source"]);
@@ -278,8 +285,9 @@ describe("the gate of the cuts and the sources", () => {
 
   it("refuses a source whose id is not its key in the table, and two sources with one id", () => {
     expect(codes(withLaw(LAW, { ...SOURCE, id: "other" }))).toEqual(["hazards-source"]);
+    // The gate of the guidebook gets the keys, so a second source with the id of the first gives one finding at its own key.
     const twice = { ...base, sources: { outages: SOURCE, copy: SOURCE } };
-    expect(codes(twice)).toEqual(["hazards-source", "hazards-source"]);
+    expect(checkHazards(twice).map((fault) => [fault.code, fault.at])).toEqual([["hazards-source", "sources.copy"]]);
   });
 
   it("passes a claim of a source with each basis of the set", () => {

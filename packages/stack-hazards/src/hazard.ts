@@ -37,8 +37,14 @@ export interface Regions {
  * A source: a public page or a public dataset. It is the source record of `@mark1russell7/guidebook`, with the regions of the source.
  * The field `by` is the organization that publishes the source. The field `checked` is the date of the read of the source.
  * The field `license` is a license of the guidebook, and the field `terms` is the page that tells the terms of the reuse.
+ * A list of hazards must have the fields `by` and `terms`. The field `by` is the credit of a CC BY source.
+ * The field `terms` is the evidence of the license.
  */
 export type HazardSource = Source & {
+  /** The organization that publishes the source. */
+  readonly by: string;
+  /** The HTTPS address of the page that tells the terms of the reuse. */
+  readonly terms: string;
   /** The regions that the source covers. A source of a law of a duration must have its regions. */
   readonly regions?: Regions | undefined;
 };
