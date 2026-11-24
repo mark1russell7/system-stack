@@ -15,7 +15,7 @@ Each function is a plain function with no clock, no network and no file.
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
-| `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, one draw and one direct use. It has the form of `EnduranceLayer`. |
+| `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, the draws and their direct uses. It has the form of `EnduranceLayer`. |
 
 ## The rules of the data
 
@@ -64,12 +64,14 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 
 `householdFragment` turns the persons and a buy list into a fragment of an endurance layer. The buy list is the count of units of each product of the catalog of supplies of `@mark1russell7/market`.
 
-- The fragment has one draw `food.energy`. Its rate is the need of the persons for one day, in `kcal`. Its users are the persons.
+- The draw `food.energy` has the need of the persons for one day, in `kcal`. Its users are the persons.
+- The draw `food.infant-formula` has the infants on formula below 6 months (`FORMULA_DRAW_MONTHS`), with the whole need of their rows.
+- The fragment has each draw with one or more users. The draw `food.energy` is first.
 - Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
-- The direct uses are the food uses of `uses`: each use for the need `food.energy`. The default `DIRECT_USES` gives `food.no-cook`, 1 kcal for each kcal.
-- The resources are the resources of the stores and of the food uses. The resource of each food use is in `kcal` in the catalog, or the function throws a `RangeError`.
-- The supply part of the draw is `supply`. Its default is the part of `NEED_SUPPLIES` for `food.energy`: `food.retail`.
+- The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives `food.no-cook` to the food draw and `food.infant-formula-ready` to the formula draw, 1 kcal for each kcal.
+- The resources are the resources of the stores and of the direct uses. The resource of each direct use is in `kcal` in the catalog, or the function throws a `RangeError`.
+- The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw: `food.retail`.
 - The result also has the food energy of each product (`buyListEnergy`). A caller gets the energy of the dry food for its converters from it.
 
 The result has two reads. `needRead` tells if the draw has a read, and `storesRead` tells if each gift of the buy list has a read.
@@ -90,7 +92,7 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
 | `breast-milk` | Only below 6 months (`BREAST_MILK_MONTHS`). The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. The result lists the infant in `breastMilk`. |
-| `formula` | Only below 12 months. The fragment has no draw of formula. Thus the infant gives no layer, as a person with no row. The result lists the infant in `formula`. With `noRow: "leave-out"`, the draw has no need of the infant, and `leftOut` lists the infant. |
+| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. The result lists each infant on formula in `formula`. |
 
 With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
 
@@ -99,6 +101,17 @@ The rules of breast milk:
 - A person of the household must have a stage of lactation, or the function gives a `RangeError`.
 - The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
 - From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
+
+The notes b and c of Table A2-3 of the guidelines (page 141) give the two changes of lactation:
+
+| Stage | The note of the source | The change |
+| --- | --- | --- |
+| `lactation-1` | 500 calories/day for the milk production, minus 170 calories/day for the weight loss after the birth. | 330 kcal/d |
+| `lactation-2` | 400 calories/day for the milk production. The source assumes a stable weight after 6 months. | 400 kcal/d |
+
+Thus below 6 months, a part of the milk comes from the stores of the mother. The draw holds only the part from food.
+The source gives the energy of the milk production, not the energy that the infant gets. It gives no change for two or more infants.
+Thus the package does not give the milk part of an infant from 6 months, and it does not give a change for twins. Each is a no read until a source gives it.
 
 A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
@@ -116,8 +129,8 @@ The package holds one record of each use and of each default supply part. `house
 
 | Name | What it has |
 | --- | --- |
-| `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` to `food.retail`. A household with a well gives a different part. |
-| `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, 1 kcal for each kcal. |
+| `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` and `food.infant-formula` to `food.retail`. A household with a well gives a different part. |
+| `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, and `food.infant-formula-ready` gives `food.infant-formula`, 1 kcal for each kcal. |
 | `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
 
 `checkJoins(catalog, uses, supplies, { needs, parts })` gives one finding for each break. An empty list is a pass. Each finding is an error.

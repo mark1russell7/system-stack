@@ -7,6 +7,12 @@ import type { Source } from "@mark1russell7/guidebook";
 // The rows of the toddlers are at 12, 15, 18 and 21 through 23 months. Each row here covers the months up to the next row.
 // The changes of pregnancy and lactation are from Table A2-3. The source gives them for women with a healthy weight before
 // the pregnancy.
+// The notes b and c of Table A2-3 (page 141, read on 2026-11-24, the PDF of the recorded sha256) give the two changes of lactation:
+// - The 1st 6 months: 500 calories/day for the milk production, minus 170 calories/day for the weight loss after the birth. That is 330.
+// - The 2nd 6 months: 400 calories/day for the milk production. The source assumes a stable weight after 6 months.
+// Thus below 6 months, 170 kcal/d of the milk comes from the stores of the mother, and not from the food of the household.
+// The source gives the energy of the milk production of the mother, not the energy that the infant gets from the milk.
+// It gives no change for a mother of two or more infants.
 // The 2025-2030 edition of the guidelines (read on 2026-11-24) has no table of calorie needs. It sends the reader to the
 // DRI calculator of the USDA. Its daily servings by calorie level start at a calorie level and do not give a need. So
 // this table stays the table of the 2020-2025 edition.
