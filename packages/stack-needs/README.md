@@ -355,7 +355,7 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 
 - `alert.watch` comes from two pages of the National Weather Service (read on 2026-11-24). Many receivers have a muted standby mode that turns on when a warning comes. Warnings also come at night. Thus a receiver stays on and listens at all hours, so 24 hours each day. One receiver for each home is a choice of this model, not of the pages. The pages are in the public domain (the license `us-public-domain`).
 - `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device. `lightNeed` gives a read from the point of the home and its awake window.
-- `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need.
+- `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need. `warmthNeed` gives a read from the facts of the building and the temperatures.
 - A user gives each no read as input data.
 - The rate of a device is a fact of the device, not of the need. An example is the watts of a radio in standby.
 
@@ -389,8 +389,19 @@ The gate refuses an empty code and two needs with one code (`daily-need-id`). It
 
 The read goes into `deviceFragment` through the input `needs`. Then the need of light gets a draw.
 
+## The heat of a home
+
+`warmthHeat` gives the space heat that a home needs on each day of a plan. `warmthNeed` changes it into a read of the need `warmth.shelter`.
+
+- The heat loss coefficient of the home is in watts for each kelvin. `heatLossOf` sums the area times the U-value of each element of the envelope.
+- `heatLossFromUse` gives the same coefficient from the heat of a past period, divided by its degree days times 24 hours. The heat is the energy of the heaters, not the fuel.
+- The heat flow of a day is the coefficient times the indoor temperature minus the outdoor temperature, minus the gains of the persons. A flow of 0 or less needs no heat.
+- The indoor target, the outdoor temperature of each day and the facts of the building are input data of the household. The package has no default target.
+- The rate of `warmthNeed` is the heat of the worst day, in `kWh/d`.
+- The sources are the pages "Thermal transmittance" and "Degree day" of Wikipedia (license `cc-by-sa-4.0`).
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, `lightHours`, `lightNeed`, the daily needs, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, the supply parts and `checkJoins`. |

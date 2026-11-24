@@ -1,4 +1,5 @@
 import { dayNumber, stopped, type Stack } from "@mark1russell7/system-stack";
+import { canRun, inputsOf } from "./converter.ts";
 import { largestFit, type Try } from "./fit.ts";
 import type { CaseCuts, Converter, DirectUse, Draw, Endurance, EnduranceLayer, IsoDate } from "./layer.ts";
 
@@ -76,18 +77,6 @@ export function giftNeed(converter: Converter): string | undefined {
 /** This function gives the resource that a converter gives, or `undefined` when it gives a need. */
 export function giftResource(converter: Converter): string | undefined {
   return "resource" in converter.gives ? converter.gives.resource : undefined;
-}
-
-/** This function gives the amount of each resource that one run of a converter takes. Two lines of one resource add. */
-function inputsOf(converter: Converter): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const input of converter.takes) if (input.amount > 0) out.set(input.resource, (out.get(input.resource) ?? 0) + input.amount);
-  return out;
-}
-
-/** This function tells if a converter can run in a case. Its device works, it takes a resource, and it gives an amount more than 0. */
-function canRun(converter: Converter, stoppedParts: ReadonlySet<string>): boolean {
-  return converter.gives.amount > 0 && inputsOf(converter).size > 0 && (converter.device === undefined || !stoppedParts.has(converter.device));
 }
 
 /** The converters of a case that make each resource, in the order of the layer, by the code of the resource. */

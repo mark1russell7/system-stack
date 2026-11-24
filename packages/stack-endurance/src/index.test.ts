@@ -12,6 +12,7 @@ describe("the root entry", () => {
       "drawDemand",
       "caseDraws",
       "enduranceOf",
+      "jointDays",
       "survivalAt",
       "tailDays",
       "survivalQuantile",

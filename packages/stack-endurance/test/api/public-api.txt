@@ -23,6 +23,7 @@ Gift: build/layer.chunk.d.ts#Gift
 INDEPENDENT_MAX_WORK: build/index.d.ts#INDEPENDENT_MAX_WORK
 INDEPENDENT_TOLERANCE: build/index.d.ts#INDEPENDENT_TOLERANCE
 IsoDate: build/layer.chunk.d.ts#IsoDate
+JointDays: build/index.d.ts#JointDays
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
 type Prior: @mark1russell7/system-stack#Prior (external)
 Resource: build/layer.chunk.d.ts#Resource
@@ -48,6 +49,7 @@ giftResource: build/index.d.ts#giftResource
 hasEnduranceError: build/index.d.ts#hasEnduranceError
 independentStop: build/index.d.ts#independentStop
 joinEndurance: build/index.d.ts#joinEndurance
+jointDays: build/index.d.ts#jointDays
 longestStop: build/index.d.ts#longestStop
 minimalStops: build/index.d.ts#minimalStops
 stopCurves: build/index.d.ts#stopCurves
@@ -98,6 +100,19 @@ export declare const INDEPENDENT_MAX_WORK: number;
 
 ### build/index.d.ts#INDEPENDENT_TOLERANCE
 export declare const INDEPENDENT_TOLERANCE = 1e-6;
+
+### build/index.d.ts#JointDays
+export interface JointDays {
+  readonly case: string;
+  readonly at: IsoDate;
+  readonly days: number;
+  readonly plan: readonly string[];
+  readonly holds: readonly string[];
+  readonly takes: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  readonly binding: readonly string[];
+  readonly runs: Readonly<Record<string, number>>;
+  readonly capped: readonly string[];
+}
 
 ### build/index.d.ts#MINIMAL_STOP_CUTS
 export declare const MINIMAL_STOP_CUTS = 12;
@@ -183,6 +198,9 @@ export declare function independentStop(curves: readonly Survival[], sets: reado
 
 ### build/index.d.ts#joinEndurance
 export declare function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer>;
+
+### build/index.d.ts#jointDays
+export declare function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions, needs: readonly string[]): JointDays;
 
 ### build/index.d.ts#longestStop
 export declare function longestStop(curves: readonly Survival[]): Survival;

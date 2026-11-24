@@ -37,6 +37,7 @@ CookRead: build/index.d.ts#CookRead
 CookStart: build/index.d.ts#CookStart
 DAILY_NEEDS: build/index.d.ts#DAILY_NEEDS
 DAILY_NEED_CODES: build/index.d.ts#DAILY_NEED_CODES
+DEGREE_DAY_SOURCE: build/index.d.ts#DEGREE_DAY_SOURCE
 DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
 DIRECT_USES: build/index.d.ts#DIRECT_USES
@@ -55,6 +56,7 @@ DeviceLine: build/index.d.ts#DeviceLine
 DeviceNoRead: build/index.d.ts#DeviceNoRead
 DeviceRead: build/index.d.ts#DeviceRead
 DeviceRun: build/index.d.ts#DeviceRun
+EnvelopeElement: build/index.d.ts#EnvelopeElement
 FDC_SR_LEGACY_SOURCE: build/index.d.ts#FDC_SR_LEGACY_SOURCE
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
@@ -93,6 +95,7 @@ LightDay: build/index.d.ts#LightDay
 LightHours: build/index.d.ts#LightHours
 LightHoursInput: build/index.d.ts#LightHoursInput
 MAX_LIGHT_DAYS: build/index.d.ts#MAX_LIGHT_DAYS
+MAX_WARMTH_DAYS: build/index.d.ts#MAX_WARMTH_DAYS
 MILK_LATER: build/index.d.ts#MILK_LATER
 MixConverter: build/index.d.ts#MixConverter
 MixFragment: build/index.d.ts#MixFragment
@@ -115,6 +118,7 @@ STORED_WATER: build/index.d.ts#STORED_WATER
 SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
 SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
 StoveShare: build/index.d.ts#StoveShare
+THERMAL_TRANSMITTANCE_SOURCE: build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
@@ -122,6 +126,9 @@ WATER_DENSITY_MIN: build/index.d.ts#WATER_DENSITY_MIN
 WATER_NEED: build/index.d.ts#WATER_NEED
 WATER_SPECIFIC_HEAT: build/index.d.ts#WATER_SPECIFIC_HEAT
 WIC_INFANT_SOURCE: build/index.d.ts#WIC_INFANT_SOURCE
+WarmthDay: build/index.d.ts#WarmthDay
+WarmthHeat: build/index.d.ts#WarmthHeat
+WarmthInput: build/index.d.ts#WarmthInput
 calorieChange: build/index.d.ts#calorieChange
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
@@ -136,10 +143,14 @@ formulaMixCheck: build/index.d.ts#formulaMixCheck
 formulaMixFragment: build/index.d.ts#formulaMixFragment
 formulaMixWater: build/index.d.ts#formulaMixWater
 hasNeedsError: build/index.d.ts#hasNeedsError
+heatLossFromUse: build/index.d.ts#heatLossFromUse
+heatLossOf: build/index.d.ts#heatLossOf
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
 lightHours: build/index.d.ts#lightHours
 lightNeed: build/index.d.ts#lightNeed
+warmthHeat: build/index.d.ts#warmthHeat
+warmthNeed: build/index.d.ts#warmthNeed
 
 ## Declarations
 
@@ -356,6 +367,9 @@ export declare const DAILY_NEEDS: readonly DailyNeed[];
 ### build/index.d.ts#DAILY_NEED_CODES
 export declare const DAILY_NEED_CODES: readonly ["daily-need-id", "daily-need-unit", "daily-need-rate"];
 
+### build/index.d.ts#DEGREE_DAY_SOURCE
+export declare const DEGREE_DAY_SOURCE: Source;
+
 ### build/index.d.ts#DGA_CALORIES
 export declare const DGA_CALORIES: CalorieTable;
 
@@ -476,6 +490,12 @@ export interface DeviceRun {
     readonly unit: string;
   };
   readonly cite: string;
+}
+
+### build/index.d.ts#EnvelopeElement
+export interface EnvelopeElement {
+  readonly areaM2: number;
+  readonly uWm2K: number;
 }
 
 ### build/index.d.ts#FDC_SR_LEGACY_SOURCE
@@ -702,6 +722,9 @@ export interface LightHoursInput {
 ### build/index.d.ts#MAX_LIGHT_DAYS
 export declare const MAX_LIGHT_DAYS = 1096;
 
+### build/index.d.ts#MAX_WARMTH_DAYS
+export declare const MAX_WARMTH_DAYS = 1096;
+
 ### build/index.d.ts#MILK_LATER
 export declare const MILK_LATER: CitedMilk;
 
@@ -816,6 +839,9 @@ export interface StoveShare {
   readonly cite: string;
 }
 
+### build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
+export declare const THERMAL_TRANSMITTANCE_SOURCE: Source;
+
 ### build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 export declare const USGS_WATER_DENSITY_SOURCE: Source;
 
@@ -836,6 +862,27 @@ export declare const WATER_SPECIFIC_HEAT: CookConstant;
 
 ### build/index.d.ts#WIC_INFANT_SOURCE
 export declare const WIC_INFANT_SOURCE: Source;
+
+### build/index.d.ts#WarmthDay
+export interface WarmthDay {
+  readonly outdoorC: number;
+  readonly heatKWh: number;
+}
+
+### build/index.d.ts#WarmthHeat
+export interface WarmthHeat {
+  readonly days: readonly WarmthDay[];
+  readonly most: number;
+  readonly mean: number;
+}
+
+### build/index.d.ts#WarmthInput
+export interface WarmthInput {
+  readonly heatLossWK: number;
+  readonly indoorC: number;
+  readonly outdoorC: readonly number[];
+  readonly gainsW?: number | undefined;
+}
 
 ### build/index.d.ts#calorieChange
 export declare function calorieChange(table: CalorieTable, sex: CalorieSex, stage: string): CalorieChange | undefined;
@@ -882,6 +929,12 @@ export declare function formulaMixWater(powderKcalPerKg: number, mix?: CitedForm
 ### build/index.d.ts#hasNeedsError
 export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;
 
+### build/index.d.ts#heatLossFromUse
+export declare function heatLossFromUse(heatKWh: number, degreeDaysKd: number): number;
+
+### build/index.d.ts#heatLossOf
+export declare function heatLossOf(elements: readonly EnvelopeElement[]): number;
+
 ### build/index.d.ts#householdFragment
 export declare function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult;
 
@@ -893,3 +946,9 @@ export declare function lightHours(input: LightHoursInput): LightHours;
 
 ### build/index.d.ts#lightNeed
 export declare function lightNeed(hours: LightHours): DailyNeed;
+
+### build/index.d.ts#warmthHeat
+export declare function warmthHeat(input: WarmthInput): WarmthHeat;
+
+### build/index.d.ts#warmthNeed
+export declare function warmthNeed(heat: WarmthHeat): DailyNeed;
