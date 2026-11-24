@@ -35,6 +35,7 @@ HazardCut: build/hazard.chunk.d.ts#HazardCut
 HazardFault: build/index.d.ts#HazardFault
 HazardGateOptions: build/index.d.ts#HazardGateOptions
 HazardList: build/hazard.chunk.d.ts#HazardList
+HazardPrior: build/index.d.ts#HazardPrior
 HazardPriorOptions: build/index.d.ts#HazardPriorOptions
 HazardRegion: build/index.d.ts#HazardRegion
 HazardSource: build/hazard.chunk.d.ts#HazardSource
@@ -388,6 +389,11 @@ export interface HazardFault extends Fault {
 ### build/index.d.ts#HazardGateOptions
 export type HazardGateOptions = Pick<GateOptions, "at" | "maxAgeDays">;
 
+### build/index.d.ts#HazardPrior
+export interface HazardPrior extends Prior {
+  readonly region: string;
+}
+
 ### build/index.d.ts#HazardPriorOptions
 export interface HazardPriorOptions extends Pick<HazardCaseOptions, "region"> {
   readonly place?: string | undefined;
@@ -699,7 +705,7 @@ export declare function hazardCase(list: HazardList, hazard: Hazard, options?: H
 export declare function hazardOf(list: HazardList, code: string): Hazard | undefined;
 
 ### build/index.d.ts#hazardPriors
-export declare function hazardPriors(list: HazardList, options?: HazardPriorOptions): Prior[];
+export declare function hazardPriors(list: HazardList, options?: HazardPriorOptions): HazardPrior[];
 
 ### build/index.d.ts#hazardRegions
 export declare function hazardRegions(region: HazardCaseOptions["region"]): readonly HazardRegion[];
