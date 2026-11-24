@@ -1,5 +1,5 @@
 import { type Constraint, type Objective, solveLexicographic } from "@mark1russell7/linear";
-import { add, div, equals, fromFloat, neg, ONE, type Rational, sign, toNumber, ZERO } from "@mark1russell7/rational";
+import { add, div, equals, fromFloat, mul, neg, ONE, type Rational, sign, toNumber, ZERO } from "@mark1russell7/rational";
 import { canRun, inputsOf } from "./converter.ts";
 import { type CaseOptions, caseDraws, caseStopped, drawDemand, giftNeed, giftResource, storeAmounts } from "./endurance.ts";
 import type { CaseCuts, Converter, EnduranceLayer, IsoDate } from "./layer.ts";
@@ -33,6 +33,11 @@ export interface JointDays {
   readonly binding: readonly string[];
   /** The count of runs of each converter at the optimum, by the `id` of the converter. A converter with no run is not in the record. */
   readonly runs: Readonly<Record<string, number>>;
+  /**
+   * The converters of the plan whose limit `perDay` stops more runs at the optimum, in the order of their `id`.
+   * The list is empty when `days` is `Infinity` or 0. Else it has each converter of the plan with a limit of 0.
+   */
+  readonly capped: readonly string[];
 }
 
 /** A sparse row: the coefficient of each variable, by its index. */
@@ -60,6 +65,7 @@ const exact = (value: number): Rational => fromFloat(value);
  * - Each draw of the plan gets `d` times its demand (`drawDemand`) from its direct uses and from the converters that give its need.
  * - The takes of each resource are not more than its stock (`storeAmounts` at `at`) plus the gifts of the converters that make it.
  * - A converter whose device stops gives nothing, and a store whose part stops gives nothing, as in `enduranceOf`.
+ * - The runs of a converter with a limit `perDay` are not more than `perDay` times `devices` times `d`. The converters of one device share it, as in `enduranceOf`.
  * - A store counts with all of its amount when its due date is after `at`, as in `enduranceOf`. A due date in the span has no effect.
  * - After the largest `d`, a second objective takes the smallest sum of the shares of the stocks. Thus the takes have no waste.
  * - The draws that are not in the set are outside this plan. They take nothing in the program.
@@ -87,7 +93,7 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
   const plan = caseDraws(layer, caseCuts, stoppedParts).filter((draw) => wanted.has(draw.need));
   const planned = new Set(plan.map((draw) => draw.need));
   const base = { case: caseCuts.case, at: options.at, plan: plan.map((draw) => draw.need), holds: [...wanted].filter((need) => !planned.has(need)).sort() };
-  const endless: JointDays = { ...base, days: Infinity, takes: {}, binding: [], runs: {} };
+  const endless: JointDays = { ...base, days: Infinity, takes: {}, binding: [], runs: {}, capped: [] };
   if (plan.length === 0) return endless;
 
   const direct = (layer.direct ?? []).filter((use) => planned.has(use.need) && use.amount > 0);
@@ -137,6 +143,26 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
     for (const [resource, index] of shareCol[i] ?? []) consume(resource, index, neg(ONE));
     for (const row of balance.values()) if (row.size > 0) rows.push({ row, relation: "<=", rhs: ZERO });
   });
+  // The limit of each device: one run uses `1 / perDay` of a day of one device, so the runs use `devices` times `d` device-days or less.
+  // The converters of one device share one limit. A converter with no device has a limit of its own. A limit of 0 stops the converter.
+  const runCols = new Map<Converter, readonly number[]>([
+    ...cooks.map((cook, c) => [cook, [cookCol[c] as number]] as const),
+    ...makers.map((maker, m) => [maker, makerCol.map((row) => row[m] as number)] as const),
+  ]);
+  const limits = new Map<string, { readonly row: Row; readonly converters: Converter[] }>();
+  for (const [converter, indexes] of runCols) {
+    if (converter.perDay === undefined) continue;
+    if (!(converter.perDay > 0)) {
+      for (const index of indexes) rows.push({ row: new Map([[index, ONE]]), relation: "<=", rhs: ZERO });
+      continue;
+    }
+    const key = converter.device === undefined ? `converter:${converter.id}` : `device:${converter.device}`;
+    const limit = limits.get(key) ?? { row: new Map([[days, neg(exact(converter.devices ?? 1))]]), converters: [] };
+    limits.set(key, limit);
+    limit.converters.push(converter);
+    for (const index of indexes) addTo(limit.row, index, div(ONE, exact(converter.perDay)));
+  }
+  for (const { row } of limits.values()) rows.push({ row, relation: "<=", rhs: ZERO });
   // The shares of each stock are not more than the stock.
   for (const resource of stocked) {
     const row: Row = new Map();
@@ -184,7 +210,17 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
       return equals(taken, exact(stock.get(resource) ?? 0));
     })
     .sort();
-  return { ...base, days: toNumber(solved.values[0] ?? ZERO), takes, binding, runs };
+  const best = solved.values[0] ?? ZERO;
+  const used = (row: Row): Rational => [...row].reduce((sum, [index, value]) => add(sum, mul(value, at(index))), ZERO);
+  const capped = sign(best) > 0
+    ? [
+        ...[...runCols.keys()].filter((converter) => converter.perDay !== undefined && !(converter.perDay > 0)),
+        ...[...limits.values()].filter(({ row }) => sign(used(row)) === 0).flatMap(({ converters }) => converters),
+      ]
+        .map((converter) => converter.id)
+        .sort()
+    : [];
+  return { ...base, days: toNumber(best), takes, binding, runs, capped };
 }
 
 /**

@@ -67,6 +67,7 @@ describe("jointDays", () => {
     expect(joint.takes).toEqual({ drink: { water: 15 }, food: { water: 5, grain: 2.5, fuel: 0.625 } });
     expect(joint.binding).toEqual(["water"]);
     expect(joint.runs).toEqual({ cook: 5 });
+    expect(joint.capped).toEqual([]);
 
     // The take order: the drink keeps back 20 / 3 days x 3 L, which is all the water. So the cook gets no water.
     const ordered = enduranceOf(POT, DRY, { at: AT });
@@ -81,6 +82,52 @@ describe("jointDays", () => {
     expect(food.days).toBe(10);
     expect(food.binding).toEqual(["grain"]);
     expect(food.takes).toEqual({ food: { water: 10, grain: 5, fuel: 1.25 } });
+  });
+
+  it("keeps the runs of a device under its limit, also when the stores give more", () => {
+    // 40 L of water and 6000 kcal of cans. The stove cooks 0.5 pots a day, so the cook gives 1000 kcal a day and the cans the rest.
+    const layer: EnduranceLayer = {
+      ...POT,
+      resources: [...POT.resources, { code: "cans", unit: "kcal" }],
+      stores: [{ id: "tank", resource: "water", amount: 40 }, ...POT.stores.slice(1), { id: "box", resource: "cans", amount: 6000 }],
+      direct: [...(POT.direct ?? []), { resource: "cans", need: "food", amount: 1 }],
+    };
+    // With no limit, the water and the grain give 10.75 days.
+    expect(jointDays(layer, DRY, { at: AT }, ["drink", "food"]).days).toBe(10.75);
+    const slow: EnduranceLayer = { ...layer, converters: (layer.converters ?? []).map((converter) => ({ ...converter, perDay: 0.5 })) };
+    const joint = jointDays(slow, DRY, { at: AT }, ["drink", "food"]);
+    expect(joint.days).toBe(6);
+    expect(joint.runs).toEqual({ cook: 3 });
+    expect(joint.capped).toEqual(["cook"]);
+    expect(joint.binding).toEqual(["cans"]);
+    expect(joint.takes).toEqual({ drink: { water: 18 }, food: { water: 3, grain: 1.5, fuel: 0.375, cans: 6000 } });
+    // Two stoves give twice the runs. Then the limit does not bind, and the water and the cans give the 10.75 days of no limit.
+    const two = jointDays({ ...slow, converters: (slow.converters ?? []).map((converter) => ({ ...converter, devices: 2 })) }, DRY, { at: AT }, ["drink", "food"]);
+    expect(two.days).toBe(10.75);
+    expect(two.binding).toEqual(["cans", "water"]);
+    expect(two.capped).toEqual([]);
+    // A limit of 0 stops the cook, so the cans alone feed the food for 3 days.
+    const none = jointDays({ ...layer, converters: (layer.converters ?? []).map((converter) => ({ ...converter, perDay: 0 })) }, DRY, { at: AT }, ["drink", "food"]);
+    expect(none.days).toBe(3);
+    expect(none.runs).toEqual({});
+    expect(none.capped).toEqual(["cook"]);
+  });
+
+  it("shares one limit between the converters of one device", () => {
+    // Two pots on one stove of 1 run a day: 2000 kcal a day from the two together, so the food holds with no other way.
+    const layer: EnduranceLayer = {
+      ...POT,
+      stores: [{ id: "tank", resource: "water", amount: 1000 }, { id: "sack", resource: "grain", amount: 1000 }, { id: "can", resource: "fuel", amount: 1000 }],
+      draws: [{ need: "food", level: "health", perDay: 4000, supply: "shop" }],
+      converters: [
+        { ...(POT.converters?.[0] as Converter), id: "a", perDay: 1 },
+        { ...(POT.converters?.[0] as Converter), id: "b", perDay: 1 },
+      ],
+    };
+    // One stove gives 1 run a day of 2000 kcal, half of the demand. So the days are 0.
+    expect(jointDays(layer, DRY, { at: AT }, ["food"]).days).toBe(0);
+    const apart = { ...layer, converters: (layer.converters ?? []).map((converter, i) => ({ ...converter, device: `stove${i}` })) };
+    expect(jointDays(apart, DRY, { at: AT }, ["food"]).days).toBe(1000 / 2);
   });
 
   it("does not use a converter whose device stops", () => {
@@ -102,7 +149,7 @@ describe("jointDays", () => {
 
   it("gives Infinity for a demand of 0, and puts the draw in holds", () => {
     const joint = jointDays(POT, { ...DRY, factors: { food: 0 } }, { at: AT }, ["food"]);
-    expect(joint).toEqual({ case: "dry", at: AT, days: Infinity, plan: [], holds: ["food"], takes: {}, binding: [], runs: {} });
+    expect(joint).toEqual({ case: "dry", at: AT, days: Infinity, plan: [], holds: ["food"], takes: {}, binding: [], runs: {}, capped: [] });
     expect(jointDays(POT, { ...DRY, factors: { food: 0 } }, { at: AT }, ["drink", "food"]).days).toBe(20 / 3);
   });
 

@@ -71,6 +71,24 @@ export interface Converter {
   readonly takes: readonly { readonly resource: string; readonly amount: number }[];
   /** The need or the resource that one run gives, and its amount. A chain of converters cannot make a resource from itself. */
   readonly gives: Gift;
+  /**
+   * The most runs of one device in a day, for example the pots that one stove cooks in a day. It is a cited fact of the
+   * device. With no `perDay`, the runs have no limit for each day.
+   *
+   * The converters of one `device` share its days. One run uses `1 / perDay` of a day of one device. Thus a stove with
+   * a converter for rice and a converter for beans does not cook more pots in a day than its limits give.
+   *
+   * The limit is a rate, not a store. Over `T` days, the converter runs `perDay` times `devices` times `T` times or
+   * less. The higher draws use the runs first. Each higher draw keeps back its runs of each day for all the days of a
+   * lower draw. A draw that the limit stops gets the rest of its need from its other ways. When they cannot give it, the
+   * draw falls short, also when the stores of the converter have more.
+   */
+  readonly perDay?: number | undefined;
+  /**
+   * The count of devices of the converter, a whole number of 1 or more. The default is 1. It has an effect only with
+   * `perDay`. The converters of one `device` give one count. When the part `device` stops, all the devices stop.
+   */
+  readonly devices?: number | undefined;
 }
 
 // The core holds the records of the cuts of a case, so that each add-on shares them. This entry gives them again.
@@ -86,6 +104,14 @@ export interface DrawEndurance {
   readonly binding: readonly string[];
   /** The amount of each resource that the draw takes in its days, by the code of the resource. A resource with no take is not in the record. */
   readonly takes: Readonly<Record<string, number>>;
+  /**
+   * The converters whose limit `perDay` stops the draw at `days`, while their inputs have more, in the order of their
+   * `id`. The record has no field `capped` when no limit stops the draw.
+   *
+   * After `days`, such a draw can still get a part of its need at the rate of the limit. The shortfall counts each of
+   * those days as a full shortfall. This is the safe side for a plan.
+   */
+  readonly capped?: readonly string[] | undefined;
 }
 
 /** The days that each draw holds when a case stops its supply. A draw whose supply works is not in `needs`. */
