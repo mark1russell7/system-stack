@@ -257,6 +257,12 @@ importers:
       '@mark1russell7/collections':
         specifier: ^0.11.2
         version: 0.11.2(zod@4.6.7)
+      '@mark1russell7/linear':
+        specifier: ^0.1.0
+        version: 0.1.0
+      '@mark1russell7/rational':
+        specifier: ^0.1.3
+        version: 0.1.3
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
         version: 0.2.1
@@ -950,6 +956,10 @@ packages:
 
   '@mark1russell7/interval@0.1.0':
     resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/linear@0.1.0':
+    resolution: {integrity: sha512-63S4hvrh3YtN17doxFli8zF/H5kRcCsXz7Oijbt28ZbkEDXcraGELa80YwBzjnlWNnjQIZV/UTJOySwZQNhv4w==}
     engines: {node: '>=22'}
 
   '@mark1russell7/market@0.8.11':
@@ -2576,6 +2586,10 @@ snapshots:
   '@mark1russell7/guidebook@0.4.0': {}
 
   '@mark1russell7/interval@0.1.0': {}
+
+  '@mark1russell7/linear@0.1.0':
+    dependencies:
+      '@mark1russell7/rational': 0.1.3
 
   '@mark1russell7/market@0.8.11':
     dependencies:
