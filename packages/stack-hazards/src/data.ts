@@ -141,19 +141,19 @@ export const NO_FOLLOW_LAW: NoLaw = { read: false, reason: "This cut follows the
 export const NO_COLLAPSE_LAW: NoLaw = {
   read: false,
   reason:
-    "The event summaries of DOE tell of one long collapse: the grid of Puerto Rico after Hurricane Maria in 2017. Their first counts of the customers out are estimates from the load. The OE-417 summaries of 2000 to 2023 do not list that event. They give the time of the last restoration of each event, not the time of most customers. Their events of 14 days or more are storms with a long tail of restoration, for example Hurricane Ike in 2008. One event gives no law. The law of EAGLE-I is from usual outages.",
+    "The event summaries of DOE tell of one long collapse: the grid of Puerto Rico after Hurricane Maria in 2017. The first counts of the customers out in those event summaries are estimates from the load. The OE-417 summary of 2017 has no row of Puerto Rico, but the OE-417 summaries of 2004 to 2016 have rows of Puerto Rico. The OE-417 summaries give the time of the last restoration of each event, not the time of most customers. The OE-417 events of 14 days or more are storms with a long tail of restoration, for example Hurricane Ike in 2008. One event gives no law. The law of EAGLE-I is from usual outages.",
 };
 
-/** The duration of the grid cut of a cyberattack. The sources read tell of two grid outages from a cyberattack. */
+/** The duration of the grid cut of a cyberattack. The sources read tell of two events of a cyberattack with a loss. */
 export const NO_CYBER_LAW: NoLaw = {
   read: false,
-  reason: "The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack: about 225,000 customers in Ukraine in 2015. It gives no duration. The OE-417 summaries of 2000 to 2023 list 42 cyber events. Only one tells of a loss of load: 29 MW in Georgia in 2021, for 103 hours. Two events give no law.",
+  reason: "The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack: about 225,000 customers in Ukraine in 2015. It gives no duration. The OE-417 summaries of 2000 to 2023 list 42 cyber events. Only one tells of a loss: 29 MW in Georgia in 2021, for 103 hours, with an unknown count of customers. Two events give no law.",
 };
 
 /** The duration of the grid cut of a solar storm. The sources read tell of three blackouts from space weather. */
 export const NO_GEOMAGNETIC_LAW: NoLaw = {
   read: false,
-  reason: "The page of NOAA SWPC names three blackouts from space weather, in 1958, 1989 and 2003. Only the blackout of 1989 in Canada has a duration: 9 hours. The OE-417 summaries of 2000 to 2023 list no event from space weather. Three events give no law.",
+  reason: "The page of NOAA SWPC names three blackouts from space weather, in 1958, 1989 and 2003. Only the blackout of 1989 in Canada has a duration: 9 hours. The OE-417 summaries of 2000 to 2023 list no event whose type names a geomagnetic, solar, magnetic or space weather cause. Three events give no law.",
 };
 
 /** The sources that each storm case examined for the law of its grid cut. */

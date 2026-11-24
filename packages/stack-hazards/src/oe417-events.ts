@@ -1,6 +1,6 @@
 // The events of the OE-417 annual summaries of DOE that are a physical attack on the grid with a loss of customers or load.
 // Each row is as the summary of its year prints it: the times are local times, and the counts are the text of the summary.
-import type { Oe417Event, Oe417File } from "./oe417.ts";
+import type { Oe417Event, Oe417File, Oe417Year } from "./oe417.ts";
 
 /** The annual summary of each year that the events come from: its id at DOE, its address and the archived copy that was read. */
 export const OE417_FILES: Readonly<Record<string, Oe417File>> = {
@@ -30,7 +30,38 @@ export const OE417_FILES: Readonly<Record<string, Oe417File>> = {
   "2023": { id: 84, format: "xls", url: "https://www.oe.netl.doe.gov/download.aspx?type=OE417XLS&ID=84", archive: "https://web.archive.org/web/20240609122923id_/https://www.oe.netl.doe.gov/download.aspx?type=OE417XLS&ID=84" },
 };
 
-/** The 113 events of a physical attack with a loss of customers or load, from 2000 to 2023, in the order of the summaries. */
+/**
+ * The counts of each summary, by the terms of `oe417IsAttack`, `OE417_CYBER_TERMS` and `OE417_SPACE_WEATHER_TERMS`.
+ * The summary of 2023 prints some events two times, the second time with no start. Each count reads such an event one time, and `copies` counts the second rows.
+ */
+export const OE417_YEARS: Readonly<Record<string, Oe417Year>> = {
+  "2000": { rows: 30, copies: 0, attacks: 2, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2001": { rows: 15, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2002": { rows: 23, copies: 0, attacks: 1, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2003": { rows: 63, copies: 0, attacks: 1, kept: 0, cyber: 1, cyberLoss: 0, spaceWeather: 0 },
+  "2004": { rows: 93, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2005": { rows: 85, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2006": { rows: 91, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2007": { rows: 78, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2008": { rows: 149, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2009": { rows: 97, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2010": { rows: 123, copies: 0, attacks: 0, kept: 0, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2011": { rows: 307, copies: 0, attacks: 82, kept: 3, cyber: 6, cyberLoss: 0, spaceWeather: 0 },
+  "2012": { rows: 196, copies: 0, attacks: 51, kept: 0, cyber: 3, cyberLoss: 0, spaceWeather: 0 },
+  "2013": { rows: 174, copies: 0, attacks: 69, kept: 6, cyber: 2, cyberLoss: 0, spaceWeather: 0 },
+  "2014": { rows: 214, copies: 0, attacks: 42, kept: 1, cyber: 3, cyberLoss: 0, spaceWeather: 0 },
+  "2015": { rows: 143, copies: 0, attacks: 40, kept: 7, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2016": { rows: 141, copies: 0, attacks: 48, kept: 6, cyber: 4, cyberLoss: 0, spaceWeather: 0 },
+  "2017": { rows: 150, copies: 0, attacks: 38, kept: 7, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2018": { rows: 220, copies: 0, attacks: 44, kept: 9, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2019": { rows: 278, copies: 0, attacks: 64, kept: 12, cyber: 0, cyberLoss: 0, spaceWeather: 0 },
+  "2020": { rows: 383, copies: 0, attacks: 60, kept: 12, cyber: 3, cyberLoss: 0, spaceWeather: 0 },
+  "2021": { rows: 387, copies: 0, attacks: 60, kept: 9, cyber: 7, cyberLoss: 1, spaceWeather: 0 },
+  "2022": { rows: 390, copies: 0, attacks: 106, kept: 25, cyber: 9, cyberLoss: 0, spaceWeather: 0 },
+  "2023": { rows: 316, copies: 32, attacks: 91, kept: 15, cyber: 4, cyberLoss: 0, spaceWeather: 0 },
+};
+
+/** The 112 events of a physical attack with a loss of customers or load, in the order of the summaries. The summaries of 2000 to 2010 have no such event. */
 export const OE417_ATTACK_EVENTS: readonly Oe417Event[] = [
   { year: 2011, began: "2011-05-21T17:00", restored: "2011-05-22T18:34", area: "Dixie Valley Area, Nevada", type: "Physical Attack", customers: "UNK", megawatts: "56" },
   { year: 2011, began: "2011-06-04T01:17", restored: "2011-06-04T03:25", area: "Midway, California", type: "Vandalism", customers: "420", megawatts: "UNK" },
@@ -144,5 +175,4 @@ export const OE417_ATTACK_EVENTS: readonly Oe417Event[] = [
   { year: 2023, began: "2023-05-13T05:27", restored: null, area: "North Dakota: Williams County;", type: "Actual Physical Attack/Vandalism", customers: "327", megawatts: "166" },
   { year: 2023, began: "2023-06-24T18:17", restored: "2023-06-24T23:25", area: "Michigan", type: "- Vandalism - Theft", customers: "5200", megawatts: "5" },
   { year: 2023, began: "2023-07-17T09:46", restored: "2023-07-17T11:00", area: "New York: Broome County;", type: "- Vandalism", customers: "642", megawatts: "0" },
-  { year: 2023, began: null, restored: "2023-07-17T11:00", area: "New York: Broome County;", type: "- Vandalism", customers: "642", megawatts: "0" },
 ];

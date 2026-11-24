@@ -105,9 +105,9 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 
 | No read | Its cuts | The reason |
 | --- | --- | --- |
-| `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. The OE-417 summaries give the last restoration of each event, and their long storms are not a collapse. One event gives no law. |
-| `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. Of the 42 cyber events of the OE-417 summaries, one tells of a loss of load. Two events give no law. |
-| `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. The OE-417 summaries list no event from space weather. |
+| `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. The OE-417 summary of 2017 has no row of Puerto Rico. The OE-417 summaries give the last restoration of each event, and their long storms are not a collapse. One event gives no law. |
+| `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. Of the 42 cyber events of the OE-417 summaries, one tells of a loss, with an unknown count of customers. Two events give no law. |
+| `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. No type of an event of the OE-417 summaries names a geomagnetic, solar, magnetic or space weather cause. |
 | `NO_FOLLOW_LAW` | The cuts that follow the stop of the grid in a collapse or a solar storm | The grid cut of the case has no law, and no source read gives a duration of its own. |
 | `NO_EVENT_LAW` | Each other cut | No source read gives a duration of the cut or a record of its events. |
 
@@ -143,16 +143,38 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 
 | Entry | What it is |
 | --- | --- |
-| `OE417_ATTACK_EVENTS` | The 113 events of 2011 to 2023 of a physical attack, vandalism, sabotage or theft, with a loss of customers or load. Each row is as its summary prints it. |
+| `OE417_ATTACK_EVENTS` | The 112 events of 2011 to 2023 of a physical attack, vandalism, sabotage or theft, with a loss of customers or load. Each row is as its summary prints it. The summaries of 2000 to 2010 have no such event. |
+| `OE417_YEARS` | The counts of each summary: the events, the second rows of an event, the attacks, the kept events, the cyber events and the events from space weather. |
 | `OE417_FILES` | The summary of each year: its id at DOE, its address and the archived copy that the dataset read. |
+| `oe417IsAttack(type)` | It tells if a type is a proved attack, by the terms `OE417_ATTACK_TERMS` and `OE417_NOT_ATTACK_TERMS`. |
+| `oe417Count(text)` | It gives the first number of a count of a summary, or `NaN` for a text with no number. |
 | `oe417Hours(event)` | It gives the hours from the start of an event to its restoration, from the local times of the summary. |
-| `oe417AttackLaw(events)` | It gives a law of the duration with one Kaplan-Meier curve for the nation. |
-| `OE417_ATTACK_LAW` | The law of the 89 events with a duration of 15 minutes or more. |
+| `oe417AttackLaw(events)` | It gives the law of the time for which the customers have no power, with one Kaplan-Meier curve for the nation. |
+| `OE417_ATTACK_LAW` | The law of the 70 events with customers: 62 ends of 15 minutes or more and 8 open events. |
 
-- An event of a suspicion (a suspected attack or a suspicious activity) is not in the set. The attack is not proved.
-- The time of the restoration in a summary is the end of the event, so no event is censored. The 14 events with no time of an end are not in the law.
+The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
+
+- The other 34 events give 0 customers or no count. Some give a count of megawatts that cannot be a loss of load with no customers, for example 9,760 MW in California in 2018. Such a count can be a load or a rating.
+- An event of a suspicion, a threat or a possible attack is not in the set. The attack is not proved.
+- The 8 open events have a start and no time of the restoration. Each was most likely open when its form was sent. The law reads each one as censored at the longest read duration, 3.5 days. The curve then falls to 0 at 7 days.
+- One of the open events is the attack in Moore County, North Carolina, in December 2022, with 45,000 customers.
+- The summary of 2023 prints 32 events two times, the second time with no start. The set and the counts read each such event one time.
 - The times are local times. An event across a change of the clock can be one hour off.
 - No case of the list uses this law yet. A case of a physical attack on the grid waits for its code in the alert taxonomy.
+
+The open events change the tail of the law:
+
+| Duration | The share of the events that last longer | The share with the open events left out |
+| --- | --- | --- |
+| 1 hour | 81% | 79% |
+| 4 hours | 36% | 27% |
+| 12 hours | 20% | 10% |
+| 1 day | 14% | 3% |
+| 3 days | 13% | 2% |
+
+To leave the open events out gives a lower curve, and a lower curve makes a plan too small.
+
+The reader of the archived files is not in this repository yet. Each row names the year of its summary, and `OE417_FILES` gives the archived copy of each year. Thus a reader can check each row and each count.
 
 ## The entries
 
