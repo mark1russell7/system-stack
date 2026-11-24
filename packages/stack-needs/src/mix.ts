@@ -12,25 +12,33 @@ import { FORMULA_POWDER, FORMULA_READY } from "./uses.ts";
 /**
  * This function gives the mix water of infant formula powder, in `kg` for each `kg` of powder.
  *
- * The rule is a mass balance. It assumes that the prepared powder has the energy in 100 g of the ready-to-feed item of the
- * same store brand. The reason: the FDC file gives these two items of one brand, and the catalog cites no mix ratio of a label.
- * The assumption ends when a label-cited mix ratio replaces it.
+ * - With `mix.label`, the rule is the label rule. The label gives the water of 100 kcal of prepared formula.
+ *   1 kg of powder makes its energy into prepared formula. Its water is `label.water / 100` g for each kcal.
+ *   The powder holds some of that water, so the mix water is that water minus the water of the powder.
+ *   For `FORMULA_MIX`, 1.34 g/kcal × 5240 kcal = 7021.6 g, minus 20 g, gives 7.0016 kg. That is 1.33618 g for each kcal.
+ * - Without `mix.label`, the rule is a mass balance. It assumes that the prepared powder has the energy in 100 g of the ready-to-feed item.
+ *   Then 1 kg of powder gives `powder / ready` kg of prepared formula, and the water is that mass minus 1 kg.
+ *   For the FDC items, that is 7.3175 kg, 4.5% more than the label rule.
+ * - The water of the powder is the water of `mix.powderWater` for each powder product.
  *
- * Thus 1 kg of powder gives `powder / ready` kg of prepared formula, and the water is that mass minus 1 kg.
- * For `FORMULA_MIX`, 5240 kcal/kg divided by 630 kcal/kg gives 8.3175 kg, so the water is 7.3175 kg. That is 1.39646 g for each kcal.
  * `formulaMixCheck` compares the water of the prepared formula with the cited water of the ready-to-feed item.
  *
  * @param powderKcalPerKg - The energy of the powder, in `kcal/kg`, for example 5240
- * @param mix - The facts of the rule. The default is `FORMULA_MIX`. Only its energy of the ready-to-feed item applies.
+ * @param mix - The facts of the rule. The default is `FORMULA_MIX`.
  * @returns The mass of the mix water, in kg for each kg of powder
- * @throws RangeError when the energy of the powder is not above the energy of the ready-to-feed item
+ * @throws RangeError when the energy of the powder is not above the energy of the ready-to-feed item, or the rule gives no positive water
  */
 export function formulaMixWater(powderKcalPerKg: number, mix: CitedFormulaMix = FORMULA_MIX): number {
   const readyKcalPerKg = mix.readyKcal * 10;
   if (!(powderKcalPerKg > readyKcalPerKg) || !Number.isFinite(powderKcalPerKg)) {
     throw new RangeError(`The powder gives ${String(powderKcalPerKg)} kcal/kg. The mix rule needs a finite energy above the ${String(readyKcalPerKg)} kcal/kg of the ready-to-feed item.`);
   }
-  return powderKcalPerKg / readyKcalPerKg - 1;
+  if (mix.label === undefined) return powderKcalPerKg / readyKcalPerKg - 1;
+  const water = ((mix.label.water / 100) * powderKcalPerKg - mix.powderWater * 10) / 1000;
+  if (!(water > 0) || !Number.isFinite(water)) {
+    throw new RangeError(`The label rule gives ${String(water)} kg of mix water for each kg of powder. The rule needs a positive finite water.`);
+  }
+  return water;
 }
 
 /** The check of the mix rule: the water in 100 g of prepared formula from the rule, and the cited water of the ready-to-feed item. */
@@ -48,9 +56,9 @@ export interface FormulaMixCheck {
 }
 
 /**
- * This function gives the check of the mix rule with the water of the two items. The rule does not use their water, so the
- * check is independent of it. For `FORMULA_MIX`, 100 g of prepared formula has 12.023 g of powder and 87.977 g of mix water.
- * The powder holds 0.240 g of water, so the prediction is 88.218 g. The FDC item gives 88.1 g, 0.13% less.
+ * This function gives the check of the mix rule with the cited water of the ready-to-feed item. The rule does not use that water,
+ * so the check is independent of it. For `FORMULA_MIX`, 100 g of prepared formula has 12.4975 g of powder and 87.5025 g of mix water.
+ * The powder holds 0.2500 g of water, so the prediction is 87.7525 g. The FDC item gives 88.1 g, 0.39% more.
  *
  * @param mix - The facts of the rule. The default is `FORMULA_MIX`.
  * @returns The predicted water, the cited water and their relative difference
@@ -161,8 +169,7 @@ function mixLine(product: SupplyProduct, perUnitKg: number | undefined, foodGift
  *
  * - One run of the converter is 1 kg of powder. It takes the powder and the mix water from `water.bottled` only.
  *   It gives the energy of the powder as `food.infant-formula-ready`. The direct use of that resource feeds the formula need.
- * - The mix water is `formulaMixWater`: a mass balance with the energy of the ready-to-feed item of the same store brand.
- *   This is an assumption. A label-cited mix ratio replaces it.
+ * - The mix water is `formulaMixWater`: the label water of the store-brand powder (21 CFR 107.10), minus the water of the powder.
  * - The mass of the water converts to a volume at `WATER_DENSITY_MAX`, 1 kg/L. Water above 4 °C is less dense, so the true volume is a little more.
  * - The water is `water.bottled`, commercially bottled water (`FORMULA_WATER`). The WIC guide (page 107) tells to use bottled water
  *   for powder after a disaster or in a power cut. A store of tap water (`water.stored`) does not feed the mix.

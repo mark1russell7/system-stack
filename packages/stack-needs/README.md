@@ -249,7 +249,7 @@ The records of the converter:
 
 | Field | Value for 1 kg of the catalog powder |
 | --- | --- |
-| `takes` | 1 kg of `food.infant-formula-powder`, and 7.3175 L of `water.bottled` |
+| `takes` | 1 kg of `food.infant-formula-powder`, and 7.0016 L of `water.bottled` |
 | `gives` | 5240 kcal of `food.infant-formula-ready`, the resource of the ready formula |
 | `id` | `mix:food.infant-formula-powder`. The option `prefix` changes the start. |
 
@@ -257,15 +257,25 @@ The direct use of `food.infant-formula-ready` then feeds the formula draw. The p
 
 ### The mix rule
 
-The rule is a mass balance. It assumes that the prepared powder has the energy in 100 g of the ready-to-feed item of the same store brand. The reason: FoodData Central gives these two items of one brand, and no catalog record cites the mix ratio of a label. A label-cited mix ratio replaces this assumption.
+The rule takes the label water of the powder. 21 CFR 107.10(a) puts on each US infant formula label a table for 100 kcal of the formula, as prepared by the label directions. The table gives the water in grams. Thus the label water gives the mix ratio of the label as a mass, with no scoop size.
 
-1. The powder gives 524 kcal in 100 g, and the ready-to-feed item gives 63 kcal in 100 g.
-2. Thus 100 g of prepared formula holds 100 × 63 / 524 = 12.023 g of powder and 87.977 g of mix water.
-3. The mix water is 1.39646 g for each kcal, and 7.3175 kg for each kg of powder (`formulaMixWater`).
-4. The water mass converts to a volume at `WATER_DENSITY_MAX`, 1 kg/L. Water above 4 °C is less dense, so the true volume is a little more.
-5. The energy of each powder product comes from its food energy in the catalog. Two products can give powder. Then the converter takes the most water and the least energy of their lines.
+1. The label of the store-brand infant powder gives 134 g of water for 100 kcal (`STORE_BRAND_LABEL`, from the product page of its maker).
+2. The powder gives 524 kcal and 2 g of water in 100 g (FDC item 173554).
+3. Thus the formula of 1 kg of powder holds 1.34 × 5240 = 7021.6 g of water. The powder holds 20 g of it.
+4. The mix water is 7.0016 kg for each kg of powder, and 1.33618 g for each kcal (`formulaMixWater`).
+5. The water mass converts to a volume at `WATER_DENSITY_MAX`, 1 kg/L. Water above 4 °C is less dense, so the true volume is a little more.
+6. The energy of each powder product comes from its food energy in the catalog. Two products can give powder. Then the converter takes the most water and the least energy of their lines.
 
-`formulaMixCheck` gives an independent check of the rule. The rule does not use the water of the two items. The powder holds 2 g of water in 100 g, thus 0.240 g in 12.023 g. The predicted water of 100 g of prepared formula is 87.977 + 0.240 = 88.218 g. The FDC item 172319 gives 88.1 g, 0.13% less.
+The product page tells that the actual label varies with the retailer. A label of a different powder gives a different value. Give it as `mix.label`.
+
+Without `mix.label`, the rule is a mass balance. It assumes that the prepared powder has the energy in 100 g of the ready-to-feed item 172319, 63 kcal. Then the mix water is 5240 / 630 − 1 = 7.3175 kg for each kg of powder, 4.5% more than the label rule.
+
+`formulaMixCheck` gives an independent check of the rule with the cited water of the ready-to-feed item. The rule does not use that water.
+
+| Rule | Powder in 100 g of prepared formula | Predicted water | The FDC item 172319 |
+| --- | --- | --- | --- |
+| The label rule | 12.4975 g | 87.7525 g | 88.1 g, 0.39% more |
+| The mass balance | 12.023 g | 88.218 g | 88.1 g, 0.13% less |
 
 These facts give a no read, and then the powder has no converter:
 
@@ -432,4 +442,4 @@ The read goes into `deviceFragment` through the input `needs`. Then the need of 
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment`, `FORMULA_MIX` and `FORMULA_WATER`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, `RESOURCE_SUBSETS` and `subsetConverters`, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment`, `FORMULA_MIX`, `STORE_BRAND_LABEL` and `FORMULA_WATER`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, `RESOURCE_SUBSETS` and `subsetConverters`, the supply parts and `checkJoins`. |

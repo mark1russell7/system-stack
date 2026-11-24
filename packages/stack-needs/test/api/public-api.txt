@@ -15,6 +15,7 @@ BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
 CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
+CFR_107_10_SOURCE: build/index.d.ts#CFR_107_10_SOURCE
 COLD_START_CELSIUS: build/index.d.ts#COLD_START_CELSIUS
 CalorieChange: build/index.d.ts#CalorieChange
 CalorieNeed: build/index.d.ts#CalorieNeed
@@ -25,6 +26,7 @@ CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 CalorieTables: build/index.d.ts#CalorieTables
 CitedFeeds: build/index.d.ts#CitedFeeds
+CitedFormulaLabel: build/index.d.ts#CitedFormulaLabel
 CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
 CitedFormulaMix: build/index.d.ts#CitedFormulaMix
 CitedFormulaWater: build/index.d.ts#CitedFormulaWater
@@ -120,6 +122,8 @@ ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
 ResourceSubset: build/index.d.ts#ResourceSubset
 STORED_WATER: build/index.d.ts#STORED_WATER
+STORE_BRAND_INFANT_SOURCE: build/index.d.ts#STORE_BRAND_INFANT_SOURCE
+STORE_BRAND_LABEL: build/index.d.ts#STORE_BRAND_LABEL
 SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
 SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
 StoveShare: build/index.d.ts#StoveShare
@@ -187,6 +191,9 @@ export declare const CALORIE_SEXES: readonly ["female", "male"];
 
 ### build/index.d.ts#CALORIE_TABLES
 export declare const CALORIE_TABLES: readonly CalorieTable[];
+
+### build/index.d.ts#CFR_107_10_SOURCE
+export declare const CFR_107_10_SOURCE: Source;
 
 ### build/index.d.ts#COLD_START_CELSIUS
 export declare const COLD_START_CELSIUS = 0;
@@ -265,6 +272,15 @@ export interface CitedFeeds {
   readonly locator: string;
 }
 
+### build/index.d.ts#CitedFormulaLabel
+export interface CitedFormulaLabel {
+  readonly water: number;
+  readonly source: Source;
+  readonly locator: string;
+  readonly rule: Source;
+  readonly ruleLocator: string;
+}
+
 ### build/index.d.ts#CitedFormulaLeast
 export interface CitedFormulaLeast {
   readonly perDay: number;
@@ -286,6 +302,7 @@ export interface CitedFormulaMix {
   readonly locator: string;
   readonly waterSource: Source;
   readonly waterLocator: string;
+  readonly label?: CitedFormulaLabel | undefined;
 }
 
 ### build/index.d.ts#CitedFormulaWater
@@ -865,6 +882,12 @@ export interface ResourceSubset {
 
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
+
+### build/index.d.ts#STORE_BRAND_INFANT_SOURCE
+export declare const STORE_BRAND_INFANT_SOURCE: Source;
+
+### build/index.d.ts#STORE_BRAND_LABEL
+export declare const STORE_BRAND_LABEL: CitedFormulaLabel;
 
 ### build/index.d.ts#SUNRISE_EQUATION_SOURCE
 export declare const SUNRISE_EQUATION_SOURCE: Source;

@@ -192,6 +192,57 @@ export const FORMULA_LATER_LEAST: CitedFormulaLeast = {
   kcalLocator: "FDC ID 172319: 63 kcal in 100 g (food_nutrient.csv), and 30.4 g in 1 fl oz (food_portion.csv)",
 };
 
+/** The source of the label rule: 21 CFR 107.10 in the eCFR. It is a work of the United States federal government. */
+export const CFR_107_10_SOURCE: Source = {
+  id: "ecfr-21-cfr-107-10",
+  title: "21 CFR 107.10, Nutrient information (infant formula)",
+  url: "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-B/part-107/subpart-B/section-107.10",
+  license: "us-public-domain",
+  checked: "2026-11-24",
+  by: "Office of the Federal Register",
+  terms: "https://www.ecfr.gov/reader-aids/understanding-the-ecfr/what-is-the-ecfr",
+  sha256: "93d93c385b89bd1dfabd1e859ff3b2704be1c47a7a0e20ad0eefd1ac0574286a",
+  note: "The sha256 is of the XML of the section from the versioner API, the version of 2026-11-23.",
+};
+
+/** The source of the label water: the product page of the store-brand infant formula of its maker. */
+export const STORE_BRAND_INFANT_SOURCE: Source = {
+  id: "store-brand-formula-infant",
+  title: "Store Brand Infant Formula, product page",
+  url: "https://storebrandformula.com/formula-infant",
+  license: "all-rights-reserved",
+  checked: "2026-11-24",
+  by: "Perrigo",
+  terms: "https://storebrandformula.com/terms",
+  sha256: "4364c393d384f6874e16983730268482456789015004ba8db841cf6f600d2560",
+  note: "The terms cover user contributions only. They have no clause on automated reads or AI use. The model cites one value as a fact and copies no text.",
+};
+
+/**
+ * The label water of prepared infant formula: the water in grams that 100 kcal of the formula holds, as prepared by the label directions.
+ * 21 CFR 107.10 puts this value on each US infant formula label. Thus it gives the mix ratio of the label as a mass.
+ */
+export interface CitedFormulaLabel {
+  /** The water of the prepared formula, in `g` for 100 `kcal`. */
+  readonly water: number;
+  readonly source: Source;
+  readonly locator: string;
+  /** The rule that the label value is for the formula as prepared by the label directions. */
+  readonly rule: Source;
+  readonly ruleLocator: string;
+}
+
+/**
+ * The label water of the store-brand infant powder: 134 g for 100 kcal. The product page notes that the actual label varies with the retailer.
+ */
+export const STORE_BRAND_LABEL: CitedFormulaLabel = {
+  water: 134,
+  source: STORE_BRAND_INFANT_SOURCE,
+  locator: "Compare the Nutrition, Store Brand Infant, Nutrients/100 cal: Water g 134",
+  rule: CFR_107_10_SOURCE,
+  ruleLocator: "107.10(a): the information is for the product as prepared in accordance with label directions, and (a)(2) lists water in grams for 100 kilocalories",
+};
+
 /**
  * The facts of the mix rule: the energy and the water of a powder and of a ready-to-feed item of one store brand.
  * `formulaMixWater` gives the rule, and `formulaMixCheck` gives its check.
@@ -210,11 +261,17 @@ export interface CitedFormulaMix {
   /** The source that tells to mix the powder with safe water, one bottle at a time. */
   readonly waterSource: Source;
   readonly waterLocator: string;
+  /**
+   * The label water of the prepared formula. With it, `formulaMixWater` uses the label rule.
+   * Without it, `formulaMixWater` uses the mass balance with the ready-to-feed item.
+   */
+  readonly label?: CitedFormulaLabel | undefined;
 }
 
 /**
- * The facts of the mix rule: the FDC items 173554 (store brand, powder) and 172319 (store brand, ready-to-feed).
+ * The facts of the mix rule: the FDC items 173554 (store brand, powder) and 172319 (store brand, ready-to-feed), and the label water.
  * The powder gives 524 kcal and 2 g of water in 100 g. The ready-to-feed item gives 63 kcal and 88.1 g of water in 100 g.
+ * The label of the store-brand powder gives 134 g of water for 100 kcal of prepared formula.
  * The WIC guide tells to mix powder one bottle at a time, and to use bottled water after a disaster or in a power cut.
  */
 export const FORMULA_MIX: CitedFormulaMix = {
@@ -226,6 +283,7 @@ export const FORMULA_MIX: CitedFormulaMix = {
   locator: "FDC ID 173554: 524 kcal (nutrient 1008) and 2 g of water (nutrient 1051) in 100 g. FDC ID 172319: 63 kcal and 88.1 g of water in 100 g (food_nutrient.csv)",
   waterSource: WIC_INFANT_SOURCE,
   waterLocator: "Page 106, Guidelines for Using Infant Formula When Access to Common Kitchen Appliances Is Limited, and Natural Disaster or Power Outage",
+  label: STORE_BRAND_LABEL,
 };
 
 /** The rule of the mix water of infant formula after a disaster or in a power cut, with its quotes and its citation. */
