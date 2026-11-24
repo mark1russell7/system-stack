@@ -195,9 +195,12 @@ The model of one pot:
    Each choice gives the most fuel. At a high place the test water boils below 100 °C, so the end has no default.
    The boil time is then the boil fuel over the mass rate. When the share and the yield both give a boil fuel, the line takes the most.
    The adverse factor of the stove (`adverse` of market) multiplies the boil fuel of the yield. Cold, snow melt and wind take more fuel than the calm test.
-   A factor with the bound `most` also takes a most yield. For example, the canister stove of the catalog has a most yield and a most factor of 4.
-   Its boil fuel is 4 times the calm fuel. This is an estimate, not a proven upper limit. The source gives 3 to 4 times as a typical range, not as a ceiling.
-   A factor with no bound is the value. The cook part stays the rate times the cook time.
+   A factor with the bound `most` also takes a most yield. So does a factor with a typical range (`typical`).
+   The fuel from each of the two is an estimate, not an upper limit.
+   For example, the canister stove of the catalog has a most yield and the factor 4.
+   The factor is the high end of its typical range of 3 to 4.
+   Its boil fuel is 4 times the calm fuel. The line also gives the fuel of the pot at each end of the range (`fuelSpread`).
+   A factor with no bound and no range is the value. The cook part stays the rate times the cook time.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
 5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit. A boil fuel from an adverse factor is an estimate (step 3), so that fuel is not a proven upper limit.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
@@ -212,8 +215,9 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | No cited stove rate, or a rate that is not an energy or a mass in a time | The stove time and the fuel. |
 | A stove rate with a bound, for example `bound: "least"` of market | The stove time and the fuel. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel. |
 | No cited stove share, and no boil yield with a read | The stove time and the fuel. The water and the heat keep their reads. |
-| A boil yield with the bound `most` and no adverse factor with the bound `most`, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
+| A boil yield with the bound `most` and no adverse factor with the bound `most` or a typical range, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
 | An adverse factor with the bound `least`, or a factor that is not a finite number of 1 or more | No boil fuel from the yield. A least factor gives too little fuel. |
+| An adverse factor with a bound and a typical range, a range that is not `1 <= low <= high`, or a factor outside its range | No boil fuel from the yield. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
 | A cited soak rate that does not convert to `L/kg`, for example a rate for each volume with no bulk mass | The soak water. The resource then has no converter. |

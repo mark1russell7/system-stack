@@ -393,8 +393,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0
       '@mark1russell7/market':
-        specifier: ^0.9.0
-        version: 0.9.0
+        specifier: ^0.10.0
+        version: 0.10.0
       '@mark1russell7/quantity':
         specifier: ^0.4.4
         version: 0.4.5(zod@4.6.7)
@@ -954,6 +954,10 @@ packages:
     resolution: {integrity: sha512-e/yR7Dw4M72NpVpFegSqchojatDZEYca3Tay2Nv+d8vD/n+GRsfe4atYiQzCf8hvbAjY0aTx2U2Cg13WDSOn8g==}
     engines: {node: '>=22.12'}
 
+  '@mark1russell7/guidebook@0.5.1':
+    resolution: {integrity: sha512-Ck+si2CfuMS+DBZ8HamXbV9xhUsf1nuRcLvpQWNongcri5ObEfD27eSkoFxPBP4DiF0iVG/qmO1AxhC/TK2thA==}
+    engines: {node: '>=22.12'}
+
   '@mark1russell7/interval@0.1.0':
     resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
     engines: {node: '>=22'}
@@ -962,8 +966,8 @@ packages:
     resolution: {integrity: sha512-63S4hvrh3YtN17doxFli8zF/H5kRcCsXz7Oijbt28ZbkEDXcraGELa80YwBzjnlWNnjQIZV/UTJOySwZQNhv4w==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/market@0.9.0':
-    resolution: {integrity: sha512-MJ3MucotMigKpqoAjm77Y9BEvjFW1OIIrbeN9fi638eHO7C8/BLRfA7WrmhGTWoD2RL1oX+OgPTrDxkp/brNLQ==}
+  '@mark1russell7/market@0.10.0':
+    resolution: {integrity: sha512-DrK1y+6I1vkfnM6wITgNbg4b3rMz8pZZcEhbKjY/QwNykCCoNUYumqmCflBTtNGw723T1ksBWVynJKAtUJ/mLw==}
     engines: {node: '>=22'}
 
   '@mark1russell7/optional@1.5.0':
@@ -2585,15 +2589,17 @@ snapshots:
 
   '@mark1russell7/guidebook@0.4.0': {}
 
+  '@mark1russell7/guidebook@0.5.1': {}
+
   '@mark1russell7/interval@0.1.0': {}
 
   '@mark1russell7/linear@0.1.0':
     dependencies:
       '@mark1russell7/rational': 0.1.3
 
-  '@mark1russell7/market@0.9.0':
+  '@mark1russell7/market@0.10.0':
     dependencies:
-      '@mark1russell7/guidebook': 0.4.0
+      '@mark1russell7/guidebook': 0.5.1
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.8(zod@4.6.7)
       '@mark1russell7/strategy-search': 0.1.2
