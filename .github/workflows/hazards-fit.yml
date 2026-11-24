@@ -15,6 +15,14 @@ on:
         description: The share of the customers of a county that starts an event (empty for the default)
         type: string
         default: ""
+      join:
+        description: The join time in seconds of near runs of one county into one event (empty for 0, no join)
+        type: string
+        default: ""
+      sweep:
+        description: Also count the events with each join time of the sweep (0, 1, 4, 12 and 24 hours)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,9 +54,13 @@ jobs:
         env:
           YEARS: ${{ inputs.years }}
           SHARE: ${{ inputs.share }}
+          JOIN: ${{ inputs.join }}
+          SWEEP: ${{ inputs.sweep }}
         run: |
           args=(--years "$YEARS" --out out/eaglei-laws.json)
           if [ -n "$SHARE" ]; then args+=(--share "$SHARE"); fi
+          if [ -n "$JOIN" ]; then args+=(--join "$JOIN"); fi
+          if [ "$SWEEP" = "true" ]; then args+=(--sweep); fi
           node packages/stack-hazards/scripts/eaglei-fit.ts "${args[@]}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

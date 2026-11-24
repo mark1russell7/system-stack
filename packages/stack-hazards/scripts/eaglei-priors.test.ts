@@ -15,7 +15,7 @@ function record(change: Partial<EagleLaws> = {}): EagleLaws {
     scheme: "us-state-fips",
     lines: 0,
     skipped: 0,
-    tally: { counts: 0, times: 0, repeats: 0, unknown: 0, missing: 0, truncated: 0 },
+    tally: { counts: 0, times: 0, repeats: 0, unknown: 0, missing: 0, truncated: 0, joined: 0 },
     events: 0,
     regions: {},
     priors: {

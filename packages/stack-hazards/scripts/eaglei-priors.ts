@@ -4,8 +4,10 @@ import { parseArgs } from "node:util";
 import type { PriorTable } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
 import { observedRegions, regionRates } from "../src/priors.ts";
-import { LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
+import { LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
+
+export { PRIOR_LIMIT };
 
 // The step after the fit job: the counts of the priors in the artifact eaglei-laws become the modules
 // src/eaglei-county-priors.ts and src/eaglei-state-priors.ts. A person runs this script and commits the modules.
@@ -22,17 +24,6 @@ export interface EaglePriorTables {
   readonly county: PriorTable;
   readonly state: PriorTable;
 }
-
-/**
- * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
- * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
- * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
- * of an event many times. A true rate can also be above the limit, for example in Puerto Rico. Such a region is not
- * in the table, so its prior is no read. The measures are not the same. EIA counts each interruption of more than 5
- * minutes at a customer. The table counts the events of a county at 1% or more of its customers. So the comparison
- * holds only for the order of the number.
- */
-export const PRIOR_LIMIT = 12;
 
 /** The share of the customers of a county that starts an event, when the fit has no option `share`: the default of `outageReader`. */
 const DEFAULT_SHARE = 0.01;

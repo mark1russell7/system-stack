@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, eagleFiles, fitEagle, lawsTable, linesOf, ranges, yearsOf } from "./eaglei-fit.ts";
+import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, ranges, sweepTable, yearsOf } from "./eaglei-fit.ts";
 import { RANGE_TRIES, type FitContext } from "./fetch.ts";
 import { STORM_BASE, stormFiles } from "./storm-files.ts";
 import { STORM_CLASSES } from "../src/storms.ts";
@@ -174,6 +174,27 @@ describe("fitEagle", () => {
     const one = { "99001": { events: 1, share: 0.04 } };
     expect(laws.priors?.counts).toEqual({ "infra.power.outage": {}, "met.winter.storm": one, "met.heat.extreme": {}, "met.tropical.hurricane": {}, "met.flood": {}, "met.tornado": one });
     expect(laws.regions).toEqual((await fitEagle(context(fake(article()).transport), { now: () => new Date() })).regions);
+  });
+
+  it("gives the counts of the events with each join time of the sweep, in the order of the join times", async () => {
+    const laws = await fitEagle(context(fake(article()).transport), { now: () => new Date("2026-11-22T00:00:00Z"), join: 3600, sweep: [7200, 0, 3600] });
+    expect(laws.options.join).toBe(3600);
+    // The county 99001 has 1 event in 2 years at a share of 0.04, so its rate is 0.02. The county 99009 has no event, so it has no rate.
+    const row = { events: 1, joined: 0, truncated: 0, median: 0.02, most: { area: "99001", rate: 0.02 }, over: 0 };
+    expect(laws.sweep).toEqual([0, 3600, 7200].map((join) => ({ join, ...row })));
+    expect(sweepTable(laws.sweep ?? [])).toContain("| 2 | 1 | 0 | 0 | 0.020 | 99001 0.0 | 0 |");
+    expect(JOIN_SWEEP).toEqual([0, 3600, 14_400, 43_200, 86_400]);
+    expect((await fitEagle(context(fake(article()).transport), { now: () => new Date() })).sweep).toBeUndefined();
+  });
+
+  it("gives the median and the largest rate of the counties, and the counties over the limit", () => {
+    const event = (area: string, peak: number) => ({ area, start: 0, seconds: 900, peak, censored: false });
+    const events = [...Array.from({ length: PRIOR_LIMIT + 1 }, () => event("A", 100)), event("B", 50)];
+    const observation = { years: { A: 1, B: 1, C: 1 }, customers: { A: 100, B: 100, C: 100 } };
+    const customers = new Map(Object.entries(observation.customers));
+    const tally = { counts: 0, times: 0, repeats: 0, unknown: 0, missing: 0, truncated: 2, joined: 3 };
+    expect(joinSweep(3600, { events, tally }, observation, customers)).toEqual({ join: 3600, events: 14, joined: 3, truncated: 2, median: 6.75, most: { area: "A", rate: 13 }, over: 1 });
+    expect(joinSweep(0, { events: [], tally }, observation, customers)).toMatchObject({ events: 0, median: 0, most: undefined, over: 0 });
   });
 
   it("gives the newest details file of each year of the test, and no other file", () => {
