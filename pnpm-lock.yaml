@@ -228,7 +228,7 @@ importers:
         version: link:../system-stack
       ireko:
         specifier: ^0.2.5
-        version: 0.2.5
+        version: 0.2.6
     devDependencies:
       '@mark1russell7/cue':
         specifier: ^2.0.0
@@ -1793,8 +1793,8 @@ packages:
     resolution: {integrity: sha512-6xwYfHbajpoF0xLW+iwLkhwgvLoZDfjYfoFNu8ftMoXINzwuymNLd9u/KmwtdT2GbR+/Cz66otEGEVVUHX9QLQ==}
     engines: {node: '>=10.13.0'}
 
-  ireko@0.2.5:
-    resolution: {integrity: sha512-NwwoYEJHCL8Tp1bjzCJvNyeUIKVSXo3H9mLPQLgE3CAX+/N8CTeYV+gFrvCRFCYQ9aYWX/ylh6Huo00B5igczg==}
+  ireko@0.2.6:
+    resolution: {integrity: sha512-QaXK0hq01VN76B93BqOt0zIelwZz/dn/3EtqWA3vTRMstK2Hk6D61jwJsW/qz0un3L/w6tnZHVOjv6Pz30bQSw==}
     engines: {node: '>=22.12'}
     peerDependencies:
       '@xyflow/react': ^12.0.0
@@ -3144,7 +3144,7 @@ snapshots:
 
   interpret@3.1.1: {}
 
-  ireko@0.2.5: {}
+  ireko@0.2.6: {}
 
   is-core-module@2.18.0:
     dependencies:
