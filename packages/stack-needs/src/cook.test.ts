@@ -324,7 +324,7 @@ describe("the cook fragment", () => {
       expect(one.read && one.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
     });
 
-    it("gives the canister stove of the catalog the most fuel: its calm yield times its most adverse factor of 4", () => {
+    it("gives the canister stove of the catalog an estimate of the fuel: its calm yield times its most adverse factor of 4", () => {
       const line = cookFragment({ catalog: SUPPLY_CATALOG, units: { "food.rice-white-1kg": 1 }, stove: "heat.stove-canister-1-burner", batch: { value: 0.5, unit: "kg" } }).lines[0];
       if (line === undefined || !line.water.read || !line.fuel.read || !line.minutes.read) throw new Error("The canister line has no read.");
       // The pot of 0.5 kg starts at 0 °C. The test boils 16 L from 21 °C to 100 °C with 227 g of fuel.
