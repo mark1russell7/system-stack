@@ -13,10 +13,19 @@ export interface BasisOptions {
   readonly assessed?: "keep" | "drop" | undefined;
 }
 
+/** A region of the user, as a code of a scheme, for example `{ scheme: "us-state-fips", code: "37" }`. */
+export interface HazardRegion {
+  readonly scheme: string;
+  readonly code: string;
+}
+
 /** The options of `hazardCase`. */
 export interface HazardCaseOptions extends BasisOptions {
-  /** The region of the user, as a code of a scheme. A law with no curve for it gives a cut with no curve. */
-  readonly region?: { readonly scheme: string; readonly code: string } | undefined;
+  /**
+   * The region of the user: one region, or one region for each scheme. A place has a code in each scheme, for example a state and the nation.
+   * Each law reads the first region with its scheme. A law with no region of its scheme, or with no curve for the code, gives a cut with no curve.
+   */
+  readonly region?: HazardRegion | readonly HazardRegion[] | undefined;
   /**
    * The ids of the parts of the stack for each reference part, when the stack does not use the reference ids.
    * A reference part with an empty list is not in the stack, so the case has no cut of it. The default is the reference id.
@@ -55,15 +64,23 @@ export function supplyState(hazard: Hazard, part: string, options: BasisOptions 
  * The option `assessed` can drop the claims of assessed risks. A cut with only assessed claims then has no `duration`. The function is pure.
  */
 export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCaseOptions = {}): CaseCuts {
+  const regions = regionList(options.region);
   const cuts = hazard.cuts.flatMap((cut): Cut[] => {
     const item = basisCut(cut, options);
     const ids = options.parts?.[item.part] ?? [item.part];
     const law = item.duration.read ? item.duration : undefined;
-    const curve = law !== undefined && options.region !== undefined && options.region.scheme === law.scheme ? law.curves[options.region.code] : undefined;
+    const code = law === undefined ? undefined : regions.find((region) => region.scheme === law.scheme)?.code;
+    const curve = law !== undefined && code !== undefined ? law.curves[code] : undefined;
     const source = curve !== undefined && law !== undefined ? sourceUrl(list, law.source) : claimSources(list, item);
     return ids.map((part) => ({ part, title: item.title, ...(curve === undefined ? {} : { duration: curve }), source }));
   });
   return { case: hazard.case, title: hazard.title, cuts };
+}
+
+/** This function gives the regions of the option `region` as a list. */
+function regionList(region: HazardCaseOptions["region"]): readonly HazardRegion[] {
+  if (region === undefined) return [];
+  return "scheme" in region ? [region] : region;
 }
 
 /**

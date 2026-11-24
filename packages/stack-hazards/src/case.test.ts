@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hazardCase, hazardOf, NO_TOLD_LAW, supplyState, type HazardCaseOptions } from "./case.ts";
 import { HAZARD_LIST } from "./data.ts";
 import { EAGLEI_GRID_LAW } from "./eaglei-law.ts";
+import { OE417_ATTACK_LAW, OE417_SOURCE } from "./oe417.ts";
 import { HAZARDS_SCHEMA, type HazardList } from "./hazard.ts";
 
 const STORM = hazardOf(HAZARD_LIST, "met.winter.storm")!;
@@ -38,6 +39,29 @@ describe("a hazard case as the values of CaseCuts", () => {
     expect(cuts.find((cut) => cut.part === "power.grid")?.duration).toEqual(EAGLEI_GRID_LAW.curves["48"]);
     expect(cuts.filter((cut) => cut.duration !== undefined).map((cut) => cut.part)).toEqual(["power.grid"]);
     expect(hazardCase(HAZARD_LIST, outage).cuts.every((cut) => cut.duration === undefined)).toBe(true);
+  });
+
+  it("gives the law of the nation to the grid cut of a physical attack, and a state law to a power outage, from one list of regions", () => {
+    const attack = hazardOf(HAZARD_LIST, "infra.power.physical-attack")!;
+    const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
+    const place = [
+      { scheme: "us-state-fips", code: "37" },
+      { scheme: "us-nation", code: "US" },
+    ];
+    const grid = (hazard: typeof attack, options: HazardCaseOptions) => hazardCase(HAZARD_LIST, hazard, options).cuts.find((cut) => cut.part === "power.grid");
+    expect(grid(attack, { region: place })?.duration).toEqual(OE417_ATTACK_LAW.curves["US"]);
+    expect(grid(attack, { region: place })?.source).toBe(OE417_SOURCE.url);
+    expect(grid(outage, { region: place })?.duration).toEqual(EAGLEI_GRID_LAW.curves["37"]);
+    expect(grid(attack, { region: { scheme: "us-nation", code: "US" } })?.duration).toEqual(OE417_ATTACK_LAW.curves["US"]);
+    // A state alone does not reach the law of the nation: the cut is no read, not a pass.
+    expect(grid(attack, { region: place[0] })?.duration).toBeUndefined();
+    expect(grid(attack, { region: [] })?.duration).toBeUndefined();
+  });
+
+  it("reads the first region of the scheme of a law", () => {
+    const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
+    const cuts = hazardCase(HAZARD_LIST, outage, { region: [{ scheme: "us-state-fips", code: "48" }, { scheme: "us-state-fips", code: "37" }] }).cuts;
+    expect(cuts.find((cut) => cut.part === "power.grid")?.duration).toEqual(EAGLEI_GRID_LAW.curves["48"]);
   });
 
   it("gives the curve of the region of the user, and no curve for another region", () => {
