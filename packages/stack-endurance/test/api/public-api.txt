@@ -111,6 +111,7 @@ export interface JointDays {
   readonly takes: Readonly<Record<string, Readonly<Record<string, number>>>>;
   readonly binding: readonly string[];
   readonly runs: Readonly<Record<string, number>>;
+  readonly capped: readonly string[];
 }
 
 ### build/index.d.ts#MINIMAL_STOP_CUTS
