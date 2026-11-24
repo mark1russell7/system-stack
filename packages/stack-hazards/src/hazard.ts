@@ -141,7 +141,8 @@ export interface Hazard {
 
 /**
  * A table of the yearly priors of some cases from one source, in one scheme of regions.
- * The rate of a case in a region is `[perYear, reach]`: the events in one year in the region, and the mean share of the region that one event reaches.
+ * The rate of a case in a region is `[perYear, reach]`. `perYear` is the events in one year in the region.
+ * `reach` is the mean share of the region that one event reaches.
  */
 export interface PriorTable {
   /** The id of the source. The source must have a license. */
@@ -154,7 +155,7 @@ export interface PriorTable {
   readonly method: string;
   /** The regions that the source observes. An observed region with no rate of a case has no event of the case, so its prior is 0. */
   readonly codes: readonly string[];
-  /** The rate of each case in each region with one event or more, by the code of the case, then by the code of the region. */
+  /** The rate of each case in each region with one event or more. The keys are the code of the case, then the code of the region. */
   readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
 }
 

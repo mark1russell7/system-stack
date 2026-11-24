@@ -151,6 +151,18 @@ The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. 
 
 The fit job also reads the details files of NOAA Storm Events and the zone-county file of the National Weather Service. Each is in the public domain. An outage is in a case when a storm event of the case covers its county at its start. The window starts 1 hour before the event and ends 3 hours after it. The table `STORM_CLASSES` gives the event types of each case. The match is in time and place only, so it does not prove the cause of an outage.
 
+## The yearly priors from outage records
+
+`HAZARD_LIST` has two tables of yearly priors from EAGLE-I: one for each county (`us-county-fips`) and one for each state (`us-state-fips`). `hazardPriors(list, { region })` gives the prior of each case for the first region of the option with a table of the case.
+
+- `perYear` is the count of the events of the case in one year in the region. `reach` is the mean share of the customers of the region that an event puts out of power.
+- The case `infra.power.outage` counts the outages in no storm case. Each storm case counts the outages that start in a storm event of the case.
+- An event starts at 1% of the customers of a county, so a smaller outage is not counted. Thus each rate is a lower bound.
+- A region that the table observes with no event of a case has a prior of 0. A region that the table does not observe has no prior: that is no read.
+- Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
+
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the module `src/eaglei-priors.ts` from them. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
+
 ## The law of a physical attack
 
 The OE-417 annual summaries of DOE list the electric disturbance events of each year. They are a work of the United States federal government, in the public domain.

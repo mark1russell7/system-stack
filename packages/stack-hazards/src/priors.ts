@@ -23,8 +23,9 @@ export interface CoverageTally {
 }
 
 /**
- * This function gives a tally of the years of each area. A source that lists an area only when it has customers out observes the area in each year with one count.
- * A year in which the source starts to observe an area counts as a full year, so a rate from the tally is a lower bound.
+ * This function gives a tally of the years of each area. A source can list an area only when it has customers out.
+ * Then the source observes the area in each year with one count.
+ * The first year in which the source observes an area counts as a full year. Thus a rate from the tally is a lower bound.
  */
 export function coverageTally(): CoverageTally {
   const seen = new Map<string, Set<number>>();

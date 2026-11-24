@@ -2,11 +2,40 @@ import { describe, expect, it } from "vitest";
 import { checkHazards } from "./check.ts";
 import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
 import type { OutageEvent } from "./outages.ts";
+import { HAZARD_LIST } from "./data.ts";
+import { EAGLEI_COUNTY_PRIORS, EAGLEI_STATE_PRIORS } from "./eaglei-priors.ts";
 import { areaCounts, coverageTally, hazardPriors, observedRegions, regionRates, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
 const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, seconds: 3600, peak, censored: false });
 const state = (area: string): string => area.slice(0, 2);
+
+describe("the priors of the reference list", () => {
+  it("has the tables of EAGLE-I for each county and each state, and the gate passes", () => {
+    expect(HAZARD_LIST.priors).toEqual([EAGLEI_COUNTY_PRIORS, EAGLEI_STATE_PRIORS]);
+    expect([EAGLEI_COUNTY_PRIORS.scheme, EAGLEI_STATE_PRIORS.scheme]).toEqual(["us-county-fips", "us-state-fips"]);
+    expect(EAGLEI_COUNTY_PRIORS.codes.length).toBeGreaterThan(3000);
+    expect(EAGLEI_STATE_PRIORS.codes.length).toBeGreaterThanOrEqual(50);
+    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-prior")).toEqual([]);
+  });
+
+  it("gives a prior of each case of the tables for a county, and the prior of the state for a county that no table has", () => {
+    const cases = Object.keys(EAGLEI_COUNTY_PRIORS.rates).sort();
+    const county = hazardPriors(HAZARD_LIST, { region: [{ scheme: "us-county-fips", code: "01001" }, { scheme: "us-state-fips", code: "01" }] });
+    expect(county.map((prior) => prior.case).sort()).toEqual(cases);
+    for (const prior of county) {
+      expect(prior.perYear).toBeGreaterThanOrEqual(0);
+      expect(prior.reach).toBeGreaterThanOrEqual(0);
+      expect(prior.reach).toBeLessThanOrEqual(1);
+      expect(prior.asOf).toBe(EAGLEI_COUNTY_PRIORS.asOf);
+    }
+    expect(county.find((prior) => prior.case === "infra.power.outage")?.place).toBe("us-county-fips:01001");
+    // A code that is not a county falls back to the table of the state.
+    const state = hazardPriors(HAZARD_LIST, { region: [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] });
+    expect(new Set(state.map((prior) => prior.place))).toEqual(new Set(["us-state-fips:01"]));
+    expect(hazardPriors(HAZARD_LIST, {})).toEqual([]);
+  });
+});
 
 describe("the counts of the priors", () => {
   it("counts the calendar years in which a source lists each area", () => {

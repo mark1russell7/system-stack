@@ -20,7 +20,8 @@ import { priorTableFaults } from "./priors.ts";
  * - `hazards-fit`: the fit of a law has no family, no method, or a count of events that is not a whole number above 0.
  * - `hazards-curve`: a curve of a law does not have the form of a survival curve.
  * - `hazards-prior`: a table of priors names a source that the table of the sources does not have, or a source with no license.
- *   Or it has no method, a wrong date, a case that is not in the list, a region that is not in its codes, or a rate that is not a count of 0 or more with a share from 0 to 1.
+ *   Or it has no method, a wrong date, a case that is not in the list, or a region that is not in its codes.
+ *   Or it has a rate that is not a count of 0 or more with a share from 0 to 1.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
  */
 export const HAZARD_CODES: readonly [
