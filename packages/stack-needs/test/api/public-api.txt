@@ -24,6 +24,9 @@ DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
 DIRECT_USES: build/index.d.ts#DIRECT_USES
 FOOD_NEED: build/index.d.ts#FOOD_NEED
+FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
+FORMULA_NEED: build/index.d.ts#FORMULA_NEED
+FORMULA_READY: build/index.d.ts#FORMULA_READY
 FragmentDirectUse: build/index.d.ts#FragmentDirectUse
 FragmentDraw: build/index.d.ts#FragmentDraw
 FragmentResource: build/index.d.ts#FragmentResource
@@ -165,6 +168,15 @@ export declare const DIRECT_USES: readonly FragmentDirectUse[];
 ### build/index.d.ts#FOOD_NEED
 export declare const FOOD_NEED = "food.energy";
 
+### build/index.d.ts#FORMULA_DRAW_MONTHS
+export declare const FORMULA_DRAW_MONTHS = 6;
+
+### build/index.d.ts#FORMULA_NEED
+export declare const FORMULA_NEED = "food.infant-formula";
+
+### build/index.d.ts#FORMULA_READY
+export declare const FORMULA_READY = "food.infant-formula-ready";
+
 ### build/index.d.ts#FragmentDirectUse
 export interface FragmentDirectUse {
   readonly resource: string;
@@ -294,6 +306,7 @@ export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs
 export declare const NEED_SUPPLIES: {
   readonly "hydration.drink": "water.main";
   readonly "food.energy": "food.retail";
+  readonly "food.infant-formula": "food.retail";
 };
 
 ### build/index.d.ts#NO_COOK
