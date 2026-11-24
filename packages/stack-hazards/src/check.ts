@@ -60,6 +60,8 @@ export type HazardGateOptions = Pick<GateOptions, "at" | "maxAgeDays">;
  *
  * With the option `at`, the source gate also examines the check date of each source. A check after `at` is an error.
  * A check older than `maxAgeDays` (365 by default) is a warning. Both have the code `hazards-source`.
+ *
+ * @throws RangeError when `at` is not a date YYYY-MM-DD, from `checkSources`.
  */
 export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_PARTS, options: HazardGateOptions = {}): HazardFault[] {
   const faults: HazardFault[] = [];
