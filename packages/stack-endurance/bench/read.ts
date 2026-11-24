@@ -7,6 +7,9 @@
  * - The noise cap is the `runLimit` of the A/A spreads of the same jobs (`aaLimits`). A job above it is a no read.
  * - A job on a CPU model with no frozen value is a no read. A no read is not a pass.
  * - The gate reads the jobs of one CPU model in one run as one group. A group is beyond only when its lowest value is above the limit (`groupCases`).
+ * - A group of 2 jobs or more on a model with its own limit reads against the group limit of the model (`groupTables`).
+ *   The group limit is `runLimit` of the lowest value of each run of the model.
+ *   A group of 1 job reads against the limit of one job.
  */
 import { aaLimits, aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
@@ -15,12 +18,12 @@ import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 /** The schema of the record of one job. */
 export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
 /** The schema of the file of the frozen limits. */
-export const LIMITS_SCHEMA = "stack-endurance/independent-limits/1";
+export const LIMITS_SCHEMA = "stack-endurance/independent-limits/2";
 /** The measure of each value and each limit. */
 export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
 export const RULE =
-  "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling.";
+  "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling. The group limit of a model is runLimit of the lowest value of each run of the model. A group of 2 jobs or more reads against it. A group of 1 job reads against the limit of one job.";
 /** The case of the A/A pair: the largest case of the sum over the states, with a second arm of the same child. */
 export const AA_CASE = caseId(12);
 /** The id of the second arm of the A/A pair. */
@@ -97,7 +100,12 @@ export interface FrozenLimits {
   readonly cases: Readonly<Record<string, RunLimit>>;
   /** The noise cap: the limit of the A/A spread of a job, on a log scale, with its values. */
   readonly noiseCap: RunLimit;
+  /** The group limit of each case for each CPU model with jobs of `MIN_RUNS` runs or more (`groupTables`). `limitFaults` computes each one again from the jobs. */
+  readonly groups: Readonly<Record<string, Readonly<Record<string, GroupLimit>>>>;
 }
+
+/** The group limit of one case on one CPU model: `runLimit` of the lowest value of each run, with the run of each value. */
+export type GroupLimit = RunLimit & { readonly runs: readonly string[] };
 
 /** The stamp of a freeze. */
 export interface FreezeStamp {
@@ -129,6 +137,7 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
   });
   // Each job stays: a freeze keeps the worst job, and a noisy job widens the cap only in this file, which a review reads.
   const noiseCap = aaLimits(aa, { cut: Infinity }).fallback.noiseCap;
+  const jobs = reads.map((read) => ({ job: read.job, cpu: read.cpu, run: read.run, commit: read.commit ?? stamp.commit }));
   return {
     schema: LIMITS_SCHEMA,
     measure: MEASURE,
@@ -137,9 +146,10 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     commit: stamp.commit,
     date: stamp.date,
     runs: stamp.runs,
-    jobs: reads.map((read) => ({ job: read.job, cpu: read.cpu, run: read.run, commit: read.commit ?? stamp.commit })),
+    jobs,
     cases,
     noiseCap,
+    groups: groupTables(jobs, cases),
   };
 }
 
@@ -162,6 +172,14 @@ export function limitFaults(file: FrozenLimits): string[] {
   }
   for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
   check("the noise cap", file.noiseCap);
+  // Each group limit must be the limit that the jobs and the values of the file give. Thus a review of the jobs is also a review of the group limits.
+  const again = groupTables(file.jobs, file.cases);
+  const stored: FrozenLimits["groups"] = typeof file.groups === "object" && file.groups !== null ? file.groups : {};
+  for (const id of new Set([...Object.keys(again), ...Object.keys(stored)])) {
+    for (const cpu of new Set([...Object.keys(again[id] ?? {}), ...Object.keys(stored[id] ?? {})])) {
+      if (JSON.stringify(stored[id]?.[cpu]) !== JSON.stringify(again[id]?.[cpu])) faults.push(`The group limit of ${id} on ${cpu} is not runLimit of the lowest value of each run of its jobs.`);
+    }
+  }
   return faults;
 }
 
@@ -178,17 +196,37 @@ export type CaseTable = Readonly<Record<string, RunLimit>> & { readonly other: R
 export function modelTables(file: FrozenLimits): Record<string, CaseTable> {
   const tables: Record<string, CaseTable> = {};
   for (const [id, pooled] of Object.entries(file.cases)) {
-    const groups = new Map<string, { values: number[]; runs: Set<string> }>();
-    file.jobs.forEach((job, index) => {
-      const value = pooled.values[index];
-      if (value === undefined) return;
-      const group = groups.get(job.cpu) ?? { values: [], runs: new Set<string>() };
-      group.values.push(value);
-      group.runs.add(job.run);
-      groups.set(job.cpu, group);
-    });
-    const models = [...groups].filter(([cpu, group]) => cpu !== "other" && group.runs.size >= MIN_RUNS).map(([cpu, group]) => [cpu, runLimit(group.values)] as const);
+    const models = [...modelRuns(file.jobs, pooled.values)].map(([cpu, runs]) => [cpu, runLimit([...runs.values()].flat())] as const);
     tables[id] = { ...Object.fromEntries(models), other: pooled };
+  }
+  return tables;
+}
+
+/** This function gives the values of each CPU model with jobs of `MIN_RUNS` runs or more, by run, in the order of the jobs. The key of a model is its full name. */
+function modelRuns(jobs: FrozenLimits["jobs"], values: readonly number[]): Map<string, Map<string, number[]>> {
+  const models = new Map<string, Map<string, number[]>>();
+  jobs.forEach((job, index) => {
+    const value = values[index];
+    if (value === undefined || job.cpu === "other") return;
+    const runs = models.get(job.cpu) ?? new Map<string, number[]>();
+    runs.set(job.run, [...(runs.get(job.run) ?? []), value]);
+    models.set(job.cpu, runs);
+  });
+  return new Map([...models].filter(([, runs]) => runs.size >= MIN_RUNS));
+}
+
+/**
+ * This function gives the group limit of each case on each CPU model with jobs of `MIN_RUNS` runs or more.
+ *
+ * - The group limit is `runLimit` of the lowest value of each run of the model. A run with 1 job of the model gives the value of that job.
+ * - One slow machine in a run of the freeze does not widen the group limit. The other jobs of its run give the lowest value.
+ * - The group limit is at most the limit of one job. The lowest values are at most the values, and their spread is at most the spread of the values.
+ */
+export function groupTables(jobs: FrozenLimits["jobs"], cases: Readonly<Record<string, RunLimit>>): Record<string, Record<string, GroupLimit>> {
+  const tables: Record<string, Record<string, GroupLimit>> = {};
+  for (const [id, pooled] of Object.entries(cases)) {
+    const models = [...modelRuns(jobs, pooled.values)].map(([cpu, runs]) => [cpu, { ...runLimit([...runs.values()].map((values) => Math.min(...values))), runs: [...runs.keys()] }] as const);
+    tables[id] = Object.fromEntries(models);
   }
   return tables;
 }
@@ -201,6 +239,8 @@ export interface CaseOutcome {
   readonly limit: number | undefined;
   /** The key of the limit in the table of the case: the CPU model, or `other` for the ceiling. */
   readonly model?: string;
+  /** The group limit of the model, for a group of 2 jobs or more. A job at the ceiling has none. */
+  readonly groupLimit?: number;
   /** The words of `limitOnModel` for a read at the ceiling. A pass at the ceiling does not hold a gain. */
   readonly note?: string;
   /** The reason of a no read. */
@@ -238,7 +278,8 @@ export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGat
     const model = own === undefined ? "other" : read.cpu;
     const on = table === undefined ? undefined : limitOnModel({ gain: (own ?? table.other).limit, ceiling: table.other.limit, models: own === undefined ? [] : [model] }, model);
     const limit = on?.limit;
-    const place = table === undefined ? {} : { model, ...(on?.note === undefined ? {} : { note: on.note }) };
+    const group = own === undefined ? undefined : limits?.groups[id]?.[read.cpu]?.limit;
+    const place = table === undefined ? {} : { model, ...(group === undefined ? {} : { groupLimit: group }), ...(on?.note === undefined ? {} : { note: on.note }) };
     if (why !== undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: why };
     if (ms === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The job has no value of the case." };
     if (limit === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The file has no limit of the case." };
@@ -277,8 +318,11 @@ export interface GroupCase {
   readonly cpu: string;
   /** The key of the limit in the table of the case: the CPU model, or `other` for the ceiling. */
   readonly model: string;
+  /** The limit that decides. A group of 2 jobs or more on its own model has the group limit. Each other group has the limit of one job. */
   readonly limit: number;
-  /** The jobs of the group that read the case. Each job keeps its own outcome. */
+  /** The kind of the limit that decides. */
+  readonly kind: "group" | "job";
+  /** The jobs of the group that read the case. Each job keeps its own outcome, against the limit of one job. */
   readonly jobs: readonly GroupJob[];
   /** The value that decides: the lowest value of the jobs of the group. */
   readonly ms: number;
@@ -291,24 +335,28 @@ export interface GroupCase {
  * - The jobs of one CPU model in one run time one commit on one kind of runner. On the limit of their model, they make one group.
  * - A group is `beyond` only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it.
  *   One slow machine makes one job slower, and the other jobs of the group keep the group within.
+ * - A group of 2 jobs or more reads against the group limit of its model (`groupTables`). The lowest of 2 jobs or more is lower than the value of one job.
+ * - A group of 1 job reads against the limit of one job. Its lowest value is its only value, so its limit must hold the slow machines of the freeze.
  * - A job at the ceiling is a group of its own, so it reads as before. The ceiling stops only a large regression.
  * - A job that does not read the case (a no read) is not in a group. A noisy job has no valid value, so its value does not keep a group within.
  */
 export function groupCases(gates: readonly JobGate[], id: string): GroupCase[] {
-  const groups = new Map<string, { run: string; cpu: string; model: string; limit: number; jobs: GroupJob[] }>();
+  const groups = new Map<string, { run: string; cpu: string; model: string; limit: number; groupLimit: number | undefined; jobs: GroupJob[] }>();
   for (const gate of gates) {
     const item = gate.cases.find((value) => value.case === id);
     if (item === undefined || item.outcome === "cannot decide" || item.ms === undefined || item.limit === undefined) continue;
     const model = item.model ?? "other";
     const own = item.note === undefined && model === gate.cpu;
     const key = JSON.stringify(own ? [gate.run, gate.cpu] : [gate.run, gate.cpu, gate.job]);
-    const group = groups.get(key) ?? { run: gate.run, cpu: gate.cpu, model, limit: item.limit, jobs: [] };
+    const group = groups.get(key) ?? { run: gate.run, cpu: gate.cpu, model, limit: item.limit, groupLimit: own ? item.groupLimit : undefined, jobs: [] };
     group.jobs.push({ job: gate.job, ms: item.ms, outcome: item.outcome });
     groups.set(key, group);
   }
-  return [...groups.values()].map((group): GroupCase => {
+  return [...groups.values()].map(({ groupLimit, ...group }): GroupCase => {
     const ms = Math.min(...group.jobs.map((job) => job.ms));
-    return { case: id, ...group, ms, outcome: ms <= group.limit ? "within" : "beyond" };
+    const kind = groupLimit !== undefined && group.jobs.length >= 2 ? "group" : "job";
+    const limit = kind === "group" ? (groupLimit ?? group.limit) : group.limit;
+    return { case: id, ...group, limit, kind, ms, outcome: ms <= limit ? "within" : "beyond" };
   });
 }
 
@@ -352,6 +400,9 @@ export function runGate(gates: readonly JobGate[]): Gate {
   return gateOf(runCases(gates));
 }
 
+/** The title of the column of the gate of each job in the report. It is the gate of the job alone: the gate of the run reads the groups. */
+export const JOB_GATE = "Gate of the job alone";
+
 const ms = (value: number | undefined): string => (value === undefined ? "-" : value < 10 ? value.toFixed(3) : value.toFixed(1));
 
 /** This function gives the Markdown report of a read: the value of each case in each job, the gate, and the candidate limits. */
@@ -362,7 +413,7 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     "",
     `The value of a case is ${MEASURE}.`,
     "",
-    `| Job | CPU | ${ids.map((id) => `${id} (ms)`).join(" | ")} | A/A spread | Gate |`,
+    `| Job | CPU | ${ids.map((id) => `${id} (ms)`).join(" | ")} | A/A spread | ${JOB_GATE} |`,
     `| --- | --- | ${ids.map(() => "---").join(" | ")} | --- | --- |`,
   ];
   for (const read of reads) {
@@ -373,25 +424,25 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
   const run = runCases(gates);
   lines.push(
     "",
-    "The gate of each case over the groups. A group is the jobs of one CPU model in one run. Its lowest value decides. The last column gives the rule of one job, which the gate does not use:",
+    "The gate of each case over the groups. A group is the jobs of one CPU model in one run. Its lowest value decides. A group of 2 jobs or more reads against the group limit. The last column gives the rule of one job, which the gate does not use:",
     "",
     "| Case | Jobs that read | Outcome | Rule of one job |",
     "| --- | --- | --- | --- |",
   );
   for (const item of run) lines.push(`| ${item.case} | ${String(item.reads)} | ${item.outcome}${item.reason === undefined ? "" : `: ${item.reason}`} | ${item.perJob} |`);
-  const near = run.flatMap((item) => item.groups.filter((group) => group.jobs.some((job) => job.ms >= NEAR * group.limit)));
+  const near = run.flatMap((item) => item.groups.filter((group) => group.ms >= NEAR * group.limit || group.jobs.some((job) => job.outcome === "beyond")));
   if (near.length > 0) {
     lines.push(
       "",
-      `The groups with a job at ${String(Math.round(NEAR * 100))}% of the limit or more. The lowest value of the group decides:`,
+      `The groups with a lowest value at ${String(Math.round(NEAR * 100))}% of the limit or more, or with a job beyond the limit of one job. The lowest value of the group decides:`,
       "",
-      "| Case | Run | CPU | Limit (ms) | Jobs: value (ms), share of the limit, outcome of the job | Lowest (ms) | Outcome |",
+      "| Case | Run | CPU | Limit (ms) | Jobs: value (ms), share of the limit, outcome of the job alone | Lowest (ms) | Outcome |",
       "| --- | --- | --- | --- | --- | --- | --- |",
     );
     for (const group of near) {
       const jobs = group.jobs.map((job) => `${job.job}: ${ms(job.ms)}, ${((100 * job.ms) / group.limit).toFixed(1)}%, ${job.outcome}`).join("<br>");
       const cpu = group.model === "other" ? `${group.cpu} (ceiling)` : group.cpu;
-      lines.push(`| ${group.case} | ${group.run} | ${cpu} | ${ms(group.limit)} | ${jobs} | ${ms(group.ms)} | ${group.outcome} |`);
+      lines.push(`| ${group.case} | ${group.run} | ${cpu} | ${ms(group.limit)} (${group.kind === "group" ? "group" : "one job"}) | ${jobs} | ${ms(group.ms)} | ${group.outcome} |`);
     }
   }
   const reasons = [...new Set(gates.flatMap((gate) => gate.cases.flatMap((item) => (item.reason === undefined ? [] : [`${gate.job}: ${item.reason}`]))))];
@@ -412,6 +463,8 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
         const jobs = candidate.jobs.filter((job) => job.cpu === model);
         lines.push(`| ${model} | ${String(new Set(jobs.map((job) => job.run)).size)} | ${String(jobs.length)} | ${ids.map((id) => String(tables[id]?.[model]?.limit ?? "-")).join(" | ")} |`);
       }
+      lines.push("", "The candidate group limits of each of these models: runLimit of the lowest value of each run. A group of 2 jobs or more reads against them:", "", `| CPU | ${ids.map((id) => `${id} (ms)`).join(" | ")} |`, `| --- | ${ids.map(() => "---").join(" | ")} |`);
+      for (const model of models) lines.push(`| ${model} | ${ids.map((id) => String(candidate.groups[id]?.[model]?.limit ?? "-")).join(" | ")} |`);
     }
     lines.push("", `The candidate noise cap is ${String(candidate.noiseCap.limit)}, on a log scale.`);
   }
