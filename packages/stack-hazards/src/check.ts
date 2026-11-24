@@ -1,4 +1,4 @@
-import { checkSources, isWebAddress, LICENSES, permits, type FindingCode, type Use } from "@mark1russell7/guidebook";
+import { checkSources, LICENSES, permits, type FindingCode, type GateOptions, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults } from "./priors.ts";
@@ -69,15 +69,9 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     if (knownLicense(source) && !permits(source.license, "summary")) {
       add("error", "hazards-license", at, `The license "${source.license}" of the source "${id}" does not permit a summary, so the list can only link to it.`);
     }
-    // Three rules of the list that the source gate of the guidebook does not have at this time. They move to options of that gate.
-    // A web address that is not HTTPS: the source gate gives the fault of an address that is not a web address, also for an empty page of the terms.
-    if (isWebAddress(source.url) && !source.url.startsWith("https://")) add("error", "hazards-source", at, `The source "${id}" has no HTTPS URL.`);
-    if (typeof source.by !== "string" || source.by.trim() === "") add("error", "hazards-source", at, `The source "${id}" has no publisher (by).`);
-    if (typeof source.terms !== "string") add("error", "hazards-license", at, `The source "${id}" has no page of its terms.`);
-    else if (isWebAddress(source.terms) && !source.terms.startsWith("https://")) add("error", "hazards-license", at, `The page of the terms of the source "${id}" has no HTTPS URL.`);
   }
   // The gate of the guidebook gets the key of each source as its id, so the path of each finding is a key of the table.
-  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })))) {
+  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })), SOURCE_RULES)) {
     add(finding.level, sourceCode(finding.code), `sources.${finding.id}`, `${finding.message} (${finding.code})`);
   }
   // A source with a fault of its license gives one finding. The laws and the tables of priors of that source give no second finding.
@@ -133,7 +127,13 @@ function basisFault(claim: Claim): string | undefined {
   return (CLAIM_BASES as readonly unknown[]).includes(basis) ? undefined : `has the basis "${String(basis)}", which is not one of ${CLAIM_BASES.join(", ")}`;
 }
 
-/** This function gives the code of the gate for a code of the source gate of the guidebook. */
+/**
+ * The rules of a source of a list, as options of the source gate of the guidebook.
+ * A source has a publisher for the credit, a page of the terms as the evidence of the license, and HTTPS addresses.
+ */
+const SOURCE_RULES: GateOptions = { require: ["by", "terms"], https: true };
+
+/** This function gives the code of the gate for a code of the source gate of the guidebook. A fault of a field of a source, also of `terms`, is a `hazards-source`. */
 function sourceCode(code: FindingCode): HazardCode {
   return code === "unknown-license" ? "hazards-license" : "hazards-source";
 }

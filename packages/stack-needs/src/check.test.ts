@@ -50,7 +50,8 @@ describe("the gate of a calorie table", () => {
     const faults = checkCalorieTable(broken);
     expect(hasNeedsError(faults)).toBe(true);
     const source = faults.filter((fault) => fault.record === "source").map((fault) => fault.code);
-    expect([...source].sort()).toEqual(["bad-date", "bad-sha256", "bad-url", "empty-title", "unknown-license"]);
+    // The source has no publisher and no page of its terms, so the rules of a table give two findings missing-field.
+    expect([...source].sort()).toEqual(["bad-date", "bad-sha256", "bad-url", "empty-title", "missing-field", "missing-field", "unknown-license"]);
     expect(faults.filter((fault) => fault.record === "row").map((fault) => fault.code)).toEqual(["needs-overlap", "needs-row", "needs-row", "needs-value", "needs-value", "needs-gap", "needs-gap"]);
   });
 

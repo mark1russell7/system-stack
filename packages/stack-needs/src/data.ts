@@ -19,6 +19,7 @@ export const DGA_SOURCE: Source = {
   license: "us-public-domain",
   checked: "2026-11-22",
   by: "U.S. Department of Agriculture and U.S. Department of Health and Human Services",
+  terms: "https://www.dietaryguidelines.gov/policy-and-links",
   sha256: "ceea04ce1a7c13a95a170f3548ed3926ad6dd49599bd730fb58bc9c02711d16e",
 };
 

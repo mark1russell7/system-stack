@@ -1,4 +1,4 @@
-import { checkSources, type Finding, type FindingCode, type GateOptions } from "@mark1russell7/guidebook";
+import { checkSources, type Finding, type FindingCode, type GateOptions, type SourceField } from "@mark1russell7/guidebook";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } from "./calorie.ts";
 
@@ -33,10 +33,14 @@ function goodNeed(need: Quantity, positive = true): boolean {
   }
 }
 
+/** The fields that the source of each table must have: the credit, the evidence of the license and the hash of the file. */
+const TABLE_FIELDS: readonly SourceField[] = ["by", "terms", "sha256"];
+
 /**
  * This function gives each finding of a table of calorie needs. A list with no error tells that the gate passes.
  *
- * - The findings of the source come from `checkSources` of `@mark1russell7/guidebook`, with the options of the call.
+ * - The findings of the source come from `checkSources` of `@mark1russell7/guidebook`, with the options of the call and the rules of a table.
+ * - The rules of a table: the source has a publisher (`by`), a page of its terms and a hash, and its addresses start with `https:`.
  * - The hash of the source is part of the gate of the sources (`bad-sha256`).
  * - The rows have the codes of `NEEDS_CODES`.
  *
@@ -46,7 +50,8 @@ function goodNeed(need: Quantity, positive = true): boolean {
  * @param options - The options of the gate of the sources, for example the date of the gate
  */
 export function checkCalorieTable(table: CalorieTable, options?: GateOptions): NeedsFinding[] {
-  const findings: NeedsFinding[] = [...checkSources([table.source], options)];
+  const require = [...new Set([...(options?.require ?? []), ...TABLE_FIELDS])];
+  const findings: NeedsFinding[] = [...checkSources([table.source], { ...options, require, https: true })];
   const add = (code: NeedsCode, record: "source" | "row" | "change", id: string, message: string): void => {
     findings.push({ level: "error", code, record, id, message });
   };

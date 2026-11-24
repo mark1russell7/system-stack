@@ -326,8 +326,8 @@ importers:
   packages/stack-hazards:
     dependencies:
       '@mark1russell7/guidebook':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@mark1russell7/rigor-statistics':
         specifier: ^0.2.19
         version: 0.2.19
@@ -372,8 +372,8 @@ importers:
   packages/stack-needs:
     dependencies:
       '@mark1russell7/guidebook':
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@mark1russell7/market':
         specifier: ^0.7.0
         version: 0.7.0
@@ -920,6 +920,10 @@ packages:
 
   '@mark1russell7/guidebook@0.3.0':
     resolution: {integrity: sha512-D8BA5Xznbn4K0SYMHZVQG8MLcW+GumjbWRBTNEf7H82nZ1YcUz1Jyer4cyxtWWjctvFsLjAw75zqLz6C0Z6moQ==}
+    engines: {node: '>=22.12'}
+
+  '@mark1russell7/guidebook@0.4.0':
+    resolution: {integrity: sha512-e/yR7Dw4M72NpVpFegSqchojatDZEYca3Tay2Nv+d8vD/n+GRsfe4atYiQzCf8hvbAjY0aTx2U2Cg13WDSOn8g==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/interval@0.1.0':
@@ -2522,6 +2526,8 @@ snapshots:
       '@mark1russell7/predicates': 0.1.5
 
   '@mark1russell7/guidebook@0.3.0': {}
+
+  '@mark1russell7/guidebook@0.4.0': {}
 
   '@mark1russell7/interval@0.1.0': {}
 
