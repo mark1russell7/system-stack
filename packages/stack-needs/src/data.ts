@@ -154,7 +154,7 @@ export interface CitedFeeds {
  */
 export const FORMULA_FEEDS: CitedFeeds = { perDay: 8, source: WIC_INFANT_SOURCE, locator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137" };
 
-/** The source of the energy of one fluid ounce of ready-to-feed formula: the SR Legacy file of FoodData Central. */
+/** The source of the energy and the water of the infant formula items: the SR Legacy file of FoodData Central. */
 export const FDC_SR_LEGACY_SOURCE: Source = {
   id: "fdc-sr-legacy-2018-04",
   title: "FoodData Central, SR Legacy (April 2018)",
@@ -190,6 +190,42 @@ export const FORMULA_LATER_LEAST: CitedFormulaLeast = {
   kcalPerOunce: 19.152,
   kcalSource: FDC_SR_LEGACY_SOURCE,
   kcalLocator: "FDC ID 172319: 63 kcal in 100 g (food_nutrient.csv), and 30.4 g in 1 fl oz (food_portion.csv)",
+};
+
+/**
+ * The facts of the mix rule: the energy and the water of a powder and of a ready-to-feed item of one store brand.
+ * `formulaMixWater` gives the rule, and `formulaMixCheck` gives its check.
+ */
+export interface CitedFormulaMix {
+  /** The energy of the powder, in `kcal` in 100 g. */
+  readonly powderKcal: number;
+  /** The water of the powder, in `g` in 100 g. Only the check of the rule uses it. */
+  readonly powderWater: number;
+  /** The energy of the ready-to-feed item, in `kcal` in 100 g. */
+  readonly readyKcal: number;
+  /** The water of the ready-to-feed item, in `g` in 100 g. Only the check of the rule uses it. */
+  readonly readyWater: number;
+  readonly source: Source;
+  readonly locator: string;
+  /** The source that tells to mix the powder with safe water, one bottle at a time. */
+  readonly waterSource: Source;
+  readonly waterLocator: string;
+}
+
+/**
+ * The facts of the mix rule: the FDC items 173554 (store brand, powder) and 172319 (store brand, ready-to-feed).
+ * The powder gives 524 kcal and 2 g of water in 100 g. The ready-to-feed item gives 63 kcal and 88.1 g of water in 100 g.
+ * The WIC guide tells to mix powder one bottle at a time, and to use bottled water after a disaster or in a power cut.
+ */
+export const FORMULA_MIX: CitedFormulaMix = {
+  powderKcal: 524,
+  powderWater: 2,
+  readyKcal: 63,
+  readyWater: 88.1,
+  source: FDC_SR_LEGACY_SOURCE,
+  locator: "FDC ID 173554: 524 kcal (nutrient 1008) and 2 g of water (nutrient 1051) in 100 g. FDC ID 172319: 63 kcal and 88.1 g of water in 100 g (food_nutrient.csv)",
+  waterSource: WIC_INFANT_SOURCE,
+  waterLocator: "Page 106, Guidelines for Using Infant Formula When Access to Common Kitchen Appliances Is Limited, and Natural Disaster or Power Outage",
 };
 
 /** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
