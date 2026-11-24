@@ -10,6 +10,7 @@ ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ALERT_WATCH_NEED: build/index.d.ts#ALERT_WATCH_NEED
 ActivityLevel: build/index.d.ts#ActivityLevel
 BOIL_CELSIUS: build/index.d.ts#BOIL_CELSIUS
+BOTTLED_WATER: build/index.d.ts#BOTTLED_WATER
 BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
@@ -26,6 +27,7 @@ CalorieTables: build/index.d.ts#CalorieTables
 CitedFeeds: build/index.d.ts#CitedFeeds
 CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
 CitedFormulaMix: build/index.d.ts#CitedFormulaMix
+CitedFormulaWater: build/index.d.ts#CitedFormulaWater
 CitedMilk: build/index.d.ts#CitedMilk
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
@@ -66,6 +68,7 @@ FORMULA_MIX: build/index.d.ts#FORMULA_MIX
 FORMULA_NEED: build/index.d.ts#FORMULA_NEED
 FORMULA_POWDER: build/index.d.ts#FORMULA_POWDER
 FORMULA_READY: build/index.d.ts#FORMULA_READY
+FORMULA_WATER: build/index.d.ts#FORMULA_WATER
 FormulaMixCheck: build/index.d.ts#FormulaMixCheck
 FormulaMixInput: build/index.d.ts#FormulaMixInput
 FormulaMixLine: build/index.d.ts#FormulaMixLine
@@ -112,12 +115,15 @@ NeedsFinding: build/index.d.ts#NeedsFinding
 NoRowAction: build/index.d.ts#NoRowAction
 OpenedWaste: build/index.d.ts#OpenedWaste
 Person: build/index.d.ts#Person
+RESOURCE_SUBSETS: build/index.d.ts#RESOURCE_SUBSETS
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
+ResourceSubset: build/index.d.ts#ResourceSubset
 STORED_WATER: build/index.d.ts#STORED_WATER
 SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
 SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
 StoveShare: build/index.d.ts#StoveShare
+SubsetConverter: build/index.d.ts#SubsetConverter
 THERMAL_TRANSMITTANCE_SOURCE: build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
@@ -149,6 +155,7 @@ householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
 lightHours: build/index.d.ts#lightHours
 lightNeed: build/index.d.ts#lightNeed
+subsetConverters: build/index.d.ts#subsetConverters
 warmthHeat: build/index.d.ts#warmthHeat
 warmthNeed: build/index.d.ts#warmthNeed
 
@@ -165,6 +172,9 @@ export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
 
 ### build/index.d.ts#BOIL_CELSIUS
 export declare const BOIL_CELSIUS = 100;
+
+### build/index.d.ts#BOTTLED_WATER
+export declare const BOTTLED_WATER = "water.bottled";
 
 ### build/index.d.ts#BREAST_MILK_MONTHS
 export declare const BREAST_MILK_MONTHS = 6;
@@ -276,6 +286,19 @@ export interface CitedFormulaMix {
   readonly locator: string;
   readonly waterSource: Source;
   readonly waterLocator: string;
+}
+
+### build/index.d.ts#CitedFormulaWater
+export interface CitedFormulaWater {
+  readonly resource: string;
+  readonly quote: string;
+  readonly otherwise: string;
+  readonly cleaning: {
+    readonly read: false;
+    readonly why: string;
+  };
+  readonly source: Source;
+  readonly locator: string;
 }
 
 ### build/index.d.ts#CitedMilk
@@ -525,6 +548,9 @@ export declare const FORMULA_POWDER = "food.infant-formula-powder";
 ### build/index.d.ts#FORMULA_READY
 export declare const FORMULA_READY = "food.infant-formula-ready";
 
+### build/index.d.ts#FORMULA_WATER
+export declare const FORMULA_WATER: CitedFormulaWater;
+
 ### build/index.d.ts#FormulaMixCheck
 export interface FormulaMixCheck {
   readonly powder: number;
@@ -539,6 +565,7 @@ export interface FormulaMixInput {
   readonly catalog: SupplyCatalog;
   readonly units: Readonly<Record<string, number>>;
   readonly mix?: CitedFormulaMix | undefined;
+  readonly water?: CitedFormulaWater | undefined;
   readonly prefix?: string | undefined;
 }
 
@@ -555,6 +582,8 @@ export interface FormulaMixResult {
   readonly lines: readonly FormulaMixLine[];
   readonly why: string | undefined;
   readonly read: boolean;
+  readonly bottled: readonly string[];
+  readonly waterWhy: string | undefined;
 }
 
 ### build/index.d.ts#FragmentConverter
@@ -618,6 +647,7 @@ export interface HouseholdFragment {
   readonly stores: readonly FragmentStore[];
   readonly draws: readonly FragmentDraw[];
   readonly direct: readonly FragmentDirectUse[];
+  readonly converters: readonly SubsetConverter[];
 }
 
 ### build/index.d.ts#HouseholdFragmentInput
@@ -628,6 +658,7 @@ export interface HouseholdFragmentInput {
   readonly units: Readonly<Record<string, number>>;
   readonly supply?: string | undefined;
   readonly uses?: readonly FragmentDirectUse[] | undefined;
+  readonly subsets?: readonly ResourceSubset[] | undefined;
   readonly level: string;
   readonly levels?: readonly string[] | undefined;
   readonly table?: CalorieTables | undefined;
@@ -679,13 +710,13 @@ export declare const INFANT_MONTHS = 12;
 export type InfantFeeding = (typeof INFANT_FEEDINGS)[number];
 
 ### build/index.d.ts#JOIN_CODES
-export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part"];
+export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part", "join-subset-resource", "join-subset-same", "join-subset-unit"];
 
 ### build/index.d.ts#JoinCode
 export type JoinCode = (typeof JOIN_CODES)[number];
 
 ### build/index.d.ts#JoinFinding
-export type JoinFinding = Finding<JoinCode, "use" | "supply">;
+export type JoinFinding = Finding<JoinCode, "use" | "supply" | "subset">;
 
 ### build/index.d.ts#JoinReferences
 export interface JoinReferences {
@@ -812,6 +843,9 @@ export interface Person {
   readonly feeding?: InfantFeeding | undefined;
 }
 
+### build/index.d.ts#RESOURCE_SUBSETS
+export declare const RESOURCE_SUBSETS: readonly ResourceSubset[];
+
 ### build/index.d.ts#ReferenceNeed
 export interface ReferenceNeed {
   readonly code: string;
@@ -821,6 +855,12 @@ export interface ReferenceNeed {
 ### build/index.d.ts#ReferencePart
 export interface ReferencePart {
   readonly id: string;
+}
+
+### build/index.d.ts#ResourceSubset
+export interface ResourceSubset {
+  readonly resource: string;
+  readonly of: string;
 }
 
 ### build/index.d.ts#STORED_WATER
@@ -837,6 +877,19 @@ export interface StoveShare {
   readonly value: number;
   readonly heating: HeatingValue;
   readonly cite: string;
+}
+
+### build/index.d.ts#SubsetConverter
+export interface SubsetConverter {
+  readonly id: string;
+  readonly takes: readonly {
+    readonly resource: string;
+    readonly amount: number;
+  }[];
+  readonly gives: {
+    readonly resource: string;
+    readonly amount: number;
+  };
 }
 
 ### build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
@@ -909,7 +962,7 @@ export declare function checkCalorieTable(table: CalorieTable, options?: GateOpt
 export declare function checkDailyNeeds(needs: readonly DailyNeed[], options?: GateOptions): DailyNeedFinding[];
 
 ### build/index.d.ts#checkJoins
-export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFinding[];
+export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences, subsets?: readonly ResourceSubset[]): JoinFinding[];
 
 ### build/index.d.ts#cookFragment
 export declare function cookFragment(input: CookFragmentInput): CookFragmentResult;
@@ -946,6 +999,9 @@ export declare function lightHours(input: LightHoursInput): LightHours;
 
 ### build/index.d.ts#lightNeed
 export declare function lightNeed(hours: LightHours): DailyNeed;
+
+### build/index.d.ts#subsetConverters
+export declare function subsetConverters(catalog: SupplyCatalog, resources: Iterable<string>, subsets?: readonly ResourceSubset[], prefix?: string): SubsetConverter[];
 
 ### build/index.d.ts#warmthHeat
 export declare function warmthHeat(input: WarmthInput): WarmthHeat;

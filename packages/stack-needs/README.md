@@ -19,6 +19,8 @@ Each function is a plain function with no clock, no network and no file.
 | `OpenedWaste` | The containers of one product with no cold storage: the count, the energy of one container, the feed, the energy used and the waste. |
 | `CookFragment` | A fragment of an endurance layer: the resources and one cook converter for each dry resource with a read. It has the form of `EnduranceLayer`. |
 | `CookLine` | The energy, the cook water, the heat to boil, the stove time and the fuel of one pot of one dry food, each a read or a no read. |
+| `ResourceSubset` | A resource and a wider resource. Each unit of the resource is also a unit of the wider resource, for example `water.bottled` in `water.stored`. |
+| `CitedFormulaWater` | The rule of the mix water of infant formula powder: the resource, the quotes of the source, the cleaning water as a no read and the citation. |
 
 ## The rules of the data
 
@@ -70,7 +72,8 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 - The draw `food.energy` has the need of the persons for one day, in `kcal`. Its users are the persons.
 - The draw `food.infant-formula` has the infants on formula below 6 months (`FORMULA_DRAW_MONTHS`), with the whole need of their rows.
 - The fragment has each draw with one or more users. The draw `food.energy` is first.
-- Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
+- Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg`, `water.stored` in `L` and `water.bottled` in `L`.
+- The only converters of the fragment are the subsets of the resources of its stores (`subsetConverters`). The default `RESOURCE_SUBSETS` makes `water.bottled` also `water.stored`. Refer to the section on the water of infant formula powder.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
 - With no cold storage, an opened container of formula serves one feed. This is the default (`cold` is false), the worst case of no power. The next section tells the rule.
 - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives `food.no-cook` to the food draw and `food.infant-formula-ready` to the formula draw, 1 kcal for each kcal.
@@ -155,7 +158,7 @@ A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation
 
 ### The resources of the buy list and the join
 
-The fragment has no converter. Thus, with this fragment alone, only `food.no-cook` feeds the draw. This is the worst case: no water and no fuel.
+The fragment has no converter of food. Thus, with this fragment alone, only `food.no-cook` feeds the draw. This is the worst case: no water and no fuel.
 
 `cookFragment` gives the converters for the dry food in a different fragment, with the water and the fuel of each pot. Then `joinEndurance` joins the fragments. The dry food then adds days only while the water and the fuel last.
 
@@ -221,7 +224,7 @@ A dry resource with a no read in a line has no converter. It is in `noReads`, an
 The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water: the market fact `usda.refried-beans-soak` cites the USDA recipe, which tells to discard it. Thus the soak adds to the water take, and it adds no heat and no fuel.
 For example, the dry beans of the catalog take 3.65 L/kg of soak water and 3.65 L/kg of cook water. A product with no cited soak takes no soak water.
 
-The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
+The cook water and the drinking water are one store, `water.stored`. A cook can use tap water. The subset converter of `householdFragment` also gives the bottled water of the buy list as `water.stored`, so a cook takes the two. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
 `jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.
 
 The cited constants:
@@ -250,7 +253,7 @@ The records of the converter:
 
 | Field | Value for 1 kg of the catalog powder |
 | --- | --- |
-| `takes` | 1 kg of `food.infant-formula-powder`, and 7.3175 L of `water.stored` |
+| `takes` | 1 kg of `food.infant-formula-powder`, and 7.3175 L of `water.bottled` |
 | `gives` | 5240 kcal of `food.infant-formula-ready`, the resource of the ready formula |
 | `id` | `mix:food.infant-formula-powder`. The option `prefix` changes the start. |
 
@@ -276,7 +279,26 @@ These facts give a no read, and then the powder has no converter:
 | A product that gives more than one food | The energy and the water |
 | An energy of the powder that is not more than the 630 kcal/kg of the ready-to-feed item | The water |
 
-The water is `water.stored`, the store of the drinking water, as for a cook. The WIC guide tells to use bottled water after a disaster or in a power cut. A store of water from the tap is safe water only when its source is safe. A drinking draw at a higher level takes its water first. Thus, when a case cuts the water supply, the powder can add 0 days.
+### Only bottled water
+
+The mix takes only commercially bottled water, `water.bottled` (`FORMULA_WATER`). The rule comes from the WIC guide "Infant Nutrition and Feeding" of the USDA (`WIC_INFANT_SOURCE`, `us-public-domain`). The guide gives it from the CDC.
+
+| Locator | The words of the source |
+| --- | --- |
+| Page 107, the box "Natural Disaster or Power Outage: Infant Formula Guidelines" | "Use ready-to-feed formula if possible." |
+| The same box | "Use bottled water to prepare powdered or liquid concentrated infant formula. If bottled water or ready-to-feed formulas are not available, discuss options with a health care provider." |
+| The same box | "Clean bottles and nipples with bottled, boiled, or treated water before each use." |
+
+- The catalog of market gives bottled water its own resource, `water.bottled`, since market 0.9.0. The jug of commercially bottled water gives it. The container filled from the tap gives `water.stored`.
+- `RESOURCE_SUBSETS` makes `water.bottled` a subset of `water.stored`. `householdFragment` gives one converter for it: 1 L of `water.bottled` gives 1 L of `water.stored`, with no device and no limit.
+- Thus a drinking draw and a cook take the tap water and the bottled water, and the mix takes only the bottled water. Each litre goes to one draw only.
+- The endurance query decides the share. A take of `water.stored` uses the tap water first, then the bottled water through the converter.
+- The draws take in the order of their level, then of their codes. A drinking draw at a higher level keeps back its water first, so the powder can add 0 days.
+- A household with only tap water and powder gets 0 days of formula from the powder. `binding` of the formula draw then names `water.bottled`.
+- `formulaMixFragment` gives the reason in `waterWhy` when the buy list has powder and no product that gives `water.bottled`. `bottled` names the products that give it.
+- The converter stays in that case, because a different fragment can give a store of bottled water.
+- The guide tells to discuss the options with a health care provider when the household has no bottled water. The model does not model that step.
+- The cleaning water of the bottles and the nipples is a no read (`FORMULA_WATER.cleaning`). The source gives no amount, so the model has no draw for it.
 
 The WIC guide tells to prepare powder one bottle at a time, for one feed. Thus the mix has no waste of an opened container. The rule of opened containers applies only to a product with the field `opened`.
 
@@ -285,6 +307,7 @@ The cited constant:
 | Name | Value | Source |
 | --- | --- | --- |
 | `FORMULA_MIX` | 524 kcal and 2 g of water in 100 g of powder. 63 kcal and 88.1 g of water in 100 g of ready-to-feed formula. | FoodData Central, SR Legacy (April 2018, CC0 1.0): FDC ID 173554 (store brand, powder) and FDC ID 172319 (store brand, ready-to-feed), `food_nutrient.csv`. The water source is the WIC guide, page 106. |
+| `FORMULA_WATER` | The mix water is `water.bottled` only. The cleaning water is a no read. | The WIC guide, page 107, the box "Natural Disaster or Power Outage: Infant Formula Guidelines", from the CDC. |
 
 ## The uses, the supply parts and the join gate
 
@@ -294,11 +317,13 @@ The package holds one record of each use and of each default supply part. `house
 | --- | --- |
 | `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` and `food.infant-formula` to `food.retail`. A household with a well gives a different part. |
 | `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, and `food.infant-formula-ready` gives `food.infant-formula`, 1 kcal for each kcal. |
+| `RESOURCE_SUBSETS` | `water.bottled` is a subset of `water.stored`. This is a definition, not a read. |
+| `subsetConverters` | The converter of each subset whose resource has a store. One run gives the same amount of the wider resource, in its unit. |
 | `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
 
-`checkJoins(catalog, uses, supplies, { needs, parts })` gives one finding for each break. An empty list is a pass. Each finding is an error.
+`checkJoins(catalog, uses, supplies, { needs, parts }, subsets)` gives one finding for each break. The default of `subsets` is `RESOURCE_SUBSETS`. An empty list is a pass. Each finding is an error.
 
-A finding has the form of a finding of `@mark1russell7/guidebook`, the same form as the findings of `checkCalorieTable`. Its record is `use` or `supply`. The `id` of a `use` finding is the resource of the use. The `id` of a `supply` finding is the need.
+A finding has the form of a finding of `@mark1russell7/guidebook`, the same form as the findings of `checkCalorieTable`. Its record is `use`, `supply` or `subset`. The `id` of a `use` or a `subset` finding is its resource. The `id` of a `supply` finding is the need.
 
 | Code | Record | The break |
 | --- | --- | --- |
@@ -308,6 +333,9 @@ A finding has the form of a finding of `@mark1russell7/guidebook`, the same form
 | `join-use-amount` | `use` | The amount of a direct use is not the factor from the unit of its resource to the unit of its need. |
 | `join-supply-need` | `supply` | A supply names a need that is not a reference need. |
 | `join-supply-part` | `supply` | A supply names a part that is not a reference part. |
+| `join-subset-resource` | `subset` | A subset names a resource that is not in the catalog. |
+| `join-subset-same` | `subset` | A subset names one resource two times. |
+| `join-subset-unit` | `subset` | The unit of the resource of a subset does not convert to the unit of the wider resource. |
 
 A direct use is a definition. Thus its amount is the factor of the units, from `valueIn` of `@mark1russell7/quantity`. For example, a use in `gal` for a need in `L` gives 3.785411784 L for each gal. A different rate is a converter, and a converter has a cited source.
 
@@ -408,4 +436,4 @@ The read goes into `deviceFragment` through the input `needs`. Then the need of 
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment`, `FORMULA_MIX` and `FORMULA_WATER`, `deviceFragment`, `lightHours`, `lightNeed`, `warmthHeat`, `warmthNeed`, `heatLossOf`, `heatLossFromUse`, the daily needs, the uses, `RESOURCE_SUBSETS` and `subsetConverters`, the supply parts and `checkJoins`. |

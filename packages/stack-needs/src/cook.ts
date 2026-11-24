@@ -440,7 +440,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * A soak rate that does not convert to `L/kg` gives a no read.
  * A product that gives more than one food has no energy for each food, so its energy is a no read.
  *
- * The cook water is `water.stored`, the store of the drinking water. A drinking draw at a higher level of the same store takes
+ * The cook water is `water.stored`, the store of the drinking water. A cook can use tap water. The subset converter of
+ * `householdFragment` also gives the bottled water of the buy list as `water.stored`. A drinking draw at a higher level of the same store takes
  * its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store.
  * Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
  *
