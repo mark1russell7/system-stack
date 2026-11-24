@@ -36,6 +36,19 @@ export interface CaseCuts {
   readonly leadSeconds?: number | undefined;
 }
 
+/** The yearly prior of one case at one place: the events in one year in an area, and the share of them that reach the place. */
+export interface Prior {
+  readonly case: string;
+  readonly place: string;
+  /** The events in one year in the area (`lambda`), 0 or more. */
+  readonly perYear: number;
+  /** The share of the events of the area that reach the place (`q`), from 0 to 1. */
+  readonly reach: number;
+  readonly source: string;
+  /** The date of the data of the source, as an ISO date. */
+  readonly asOf: string;
+}
+
 /** This function gives the first fault of a survival curve, or `undefined`. */
 export function curveFault(curve: Survival): string | undefined {
   const first = curve[0];

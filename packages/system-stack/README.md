@@ -194,13 +194,14 @@ A file of known faults has the format `known/1`: `{ "schema": "known/1", "known"
 
 ## The cuts of a case
 
-A case is an event that stops some parts at the same time, for example a winter storm. The add-ons share the records of a case. One add-on gives the cuts of a case, and another add-on calculates with them.
+A case is an event that stops some parts at the same time, for example a winter storm. The add-ons share the records of a case. One add-on gives the cuts and the priors of a case, and another add-on calculates with them.
 
 | Record or function | What it tells |
 | --- | --- |
 | `CaseCuts` | A case: its code, its name, its cuts and the changes that it makes to the add-ons. |
 | `Cut` | A part that the case stops, the source of the cut and the curve of the duration of the stop. |
 | `Survival` | The chance that a cut lasts more than a time: points `[days, chance]` from `[0, 1]` down to a chance of 0. |
+| `Prior` | The events of a case in one year in an area (`perYear`), and the share of them that reach one place (`reach`). |
 | `curveFault(curve)` | The first fault of a survival curve, or `undefined`. |
 
 A cut can have no curve, as before a source gives one. Then each result that needs the curve is no read, not a pass.

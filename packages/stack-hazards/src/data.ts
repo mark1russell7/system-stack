@@ -1,4 +1,5 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
+import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_ATTACK_LAW, OE417_SOURCE } from "./oe417.ts";
 import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
 
@@ -201,6 +202,8 @@ const pulseCuts = (extra: readonly Claim[] = []): HazardCut[] =>
 export const HAZARD_LIST: HazardList = {
   schema: HAZARDS_SCHEMA,
   sources: HAZARD_SOURCES,
+  // The table of the counties is large, so it has its own entry: @mark1russell7/stack-hazards/county-priors.
+  priors: [EAGLEI_STATE_PRIORS],
   hazards: [
     {
       case: "infra.power.outage",

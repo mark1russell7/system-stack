@@ -3,7 +3,7 @@
 // A case cuts some parts for a time. The queries give the days that each draw holds, and the days that it does not get its need.
 // The add-on names no topic: the resources, the needs and the levels are data. The unit of time is the day.
 
-import type { CaseCuts } from "@mark1russell7/system-stack";
+import type { CaseCuts, Prior } from "@mark1russell7/system-stack";
 
 /** The name of the format of an endurance layer. It is the key of the layer in `Stack.layers`. */
 export const ENDURANCE_SCHEMA = "endurance/1";
@@ -74,20 +74,7 @@ export interface Converter {
 }
 
 // The core holds the records of the cuts of a case, so that each add-on shares them. This entry gives them again.
-export type { CaseCuts, Cut, Survival } from "@mark1russell7/system-stack";
-
-/** The yearly prior of one case at one place. */
-export interface Prior {
-  readonly case: string;
-  readonly place: string;
-  /** The events in one year in the area (`lambda`), 0 or more. */
-  readonly perYear: number;
-  /** The share of the events of the area that reach the place (`q`), from 0 to 1. */
-  readonly reach: number;
-  readonly source: string;
-  /** The date of the data of the source. */
-  readonly asOf: IsoDate;
-}
+export type { CaseCuts, Cut, Prior, Survival } from "@mark1russell7/system-stack";
 
 /** The days that one draw holds, and the resources that are used up at that time. */
 export interface DrawEndurance {
