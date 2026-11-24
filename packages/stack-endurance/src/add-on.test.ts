@@ -36,6 +36,14 @@ describe("enduranceAddOn", () => {
 });
 
 describe("parseEndurance", () => {
+  it("reads the limit for each day and the count of devices of a converter, and refuses them as text", () => {
+    const converter = SAMPLE_ENDURANCE.converters?.[0];
+    if (converter === undefined) throw new Error("The sample has no converter.");
+    const layer = { ...SAMPLE_ENDURANCE, converters: [{ ...converter, perDay: 3, devices: 2 }] };
+    expect(parseEndurance(JSON.parse(JSON.stringify(layer)))).toEqual({ ok: true, layer });
+    expect(parseEndurance({ ...layer, converters: [{ ...converter, devices: "2" }] }).ok).toBe(false);
+  });
+
   it("reads the sample, and refuses a field that the format does not have", () => {
     expect(parseEndurance(JSON.parse(JSON.stringify(SAMPLE_ENDURANCE)))).toEqual({ ok: true, layer: SAMPLE_ENDURANCE });
     const read = parseEndurance({ ...SAMPLE_ENDURANCE, extra: 1 });
