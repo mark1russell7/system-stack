@@ -167,6 +167,20 @@ export const NASEM_ENERGY_SOURCE: Source = {
   sha256: "e6a7d9c9104053d4925c621b659b06de4c8dd6c64ed4534e6f5bc5cf0dd41b27",
 };
 
+/** The energy of the breast milk of one infant for one day, with its source and its place in the source. */
+export interface CitedMilk {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+/**
+ * The energy of the breast milk of one infant from 6 months: 381 kcal/d. Table 5-14 of the NASEM report gives 568 g/d of milk
+ * at 7 to 12 months for women that partly breastfeed, at 0.67 kcal/g. Its value at 6 months, 599 kcal/d, is for women that
+ * only breastfeed. An infant from 6 months also has food, so the lower value gives the larger draw, the worst case.
+ */
+export const MILK_LATER: CitedMilk = { perDay: 381, source: NASEM_ENERGY_SOURCE, locator: "Table 5-14, Energy Cost of Milk Production in Breastfeeding Women During the First Year Postpartum, page 97" };
+
 /**
  * The table of the Estimated Energy Requirements of the ages of 0 to 35 months, from the report Dietary Reference Intakes
  * for Energy (2023): 24 rows, 12 for each sex. Each row gives one need for each age group and sex. The last row ends at

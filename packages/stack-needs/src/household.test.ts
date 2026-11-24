@@ -2,7 +2,7 @@ import { SUPPLY_CATALOG, type SupplyCatalog, type SupplyProduct } from "@mark1ru
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { DGA_CALORIES, FORMULA_FEEDS, NASEM_INFANT_CALORIES } from "./data.ts";
+import { DGA_CALORIES, FORMULA_FEEDS, MILK_LATER, NASEM_INFANT_CALORIES } from "./data.ts";
 import { FORMULA_DRAW_MONTHS, householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
 import { FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK } from "./uses.ts";
 
@@ -164,15 +164,31 @@ describe("the household fragment", () => {
     expect(DGA_CALORIES.changes?.filter((change) => change.milk === true).map((change) => change.stage)).toEqual(["lactation-1", "lactation-2"]);
   });
 
-  it("refuses breast milk from 6 months and formula from 12 months", () => {
+  it("refuses breast milk and formula from 12 months", () => {
     const mother: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "lactation-2" };
     const man = adults[0] as Person;
-    for (const [ageMonths, feeding] of [[6, "breast-milk"], [9, "breast-milk"], [14, "breast-milk"], [12, "formula"], [14, "formula"]] as const) {
+    for (const [ageMonths, feeding] of [[12, "breast-milk"], [14, "breast-milk"], [12, "formula"], [14, "formula"]] as const) {
       expect(() => householdFragment({ ...input, persons: [man, mother, { sex: "female", ageMonths, count: 1, feeding }] }), `${String(ageMonths)} ${feeding}`).toThrow(/Give feeding: food/);
     }
     expect(() => householdFragment({ ...input, persons: [{ ...man, feeding: "breast-milk" }, mother] })).toThrow(/only for an infant/);
     expect(fragmentOf({ ...input, persons: [man, mother, { sex: "female", ageMonths: 5, count: 1, feeding: "breast-milk" }] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400, users: 2 });
     expect(fragmentOf({ ...input, persons: [man, mother, { sex: "female", ageMonths: 14, count: 1, feeding: "food" }] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400 + 800, users: 3 });
+  });
+
+  it("puts the need of an infant on breast milk from 6 months minus the milk energy in the food draw", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months and 745 kcal/d for the boys of 9 to 11 months.
+    // Table 5-14 of the NASEM report gives 381 kcal/d of milk energy from 6 months, and the stage lactation-2 adds 400 kcal/d.
+    const man = adults[0] as Person;
+    const mother: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "lactation-2" };
+    const girl: Person = { sex: "female", ageMonths: 6, count: 1, feeding: "breast-milk" };
+    const result = fragmentOf({ ...input, persons: [man, mother, girl] });
+    expect(result.layer.draws).toEqual([{ need: FOOD_NEED, level: "critical", perDay: DAILY + 400 + (604 - MILK_LATER.perDay), users: 3, supply: "food.retail" }]);
+    expect(result.breastMilk).toEqual([girl]);
+    const boy: Person = { sex: "male", ageMonths: 11, count: 1, feeding: "breast-milk" };
+    expect(fragmentOf({ ...input, persons: [man, mother, boy] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400 + (745 - 381), users: 3 });
+    // The rule of one infant for each person with a stage of lactation holds from 6 months.
+    const twins = householdFragment({ ...input, persons: [man, mother, { ...boy, count: 2 }] });
+    expect(twins.layer === undefined ? twins.why : "").toMatch(/2 infants drink breast milk, but the draw has 1 persons/);
   });
 
   it("gives no layer when the infants on breast milk are more than the persons of the draw with a stage of lactation", () => {
@@ -182,7 +198,7 @@ describe("the household fragment", () => {
     for (const noRow of [undefined, "leave-out"] as const) {
       const result = householdFragment({ ...input, persons: [man, mother, twins], noRow });
       expect(result.layer).toBeUndefined();
-      expect(result.layer === undefined ? result.why : "").toMatch(/2 infants drink only breast milk, but the draw has 1 persons/);
+      expect(result.layer === undefined ? result.why : "").toMatch(/2 infants drink breast milk, but the draw has 1 persons/);
     }
     const two = fragmentOf({ ...input, persons: [man, { ...mother, count: 2 }, twins] });
     expect(two.layer.draws[0]).toMatchObject({ perDay: 2400 + 2 * (1800 + 330), users: 3 });

@@ -108,7 +108,7 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | `feeding` | The draw of food energy |
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
-| `breast-milk` | Only below 6 months (`BREAST_MILK_MONTHS`). The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. The result lists the infant in `breastMilk`. |
+| `breast-milk` | Only below 12 months. Below 6 months (`BREAST_MILK_MONTHS`), the draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. From 6 months, the infant also has food. The draw holds the need of the row minus the milk energy (`MILK_LATER`, 381 kcal/d). The result lists the infant in `breastMilk`. |
 | `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. The result lists each infant on formula in `formula`. |
 
 With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
@@ -117,7 +117,7 @@ The rules of breast milk:
 
 - A person of the household must have a stage of lactation, or the function gives a `RangeError`.
 - The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
-- From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
+- From 6 months, the food draw holds the need of the row minus 381 kcal/d of milk. The next sections give the sources.
 
 The notes b and c of Table A2-3 of the guidelines (page 141) give the two changes of lactation:
 
@@ -128,7 +128,19 @@ The notes b and c of Table A2-3 of the guidelines (page 141) give the two change
 
 Thus below 6 months, a part of the milk comes from the stores of the mother. The draw holds only the part from food.
 The source gives the energy of the milk production, not the energy that the infant gets. It gives no change for two or more infants.
-Thus the package does not give the milk part of an infant from 6 months, and it does not give a change for twins. Each is a no read until a source gives it.
+
+Table 5-14 of the NASEM report (2023, page 97) gives the milk of the first year. The milk energy is the milk times 0.67 kcal/g:
+
+| Time after the birth | Milk (g/d) | Milk energy (kcal/d) | The women of the source |
+| --- | --- | --- | --- |
+| 0 to 2 months | 732 | 490 | Only breastfeed |
+| 3 to 4 months | 779 | 522 | Only breastfeed |
+| 5 months | 826 | 553 | Only breastfeed |
+| 6 months | 894 | 599 | Only breastfeed |
+| 7 to 12 months | 568 | 381 | Partly breastfeed |
+
+From 6 months, the infant also has food. Thus the package takes 381 kcal/d of milk from 6 months (`MILK_LATER`). Less milk gives a larger draw, so this is the worst case.
+The NASEM report gives no change for a mother of two or more infants. Thus twins on breast milk stay a no read: the function gives no layer.
 
 A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
