@@ -83,10 +83,12 @@ PoolLaw: build/hazard.chunk.d.ts#PoolLaw
 PoolScore: build/hazard.chunk.d.ts#PoolScore
 PooledRates: build/index.d.ts#PooledRates
 PriorTable: build/hazard.chunk.d.ts#PriorTable
+ReachScore: build/hazard.chunk.d.ts#ReachScore
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
+SilentAreas: build/index.d.ts#SilentAreas
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
@@ -120,6 +122,7 @@ stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
+withoutSilentAreas: build/index.d.ts#withoutSilentAreas
 zoneCounties: build/index.d.ts#zoneCounties
 
 ## ./county-priors (build/eaglei-county-priors.d.ts): names
@@ -158,6 +161,10 @@ type ClaimBasis = (typeof CLAIM_BASES)[number];
 interface CountyPooling {
   readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
   readonly holdout: PoolHoldout;
+  readonly silent: {
+    readonly areas: number;
+    readonly expected: number;
+  };
 }
 
 ### build/hazard.chunk.d.ts#DurationLaw
@@ -250,6 +257,11 @@ interface PoolScore {
     readonly state: number;
     readonly areas: number;
   };
+  readonly reach: {
+    readonly areas: number;
+    readonly plain: ReachScore;
+    readonly events: ReachScore;
+  };
 }
 
 ### build/hazard.chunk.d.ts#PriorTable
@@ -260,6 +272,12 @@ interface PriorTable {
   readonly method: string;
   readonly codes: readonly string[];
   readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+}
+
+### build/hazard.chunk.d.ts#ReachScore
+interface ReachScore {
+  readonly bias: number;
+  readonly error: number;
 }
 
 ### build/hazard.chunk.d.ts#Regions
@@ -309,7 +327,7 @@ export interface CoverageTally {
 }
 
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS
-export declare const EAGLEI_NATION_CUSTOMERS = 155605385;
+export declare const EAGLEI_NATION_CUSTOMERS = 154857853;
 
 ### build/index.d.ts#EAGLEI_STATE_PRIORS
 export declare const EAGLEI_STATE_PRIORS: PriorTable;
@@ -565,6 +583,13 @@ export interface RegionCurve {
 ### build/index.d.ts#STORM_CLASSES
 export declare const STORM_CLASSES: Readonly<Record<string, readonly string[]>>;
 
+### build/index.d.ts#SilentAreas
+export interface SilentAreas {
+  readonly observation: Observation;
+  readonly silent: readonly string[];
+  readonly expected: number;
+}
+
 ### build/index.d.ts#StormArea
 export type StormArea = "C" | "Z" | "M";
 
@@ -681,6 +706,9 @@ export declare function supplyState(hazard: Hazard, part: string, options?: Basi
 
 ### build/index.d.ts#survivalOf
 export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;
+
+### build/index.d.ts#withoutSilentAreas
+export declare function withoutSilentAreas(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation, group: (area: string) => string): SilentAreas;
 
 ### build/index.d.ts#zoneCounties
 export declare function zoneCounties(text: string): Map<string, readonly string[]>;

@@ -53,6 +53,8 @@ describe("poolHoldout", () => {
     const holdout = poolHoldout(priors);
     expect(holdout).toMatchObject({ seed: POOL_HOLDOUT_SEED, rounds: POOL_HOLDOUT_ROUNDS });
     expect(Object.keys(holdout.cases)).toEqual(["case.a", "case.b"]);
+    // Each case has a score of the reach, with the same count of counties for the two methods.
+    for (const score of Object.values(holdout.cases)) expect(score.reach.plain.error).toBeGreaterThanOrEqual(Math.abs(score.reach.plain.bias) - 1e-12);
     expect(poolHoldout(priors)).toEqual(holdout);
     // A new case does not change the draws of the other cases.
     expect(poolHoldout({ ...priors, counts: { ...priors.counts, "case.c": {} } }).cases["case.a"]).toEqual(holdout.cases["case.a"]);

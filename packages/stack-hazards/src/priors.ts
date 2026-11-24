@@ -105,9 +105,10 @@ export interface PooledRates {
  *
  * - The fit of each group is the gamma-Poisson law of the events of its observed areas in their years (`fitGammaRates`).
  * - `perYear` of an area is the mean of its rate after its count (`pooledRate`). An area with few years gets a rate near the mean of its group.
- * - `reach` of an area with events is the mean peak share of its events, as in `regionRates`. An area with no event gets the mean peak share of the events of its group.
+ * - `reach` of an area with events is the mean peak share of its events, as in `regionRates`. An area with no event gets the plain mean of the reach of the areas of its group with events.
+ *   The plain mean gives each area one weight. A mean over the events gives more weight to the areas with many events, and their events reach a smaller share.
  * - A group with no event gets the shape `Infinity` and its pooled mean toward all groups. That fit has the events of each group in the years of its areas.
- *   Thus its areas get a rate of more than 0, and a later event of the group does not have the chance 0.
+ *   Thus its areas get a rate of more than 0, and a later event of the group does not have the chance 0. Its areas get the plain mean of the reach of all areas with events.
  * - When no group has an event, no area gets a rate, as an area with no event gets from `regionRates`.
  *
  * @param counts - The counts of the events of each area in one case
@@ -128,26 +129,73 @@ export function pooledRates(counts: Readonly<Record<string, AreaCount>>, observa
   // The groups as units of one fit: the events of each group in the years of its areas. It gives the mean of a group with no event.
   const groups = codes.map((code) => unitsOf(code).reduce((sum, unit) => ({ count: sum.count + unit.count, exposure: sum.exposure + unit.exposure }), { count: 0, exposure: 0 }));
   const nation = groups.length > 0 ? fitGammaRates(groups) : { shape: Number.POSITIVE_INFINITY, mean: 0 };
-  // The mean peak share of all events, for a group with no event.
-  const allShares = codes.flatMap((code) => members.get(code) ?? []).reduce((sum, area) => sum + (counts[area]?.share ?? 0), 0);
-  const allEvents = groups.reduce((sum, unit) => sum + unit.count, 0);
+  // The reach of each area with events: the mean peak share of its events. The plain mean of the reach of all areas is for a group with no event.
+  const reachOf = (area: string): number | undefined => {
+    const count = counts[area];
+    return count !== undefined && count.events > 0 ? count.share / count.events : undefined;
+  };
+  const plainMean = (areas: readonly string[]): number => {
+    const reaches = areas.map(reachOf).filter((reach) => reach !== undefined);
+    return reaches.length > 0 ? reaches.reduce((sum, reach) => sum + reach, 0) / reaches.length : 0;
+  };
+  const allReach = plainMean(codes.flatMap((code) => members.get(code) ?? []));
   codes.forEach((code, position) => {
     const areas = members.get(code) ?? [];
     const units = unitsOf(code);
     const events = units.reduce((sum, unit) => sum + unit.count, 0);
     const law = events > 0 ? fitGammaRates(units) : { shape: Number.POSITIVE_INFINITY, mean: pooledRate(groups[position] as { count: number; exposure: number }, nation) };
-    const shares = events > 0 ? areas.reduce((sum, area) => sum + (counts[area]?.share ?? 0), 0) : allShares;
-    const total = events > 0 ? events : allEvents;
+    const groupReach = events > 0 ? plainMean(areas) : allReach;
     laws[code] = { shape: law.shape, mean: law.mean, areas: areas.length, events, from: events > 0 ? "group" : "nation" };
     areas.forEach((area, index) => {
       const perYear = pooledRate(units[index] as { count: number; exposure: number }, law);
       if (!(perYear > 0)) return;
-      const count = counts[area];
-      const reach = count !== undefined && count.events > 0 ? count.share / count.events : shares / total;
-      rates[area] = [perYear, Math.min(1, reach)];
+      rates[area] = [perYear, Math.min(1, reachOf(area) ?? groupReach)];
     });
   });
   return { rates: Object.fromEntries(Object.keys(rates).sort().map((area) => [area, rates[area] as readonly [number, number]])), laws };
+}
+
+/** The areas with no event in any case, and the observation without them (`withoutSilentAreas`). */
+export interface SilentAreas {
+  /** The observation without the silent areas. */
+  readonly observation: Observation;
+  /** The codes of the observed areas with no event in any case, in their order. */
+  readonly silent: readonly string[];
+  /**
+   * The count of the observed areas with no event in any case that the laws expect. It is the sum over the observed areas of the chance of no event in each case in its years.
+   * The chance of each case is the chance of 0 under the gamma-Poisson law of the group of the area in `pooledRates`.
+   */
+  readonly expected: number;
+}
+
+/**
+ * This function gives the observation without the silent areas: the observed areas with no event in any case.
+ * A source that lists an area can still miss its events, for example when it has the counts of one small utility of a county.
+ * Then the area has years and customers but no event. A pooled rate toward its group then makes a low rate from a gap in the source.
+ * When the laws expect few silent areas (`expected`) and the source has many, most silent areas are gaps. No test of one area can tell a gap from a low rate.
+ * Thus a silent area is not observed: it is no read, and a table of a larger region gives its prior.
+ *
+ * @param counts - The counts of the events of each area, by the code of the case
+ * @param observation - The years and the customers of each area
+ * @param group - This function gives the code of the group of an area, for example `eagleRegion`
+ */
+export function withoutSilentAreas(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation, group: (area: string) => string): SilentAreas {
+  const cases = Object.keys(counts).sort();
+  const laws = cases.map((name) => pooledRates(counts[name] ?? {}, observation, group).laws);
+  const areas = observedAreas(observation);
+  const silent = areas.filter((area) => cases.every((name) => (counts[name]?.[area]?.events ?? 0) === 0));
+  const expected = areas.reduce((sum, area) => {
+    const years = observation.years[area] ?? 0;
+    // The log of the chance of 0 events in the years: the gamma-Poisson law, or the Poisson law when the shape is Infinity.
+    const log = laws.reduce((total, law) => {
+      const { shape, mean } = law[group(area)] ?? { shape: Number.POSITIVE_INFINITY, mean: 0 };
+      return total + (Number.isFinite(shape) ? shape * Math.log(shape / (shape + mean * years)) : -mean * years);
+    }, 0);
+    return sum + Math.exp(log);
+  }, 0);
+  const out = new Set(silent);
+  const keep = (record: Readonly<Record<string, number>>): Record<string, number> => Object.fromEntries(Object.entries(record).filter(([area]) => !out.has(area)));
+  return { observation: { years: keep(observation.years), customers: keep(observation.customers) }, silent, expected };
 }
 
 /** The options of `hazardPriors`. */
