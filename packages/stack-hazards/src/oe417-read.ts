@@ -58,7 +58,7 @@ function dayOf(value: string | number | null): number | undefined {
   return Date.UTC(year, Number(match[1]) - 1, Number(match[2])) / MINUTE;
 }
 
-/** This function gives the minutes of a day from a time, a fraction of a day or a text such as `3:45 p.m.`, or `undefined`. */
+/** This function gives the minutes of a day from a time, a fraction of a day or a text, for example `3:45 p.m.`, or `undefined`. */
 function clockOf(value: string | number | null): number | undefined {
   if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? Math.round((value % 1) * DAY_MINUTES) : undefined;
   const match = typeof value === "string" ? /^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?(?:\s|$)/iu.exec(value) : null;
@@ -114,7 +114,8 @@ function headerOf(grid: Oe417Grid): { readonly row: number; readonly columns: Co
 
 /**
  * This function reads the events of one annual summary in a sheet. It reads the three layouts of 2002 to 2023 and finds the columns by their labels.
- * A row is an event when it has an area and a type. A row with no start date that equals an earlier row in each other field is a second row: the function counts it and leaves it out.
+ * A row is an event when it has an area and a type.
+ * A row with no start date that equals an earlier row in each other field is a second row. The function counts it and leaves it out.
  *
  * @param year - The year of the summary
  * @param grid - The cells of the sheet that holds the events
@@ -286,7 +287,8 @@ const FIELDS = ["rows", "copies", "attacks", "kept", "cyber", "cyberLoss", "spac
 const EVENT_FIELDS = ["year", "began", "restored", "area", "type", "customers", "megawatts"] as const;
 
 /**
- * This function lists each difference between a read and the dataset: a year that the read lacks, a count that is not equal, an event that is not equal.
+ * This function lists each difference between a read and the dataset.
+ * A difference is a year that the read lacks, a count that is not equal, or an event that is not equal.
  * A year that the read has and the dataset lacks is a new year, not a difference. The function adds such a year to `fresh`.
  *
  * @param read - The counts and the events that the reader gave

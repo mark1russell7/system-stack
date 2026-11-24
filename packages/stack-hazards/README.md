@@ -236,7 +236,7 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `oe417Compare(read, years, events)` | It lists each difference between a read and the dataset. |
 
 The script `scripts/oe417-read.ts` fetches the archived summaries and gives them to these functions. The workflow `oe417-read` starts it in CI with `--check`. The check passes when the read equals `OE417_YEARS` and `OE417_ATTACK_EVENTS`.
-To add a new year, give the option `--extra` a JSON file of entries like those of `OE417_FILES`, or give the workflow the same JSON in its input `extra`. The script then lists the new year and its events.
+To add a new year, give the option `--extra` a JSON file of entries like those of `OE417_FILES`. The input `extra` of the workflow takes the same JSON. The script then lists the new year and its events.
 
 The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
 

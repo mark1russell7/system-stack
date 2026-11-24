@@ -152,9 +152,10 @@ describe("the comparison with the dataset", () => {
   it("lists each count and each field that differs, a missing year and a missing event", () => {
     const first = OE417_ATTACK_EVENTS[0];
     if (first === undefined) throw new Error("The dataset has no event.");
-    const { "2002": dropped, ...years } = { ...OE417_YEARS, "2003": { ...OE417_YEARS["2003"]!, rows: 64 } };
+    const { "2002": dropped, ...years } = OE417_YEARS;
     expect(dropped).toBeDefined();
-    const lines = oe417Compare({ years, events: [{ ...first, area: "Elsewhere" }, ...OE417_ATTACK_EVENTS.slice(1, 100)] }, OE417_YEARS, OE417_ATTACK_EVENTS);
+    const changed = { ...years, "2003": { ...OE417_YEARS["2003"]!, rows: 64 } };
+    const lines = oe417Compare({ years: changed, events: [{ ...first, area: "Elsewhere" }, ...OE417_ATTACK_EVENTS.slice(1, 100)] }, OE417_YEARS, OE417_ATTACK_EVENTS);
     expect(lines).toContain("2002: the read has no counts for this year.");
     expect(lines).toContain("2003: rows is 64, the dataset has 63.");
     expect(lines.some((line) => line.startsWith("event 0 (2011 Dixie Valley Area, Nevada): area is \"Elsewhere\""))).toBe(true);

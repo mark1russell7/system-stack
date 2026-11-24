@@ -2,7 +2,8 @@
  * The reader of the OE-417 annual summaries of DOE. The workflow `oe417-read` starts it in CI. The package on npm does not have it.
  *
  * The job fetches the archived copy of each summary of `OE417_FILES` through `polite-crawler`, one request at a time.
- * It reads the sheets (XLS) with SheetJS and the text of the PDF files with `pdftotext`, and it gives the rows to the pure functions of `src/oe417-read.ts`.
+ * It reads the sheets (XLS) with SheetJS and the text of the PDF files with `pdftotext`.
+ * It gives the rows to the pure functions of `src/oe417-read.ts`.
  * It writes the counts of each year and the events to a JSON file. With `--check` it compares them with `OE417_YEARS` and `OE417_ATTACK_EVENTS`.
  *
  * Options:
@@ -18,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { read as readBook, utils, type WorkSheet } from "@e965/xlsx";
-import { recordOf, textOf } from "@mark1russell7/optional/read";
+import { isRecord, numberOf, textOf } from "@mark1russell7/optional/read";
 import { fetchTransport, statusLine, type Pace } from "polite-crawler/api";
 import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS } from "../src/oe417-events.ts";
@@ -80,15 +81,14 @@ export function readPdf(year: number, bytes: Uint8Array): Oe417Rows {
 /** This function reads the file of the extra summaries: a JSON object from a year to an `Oe417File`. */
 export function extraFiles(path: string): Record<string, Oe417File> {
   const files: Record<string, Oe417File> = {};
-  const root = recordOf(JSON.parse(readFileSync(path, "utf8")) as unknown);
-  if (root === undefined) throw new RangeError(`The file ${path} is not a JSON object from a year to a summary.`);
-  for (const [year, value] of Object.entries(root)) {
-    const entry = recordOf(value);
-    const id = entry?.["id"];
-    const format = textOf(entry?.["format"]);
-    const url = textOf(entry?.["url"]);
-    const archive = textOf(entry?.["archive"]);
-    if (!/^\d{4}$/u.test(year) || typeof id !== "number" || (format !== "xls" && format !== "pdf") || url === undefined || archive === undefined) {
+  const root: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (!isRecord(root)) throw new RangeError(`The file ${path} is not a JSON object from a year to a summary.`);
+  for (const [year, entry] of Object.entries(root)) {
+    const id = numberOf(entry, "id");
+    const format = textOf(entry, "format");
+    const url = textOf(entry, "url");
+    const archive = textOf(entry, "archive");
+    if (!/^\d{4}$/u.test(year) || id === undefined || (format !== "xls" && format !== "pdf") || url === undefined || archive === undefined) {
       throw new RangeError(`The entry "${year}" of ${path} needs a number id, a format xls or pdf, a url and an archive address.`);
     }
     files[year] = { id, format, url, archive };
