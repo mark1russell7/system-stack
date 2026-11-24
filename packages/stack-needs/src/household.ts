@@ -6,7 +6,7 @@ import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirec
 // The join of a household and a buy list into a fragment of an endurance layer: a draw of food energy, a draw of infant formula and the stores of the list.
 // The records have the form of the records of `@mark1russell7/stack-endurance`. An add-on does not import a different add-on, so the form is a copy.
 // A test assigns the layer to `EnduranceLayer` of stack-endurance. That test is the type gate of the copy.
-// The fragment has no converter. No cited source gives the water and the fuel to cook 1 kg of dry food, and a number with no source is not data.
+// The fragment has no converter. `cookFragment` gives the converters of the dry food, with the water and the fuel of each pot.
 
 /** A resource of a store, with its unit. */
 export interface FragmentResource {
@@ -195,7 +195,7 @@ function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[]
  *   `food.no-cook` feeds the food draw, and `food.infant-formula-ready` feeds the formula draw.
  * - The resources are the resources of the stores and of the direct uses, with the units of the catalog.
  * - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw.
- * - The fragment has no converter. A caller adds converters for the dry food, with the water and the fuel of each run.
+ * - The fragment has no converter. `cookFragment` gives the converters for the dry food, with the water and the fuel of each pot.
  *
  * A person with no row in the tables gives no layer, because a low rate gives too many days. The default tables give a row for each age.
  * The option `noRow: "leave-out"` leaves those persons out of the draw. A draw of 0 kcal gives no layer.
