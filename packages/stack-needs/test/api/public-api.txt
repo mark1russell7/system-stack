@@ -46,6 +46,15 @@ DailyNeedFinding: build/index.d.ts#DailyNeedFinding
 DailyNeedUsers: build/index.d.ts#DailyNeedUsers
 DailyRateNoRead: build/index.d.ts#DailyRateNoRead
 DailyRateRead: build/index.d.ts#DailyRateRead
+DeviceConverter: build/index.d.ts#DeviceConverter
+DeviceDraws: build/index.d.ts#DeviceDraws
+DeviceFragment: build/index.d.ts#DeviceFragment
+DeviceFragmentInput: build/index.d.ts#DeviceFragmentInput
+DeviceFragmentResult: build/index.d.ts#DeviceFragmentResult
+DeviceLine: build/index.d.ts#DeviceLine
+DeviceNoRead: build/index.d.ts#DeviceNoRead
+DeviceRead: build/index.d.ts#DeviceRead
+DeviceRun: build/index.d.ts#DeviceRun
 FDC_SR_LEGACY_SOURCE: build/index.d.ts#FDC_SR_LEGACY_SOURCE
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
@@ -65,6 +74,7 @@ FragmentDraw: build/index.d.ts#FragmentDraw
 FragmentResource: build/index.d.ts#FragmentResource
 FragmentStore: build/index.d.ts#FragmentStore
 GiftNoRead: build/index.d.ts#GiftNoRead
+HOURS_IN_DAY: build/index.d.ts#HOURS_IN_DAY
 HouseholdFragment: build/index.d.ts#HouseholdFragment
 HouseholdFragmentInput: build/index.d.ts#HouseholdFragmentInput
 HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
@@ -115,6 +125,7 @@ checkCalorieTable: build/index.d.ts#checkCalorieTable
 checkDailyNeeds: build/index.d.ts#checkDailyNeeds
 checkJoins: build/index.d.ts#checkJoins
 cookFragment: build/index.d.ts#cookFragment
+deviceFragment: build/index.d.ts#deviceFragment
 formulaMixCheck: build/index.d.ts#formulaMixCheck
 formulaMixFragment: build/index.d.ts#formulaMixFragment
 formulaMixWater: build/index.d.ts#formulaMixWater
@@ -376,6 +387,88 @@ export interface DailyRateRead {
   readonly note: string;
 }
 
+### build/index.d.ts#DeviceConverter
+export interface DeviceConverter extends FragmentConverter {
+  readonly perDay: number;
+  readonly devices: number;
+}
+
+### build/index.d.ts#DeviceDraws
+export interface DeviceDraws {
+  readonly level: string;
+  readonly supply: string;
+}
+
+### build/index.d.ts#DeviceFragment
+export interface DeviceFragment {
+  readonly schema: "endurance/1";
+  readonly levels: readonly string[];
+  readonly resources: readonly FragmentResource[];
+  readonly stores: readonly never[];
+  readonly draws: readonly FragmentDraw[];
+  readonly converters: readonly DeviceConverter[];
+}
+
+### build/index.d.ts#DeviceFragmentInput
+export interface DeviceFragmentInput {
+  readonly catalog: SupplyCatalog;
+  readonly units: Readonly<Record<string, number>>;
+  readonly runs?: Readonly<Record<string, DeviceRun>> | undefined;
+  readonly parts?: Readonly<Record<string, string>> | undefined;
+  readonly draws?: DeviceDraws | undefined;
+  readonly needs?: readonly DailyNeed[] | undefined;
+  readonly prefix?: string | undefined;
+}
+
+### build/index.d.ts#DeviceFragmentResult
+export interface DeviceFragmentResult {
+  readonly layer: DeviceFragment;
+  readonly lines: readonly DeviceLine[];
+  readonly noReads: readonly DeviceNoRead[];
+  readonly read: boolean;
+}
+
+### build/index.d.ts#DeviceLine
+export interface DeviceLine {
+  readonly product: string;
+  readonly need: string;
+  readonly battery: string;
+  readonly devices: number;
+  readonly hours: DeviceRead;
+}
+
+### build/index.d.ts#DeviceNoRead
+export type DeviceNoRead = {
+  readonly product: string;
+  readonly need?: never;
+  readonly why: string;
+} | {
+  readonly need: string;
+  readonly product?: never;
+  readonly why: string;
+};
+
+### build/index.d.ts#DeviceRead
+export type DeviceRead = {
+  readonly read: true;
+  readonly value: number;
+  readonly unit: string;
+} | {
+  readonly read: false;
+  readonly why: string;
+};
+
+### build/index.d.ts#DeviceRun
+export interface DeviceRun {
+  readonly amount: number;
+  readonly unit: string;
+  readonly per: {
+    readonly amount: number;
+    readonly unit: string;
+  };
+  readonly cite: string;
+}
+
 ### build/index.d.ts#FDC_SR_LEGACY_SOURCE
 export declare const FDC_SR_LEGACY_SOURCE: Source;
 
@@ -484,6 +577,9 @@ export interface GiftNoRead {
   readonly resource: string;
   readonly why: string;
 }
+
+### build/index.d.ts#HOURS_IN_DAY
+export declare const HOURS_IN_DAY: number;
 
 ### build/index.d.ts#HouseholdFragment
 export interface HouseholdFragment {
@@ -729,6 +825,9 @@ export declare function checkJoins(catalog: SupplyCatalog, uses: readonly Fragme
 
 ### build/index.d.ts#cookFragment
 export declare function cookFragment(input: CookFragmentInput): CookFragmentResult;
+
+### build/index.d.ts#deviceFragment
+export declare function deviceFragment(input: DeviceFragmentInput): DeviceFragmentResult;
 
 ### build/index.d.ts#formulaMixCheck
 export declare function formulaMixCheck(mix?: CitedFormulaMix): FormulaMixCheck;
