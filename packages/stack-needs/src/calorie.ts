@@ -66,6 +66,12 @@ export interface CalorieTable {
   readonly changes?: readonly CalorieChange[] | undefined;
 }
 
+/**
+ * One table, or tables in order. For each person, the first table with a row for the age gives the need.
+ * An example is `CALORIE_CHAIN`: the guidelines from 12 months, and the infant table below 12 months.
+ */
+export type CalorieTables = CalorieTable | readonly CalorieTable[];
+
 /** A group of persons of the same sex and age, and their count. */
 export interface Person {
   readonly sex: CalorieSex;
@@ -80,7 +86,7 @@ export interface Person {
 
 /** The need of one person record for the days, or no read when the table has no row for the age. */
 export type CalorieNeedLine =
-  | { readonly person: Person; readonly read: true; readonly level: ActivityLevel; readonly row: string; readonly stage?: string | undefined; readonly need: Quantity }
+  | { readonly person: Person; readonly read: true; readonly level: ActivityLevel; readonly table: string; readonly row: string; readonly stage?: string | undefined; readonly need: Quantity }
   | { readonly person: Person; readonly read: false; readonly why: string };
 
 /** The energy need of the persons of a household for a count of days. */
@@ -117,6 +123,27 @@ export function calorieRow(table: CalorieTable, sex: CalorieSex, ageMonths: numb
 }
 
 /**
+ * This function gives the first table with a row for a sex and an age in months, and its row.
+ * It gives `undefined` when no table has a row.
+ *
+ * @param tables - One table, or tables in order
+ * @param sex - The sex
+ * @param ageMonths - The age, in whole months
+ */
+export function calorieRowOf(tables: CalorieTables, sex: CalorieSex, ageMonths: number): { readonly table: CalorieTable; readonly row: CalorieRow } | undefined {
+  for (const table of tableList(tables)) {
+    const row = calorieRow(table, sex, ageMonths);
+    if (row !== undefined) return { table, row };
+  }
+  return undefined;
+}
+
+/** This function gives the tables of the input as a list. */
+function tableList(tables: CalorieTables): readonly CalorieTable[] {
+  return "rows" in tables ? [tables] : tables;
+}
+
+/**
  * This function gives the change of a table for a sex and a stage, or `undefined` when the table has no such change.
  *
  * @param table - The table of calorie needs
@@ -129,29 +156,34 @@ export function calorieChange(table: CalorieTable, sex: CalorieSex, stage: strin
 
 /**
  * This function gives the energy need of the persons of a household for a count of days, in `kcal`.
- * It adds the need of each person at the activity level of that person. The table finds the row of each person from the age.
+ * It adds the need of each person at the activity level of that person. The first table with a row for the age of a person gives the row.
  *
- * - An age with no row in the table gives a line with no read, for example 6 months. Then the total is a lower limit.
+ * - An age with no row in the tables gives a line with no read, for example 6 months in `DGA_CALORIES` alone. Then the total is a lower limit.
+ * - Each line with a read has the `id` of the table of its row.
  * - The table of the toddlers gives one need for each age and sex. Thus the level does not change the need of a toddler.
- * - A record with a stage adds the change of the stage to the need of its row, for example 340 kcal/d in the second trimester.
+ * - A record with a stage adds the change of the stage to the need of its row, for example 340 kcal/d in the second trimester. The change comes from the table of the row.
  * - One stage holds for each day of the call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
  *
  * The activity level is an explicit input. This package has no default level. The planner selects it, also for the worst case of a long power cut.
  * In that case, work can make the level higher, for example the carry of water. The function is pure.
  *
- * @param table - The table of calorie needs
+ * @param tables - The table of calorie needs, or tables in order
  * @param persons - The person records of the household: a sex, an age in months, a count and, as an option, a level
  * @param level - The activity level of each record with no level of its own
  * @param days - The count of days, a finite number of 0 or more
  * @throws RangeError when a count of persons or an age is not a whole number of 0 or more, or when the household has no person
  * @throws RangeError when a level is not a level of the table, or when a sex is not a sex of the table
- * @throws RangeError when the count of days is not a finite number of 0 or more
- * @throws RangeError when the table has no change for the stage and the sex of a record
+ * @throws RangeError when the count of days is not a finite number of 0 or more, or when the list of tables is empty
+ * @throws RangeError when no table has the change for the stage and the sex of a record
+ * @throws RangeError when the table of the row of a record has no change for the stage and the sex of the record
  * @throws RangeError when the daily need of a record, with the change of its stage, is not above 0
  */
-export function calorieNeed(table: CalorieTable, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal {
+export function calorieNeed(tables: CalorieTables, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal {
   if (!(Number.isFinite(days) && days >= 0)) throw new RangeError(`The count of days is ${String(days)}. It must be a finite number of 0 or more.`);
   if (!isActivityLevel(level)) throw new RangeError(`The activity level ${String(level)} is not a level of the table.`);
+  const list = tableList(tables);
+  if (list.length === 0) throw new RangeError("The list of tables is empty.");
+  const ids = list.map((table) => table.id).join(", ");
   let count = 0;
   const lines = persons.map((person): CalorieNeedLine => {
     const name = `${String(person.sex)} of ${String(person.ageMonths)} months`;
@@ -161,14 +193,17 @@ export function calorieNeed(table: CalorieTable, persons: readonly Person[], lev
     const own = person.level ?? level;
     if (!isActivityLevel(own)) throw new RangeError(`The activity level ${String(own)} of the persons ${name} is not a level of the table.`);
     // A stage that the table does not have is an error, not a no read: the option leave-out would remove the persons from a draw.
-    const change = person.stage === undefined ? undefined : calorieChange(table, person.sex, person.stage);
-    if (person.stage !== undefined && change === undefined) throw new RangeError(`The table ${table.id} has no change for the stage ${String(person.stage)} of the persons ${name}.`);
+    const { stage } = person;
+    if (stage !== undefined && list.every((table) => calorieChange(table, person.sex, stage) === undefined)) throw new RangeError(`The tables ${ids} have no change for the stage ${String(stage)} of the persons ${name}.`);
     count += person.count;
-    const row = calorieRow(table, person.sex, person.ageMonths);
-    if (row === undefined) return { person, read: false, why: `The table ${table.id} has no row for a ${name}.` };
+    const found = calorieRowOf(list, person.sex, person.ageMonths);
+    if (found === undefined) return { person, read: false, why: `The tables ${ids} have no row for a ${name}.` };
+    const { table, row } = found;
+    const change = stage === undefined ? undefined : calorieChange(table, person.sex, stage);
+    if (stage !== undefined && change === undefined) throw new RangeError(`The table ${table.id} of the row of the persons ${name} has no change for the stage ${String(stage)}.`);
     const daily = valueIn(row.need.levels === undefined ? row.need.each : row.need.levels[own], DAILY_UNIT) + (change === undefined ? 0 : valueIn(change.change, DAILY_UNIT));
     if (!(daily > 0)) throw new RangeError(`The daily need of the persons ${name} at the stage ${String(person.stage)} is ${String(daily)} kcal/d. It must be above 0.`);
-    const line = { person, read: true as const, level: own, row: row.age, need: quantity(person.count * daily * days, ENERGY_UNIT) };
+    const line = { person, read: true as const, level: own, table: table.id, row: row.age, need: quantity(person.count * daily * days, ENERGY_UNIT) };
     return change === undefined ? line : { ...line, stage: change.stage };
   });
   if (count === 0) throw new RangeError("The household has no person.");

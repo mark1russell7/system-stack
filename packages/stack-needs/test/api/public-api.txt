@@ -8,6 +8,7 @@
 
 ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ActivityLevel: build/index.d.ts#ActivityLevel
+CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
 CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
 CalorieChange: build/index.d.ts#CalorieChange
@@ -17,6 +18,7 @@ CalorieNeedTotal: build/index.d.ts#CalorieNeedTotal
 CalorieRow: build/index.d.ts#CalorieRow
 CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
+CalorieTables: build/index.d.ts#CalorieTables
 DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
 DIRECT_USES: build/index.d.ts#DIRECT_USES
@@ -36,6 +38,8 @@ JOIN_CODES: build/index.d.ts#JOIN_CODES
 JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
+NASEM_ENERGY_SOURCE: build/index.d.ts#NASEM_ENERGY_SOURCE
+NASEM_INFANT_CALORIES: build/index.d.ts#NASEM_INFANT_CALORIES
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
 NEED_SUPPLIES: build/index.d.ts#NEED_SUPPLIES
 NO_COOK: build/index.d.ts#NO_COOK
@@ -50,6 +54,8 @@ WATER_NEED: build/index.d.ts#WATER_NEED
 calorieChange: build/index.d.ts#calorieChange
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
+calorieRowOf: build/index.d.ts#calorieRowOf
+checkCalorieChain: build/index.d.ts#checkCalorieChain
 checkCalorieTable: build/index.d.ts#checkCalorieTable
 checkJoins: build/index.d.ts#checkJoins
 hasNeedsError: build/index.d.ts#hasNeedsError
@@ -63,6 +69,9 @@ export declare const ACTIVITY_LEVELS: readonly ["sedentary", "moderately-active"
 
 ### build/index.d.ts#ActivityLevel
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
+
+### build/index.d.ts#CALORIE_CHAIN
+export declare const CALORIE_CHAIN: readonly CalorieTable[];
 
 ### build/index.d.ts#CALORIE_SEXES
 export declare const CALORIE_SEXES: readonly ["female", "male"];
@@ -93,6 +102,7 @@ export type CalorieNeedLine = {
   readonly person: Person;
   readonly read: true;
   readonly level: ActivityLevel;
+  readonly table: string;
   readonly row: string;
   readonly stage?: string | undefined;
   readonly need: Quantity;
@@ -131,6 +141,9 @@ export interface CalorieTable {
   readonly rows: readonly CalorieRow[];
   readonly changes?: readonly CalorieChange[] | undefined;
 }
+
+### build/index.d.ts#CalorieTables
+export type CalorieTables = CalorieTable | readonly CalorieTable[];
 
 ### build/index.d.ts#DGA_CALORIES
 export declare const DGA_CALORIES: CalorieTable;
@@ -200,7 +213,7 @@ export interface HouseholdFragmentInput {
   readonly uses?: readonly FragmentDirectUse[] | undefined;
   readonly level: string;
   readonly levels?: readonly string[] | undefined;
-  readonly table?: CalorieTable | undefined;
+  readonly table?: CalorieTables | undefined;
   readonly prefix?: string | undefined;
   readonly noRow?: NoRowAction | undefined;
 }
@@ -247,8 +260,14 @@ export interface JoinReferences {
   readonly parts: readonly ReferencePart[];
 }
 
+### build/index.d.ts#NASEM_ENERGY_SOURCE
+export declare const NASEM_ENERGY_SOURCE: Source;
+
+### build/index.d.ts#NASEM_INFANT_CALORIES
+export declare const NASEM_INFANT_CALORIES: CalorieTable;
+
 ### build/index.d.ts#NEEDS_CODES
-export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
+export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change", "needs-id"];
 
 ### build/index.d.ts#NEED_SUPPLIES
 export declare const NEED_SUPPLIES: {
@@ -263,7 +282,7 @@ export declare const NO_COOK = "food.no-cook";
 export type NeedsCode = (typeof NEEDS_CODES)[number];
 
 ### build/index.d.ts#NeedsFinding
-export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | "row" | "change">;
+export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | "row" | "change" | "chain">;
 
 ### build/index.d.ts#NoRowAction
 export type NoRowAction = "leave-out";
@@ -298,10 +317,19 @@ export declare const WATER_NEED = "hydration.drink";
 export declare function calorieChange(table: CalorieTable, sex: CalorieSex, stage: string): CalorieChange | undefined;
 
 ### build/index.d.ts#calorieNeed
-export declare function calorieNeed(table: CalorieTable, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal;
+export declare function calorieNeed(tables: CalorieTables, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal;
 
 ### build/index.d.ts#calorieRow
 export declare function calorieRow(table: CalorieTable, sex: CalorieSex, ageMonths: number): CalorieRow | undefined;
+
+### build/index.d.ts#calorieRowOf
+export declare function calorieRowOf(tables: CalorieTables, sex: CalorieSex, ageMonths: number): {
+  readonly table: CalorieTable;
+  readonly row: CalorieRow;
+} | undefined;
+
+### build/index.d.ts#checkCalorieChain
+export declare function checkCalorieChain(tables: CalorieTables, options?: GateOptions): NeedsFinding[];
 
 ### build/index.d.ts#checkCalorieTable
 export declare function checkCalorieTable(table: CalorieTable, options?: GateOptions): NeedsFinding[];
