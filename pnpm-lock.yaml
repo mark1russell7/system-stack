@@ -385,8 +385,8 @@ importers:
         version: 0.4.5(zod@4.6.7)
     devDependencies:
       '@mark1russell7/alerts':
-        specifier: ^0.1.5
-        version: 0.1.5
+        specifier: ^0.1.26
+        version: 0.1.26
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -850,8 +850,8 @@ packages:
     resolution: {integrity: sha512-rm0tf1RzSurGbXhNOlXAm8+9g+gKQpoAotPmGtIMHsKYcTEFPMD0Bxeov/Vs7UCw3MgmlokdDEnsvsKleFo6dA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/alerts@0.1.5':
-    resolution: {integrity: sha512-JdGbmS0qOkeReVXH3k15M36LRZT/JH684p5oyLttULGy6oTusfku7q2N4zmbBMqV2/8jIXN+wa0pDhcjJS4r5A==}
+  '@mark1russell7/alerts@0.1.26':
+    resolution: {integrity: sha512-a7hrLDWIwhh8/uutblRVJU7nO4X4WYRhN9GCsn/a7RyOeU7iyNi16bsWKxKzmWVNs393iUGewJ2jL+w2RcLnnQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/algebra@0.8.10':
@@ -2453,7 +2453,7 @@ snapshots:
       '@mark1russell7/text': 0.0.17
       zod: 4.6.7
 
-  '@mark1russell7/alerts@0.1.5':
+  '@mark1russell7/alerts@0.1.26':
     dependencies:
       '@mark1russell7/algebra': 0.9.10(zod@4.6.7)
       '@mark1russell7/collections': 0.11.2(zod@4.6.7)
@@ -2462,7 +2462,7 @@ snapshots:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.1.19
-      '@mark1russell7/rigor-statistics': 0.2.22
+      '@mark1russell7/rigor-statistics': 0.2.23
       '@mark1russell7/text': 0.0.17
       zod: 4.6.7
 
