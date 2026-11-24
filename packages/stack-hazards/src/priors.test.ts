@@ -6,6 +6,7 @@ import type { OutageEvent } from "./outages.ts";
 import { HAZARD_LIST } from "./data.ts";
 import { EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
 import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
+import { OE417_NATION_PRIORS } from "./oe417.ts";
 import { areaCounts, coverageTally, hazardPriors, observedRegions, regionRates, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
@@ -17,7 +18,7 @@ describe("the priors of the reference list", () => {
   const withCounties: HazardList = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.priors ?? [])] };
 
   it("has the table of the states, and the table of the counties is in its own entry. The gate passes with the two", () => {
-    expect(HAZARD_LIST.priors).toEqual([EAGLEI_STATE_PRIORS]);
+    expect(HAZARD_LIST.priors).toEqual([EAGLEI_STATE_PRIORS, OE417_NATION_PRIORS]);
     expect([EAGLEI_COUNTY_PRIORS.scheme, EAGLEI_STATE_PRIORS.scheme]).toEqual(["us-county-fips", "us-state-fips"]);
     expect(EAGLEI_COUNTY_PRIORS.codes.length).toBeGreaterThan(3000);
     expect(EAGLEI_STATE_PRIORS.codes.length).toBeGreaterThanOrEqual(50);

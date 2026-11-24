@@ -54,8 +54,10 @@ describe("eaglePriors", () => {
   it("leaves out a region with more than the limit of events at one customer in one year, so its prior is no read", () => {
     // 99001 has 40 events a year that each reach the county: more than the limit of 12.
     const over = record({ priors: { ...record().priors!, counts: { [OUTAGE_CASE]: { "99001": { events: 120, share: 120 } } } } });
-    const { county } = eaglePriors(over);
+    const { county, nation } = eaglePriors(over);
     expect(county.codes).toEqual(["99003"]);
+    // The customers of the nation keep each observed county, also the county over the limit.
+    expect(nation).toBe(4000);
     expect(county.rates[OUTAGE_CASE]).toEqual({});
     expect(county.method).toContain(`more than ${String(PRIOR_LIMIT)} events at one customer in one year in a case is not in the table, so its prior is no read: 1 regions.`);
   });
@@ -83,11 +85,13 @@ describe("priorModules", () => {
       expect(text).toContain("// The run of the fit: https://example.org/runs/1 attempt 3.");
       expect(text).toContain("EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.0000/test.1");
       expect(text).toContain("share 0.01, interval 900 s");
-      const script = text.replace(/^import .*$/mu, "").replaceAll(/export const (\w+): PriorTable =/gu, "out.$1 =");
+      const script = text.replace(/^import .*$/mu, "").replaceAll(/export const (\w+)(?:: PriorTable)? =/gu, "out.$1 =");
       // The module is plain data, so its text with no types runs as a script.
       new Function("out", script)(out);
     }
     expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
     expect(out["EAGLEI_STATE_PRIORS"]).toEqual(tables.state);
+    expect(out["EAGLEI_NATION_CUSTOMERS"]).toBe(tables.nation);
+    expect(tables.nation).toBe(4000);
   });
 });

@@ -1,11 +1,18 @@
 import { curveFault } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "./check.ts";
-import { HAZARD_SOURCES, NO_CYBER_LAW, NO_GEOMAGNETIC_LAW } from "./data.ts";
+import { HAZARD_LIST, HAZARD_SOURCES, NO_CYBER_LAW, NO_GEOMAGNETIC_LAW } from "./data.ts";
+import { EAGLEI_NATION_CUSTOMERS } from "./eaglei-state-priors.ts";
 import { HAZARDS_SCHEMA } from "./hazard.ts";
+import { hazardPriors } from "./priors.ts";
 import {
   OE417_ATTACK_EVENTS,
+  OE417_ATTACK_CASE,
   OE417_ATTACK_LAW,
+  OE417_NATION_PRIORS,
+  OE417_PRIOR_FIRST,
+  oe417AttackPrior,
+  oe417LawEvents,
   OE417_CYBER_TERMS,
   OE417_FILES,
   OE417_LEAST_HOURS,
@@ -154,5 +161,57 @@ describe("the events of a physical attack", () => {
       ],
     });
     expect(faults).toEqual([]);
+  });
+});
+
+describe("the prior of a physical attack", () => {
+  it("counts the events of the law in 2015 to 2023 over the customers of the nation", () => {
+    const events = oe417LawEvents(OE417_ATTACK_EVENTS);
+    // The law reads 70 events: 62 ends of 15 minutes or more and 8 open events.
+    expect(events).toHaveLength(70);
+    expect(OE417_ATTACK_LAW.read && OE417_ATTACK_LAW.fit.count).toBe(70);
+    // The yearly counts of 2011 to 2023. The window of the prior is the longest window to 2023 that a dispersion test at 5% does not refuse.
+    // A new summary changes these counts. Then calculate the window again. A dispersion test of rigor-statistics can make this a gate.
+    const counts = Array.from({ length: 13 }, (_, i) => events.filter((event) => event.year === 2011 + i).length);
+    expect(counts).toEqual([1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14, 8]);
+    expect(OE417_PRIOR_FIRST).toBe(2015);
+    const kept = events.filter((event) => event.year >= OE417_PRIOR_FIRST);
+    expect(kept).toHaveLength(66);
+    const customers = kept.reduce((sum, event) => sum + oe417Count(event.customers), 0);
+    expect(OE417_NATION_PRIORS).toMatchObject({ source: "doe.oe-417", asOf: "2023-12-31", scheme: "us-nation", codes: ["US"] });
+    const [perYear, reach] = OE417_NATION_PRIORS.rates[OE417_ATTACK_CASE]?.["US"] ?? [Number.NaN, Number.NaN];
+    expect(perYear).toBeCloseTo(66 / 9, 12);
+    expect(reach).toBeCloseTo(customers / 66 / EAGLEI_NATION_CUSTOMERS, 15);
+    // One customer in the nation has an event once in 2,000 to 4,000 years.
+    expect(1 / (perYear * reach)).toBeGreaterThan(2000);
+    expect(1 / (perYear * reach)).toBeLessThan(4000);
+    expect(EAGLEI_NATION_CUSTOMERS).toBeGreaterThan(140_000_000);
+    expect(EAGLEI_NATION_CUSTOMERS).toBeLessThan(170_000_000);
+    expect(OE417_NATION_PRIORS.method).toContain("each observed county of EAGLE-I");
+  });
+
+  it("gives the prior of the nation to a user with a region of the scheme us-nation, and no prior without it", () => {
+    const priors = hazardPriors(HAZARD_LIST, { region: [{ scheme: "us-state-fips", code: "01" }, { scheme: "us-nation", code: "US" }] });
+    const attack = priors.find((prior) => prior.case === OE417_ATTACK_CASE);
+    expect(attack).toMatchObject({ place: "us-nation:US", perYear: 66 / 9, source: OE417_SOURCE.url, asOf: "2023-12-31" });
+    // The state table has no attack case, so the outage prior still comes from the state.
+    expect(priors.find((prior) => prior.case === "infra.power.outage")?.place).toBe("us-state-fips:01");
+    expect(hazardPriors(HAZARD_LIST, { region: { scheme: "us-state-fips", code: "01" } }).some((prior) => prior.case === OE417_ATTACK_CASE)).toBe(false);
+    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-prior")).toEqual([]);
+  });
+
+  it("reads only the years of the option, and refuses bad years, bad customers and years with no event", () => {
+    const one = oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2022, last: 2022, customers: 1_000_000 });
+    const in2022 = oe417LawEvents(OE417_ATTACK_EVENTS).filter((event) => event.year === 2022);
+    expect(one.rates[OE417_ATTACK_CASE]?.["US"]?.[0]).toBe(in2022.length);
+    // The method tells only what the function calculates: with no note, it names no source of the customers and no reason for the years.
+    expect(one.method).toContain("over 1000000 customers of the nation. An event with no count of customers is not in the count, and that makes the rate too low.");
+    expect(one.method).not.toContain("EAGLE-I");
+    expect(one.method.endsWith("too low.")).toBe(true);
+    expect(oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2022, last: 2022, customers: 1, note: "A note." }).method.endsWith("too low. A note.")).toBe(true);
+    expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2023, last: 2011, customers: 1 })).toThrow(RangeError);
+    expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011.5, last: 2023, customers: 1 })).toThrow(RangeError);
+    expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, customers: 0 })).toThrow(RangeError);
+    expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2000, last: 2010, customers: 1 })).toThrow(RangeError);
   });
 });

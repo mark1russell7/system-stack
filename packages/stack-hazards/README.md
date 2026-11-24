@@ -194,8 +194,9 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
 - The place of each prior is the option `place`, for example `hazardPriors(list, { region, place: "home" })`. With no option, the place is the region of the table, for example `us-state-fips:01` after the fall back from a county. `yearShortfall` of stack-endurance finds a prior by its place, so give the place that it reads.
 - A county prior of 0 comes before the prior of its state. Many counties have 0 for a rare case, for example a hurricane, and many tornado rates come from one event. A pooled rate of a county and its state is a next step.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
+- The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The state module also has `EAGLEI_NATION_CUSTOMERS`, the sum of the customers of each observed county. A county in a state over the limit of the table is also in the sum. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
 ## The law of a physical attack
 
@@ -211,9 +212,14 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `oe417Hours(event)` | It gives the hours from the start of an event to its restoration, from the local times of the summary. |
 | `oe417AttackLaw(events)` | It gives the law of the time for which the customers have no power, with one Kaplan-Meier curve for the nation. |
 | `OE417_ATTACK_LAW` | The law of the 70 events with customers: 62 ends of 15 minutes or more and 8 open events. |
+| `oe417LawEvents(events)` | It gives the events that the law reads. The prior counts the same events. |
+| `oe417AttackPrior(events, { first, last, customers, note })` | It gives the table of the prior of a physical attack for the nation, from the events of the years `first` to `last`. The method tells only what it calculates, and then the text `note`. |
+| `OE417_PRIOR_FIRST` | 2015, the first year of the prior. |
+| `OE417_NATION_PRIORS` | The prior of 2015 to 2023: 66 events in 9 years, with the customers `EAGLEI_NATION_CUSTOMERS`. |
 
 The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
 
+- 8 events with customers are not in the law. 5 are shorter than 15 minutes (14,725 customers, one with 11,479). The restoration of 3 is at their start (2,002 customers).
 - The other 34 events give 0 customers or no count. Some give a count of megawatts that cannot be a loss of load with no customers, for example 9,760 MW in California in 2018. Such a count can be a load or a rating.
 - An event of a suspicion, a threat or a possible attack is not in the set. The attack is not proved.
 - The 8 open events have a start and no time of the restoration. Each was most likely open when its form was sent. The law reads each one as censored at the longest read duration, 3.5 days. The curve then falls to 0 at 7 days.
@@ -221,6 +227,28 @@ The law reads only the events with more than 0 customers. The question of a home
 - The summary of 2023 prints 32 events two times, the second time with no start. The set and the counts read each such event one time.
 - The times are local times. An event across a change of the clock can be one hour off.
 - The case `infra.power.physical-attack` uses this law on its grid cut. Its other cuts are the cuts of a power outage, with no law.
+
+The prior of a physical attack is one rate for the nation:
+
+- `perYear` is 66 events in the 9 years of 2015 to 2023, 7.3 events in one year.
+- `reach` is the mean of the customers of an event (7,481) over the customers of each observed county of EAGLE-I.
+- Thus one customer has an event once in approximately 2,800 years (`perYear * reach` is 3.5e-4).
+- An event with no count of customers is not in the rate. That makes the rate too low.
+
+The years of the prior come from a rule:
+
+- The counts of the years 2011 to 2023 are 1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14 and 8. The summaries of 2000 to 2010 list no such event.
+- The rule: the years are the longest window to the last year whose yearly counts agree with one rate. The test is a dispersion test of the counts at 5%.
+- The window from 2014 fails the test (chi-square 17.3 with 9 degrees of freedom, p 0.04). The window from 2015 passes it (9.0 with 8, p 0.34).
+- With 2011 to 2023, the rate is 5.4 events in one year, below each year from 2016 but one. The mean of years that do not agree with one rate is not the rate of the next year.
+- A test pins the yearly counts. A new summary changes them, and then the window is calculated again.
+
+The product rests on few events:
+
+- The largest event (110,000 customers, 2016) is 22% of the customers of the window, and the 3 largest are 42%. The median event has 1,842 customers.
+- Without the largest event, the product is 2.7e-4. With a second event of that size, it is 4.3e-4.
+- A bootstrap of the 9 yearly sums of the customers gives 1.5e-4 to 6.4e-4 (95%, 10,000 draws, seed 20261124).
+- The rate is for the nation. A state or a county can have a higher rate, and the summaries name places in words that are not codes.
 
 The open events change the tail of the law:
 
