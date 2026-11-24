@@ -3,12 +3,32 @@ import type { ArmProcess, BenchEnv, FreshRecord } from "@mark1russell7/rigor-ben
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, MIN_READ_JOBS, MIN_RUNS, modelTables, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
+import {
+  AA_ARM,
+  AA_CASE,
+  freezeLimits,
+  groupCases,
+  jobGate,
+  jobRead,
+  limitFaults,
+  MIN_JOBS,
+  MIN_READ_JOBS,
+  MIN_RUNS,
+  modelTables,
+  NEAR,
+  readReport,
+  RECORD_SCHEMA,
+  runCases,
+  runGate,
+  type FrozenLimits,
+  type JobGate,
+  type JobRecord,
+} from "./read.ts";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
 const STAMP = { commit: "0".repeat(40), date: "2026-11-22", runs: ["1"] };
 
-/** This function gives the record of a job: each arm has the time `scale * base` in each round, and the A/A ratio of round `r` is `aa(r)`. */
+/** This function gives the record of a job. Each arm has the time `scale * base` in each round. The A/A ratio of round `r` is `aa(r)`. */
 function jobRecord(job: string, scale: number, aa: (round: number) => number = () => 1, env: BenchEnv = ENV): JobRecord {
   const base: Record<string, number> = { m4: 0.2, m8: 5, m12: 120, m14: 400, [AA_ARM]: 120 };
   const rounds = 8;
@@ -199,7 +219,93 @@ describe("the gate of a run", () => {
     const report = readReport(reads, reads.map((read) => jobGate(read, undefined)), frozen());
     expect(report).toContain("| job-1 | cpu-a |");
     expect(report).toContain("There is no file of frozen limits.");
-    expect(report).toContain("| m12 | 0 | cannot decide: 0 jobs read the case");
+    expect(report).toContain("| m12 | 0 | cannot decide: 0 jobs read the case, and the gate needs 3. | cannot decide |");
     expect(report).toContain("The candidate limits of these 5 jobs");
+  });
+});
+
+describe("the groups of a run", () => {
+  // The jobs of one CPU model in one run make a group. The lowest value of the group decides.
+  const B = { ...ENV, cpu: "cpu-b" };
+  const mixed = (): FrozenLimits => freezeLimits([...JOBS, jobRecord("b-1", 0.6, () => 1, B), jobRecord("b-2", 0.62, () => 1, B)].map(jobRead), STAMP);
+  const inRun = (record: JobRecord, run = "r-1"): JobRecord => ({ ...record, run });
+  const gates = (records: readonly JobRecord[], file: FrozenLimits = mixed()): JobGate[] => records.map((record) => jobGate(jobRead(inRun(record)), file));
+
+  it("read a group with one slow job within, and keep the outcome of each job", () => {
+    const run = gates([jobRecord("a-1", 1), jobRecord("a-2", 1.02), jobRecord("a-3", 1.5)]);
+    expect(run[2]?.gate.outcome).toBe("block");
+    const cases = runCases(run);
+    expect(cases.map((item) => [item.outcome, item.perJob])).toEqual(IDS.map(() => ["within", "beyond"]));
+    const m12 = cases.find((item) => item.case === "m12")?.groups;
+    expect(m12).toHaveLength(1);
+    expect(m12?.[0]?.jobs.map((job) => job.outcome)).toEqual(["within", "within", "beyond"]);
+    expect(m12?.[0]?.ms).toBe(m12?.[0]?.jobs[0]?.ms);
+    expect(runGate(run).outcome).toBe("pass");
+  });
+
+  it("read a group beyond when each job of the group is above the limit", () => {
+    const run = gates([jobRecord("a-1", 1.4), jobRecord("a-2", 1.45), jobRecord("a-3", 1.5)]);
+    expect(runCases(run).map((item) => [item.outcome, item.perJob])).toEqual(IDS.map(() => ["beyond", "beyond"]));
+    expect(runGate(run).outcome).toBe("block");
+  });
+
+  it("make a group of each CPU model and each run", () => {
+    const file = mixed();
+    const slow = jobGate(jobRead(inRun(jobRecord("a-3", 1.5), "r-2")), file);
+    const run = [...gates([jobRecord("a-1", 1), jobRecord("a-2", 1)], file), slow];
+    expect(groupCases(run, "m12").map((group) => [group.run, group.jobs.length, group.outcome])).toEqual([
+      ["r-1", 2, "within"],
+      ["r-2", 1, "beyond"],
+    ]);
+  });
+
+  it("read a group of 1 job as the rule of one job", () => {
+    const run = gates([jobRecord("a-1", 1.5), jobRecord("b-1", 0.6, () => 1, B), jobRecord("b-2", 0.6, () => 1, B)]);
+    expect(runCases(run).map((item) => [item.outcome, item.perJob])).toEqual(IDS.map(() => ["beyond", "beyond"]));
+    const within = gates([jobRecord("a-1", 1), jobRecord("b-1", 0.6, () => 1, B), jobRecord("b-2", 0.6, () => 1, B)]);
+    expect(runCases(within).map((item) => [item.outcome, item.perJob])).toEqual(IDS.map(() => ["within", "within"]));
+  });
+
+  it("read each job at the ceiling alone, so one job above the ceiling blocks", () => {
+    const run = gates([jobRecord("b-1", 0.6, () => 1, B), jobRecord("b-2", 0.6, () => 1, B), jobRecord("b-3", 3, () => 1, B)]);
+    const m12 = groupCases(run, "m12");
+    expect(m12.map((group) => [group.model, group.jobs.length, group.outcome])).toEqual([
+      ["other", 1, "within"],
+      ["other", 1, "within"],
+      ["other", 1, "beyond"],
+    ]);
+    expect(runGate(run).outcome).toBe("block");
+  });
+
+  it("leave a no read out of its group, so a noisy fast job does not hold a slow group within", () => {
+    const noisy = jobRecord("a-1", 0.5, (round) => (round % 2 === 0 ? 1.3 : 0.75));
+    const run = gates([noisy, jobRecord("a-2", 1.5), jobRecord("a-3", 1.5)]);
+    expect(run[0]?.gate.outcome).toBe("no read");
+    const cases = runCases(run);
+    expect(cases.map((item) => [item.outcome, item.reads])).toEqual(IDS.map(() => ["beyond", 2]));
+    expect(cases[0]?.groups[0]?.jobs.map((job) => job.job)).toEqual(["a-2", "a-3"]);
+  });
+
+  it("keep the no reads: fewer than 3 jobs that read give no read, and no file gives no read", () => {
+    expect(runGate(gates([jobRecord("a-1", 1), jobRecord("a-2", 1)])).outcome).toBe("no read");
+    expect(runGate([0, 1, 2].map((index) => jobGate(jobRead(inRun(jobRecord(`a-${String(index)}`, 1))), undefined))).outcome).toBe("no read");
+  });
+
+  it("report each group near or beyond the limit, with its jobs and the value that decides", () => {
+    const records = [jobRecord("a-1", 1), jobRecord("a-2", 1.02), jobRecord("a-3", 1.5)].map((record) => inRun(record));
+    const run = gates(records);
+    const report = readReport(records.map(jobRead), run, undefined);
+    expect(report).toContain("| m12 | 3 | within | beyond |");
+    expect(report).toContain(`The groups with a job at ${String(NEAR * 100)}% of the limit or more. The lowest value of the group decides:`);
+    const m12 = groupCases(run, "m12")[0];
+    expect(report).toContain(`| m12 | r-1 | cpu-a | ${(m12?.limit ?? 0).toFixed(1)} | a-1: ${(m12?.ms ?? 0).toFixed(1)}, `);
+    expect(report).toMatch(/a-3: [\d.]+, 1\d\d\.\d%, beyond \| [\d.]+ \| within \|/);
+    const quiet = gates([jobRecord("a-1", 1), jobRecord("a-2", 1), jobRecord("a-3", 1)]);
+    expect(readReport([], quiet, undefined)).not.toContain("The groups with a job at");
+  });
+
+  it("mark a group at the ceiling in the report", () => {
+    const run = gates([jobRecord("b-3", 3, () => 1, B)]);
+    expect(readReport([], run, undefined)).toContain("| cpu-b (ceiling) |");
   });
 });
