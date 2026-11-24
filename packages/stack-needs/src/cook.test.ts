@@ -249,24 +249,27 @@ describe("the cook fragment with the catalog of market", () => {
   const propane: StoveFacts = { fuel: "fuel.propane", rate: { amount: 227, unit: "g", per: { amount: 90, unit: "min" }, fact: "test.stove-rate" } };
   const catalogInput: CookFragmentInput = { catalog: SUPPLY_CATALOG, units: { "food.rice-white-1kg": 4, "food.pasta-dry-1kg": 2, "food.beans-dry-1kg": 2 }, stove: propane, batch: { value: 0.5, unit: "kg" }, share: { value: 0.5, heating: "higher", cite: "test.share" } };
 
-  it("gives the fuel of rice from its cited water and time, and no fuel for pasta and beans", () => {
+  it("gives the fuel of rice, pasta and beans from their cited water and time", () => {
     const result = cookFragment(catalogInput);
+    const perMin = 0.227 / 90;
     const rice = lineOf(result.lines, "food.rice-white-1kg");
     expect(rice.water.read && rice.water.value).toBeCloseTo(2.5577, 4);
     const water = (rice.water.read ? rice.water.value : 0) * 0.5;
     const heat = (water * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100;
-    const perMin = 0.227 / 90;
     const minutes = heat / (perMin * 50327.01675450612 * 0.5) + 18;
     expect(rice.fuel.read && rice.fuel.value).toBeCloseTo(minutes * perMin, 9);
-    // Pasta has a cited time and no cited water. By time alone it looks cheaper than rice, so it is a no read.
+    // From market 0.8.8, the catalog cites the cook water of pasta and the soak and cook water of beans.
     const pasta = lineOf(result.lines, "food.pasta-dry-1kg");
-    expect(pasta.fuel.read).toBe(false);
-    // The catalog cites a soak for beans and no amount of water. Thus no water and no fuel.
     const beans = lineOf(result.lines, "food.beans-dry-1kg");
-    expect(beans.water.read).toBe(false);
-    expect(beans.fuel.read).toBe(false);
-    expect(result.layer.converters.map((converter) => converter.id)).toEqual(["cook:food.grain-dry"]);
-    expect(result.noReads.map((item) => item.resource)).toEqual(["food.pasta-dry", "food.legume-dry"]);
+    expect(pasta.water.read && pasta.water.value).toBeCloseTo(16.0232, 4);
+    expect(beans.water.read && beans.water.value).toBeCloseTo(3.6511, 4);
+    for (const line of [pasta, beans]) {
+      const pot = (line.water.read ? line.water.value : 0) * 0.5;
+      expect(line.heat.read && line.heat.value).toBeCloseTo((pot * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100, 6);
+      expect(line.fuel.read && line.minutes.read && line.fuel.value).toBeCloseTo((line.minutes.read ? line.minutes.value : 0) * perMin, 9);
+    }
+    expect(result.layer.converters.map((converter) => converter.id)).toEqual(["cook:food.grain-dry", "cook:food.pasta-dry", "cook:food.legume-dry"]);
+    expect(result.noReads).toEqual([]);
   });
 });
 

@@ -208,7 +208,7 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 
 A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
 
-The catalog of market gives no soak water. Thus a food that needs a soak, for example dry beans, has no soak draw. The beans of the catalog have no cited cook water, so they have no converter.
+Market gives the soak water of a dry food with `soakWater`. This function does not take it. Thus the water of a food with a soak, for example dry beans, is a lower limit. The cook water of beans and pasta gives their converters.
 
 The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
 

@@ -333,7 +333,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * the most water, the most fuel and the least food energy. When a line of the resource has no read, the resource has no converter.
  * A store of the resource from a different fragment gets the converter of this list.
  *
- * The catalog of market gives no soak water. A food that needs a soak, for example dry beans, has a second water draw that this function does not give.
+ * Market gives the soak water of a dry food with `soakWater`. This function does not take it. Thus the water of a food with a soak, for example dry beans, is a lower limit.
  * A product that gives more than one food has no energy for each food, so its energy is a no read.
  *
  * The cook water is `water.stored`, the store of the drinking water. A drinking draw at a higher level of the same store takes
