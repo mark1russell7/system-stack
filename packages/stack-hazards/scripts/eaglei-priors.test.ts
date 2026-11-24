@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "../src/check.ts";
-import { HAZARDS_SCHEMA, type HazardSource, type PriorTable } from "../src/hazard.ts";
+import { HAZARDS_SCHEMA, type CountyPooling, type HazardSource, type PriorTable } from "../src/hazard.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
+import { POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
 import { COUNTY_SCHEME, eaglePriors, PRIOR_LIMIT, priorModules } from "./eaglei-priors.ts";
 
 // Made-up counties of the made-up states 98 and 99. The county 99003 has no event, and the county 98001 has no customers.
@@ -30,7 +31,9 @@ describe("eaglePriors", () => {
   it("gives a table of the counties and a table of the states, with the observed regions and the rates", () => {
     const { county, state } = eaglePriors(record());
     expect(county).toMatchObject({ source: EAGLEI_SOURCE_ID, asOf: "2026-02-25", scheme: COUNTY_SCHEME, codes: ["99001", "99003"] });
-    expect(county.rates).toEqual({ [OUTAGE_CASE]: { "99001": [3, 0.1] }, "met.tornado": { "99001": [0.3333, 0.5] } });
+    // The county 99003 has no event, so its pooled rate comes from the law of its state. Its reach is the mean reach of the events of its state.
+    expect(county.rates).toEqual({ [OUTAGE_CASE]: { "99001": [2.899, 0.1], "99003": [0.1011, 0.1] }, "met.tornado": { "99001": [0.1667, 0.5], "99003": [0.1667, 0.5] } });
+    expect(county.method).toContain("perYear is the pooled rate of a county toward the counties of its state");
     expect(county.method).toContain("at or above 1% of its customers");
     expect(state).toMatchObject({ scheme: "us-state-fips", codes: ["99"] });
     // The state pools 99001 and 99003: 3 events in one year that reach 900 customers in one year, of the 4000 customers of the two counties.
@@ -58,7 +61,7 @@ describe("eaglePriors", () => {
     expect(county.codes).toEqual(["99003"]);
     // The customers of the nation keep each observed county, also the county over the limit.
     expect(nation).toBe(4000);
-    expect(county.rates[OUTAGE_CASE]).toEqual({});
+    expect(Object.keys(county.rates[OUTAGE_CASE] ?? {})).toEqual(["99003"]);
     expect(county.method).toContain(`more than ${String(PRIOR_LIMIT)} events at one customer in one year in a case is not in the table, so its prior is no read: 1 regions.`);
   });
 
@@ -85,13 +88,19 @@ describe("priorModules", () => {
       expect(text).toContain("// The run of the fit: https://example.org/runs/1 attempt 3.");
       expect(text).toContain("EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.0000/test.1");
       expect(text).toContain("share 0.01, interval 900 s");
-      const script = text.replace(/^import .*$/mu, "").replaceAll(/export const (\w+)(?:: PriorTable)? =/gu, "out.$1 =");
+      const script = text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: \w+)? =/gu, "out.$1 =");
       // The module is plain data, so its text with no types runs as a script.
       new Function("out", script)(out);
     }
     expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
     expect(out["EAGLEI_STATE_PRIORS"]).toEqual(tables.state);
     expect(out["EAGLEI_NATION_CUSTOMERS"]).toBe(tables.nation);
+    // The pooling keeps the shape Infinity of a law with no spread, and 4 digits of each law.
+    const pooling = out["EAGLEI_COUNTY_POOLING"] as unknown as CountyPooling;
+    expect(pooling.laws["met.tornado"]?.["99"]).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 0.1667, areas: 2, events: 1, from: "group" });
+    expect(pooling.laws[OUTAGE_CASE]?.["99"]).toEqual({ shape: 0.3252, mean: 1.5, areas: 2, events: 9, from: "group" });
+    expect(pooling.holdout).toMatchObject({ seed: POOL_HOLDOUT_SEED, rounds: 5 });
+    expect(Object.keys(pooling.holdout.cases)).toEqual(["infra.power.outage", "met.tornado"]);
     expect(tables.nation).toBe(4000);
   });
 });

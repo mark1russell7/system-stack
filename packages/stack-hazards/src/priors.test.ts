@@ -4,10 +4,10 @@ import { checkHazards } from "./check.ts";
 import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
 import type { OutageEvent } from "./outages.ts";
 import { HAZARD_LIST } from "./data.ts";
-import { EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
+import { EAGLEI_COUNTY_POOLING, EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
 import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_NATION_PRIORS } from "./oe417.ts";
-import { areaCounts, coverageTally, hazardPriors, observedRegions, regionRates, type Observation } from "./priors.ts";
+import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionRates, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
 const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, seconds: 3600, peak, censored: false });
@@ -117,6 +117,60 @@ describe("the rates of the regions", () => {
     expect(observedRegions(observation, state)).toEqual(["01", "02"]);
     expect(regionRates(counts, observation, state)["02"]).toBeUndefined();
     expect(observedRegions(observation, (area) => area)).not.toContain("02003");
+  });
+});
+
+describe("the pooled rates of the areas", () => {
+  // The state 99 has two counties with events. The state 98 has two observed counties and no event. The county 97001 has no customers.
+  const observation: Observation = { years: { "99001": 3, "99003": 3, "98001": 2, "98002": 4, "97001": 5 }, customers: { "99001": 3000, "99003": 1000, "98001": 10, "98002": 10 } };
+  const counts = { "99001": { events: 9, share: 0.9 }, "99003": { events: 3, share: 0.6 } };
+
+  it("moves the rate of each county toward the mean of its state, and keeps the events of the state", () => {
+    const { rates, laws } = pooledRates(counts, observation, state);
+    expect(laws["99"]).toMatchObject({ mean: 2, areas: 2, events: 12, from: "group" });
+    const [high, low] = [rates["99001"]?.[0] ?? 0, rates["99003"]?.[0] ?? 0];
+    // The raw rates are 3 and 1. Each pooled rate is between its raw rate and the mean of the state.
+    expect(high).toBeGreaterThan(2);
+    expect(high).toBeLessThan(3);
+    expect(low).toBeGreaterThan(1);
+    expect(low).toBeLessThan(2);
+    // With equal years, the pooled events of the state are its events.
+    expect((high + low) * 3).toBeCloseTo(12, 9);
+    // The reach of a county with events is the mean share of its events.
+    expect(rates["99003"]?.[1]).toBeCloseTo(0.2, 12);
+    expect(rates["97001"]).toBeUndefined();
+  });
+
+  it("gives a state with no event its pooled rate toward the states with events, and the mean reach of all events", () => {
+    const { rates, laws } = pooledRates(counts, observation, state);
+    const law = laws["98"];
+    expect(law).toMatchObject({ shape: Number.POSITIVE_INFINITY, areas: 2, events: 0, from: "nation" });
+    expect(law?.mean).toBeGreaterThan(0);
+    // The raw rate of the state 99 is 2. The rate of a state with no event is far under it.
+    expect(law?.mean).toBeLessThan(1);
+    expect(rates["98001"]).toEqual([law?.mean, 1.5 / 12]);
+    expect(rates["98002"]).toEqual(rates["98001"]);
+  });
+
+  it("gives no rate when no area has an event, and an area with no event in a state with events gets the mean reach of the state", () => {
+    expect(pooledRates({}, observation, state).rates).toEqual({});
+    const one = pooledRates({ "99001": { events: 2, share: 0.5 } }, observation, state).rates;
+    expect(one["99003"]?.[1]).toBe(0.25);
+  });
+
+  it("holds the gate of the committed table: in each case, the pooled rates score above the raw rates and the state rates on the held-out events", () => {
+    expect(EAGLEI_COUNTY_POOLING.holdout.rounds).toBeGreaterThanOrEqual(5);
+    const cases = Object.keys(EAGLEI_COUNTY_PRIORS.rates).sort();
+    expect(Object.keys(EAGLEI_COUNTY_POOLING.holdout.cases)).toEqual(cases);
+    for (const name of cases) {
+      const score = EAGLEI_COUNTY_POOLING.holdout.cases[name];
+      expect(score?.pooled, name).toBeGreaterThan(score?.state ?? Number.POSITIVE_INFINITY);
+      // The raw score is -Infinity when a county with no event in the fit half has an event in the score half. Thus the finite scores of the counties with events compare pooled with raw.
+      expect(score?.seen.pooled, name).toBeGreaterThan(score?.seen.raw ?? Number.POSITIVE_INFINITY);
+      expect(score?.squared.pooled, name).toBeLessThan(Math.min(score?.squared.raw ?? 0, score?.squared.state ?? 0));
+      // Each state with an observed county has a law in each case.
+      expect(Object.keys(EAGLEI_COUNTY_POOLING.laws[name] ?? {}).length, name).toBeGreaterThanOrEqual(50);
+    }
   });
 });
 

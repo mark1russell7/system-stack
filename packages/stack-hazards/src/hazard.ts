@@ -1,4 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
+import type { GammaRates } from "@mark1russell7/rigor-statistics";
 import type { Part, Survival } from "@mark1russell7/system-stack";
 
 // The model of the hazard cases: the reference parts of the public supplies, the sources, the cuts and the laws of their durations.
@@ -163,4 +164,51 @@ export interface HazardList {
   readonly hazards: readonly Hazard[];
   /** The tables of the yearly priors of the cases. A case with no table for the region of the user has no prior. */
   readonly priors?: readonly PriorTable[] | undefined;
+}
+
+/** The gamma law of the rates of the areas of one group, with the count of its areas and of their events. */
+export interface PoolLaw extends GammaRates {
+  /** The count of the observed areas of the group. */
+  readonly areas: number;
+  /** The sum of the events of the areas of the group. */
+  readonly events: number;
+  /** `group` for a law of the fit of the group. `nation` for a group with no event: its mean is its pooled rate toward the groups with events. */
+  readonly from: "group" | "nation";
+}
+
+/** The scores of the methods of one case in a holdout of the pooled rates (`scripts/eaglei-pooling.ts`). Each score is a sum over the counties. */
+export interface PoolScore {
+  /** The Poisson log-likelihood of the score half with the rate of each county from its own events: its events over its years. */
+  readonly raw: number;
+  /** The pooled rate of each county toward the counties of its state (`pooledRates`). */
+  readonly pooled: number;
+  /**
+   * One rate for each county of a state: the events of the state over the years of its counties.
+   * A state with no event in the fit half gets the mean of its law in `pooledRates`. Thus the two methods have the same rate for it.
+   */
+  readonly state: number;
+  /** The count of the counties with a raw rate of 0 and one event or more in the score half. Each one gives a raw score of `-Infinity`. */
+  readonly lost: number;
+  /** The sums of the squared errors of the counts of the score half: `(count - rate * years)^2`. They are finite for each method. */
+  readonly squared: { readonly raw: number; readonly pooled: number; readonly state: number };
+  /**
+   * The Poisson log-likelihoods of the counties with one event or more in the fit half, and the count of these counties.
+   * Each raw rate of these counties is above 0, so each score is finite. It compares the raw rates with the other methods when `raw` is `-Infinity`.
+   */
+  readonly seen: { readonly raw: number; readonly pooled: number; readonly state: number; readonly areas: number };
+}
+
+/** The holdout of each case of a fit, with its seed. */
+export interface PoolHoldout {
+  readonly seed: number;
+  /** The number of splits of each case. Each score is the mean of the scores of the splits. */
+  readonly rounds: number;
+  readonly cases: Readonly<Record<string, PoolScore>>;
+}
+
+/** The pooling of the county rates of one fit: the law of each state in each case, and the holdout. The holdout is the gate of the pooled rates. */
+export interface CountyPooling {
+  /** The law of each state with an observed county, by the code of the case and the code of the state. */
+  readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
+  readonly holdout: PoolHoldout;
 }

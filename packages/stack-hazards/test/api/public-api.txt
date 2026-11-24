@@ -15,6 +15,7 @@ CauseOptions: build/index.d.ts#CauseOptions
 CauseTally: build/index.d.ts#CauseTally
 Claim: build/hazard.chunk.d.ts#Claim
 ClaimBasis: build/hazard.chunk.d.ts#ClaimBasis
+CountyPooling: build/hazard.chunk.d.ts#CountyPooling
 CoverageTally: build/index.d.ts#CoverageTally
 DurationLaw: build/hazard.chunk.d.ts#DurationLaw
 EAGLEI_NATION_CUSTOMERS: build/index.d.ts#EAGLEI_NATION_CUSTOMERS
@@ -71,6 +72,10 @@ OutageOptions: build/index.d.ts#OutageOptions
 OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
+PoolHoldout: build/hazard.chunk.d.ts#PoolHoldout
+PoolLaw: build/hazard.chunk.d.ts#PoolLaw
+PoolScore: build/hazard.chunk.d.ts#PoolScore
+PooledRates: build/index.d.ts#PooledRates
 PriorTable: build/hazard.chunk.d.ts#PriorTable
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
@@ -101,6 +106,7 @@ oe417IsAttack: build/index.d.ts#oe417IsAttack
 oe417LawEvents: build/index.d.ts#oe417LawEvents
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
+pooledRates: build/index.d.ts#pooledRates
 priorTableFaults: build/index.d.ts#priorTableFaults
 regionRates: build/index.d.ts#regionRates
 stormCauses: build/index.d.ts#stormCauses
@@ -111,9 +117,13 @@ zoneCounties: build/index.d.ts#zoneCounties
 
 ## ./county-priors (build/eaglei-county-priors.d.ts): names
 
+EAGLEI_COUNTY_POOLING: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_POOLING
 EAGLEI_COUNTY_PRIORS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
 
 ## Declarations
+
+### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_POOLING
+export declare const EAGLEI_COUNTY_POOLING: CountyPooling;
 
 ### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
 export declare const EAGLEI_COUNTY_PRIORS: PriorTable;
@@ -136,6 +146,12 @@ type Claim = {
 
 ### build/hazard.chunk.d.ts#ClaimBasis
 type ClaimBasis = (typeof CLAIM_BASES)[number];
+
+### build/hazard.chunk.d.ts#CountyPooling
+interface CountyPooling {
+  readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
+  readonly holdout: PoolHoldout;
+}
 
 ### build/hazard.chunk.d.ts#DurationLaw
 interface DurationLaw {
@@ -194,6 +210,39 @@ type IsoDate = string;
 interface NoLaw {
   readonly read: false;
   readonly reason: string;
+}
+
+### build/hazard.chunk.d.ts#PoolHoldout
+interface PoolHoldout {
+  readonly seed: number;
+  readonly rounds: number;
+  readonly cases: Readonly<Record<string, PoolScore>>;
+}
+
+### build/hazard.chunk.d.ts#PoolLaw
+interface PoolLaw extends GammaRates {
+  readonly areas: number;
+  readonly events: number;
+  readonly from: "group" | "nation";
+}
+
+### build/hazard.chunk.d.ts#PoolScore
+interface PoolScore {
+  readonly raw: number;
+  readonly pooled: number;
+  readonly state: number;
+  readonly lost: number;
+  readonly squared: {
+    readonly raw: number;
+    readonly pooled: number;
+    readonly state: number;
+  };
+  readonly seen: {
+    readonly raw: number;
+    readonly pooled: number;
+    readonly state: number;
+    readonly areas: number;
+  };
 }
 
 ### build/hazard.chunk.d.ts#PriorTable
@@ -460,6 +509,12 @@ export interface OutageTally {
   readonly joined: number;
 }
 
+### build/index.d.ts#PooledRates
+export interface PooledRates {
+  readonly rates: Record<string, readonly [number, number]>;
+  readonly laws: Record<string, PoolLaw>;
+}
+
 ### build/index.d.ts#RegionCurve
 export interface RegionCurve {
   readonly curve: Survival;
@@ -564,6 +619,9 @@ export declare function outageCurves(events: readonly OutageEvent[], region: (ar
 
 ### build/index.d.ts#outageReader
 export declare function outageReader(options: OutageOptions): OutageReader;
+
+### build/index.d.ts#pooledRates
+export declare function pooledRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string): PooledRates;
 
 ### build/index.d.ts#priorTableFaults
 export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[];
