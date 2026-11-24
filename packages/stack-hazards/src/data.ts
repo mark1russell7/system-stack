@@ -1,4 +1,5 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
+import { OE417_SOURCE } from "./oe417.ts";
 import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
@@ -114,6 +115,7 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   "nws.flood": nws("Flood safety", "flood"),
   "nws.wildfire": nws("Wildfire safety", "wildfire"),
   "nws.heat": nws("Heat safety", "heat"),
+  "doe.oe-417": OE417_SOURCE,
   "eaglei.outages": EAGLEI_SOURCE,
   "noaa.storm-events": STORM_EVENTS_SOURCE,
   "nws.zone-county": ZONE_COUNTY_SOURCE,
@@ -139,19 +141,19 @@ export const NO_FOLLOW_LAW: NoLaw = { read: false, reason: "This cut follows the
 export const NO_COLLAPSE_LAW: NoLaw = {
   read: false,
   reason:
-    "The event summaries of DOE tell of one long collapse: the grid of Puerto Rico after Hurricane Maria in 2017. Their first counts of the customers out are estimates from the load. One event gives no law. The law of EAGLE-I is from usual outages.",
+    "The event summaries of DOE tell of one long collapse: the grid of Puerto Rico after Hurricane Maria in 2017. The first counts of the customers out in those event summaries are estimates from the load. The OE-417 summary of 2017 has no row of Puerto Rico, but the OE-417 summaries of 2004 to 2016 have rows of Puerto Rico. The OE-417 summaries give the time of the last restoration of each event, not the time of most customers. The OE-417 events of 14 days or more are storms with a long tail of restoration, for example Hurricane Ike in 2008. One event gives no law. The law of EAGLE-I is from usual outages.",
 };
 
-/** The duration of the grid cut of a cyberattack. The sources read tell of one grid outage from a cyberattack, with no duration. */
+/** The duration of the grid cut of a cyberattack. The sources read tell of two events of a cyberattack with a loss. */
 export const NO_CYBER_LAW: NoLaw = {
   read: false,
-  reason: "The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack: about 225,000 customers in Ukraine in 2015. It gives no duration. One event gives no law.",
+  reason: "The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack: about 225,000 customers in Ukraine in 2015. It gives no duration. The OE-417 summaries of 2000 to 2023 list 42 cyber events. Only one tells of a loss: 29 MW in Georgia in 2021, for 103 hours, with an unknown count of customers. Two events give no law.",
 };
 
 /** The duration of the grid cut of a solar storm. The sources read tell of three blackouts from space weather. */
 export const NO_GEOMAGNETIC_LAW: NoLaw = {
   read: false,
-  reason: "The page of NOAA SWPC names three blackouts from space weather, in 1958, 1989 and 2003. Only the blackout of 1989 in Canada has a duration: 9 hours. Three events give no law.",
+  reason: "The page of NOAA SWPC names three blackouts from space weather, in 1958, 1989 and 2003. Only the blackout of 1989 in Canada has a duration: 9 hours. The OE-417 summaries of 2000 to 2023 list no event whose type names a geomagnetic, solar, magnetic or space weather cause. Three events give no law.",
 };
 
 /** The sources that each storm case examined for the law of its grid cut. */
@@ -358,7 +360,8 @@ export const HAZARD_LIST: HazardList = {
       case: "infra.power.grid-collapse",
       title: "Long collapse of the power grid",
       // The event summaries of DOE on Hurricane Maria tell of the one long collapse in the records read. One event gives no law.
-      examined: ["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21"],
+      // The OE-417 summaries give the last restoration of each event, so their long storms do not tell the duration of a collapse.
+      examined: ["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21", "doe.oe-417"],
       cuts: [
         {
           part: "power.grid",
@@ -373,7 +376,7 @@ export const HAZARD_LIST: HazardList = {
     {
       case: "cyber.infrastructure-attack",
       title: "Cyberattack on the infrastructure",
-      examined: ["ready.cybersecurity", "cisa.ir-alert-h-16-056-01"],
+      examined: ["ready.cybersecurity", "cisa.ir-alert-h-16-056-01", "doe.oe-417"],
       cuts: [
         {
           part: "power.grid",
@@ -433,7 +436,7 @@ export const HAZARD_LIST: HazardList = {
     {
       case: "geo.space-weather.geomagnetic-storm",
       title: "Solar storm",
-      examined: ["ready.space-weather", "swpc.electric-power"],
+      examined: ["ready.space-weather", "swpc.electric-power", "doe.oe-417"],
       cuts: [
         {
           part: "power.grid",

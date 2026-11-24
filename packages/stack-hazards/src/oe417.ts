@@ -1,0 +1,136 @@
+import { kaplanMeier } from "@mark1russell7/rigor-statistics";
+import type { DurationLaw, Source } from "./hazard.ts";
+import { survivalOf, type SurvivalOptions } from "./law.ts";
+import { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS } from "./oe417-events.ts";
+
+// The law of the duration of a physical attack on the grid, from the events of the OE-417 annual summaries of DOE.
+
+/** The annual summary of one year: its id at DOE, its format, its address and the archived copy that was read. */
+export interface Oe417File {
+  readonly id: number;
+  readonly format: string;
+  readonly url: string;
+  /** The address of the archived copy that was read. The host of DOE did not answer the read. */
+  readonly archive: string;
+}
+
+/** One event of an annual summary, as the summary prints it. */
+export interface Oe417Event {
+  /** The year of the summary. */
+  readonly year: number;
+  /** The local time at which the event began, as `YYYY-MM-DDTHH:MM`, or `null` when the summary gives no time. */
+  readonly began: string | null;
+  /** The local time of the restoration, as `YYYY-MM-DDTHH:MM`, or `null` when the summary gives no time. */
+  readonly restored: string | null;
+  readonly area: string;
+  /** The type of the event, as the summary prints it. */
+  readonly type: string;
+  /** The count of the customers, as the summary prints it. */
+  readonly customers: string;
+  /** The loss of load in megawatts, as the summary prints it. */
+  readonly megawatts: string;
+}
+
+/** The counts of the events of one annual summary. */
+export interface Oe417Year {
+  /** The count of the events that the summary prints. A second row of an event is not in this count. */
+  readonly rows: number;
+  /** The count of the second rows: rows equal to an earlier row of the summary, but with no start. */
+  readonly copies: number;
+  /** The count of the events whose type `oe417IsAttack` accepts. */
+  readonly attacks: number;
+  /** The count of the events of an attack with a loss of customers or load: the events of `OE417_ATTACK_EVENTS`. */
+  readonly kept: number;
+  /** The count of the events whose type matches `OE417_CYBER_TERMS`. */
+  readonly cyber: number;
+  /** The count of the cyber events with a loss of customers or load. */
+  readonly cyberLoss: number;
+  /** The count of the events whose type matches `OE417_SPACE_WEATHER_TERMS`. */
+  readonly spaceWeather: number;
+}
+
+/** The terms of a type of an attack. Two of them are misspelled words that the summaries print. */
+export const OE417_ATTACK_TERMS: RegExp = /physical|physcial|vandal|sabota|sabatoge|theft/iu;
+
+/** The terms of a type that is not a proved attack: a suspicion, a threat, a possible attack or a cyber event. "Suspcious" is a misspelled word that a summary prints. */
+export const OE417_NOT_ATTACK_TERMS: RegExp = /suspect|suspicious|suspcious|potential|threat|cyber/iu;
+
+/** The terms of a type of a cyber event. */
+export const OE417_CYBER_TERMS: RegExp = /cyber/iu;
+
+/** The terms of a type of an event from space weather. */
+export const OE417_SPACE_WEATHER_TERMS: RegExp = /geomag|solar|space weather|magnetic/iu;
+
+/** The shortest duration that a law reads, in hours. It is 15 minutes, as for the outages of EAGLE-I. */
+export const OE417_LEAST_HOURS = 0.25;
+
+/** The source of the law of a physical attack: the OE-417 annual summaries of 2000 to 2023. */
+export const OE417_SOURCE: Source = {
+  name: "Electric Disturbance Events (OE-417) annual summaries, 2000 to 2023",
+  url: "https://www.oe.netl.doe.gov/OE417_annual_summary.aspx",
+  publisher: "U.S. Department of Energy, Office of Cybersecurity, Energy Security, and Emergency Response",
+  license: { name: "Public domain (a work of the United States federal government)", url: "https://www.copyright.gov/title17/92chap1.html#105" },
+  read: "2026-11-24",
+  regions: { scheme: "us-nation", codes: ["US"] },
+};
+
+/** This function tells if the type of an event is a proved attack: a physical attack, vandalism, sabotage or theft, and not a suspicion. */
+export function oe417IsAttack(type: string): boolean {
+  return OE417_ATTACK_TERMS.test(type) && !OE417_NOT_ATTACK_TERMS.test(type);
+}
+
+/** This function gives the first number of a count of a summary, for example 45000 for "45,000". It gives `NaN` for a text with no number, for example "Unknown". */
+export function oe417Count(text: string): number {
+  return Number(text.replace(/,/gu, "").match(/\d+(\.\d+)?/u)?.[0] ?? Number.NaN);
+}
+
+/**
+ * This function gives the duration of an event in hours, from its local times.
+ * It gives `undefined` when the event has no time of its start or of its restoration, or when the restoration is not after the start.
+ * The times are local times, so an event across a change of the clock can be one hour off.
+ */
+export function oe417Hours(event: Oe417Event): number | undefined {
+  if (event.began === null || event.restored === null) return undefined;
+  const hours = (Date.parse(`${event.restored}Z`) - Date.parse(`${event.began}Z`)) / 3_600_000;
+  return Number.isFinite(hours) && hours > 0 ? hours : undefined;
+}
+
+/**
+ * This function gives the law of the time for which the customers of a physical attack on the grid have no power.
+ * The law has one survival curve in days for the nation.
+ *
+ * - It reads only the events with more than 0 customers. A count of megawatts with no customers can be a load or a rating, not a loss of power at a home.
+ * - It reads each event with a duration of 15 minutes or more as an end.
+ * - An event with a start and no time of the restoration was most likely open when its form was sent. The law reads it as censored at the longest read duration: it lasts at least that long.
+ * - Thus the curve has an open tail, which falls to 0 at the `end` of the options. To leave the open events out gives a lower curve, which is not safe for a plan.
+ *
+ * @param events - The events of the summaries, for example `OE417_ATTACK_EVENTS`
+ * @param options - The form of the curve
+ */
+export function oe417AttackLaw(events: readonly Oe417Event[], options: SurvivalOptions = {}): DurationLaw {
+  const homes = events.filter((event) => oe417Count(event.customers) > 0);
+  const ends = homes.flatMap((event) => {
+    const hours = oe417Hours(event);
+    return hours !== undefined && hours >= OE417_LEAST_HOURS ? [hours / 24] : [];
+  });
+  if (ends.length === 0) throw new RangeError("oe417AttackLaw: no event with customers has a duration of 15 minutes or more.");
+  const longest = Math.max(...ends);
+  const open = homes.filter((event) => event.began !== null && event.restored === null).length;
+  const estimate = kaplanMeier([...ends.map((time) => ({ time })), ...(open > 0 ? [{ time: longest, censored: true, count: open }] : [])]);
+  return {
+    read: true,
+    source: "doe.oe-417",
+    fit: {
+      family: "kaplan-meier",
+      method: `product limit of the events with customers; ${String(open)} events with no time of the restoration are censored at the longest read duration`,
+      count: estimate.count,
+    },
+    scheme: "us-nation",
+    curves: { US: survivalOf(estimate, options) },
+  };
+}
+
+/** The law of the time for which the customers of a physical attack on the grid have no power. It reads the events of the summaries with customers. */
+export const OE417_ATTACK_LAW: DurationLaw = oe417AttackLaw(OE417_ATTACK_EVENTS);
+
+export { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS };
