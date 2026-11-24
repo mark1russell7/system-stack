@@ -51,11 +51,17 @@ export interface HazardFault extends Fault {
   readonly code: HazardCode;
 }
 
+/** The options of the gate of a list of hazard cases: the date options of the source gate of the guidebook. */
+export type HazardGateOptions = Pick<GateOptions, "at" | "maxAgeDays">;
+
 /**
  * This function gives each fault of a list of hazard cases. A list with no error tells that the gate passes.
  * The reference parts are `SUPPLY_PARTS` by default. The faults are in the order of the list. The function is pure.
+ *
+ * With the option `at`, the source gate also examines the check date of each source. A check after `at` is an error.
+ * A check older than `maxAgeDays` (365 by default) is a warning. Both have the code `hazards-source`.
  */
-export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_PARTS): HazardFault[] {
+export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_PARTS, options: HazardGateOptions = {}): HazardFault[] {
   const faults: HazardFault[] = [];
   const add = (level: "error" | "warning", code: HazardCode, at: string, message: string): void => {
     faults.push({ level, code, at, message });
@@ -71,7 +77,8 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     }
   }
   // The gate of the guidebook gets the key of each source as its id, so the path of each finding is a key of the table.
-  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })), SOURCE_RULES)) {
+  const dates: HazardGateOptions = { ...(options.at === undefined ? {} : { at: options.at }), ...(options.maxAgeDays === undefined ? {} : { maxAgeDays: options.maxAgeDays }) };
+  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })), { ...SOURCE_RULES, ...dates })) {
     add(finding.level, sourceCode(finding.code), `sources.${finding.id}`, `${finding.message} (${finding.code})`);
   }
   // A source with a fault of its license gives one finding. The laws and the tables of priors of that source give no second finding.

@@ -278,6 +278,27 @@ describe("the gate of the cuts and the sources", () => {
     expect(codes(withLaw(LAW, { ...SOURCE, terms: "http://data.example.net/terms" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, title: " " }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, checked: "21.11.2026" }))).toEqual(["hazards-source"]);
+  });
+
+  it("examines the check date of each source at the date of the gate", () => {
+    const list = withLaw(LAW);
+    const at = (date: string, maxAgeDays?: number): string[] =>
+      checkHazards(list, undefined, maxAgeDays === undefined ? { at: date } : { at: date, maxAgeDays }).map((fault) => `${fault.level}:${fault.code}:${fault.at}`);
+    // Without a date, the gate does not examine the age of a check.
+    expect(checkHazards(list)).toEqual([]);
+    expect(at("2026-11-24")).toEqual([]);
+    // A check after the date of the gate is an error.
+    expect(at("2026-11-20")).toEqual(["error:hazards-source:sources.outages"]);
+    // A check older than the limit is a warning.
+    expect(at("2027-12-01")).toEqual(["warning:hazards-source:sources.outages"]);
+    expect(at("2026-12-01", 7)).toEqual(["warning:hazards-source:sources.outages"]);
+    expect(checkHazards(list, undefined, { at: "2026-11-20" })[0]?.message).toContain("(checked-in-future)");
+  });
+
+  it("passes the list of the package at a date after each of its checks", () => {
+    const faults = checkHazards(HAZARD_LIST, undefined, { at: "2026-11-24" });
+    expect(faults.filter((fault) => fault.level === "error")).toEqual([]);
+    expect(faults.filter((fault) => fault.code === "hazards-source")).toEqual([]);
     expect(codes(withLaw(LAW, { ...SOURCE, updated: "2026-11-22" }))).toEqual(["hazards-source"]);
     const [fault] = checkHazards(withLaw(LAW, { ...SOURCE, url: "ftp://data.example.net" }));
     expect(fault).toMatchObject({ level: "error", at: "sources.outages" });

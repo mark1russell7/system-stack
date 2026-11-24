@@ -30,6 +30,7 @@ HazardCaseOptions: build/index.d.ts#HazardCaseOptions
 HazardCode: build/index.d.ts#HazardCode
 HazardCut: build/hazard.chunk.d.ts#HazardCut
 HazardFault: build/index.d.ts#HazardFault
+HazardGateOptions: build/index.d.ts#HazardGateOptions
 HazardList: build/hazard.chunk.d.ts#HazardList
 HazardPriorOptions: build/index.d.ts#HazardPriorOptions
 HazardRegion: build/index.d.ts#HazardRegion
@@ -276,6 +277,9 @@ export interface HazardFault extends Fault {
   readonly code: HazardCode;
 }
 
+### build/index.d.ts#HazardGateOptions
+export type HazardGateOptions = Pick<GateOptions, "at" | "maxAgeDays">;
+
 ### build/index.d.ts#HazardPriorOptions
 export interface HazardPriorOptions extends Pick<HazardCaseOptions, "region"> {
   readonly place?: string | undefined;
@@ -478,7 +482,7 @@ export interface SurvivalOptions {
 export declare function areaCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, AreaCount>;
 
 ### build/index.d.ts#checkHazards
-export declare function checkHazards(list: HazardList, parts?: readonly Part[]): HazardFault[];
+export declare function checkHazards(list: HazardList, parts?: readonly Part[], options?: HazardGateOptions): HazardFault[];
 
 ### build/index.d.ts#coverageTally
 export declare function coverageTally(): CoverageTally;
