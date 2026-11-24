@@ -23,6 +23,10 @@ on:
         description: Also count the events with each join time of the sweep (0, 1, 4, 12 and 24 hours)
         type: boolean
         default: false
+      raise:
+        description: Read the files two times, and use the count that a county reached on 4 different days as its customers when the file gives fewer
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -56,11 +60,13 @@ jobs:
           SHARE: ${{ inputs.share }}
           JOIN: ${{ inputs.join }}
           SWEEP: ${{ inputs.sweep }}
+          RAISE: ${{ inputs.raise }}
         run: |
           args=(--years "$YEARS" --out out/eaglei-laws.json)
           if [ -n "$SHARE" ]; then args+=(--share "$SHARE"); fi
           if [ -n "$JOIN" ]; then args+=(--join "$JOIN"); fi
           if [ "$SWEEP" = "true" ]; then args+=(--sweep); fi
+          if [ "$RAISE" = "true" ]; then args+=(--raise); fi
           node packages/stack-hazards/scripts/eaglei-fit.ts "${args[@]}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
