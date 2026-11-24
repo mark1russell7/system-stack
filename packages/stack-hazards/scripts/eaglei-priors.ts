@@ -1,12 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import type { CountyPooling, PriorTable } from "../src/hazard.ts";
+import type { CountyPooling, PoolHoldout, PoolLaw, PriorTable, StatePooling } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
-import { observedRegions, pooledRates, regionRates, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
+import { observedRegions, pooledRates, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
 import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
-import { poolHoldout } from "./eaglei-pooling.ts";
+import { poolHoldout, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
 
 export { PRIOR_LIMIT };
 
@@ -16,6 +16,9 @@ export { PRIOR_LIMIT };
 
 /** The scheme of the codes of the counties: the 5-digit FIPS code. */
 export const COUNTY_SCHEME = "us-county-fips";
+
+/** The code of the one group of the states in the pool of the state rates. */
+export const NATION_GROUP = "nation";
 
 /** The significant digits of a rate in the module. */
 const DIGITS = 4;
@@ -28,6 +31,8 @@ export interface EaglePriorTables {
   readonly nation: number;
   /** The laws of the pooled rates of the counties, and their holdout. */
   readonly pooling: CountyPooling;
+  /** The laws of the pooled rates of the states, and their holdout. */
+  readonly statePooling: StatePooling;
 }
 
 /** The rates of the regions of one case, from the counts of the areas. */
@@ -83,11 +88,18 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
       rates: Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
     };
   };
+  // Each state is an area of the one group of the nation: its events over the plain mean of the years of its counties.
+  const states = regionObservation(observation, eagleRegion);
+  const stateCounts = Object.fromEntries(Object.entries(priors.counts).map(([name, counts]) => [name, regionCounts(counts, observation, eagleRegion)]));
+  const nationGroup = (): string => NATION_GROUP;
+  const statePooled = Object.fromEntries(Object.entries(stateCounts).map(([name, counts]) => [name, pooledRates(counts, states, nationGroup)]));
   const state = table(
     laws.scheme,
     eagleRegion,
-    (_name, counts, observation) => regionRates(counts, observation, eagleRegion),
-    "perYear is the sum of the events of each county of a state over its years. reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year.",
+    (name) => statePooled[name]?.rates ?? {},
+    "perYear is the pooled rate of a state toward the states of the nation: a gamma law of the rates of the states in the case, and the mean of the rate of the state after its events. " +
+      "The events of a state are the events of its counties, and its years are the plain mean of the years of its counties. A state with no event of a case gets a rate near 0, not 0. " +
+      "reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year. A state with no event gets the plain mean of the reach of the states with events.",
   );
   // Each observed county, also in a state that the limit keeps out of the table: a later fit cannot change the reach of a national prior through the limit.
   const nation = observedRegions(observation, (area) => area).reduce((sum, area) => sum + (observation.customers[area] ?? 0), 0);
@@ -109,6 +121,10 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
       laws: Object.fromEntries(Object.entries(pooled).map(([name, entry]) => [name, entry.laws])),
       holdout: poolHoldout({ ...priors, observation }),
       silent: { areas: quiet.silent.length, expected: quiet.expected },
+    },
+    statePooling: {
+      laws: Object.fromEntries(Object.entries(statePooled).map(([name, entry]) => [name, entry.laws[NATION_GROUP] ?? { shape: Number.POSITIVE_INFINITY, mean: 0, areas: 0, events: 0, from: "group" }])),
+      holdout: poolHoldout({ observation: states, counts: stateCounts }, POOL_HOLDOUT_SEED, POOL_HOLDOUT_ROUNDS, nationGroup),
     },
   };
 }
@@ -140,15 +156,25 @@ function literal(value: unknown): string {
   return text.replaceAll(`"${mark}+"`, "Infinity").replaceAll(`"${mark}-"`, "-Infinity");
 }
 
-/** This function gives the pooling with `DIGITS` significant digits in each law and one decimal in each score. Thus a new fit changes few lines. */
-function roundedPooling(pooling: CountyPooling): CountyPooling {
-  const digits = (value: number): number => (Number.isFinite(value) ? Number(value.toPrecision(DIGITS)) : value);
-  const tenth = (value: number): number => (Number.isFinite(value) ? Math.round(value * 10) / 10 : value);
-  const laws = Object.fromEntries(
-    Object.entries(pooling.laws).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).map(([code, law]) => [code, { ...law, shape: digits(law.shape), mean: digits(law.mean) }]))]),
-  );
+/** This function gives a number with `DIGITS` significant digits. A number that is not finite does not change. */
+function digits(value: number): number {
+  return Number.isFinite(value) ? Number(value.toPrecision(DIGITS)) : value;
+}
+
+/** This function gives a number with one decimal. A number that is not finite does not change. */
+function tenth(value: number): number {
+  return Number.isFinite(value) ? Math.round(value * 10) / 10 : value;
+}
+
+/** This function gives a law with `DIGITS` significant digits in its shape and its mean. */
+function roundedLaw(law: PoolLaw): PoolLaw {
+  return { ...law, shape: digits(law.shape), mean: digits(law.mean) };
+}
+
+/** This function gives a holdout with one decimal in each score, and `DIGITS` significant digits in each score of the reach. */
+function roundedHoldout(holdout: PoolHoldout): PoolHoldout {
   const cases = Object.fromEntries(
-    Object.entries(pooling.holdout.cases).map(([name, score]) => [
+    Object.entries(holdout.cases).map(([name, score]) => [
       name,
       {
         raw: tenth(score.raw),
@@ -165,7 +191,18 @@ function roundedPooling(pooling: CountyPooling): CountyPooling {
       },
     ]),
   );
-  return { laws, holdout: { seed: pooling.holdout.seed, rounds: pooling.holdout.rounds, cases }, silent: { areas: pooling.silent.areas, expected: digits(pooling.silent.expected) } };
+  return { seed: holdout.seed, rounds: holdout.rounds, cases };
+}
+
+/** This function gives the pooling with `DIGITS` significant digits in each law and one decimal in each score. Thus a new fit changes few lines. */
+function roundedPooling(pooling: CountyPooling): CountyPooling {
+  const laws = Object.fromEntries(Object.entries(pooling.laws).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).map(([code, law]) => [code, roundedLaw(law)]))]));
+  return { laws, holdout: roundedHoldout(pooling.holdout), silent: { areas: pooling.silent.areas, expected: digits(pooling.silent.expected) } };
+}
+
+/** This function gives the pooling of the states with `DIGITS` significant digits in each law and one decimal in each score. */
+function roundedStatePooling(pooling: StatePooling): StatePooling {
+  return { laws: Object.fromEntries(Object.entries(pooling.laws).map(([name, law]) => [name, roundedLaw(law)])), holdout: roundedHoldout(pooling.holdout) };
 }
 
 /** The modules of the tables of a fit, by the name of their file in `src/`. */
@@ -186,6 +223,7 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
     "",
   ];
   const pooling = roundedPooling(tables.pooling);
+  const statePooling = roundedStatePooling(tables.statePooling);
   return {
     "eaglei-county-priors.ts": [
       ...head.slice(0, -2),
@@ -204,8 +242,16 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       "",
     ].join("\n"),
     "eaglei-state-priors.ts": [
-      ...head,
+      ...head.slice(0, -2),
+      'import type { PriorTable, StatePooling } from "./hazard.ts";',
+      "",
       ...tableLines("EAGLEI_STATE_PRIORS", "The yearly priors of the power outage and of each storm case in each state, from the outages of the counties of the state.", tables.state),
+      "",
+      "/** The gamma law of the rates of the states in each case. The holdout compares the pooled rates with the raw rates and the rate of the nation. */",
+      "export const EAGLEI_STATE_POOLING: StatePooling = {",
+      `  holdout: ${literal(statePooling.holdout)},`,
+      `  laws: ${literal(statePooling.laws)},`,
+      "};",
       "",
       "/** The sum of the customers of each observed county of the fit, also in a state over the limit of the table. A table of priors for the nation divides by it for a reach. */",
       `export const EAGLEI_NATION_CUSTOMERS = ${String(tables.nation)};`,

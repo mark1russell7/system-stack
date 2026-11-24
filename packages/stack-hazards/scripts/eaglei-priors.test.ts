@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "../src/check.ts";
-import { HAZARDS_SCHEMA, type CountyPooling, type HazardSource, type PriorTable } from "../src/hazard.ts";
+import { HAZARDS_SCHEMA, type CountyPooling, type HazardSource, type PriorTable, type StatePooling } from "../src/hazard.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
@@ -37,6 +37,7 @@ describe("eaglePriors", () => {
     expect(county.method).toContain("perYear is the pooled rate of a county toward the counties of its state");
     expect(county.method).toContain("at or above 1% of its customers");
     expect(state).toMatchObject({ scheme: "us-state-fips", codes: ["99"] });
+    expect(state.method).toContain("perYear is the pooled rate of a state toward the states of the nation");
     // The state has the observed county 99001: 3 events in one year that reach 900 customers in one year, of its 3000 customers.
     expect(state.rates[OUTAGE_CASE]?.["99"]).toEqual([3, 0.1]);
     expect(eaglePriors(record({ options: { share: 0.05, interval: 900 } })).county.method).toContain("at or above 5% of its customers");
@@ -96,6 +97,11 @@ describe("priorModules", () => {
     expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
     expect(out["EAGLEI_STATE_PRIORS"]).toEqual(tables.state);
     expect(out["EAGLEI_NATION_CUSTOMERS"]).toBe(tables.nation);
+    // The pooling of the states has the one law of the nation in each case, and its holdout.
+    const statePooling = out["EAGLEI_STATE_POOLING"] as unknown as StatePooling;
+    expect(statePooling.laws[OUTAGE_CASE]).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 3, areas: 1, events: 9, from: "group" });
+    expect(statePooling.holdout).toMatchObject({ seed: POOL_HOLDOUT_SEED, rounds: 5 });
+    expect(Object.keys(statePooling.holdout.cases)).toEqual(["infra.power.outage", "met.tornado"]);
     // The pooling keeps the shape Infinity of a law with no spread, and 4 digits of each law.
     const pooling = out["EAGLEI_COUNTY_POOLING"] as unknown as CountyPooling;
     expect(pooling.laws["met.tornado"]?.["99"]).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 0.3333, areas: 1, events: 1, from: "group" });

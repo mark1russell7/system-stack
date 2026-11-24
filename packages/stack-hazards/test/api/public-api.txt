@@ -19,6 +19,7 @@ CountyPooling: build/hazard.chunk.d.ts#CountyPooling
 CoverageTally: build/index.d.ts#CoverageTally
 DurationLaw: build/hazard.chunk.d.ts#DurationLaw
 EAGLEI_NATION_CUSTOMERS: build/index.d.ts#EAGLEI_NATION_CUSTOMERS
+EAGLEI_STATE_POOLING: build/index.d.ts#EAGLEI_STATE_POOLING
 EAGLEI_STATE_PRIORS: build/index.d.ts#EAGLEI_STATE_PRIORS
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
@@ -94,6 +95,7 @@ STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
 SilentAreas: build/index.d.ts#SilentAreas
+StatePooling: build/hazard.chunk.d.ts#StatePooling
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
@@ -127,6 +129,8 @@ outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
 priorTableFaults: build/index.d.ts#priorTableFaults
+regionCounts: build/index.d.ts#regionCounts
+regionObservation: build/index.d.ts#regionObservation
 regionRates: build/index.d.ts#regionRates
 stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
@@ -299,6 +303,12 @@ interface Regions {
 ### build/hazard.chunk.d.ts#SUPPLY_PARTS
 declare const SUPPLY_PARTS: readonly Part[];
 
+### build/hazard.chunk.d.ts#StatePooling
+interface StatePooling {
+  readonly laws: Readonly<Record<string, PoolLaw>>;
+  readonly holdout: PoolHoldout;
+}
+
 ### build/index.d.ts#AreaCount
 export interface AreaCount {
   readonly events: number;
@@ -338,6 +348,9 @@ export interface CoverageTally {
 
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS
 export declare const EAGLEI_NATION_CUSTOMERS = 154857853;
+
+### build/index.d.ts#EAGLEI_STATE_POOLING
+export declare const EAGLEI_STATE_POOLING: StatePooling;
 
 ### build/index.d.ts#EAGLEI_STATE_PRIORS
 export declare const EAGLEI_STATE_PRIORS: PriorTable;
@@ -740,6 +753,12 @@ export declare function pooledRates(counts: Readonly<Record<string, AreaCount>>,
 
 ### build/index.d.ts#priorTableFaults
 export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[];
+
+### build/index.d.ts#regionCounts
+export declare function regionCounts(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, AreaCount>;
+
+### build/index.d.ts#regionObservation
+export declare function regionObservation(observation: Observation, region: (area: string) => string): Observation;
 
 ### build/index.d.ts#regionRates
 export declare function regionRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, readonly [number, number]>;

@@ -188,7 +188,7 @@ The model of one pot:
 2. The heat to boil is the mass times 4.19002 kJ/(kg.K) times the rise to the boil (100 °C). The mass is the water and the dry food. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat. The dry food takes the specific heat of water, which is higher than its own. This term holds the heat above the true value.
 3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the water and the food. The heat of the pot itself is in the losses. It is a cited input with its heating value. It has no default.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
-5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
+5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
 7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default. Give the smallest pot that the cook makes. Each pot takes its own cook time, so a batch above the real pot gives too little fuel.
 
@@ -199,6 +199,7 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | No cited cook water | The water, the heat and the fuel. A food with a cook time and no cited water has no fuel. |
 | No cited cook time | The stove time and the fuel. |
 | No cited stove rate, or a rate that is not an energy or a mass in a time | The stove time and the fuel. |
+| A stove rate with a bound, for example `bound: "least"` of market | The stove time and the fuel. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel. |
 | No cited stove share | The stove time and the fuel. The water and the heat keep their reads. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
