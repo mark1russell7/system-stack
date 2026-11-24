@@ -127,6 +127,7 @@ outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
 priorTableFaults: build/index.d.ts#priorTableFaults
+priorTableOverlaps: build/index.d.ts#priorTableOverlaps
 regionRates: build/index.d.ts#regionRates
 stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
@@ -740,6 +741,9 @@ export declare function pooledRates(counts: Readonly<Record<string, AreaCount>>,
 
 ### build/index.d.ts#priorTableFaults
 export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[];
+
+### build/index.d.ts#priorTableOverlaps
+export declare function priorTableOverlaps(tables: readonly PriorTable[]): string[];
 
 ### build/index.d.ts#regionRates
 export declare function regionRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, readonly [number, number]>;
