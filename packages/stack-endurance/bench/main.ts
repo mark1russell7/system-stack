@@ -80,7 +80,7 @@ function recordFiles(folder: string): string[] {
 /** This function gives the gate of a job with no record: each case is a no read. */
 function missingJob(job: string): JobGate {
   const cases = BENCH_CUTS.map((cuts) => ({ case: caseId(cuts), outcome: "cannot decide" as const, ms: undefined, limit: undefined, reason: "The job gave no record." }));
-  return { job, cpu: "unknown", cases, gate: gateOf(cases) };
+  return { job, cpu: "unknown", run: job, cases, gate: gateOf(cases) };
 }
 
 function read(args: Record<string, string | boolean | undefined>): number {

@@ -6,6 +6,7 @@
  * - A CPU model with jobs of 5 runs or more in the freeze gets its own limit. Each other model of the freeze gets the ceiling: the limit over all the jobs.
  * - The noise cap is the `runLimit` of the A/A spreads of the same jobs (`aaLimits`). A job above it is a no read.
  * - A job on a CPU model with no frozen value is a no read. A no read is not a pass.
+ * - The gate reads the jobs of one CPU model in one run as one group. A group is beyond only when its lowest value is above the limit (`groupCases`).
  */
 import { aaLimits, aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
@@ -210,6 +211,8 @@ export interface CaseOutcome {
 export interface JobGate {
   readonly job: string;
   readonly cpu: string;
+  /** The CI run of the job. The jobs of one CPU model in one run make a group (`groupCases`). */
+  readonly run: string;
   readonly cases: readonly CaseOutcome[];
   readonly gate: Gate;
 }
@@ -241,7 +244,7 @@ export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGat
     if (limit === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The file has no limit of the case." };
     return { case: id, outcome: ms <= limit ? "within" : "beyond", ms, limit, ...place };
   });
-  return { job: read.job, cpu: read.cpu, cases, gate: gateOf(cases) };
+  return { job: read.job, cpu: read.cpu, run: read.run, cases, gate: gateOf(cases) };
 }
 
 function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | undefined {
@@ -257,6 +260,58 @@ function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | un
 /** The jobs that must read a case before the run decides it. */
 export const MIN_READ_JOBS = 3;
 
+/** The share of its limit at which the report shows a value: a value at 97% of its limit or more is near the limit. */
+export const NEAR = 0.97;
+
+/** One job of a group, with its value and its own outcome. */
+export interface GroupJob {
+  readonly job: string;
+  readonly ms: number;
+  readonly outcome: "within" | "beyond";
+}
+
+/** The read of one case by one group of jobs. */
+export interface GroupCase {
+  readonly case: string;
+  readonly run: string;
+  readonly cpu: string;
+  /** The key of the limit in the table of the case: the CPU model, or `other` for the ceiling. */
+  readonly model: string;
+  readonly limit: number;
+  /** The jobs of the group that read the case. Each job keeps its own outcome. */
+  readonly jobs: readonly GroupJob[];
+  /** The value that decides: the lowest value of the jobs of the group. */
+  readonly ms: number;
+  readonly outcome: "within" | "beyond";
+}
+
+/**
+ * This function gives the groups that read one case.
+ *
+ * - The jobs of one CPU model in one run time one commit on one kind of runner. On the limit of their model, they make one group.
+ * - A group is `beyond` only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it.
+ *   One slow machine makes one job slower, and the other jobs of the group keep the group within.
+ * - A job at the ceiling is a group of its own, so it reads as before. The ceiling stops only a large regression.
+ * - A job that does not read the case (a no read) is not in a group. A noisy job has no valid value, so its value does not keep a group within.
+ */
+export function groupCases(gates: readonly JobGate[], id: string): GroupCase[] {
+  const groups = new Map<string, { run: string; cpu: string; model: string; limit: number; jobs: GroupJob[] }>();
+  for (const gate of gates) {
+    const item = gate.cases.find((value) => value.case === id);
+    if (item === undefined || item.outcome === "cannot decide" || item.ms === undefined || item.limit === undefined) continue;
+    const model = item.model ?? "other";
+    const own = item.note === undefined && model === gate.cpu;
+    const key = JSON.stringify(own ? [gate.run, gate.cpu] : [gate.run, gate.cpu, gate.job]);
+    const group = groups.get(key) ?? { run: gate.run, cpu: gate.cpu, model, limit: item.limit, jobs: [] };
+    group.jobs.push({ job: gate.job, ms: item.ms, outcome: item.outcome });
+    groups.set(key, group);
+  }
+  return [...groups.values()].map((group): GroupCase => {
+    const ms = Math.min(...group.jobs.map((job) => job.ms));
+    return { case: id, ...group, ms, outcome: ms <= group.limit ? "within" : "beyond" };
+  });
+}
+
 /** The outcome of one case over all jobs of a run. */
 export interface RunCase {
   readonly case: string;
@@ -265,22 +320,30 @@ export interface RunCase {
   readonly reads: number;
   /** The reason of a no read. */
   readonly reason?: string;
+  /** The groups that read the case (`groupCases`). */
+  readonly groups: readonly GroupCase[];
+  /** The outcome of the rule of one job: the case is `beyond` when one job is `beyond`. The gate does not use it. The report shows it. */
+  readonly perJob: LimitOutcome;
 }
 
 /**
  * This function gives the outcome of each case over all jobs of a run.
  *
- * - A case is `beyond` when a job that reads it is `beyond`.
- * - A case is `within` when at least `MIN_READ_JOBS` jobs read it and each is `within`.
+ * - A case is `beyond` when a group that reads it is `beyond` (`groupCases`).
+ * - A case is `within` when at least `MIN_READ_JOBS` jobs read it and each group is `within`.
  * - Each other case is `cannot decide`. A job on a CPU model with no frozen value, a noisy job and a missing job do not read.
  */
 export function runCases(gates: readonly JobGate[]): RunCase[] {
   return BENCH_CUTS.map((cuts): RunCase => {
     const id = caseId(cuts);
-    const outcomes = gates.flatMap((gate) => gate.cases.filter((item) => item.case === id && item.outcome !== "cannot decide").map((item) => item.outcome));
-    if (outcomes.includes("beyond")) return { case: id, outcome: "beyond", reads: outcomes.length };
-    if (outcomes.length >= MIN_READ_JOBS) return { case: id, outcome: "within", reads: outcomes.length };
-    return { case: id, outcome: "cannot decide", reads: outcomes.length, reason: `${String(outcomes.length)} jobs read the case, and the gate needs ${String(MIN_READ_JOBS)}.` };
+    const groups = groupCases(gates, id);
+    const jobs = groups.flatMap((group) => group.jobs);
+    const reads = jobs.length;
+    const enough = reads >= MIN_READ_JOBS;
+    const perJob: LimitOutcome = jobs.some((job) => job.outcome === "beyond") ? "beyond" : enough ? "within" : "cannot decide";
+    if (groups.some((group) => group.outcome === "beyond")) return { case: id, outcome: "beyond", reads, groups, perJob };
+    if (enough) return { case: id, outcome: "within", reads, groups, perJob };
+    return { case: id, outcome: "cannot decide", reads, reason: `${String(reads)} jobs read the case, and the gate needs ${String(MIN_READ_JOBS)}.`, groups, perJob };
   });
 }
 
@@ -308,8 +371,29 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     lines.push(`| ${read.job} | ${read.cpu} | ${values.join(" | ")} | ${read.aa === undefined ? "-" : read.aa.spread.toFixed(4)} | ${gate} |`);
   }
   const run = runCases(gates);
-  lines.push("", "The gate of each case over the jobs:", "", "| Case | Jobs that read | Outcome |", "| --- | --- | --- |");
-  for (const item of run) lines.push(`| ${item.case} | ${String(item.reads)} | ${item.outcome}${item.reason === undefined ? "" : `: ${item.reason}`} |`);
+  lines.push(
+    "",
+    "The gate of each case over the groups. A group is the jobs of one CPU model in one run. Its lowest value decides. The last column gives the rule of one job, which the gate does not use:",
+    "",
+    "| Case | Jobs that read | Outcome | Rule of one job |",
+    "| --- | --- | --- | --- |",
+  );
+  for (const item of run) lines.push(`| ${item.case} | ${String(item.reads)} | ${item.outcome}${item.reason === undefined ? "" : `: ${item.reason}`} | ${item.perJob} |`);
+  const near = run.flatMap((item) => item.groups.filter((group) => group.jobs.some((job) => job.ms >= NEAR * group.limit)));
+  if (near.length > 0) {
+    lines.push(
+      "",
+      `The groups with a job at ${String(Math.round(NEAR * 100))}% of the limit or more. The lowest value of the group decides:`,
+      "",
+      "| Case | Run | CPU | Limit (ms) | Jobs: value (ms), share of the limit, outcome of the job | Lowest (ms) | Outcome |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
+    );
+    for (const group of near) {
+      const jobs = group.jobs.map((job) => `${job.job}: ${ms(job.ms)}, ${((100 * job.ms) / group.limit).toFixed(1)}%, ${job.outcome}`).join("<br>");
+      const cpu = group.model === "other" ? `${group.cpu} (ceiling)` : group.cpu;
+      lines.push(`| ${group.case} | ${group.run} | ${cpu} | ${ms(group.limit)} | ${jobs} | ${ms(group.ms)} | ${group.outcome} |`);
+    }
+  }
   const reasons = [...new Set(gates.flatMap((gate) => gate.cases.flatMap((item) => (item.reason === undefined ? [] : [`${gate.job}: ${item.reason}`]))))];
   if (reasons.length > 0) lines.push("", "The jobs that do not read:", "", ...reasons.map((reason) => `- ${reason}`));
   const ceiling = [...new Set(gates.flatMap((gate) => (gate.cases.some((item) => item.note !== undefined && item.outcome !== "cannot decide") ? [`${gate.job} (${gate.cpu})`] : [])))];

@@ -18,5 +18,11 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - A limit of a model is near the noise of its jobs, so a block can come from noise. When a commit changes no timed code, freeze again with the records of the whole run. Do it in a pull request. The rule then widens a limit only by a value of CI.
 - When a commit changes the timed code, a block is a finding. Find the cause before you change a limit.
 - A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
-- The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read. A job above its limit blocks the run.
+- The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read.
+- The jobs of one CPU model in one run time one commit on one kind of runner. On the limit of their model, they make one group (`groupCases`).
+- A group blocks the run only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it. One slow machine makes one job slower, and the group stays within.
+- A group of 1 job reads as one job. A job at the ceiling is a group of its own. A job with a no read is not in a group, so its value does not keep a group within.
+- Each job keeps its own outcome. The report gives the outcome of the rule of one job next to the gate. It also shows each group with a job at 97% of its limit or more.
+- The lowest of 2 or 3 jobs is lower than the value of one job. Thus a change of the code must be larger before the group blocks. With the 78 jobs, the median slowdown that blocks a run is 2.7% on the 6975P-C, not 2.2%. On the EPYC 7763, it is 4.9%, not 4.5%.
+- We read each run with a freeze of the 12 other runs. The rule of one job blocked 1 of 13 runs: the run with the slow 6975P-C job. The groups blocked no run.
 - Timed runs give valid values only in CI. On a local computer, start only the tests of this folder.
