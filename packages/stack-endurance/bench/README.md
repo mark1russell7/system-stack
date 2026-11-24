@@ -29,7 +29,7 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - A group of 1 job reads against the limit of one job. Its only value is its lowest value, so its limit must hold the slow machines of the freeze.
 - A job at the ceiling is a group of its own. A job with a no read is not in a group, so its value does not keep a group within.
 - Each job keeps its own outcome against the limit of one job. The report gives it in the column "Gate of the job alone". The gate of the run reads the groups.
-- The report shows each group with a lowest value at 97% of its limit or more. It also shows each group with a job beyond the limit of one job.
+- The report shows each group with a lowest value in the margin of its limit: above the worst value of the freeze. Such a group is slower than each value of the freeze. It also shows each group with a job beyond the limit of one job.
 - A commit can change the timed code, and the rule of one job can give beyond. In that case, read the table of groups before the merge.
 - We read each run with a freeze of the 12 other runs. The groups blocked no run. The rule of one job blocked 1 of 13 runs: the run with the slow 6975P-C job.
 - With one run out, the median uniform slowdown that blocks a run is 1.8%. The least is 1.0%, and the most is 4.9%. With only the limits of one job, these values were 2.9%, 1.9% and 5.1%.

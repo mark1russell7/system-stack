@@ -238,10 +238,14 @@ export interface CaseOutcome {
   readonly outcome: LimitOutcome;
   readonly ms: number | undefined;
   readonly limit: number | undefined;
+  /** The worst value of the freeze in the limit of one job. The margin of the limit is above it. */
+  readonly worst?: number;
   /** The key of the limit in the table of the case: the CPU model, or `other` for the ceiling. */
   readonly model?: string;
   /** The group limit of the model, for a group of 2 jobs or more. A job at the ceiling has none. */
   readonly groupLimit?: number;
+  /** The worst value of the freeze in the group limit. */
+  readonly groupWorst?: number;
   /** The words of `limitOnModel` for a read at the ceiling. A pass at the ceiling does not hold a gain. */
   readonly note?: string;
   /** The reason of a no read. */
@@ -279,8 +283,17 @@ export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGat
     const model = own === undefined ? "other" : read.cpu;
     const on = table === undefined ? undefined : limitOnModel({ gain: (own ?? table.other).limit, ceiling: table.other.limit, models: own === undefined ? [] : [model] }, model);
     const limit = on?.limit;
-    const group = own === undefined ? undefined : limits?.groups[id]?.[read.cpu]?.limit;
-    const place = table === undefined ? {} : { model, ...(group === undefined ? {} : { groupLimit: group }), ...(on?.note === undefined ? {} : { note: on.note }) };
+    const group = own === undefined ? undefined : limits?.groups[id]?.[read.cpu];
+    const worst = own?.worst ?? table?.other.worst;
+    const place =
+      table === undefined
+        ? {}
+        : {
+            model,
+            ...(worst === undefined ? {} : { worst }),
+            ...(group === undefined ? {} : { groupLimit: group.limit, groupWorst: group.worst }),
+            ...(on?.note === undefined ? {} : { note: on.note }),
+          };
     if (why !== undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: why };
     if (ms === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The job has no value of the case." };
     if (limit === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The file has no limit of the case." };
@@ -302,8 +315,6 @@ function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | un
 /** The jobs that must read a case before the run decides it. */
 export const MIN_READ_JOBS = 3;
 
-/** The share of its limit at which the report shows a value: a value at 97% of its limit or more is near the limit. */
-export const NEAR = 0.97;
 
 /** One job of a group, with its value and its own outcome. */
 export interface GroupJob {
@@ -321,6 +332,8 @@ export interface GroupCase {
   readonly model: string;
   /** The limit that decides. A group of 2 jobs or more on its own model has the group limit. Each other group has the limit of one job. */
   readonly limit: number;
+  /** The worst value of the freeze in the limit that decides. A lowest value above it is in the margin of the limit. */
+  readonly worst: number;
   /** The kind of the limit that decides. */
   readonly kind: "group" | "job";
   /** The jobs of the group that read the case. Each job keeps its own outcome, against the limit of one job. */
@@ -342,22 +355,35 @@ export interface GroupCase {
  * - A job that does not read the case (a no read) is not in a group. A noisy job has no valid value, so its value does not keep a group within.
  */
 export function groupCases(gates: readonly JobGate[], id: string): GroupCase[] {
-  const groups = new Map<string, { run: string; cpu: string; model: string; limit: number; groupLimit: number | undefined; jobs: GroupJob[] }>();
+  const groups = new Map<
+    string,
+    { run: string; cpu: string; model: string; limit: number; worst: number; groupLimit: number | undefined; groupWorst: number | undefined; jobs: GroupJob[] }
+  >();
   for (const gate of gates) {
     const item = gate.cases.find((value) => value.case === id);
     if (item === undefined || item.outcome === "cannot decide" || item.ms === undefined || item.limit === undefined) continue;
     const model = item.model ?? "other";
     const own = item.note === undefined && model === gate.cpu;
     const key = JSON.stringify(own ? [gate.run, gate.cpu] : [gate.run, gate.cpu, gate.job]);
-    const group = groups.get(key) ?? { run: gate.run, cpu: gate.cpu, model, limit: item.limit, groupLimit: own ? item.groupLimit : undefined, jobs: [] };
+    const group = groups.get(key) ?? {
+      run: gate.run,
+      cpu: gate.cpu,
+      model,
+      limit: item.limit,
+      worst: item.worst ?? item.limit,
+      groupLimit: own ? item.groupLimit : undefined,
+      groupWorst: own ? item.groupWorst : undefined,
+      jobs: [],
+    };
     group.jobs.push({ job: gate.job, ms: item.ms, outcome: item.outcome });
     groups.set(key, group);
   }
-  return [...groups.values()].map(({ groupLimit, ...group }): GroupCase => {
+  return [...groups.values()].map(({ groupLimit, groupWorst, ...group }): GroupCase => {
     const ms = Math.min(...group.jobs.map((job) => job.ms));
     const kind = groupLimit !== undefined && group.jobs.length >= 2 ? "group" : "job";
     const limit = kind === "group" ? (groupLimit ?? group.limit) : group.limit;
-    return { case: id, ...group, limit, kind, ms, outcome: ms <= limit ? "within" : "beyond" };
+    const worst = kind === "group" ? (groupWorst ?? limit) : group.worst;
+    return { case: id, ...group, limit, worst, kind, ms, outcome: ms <= limit ? "within" : "beyond" };
   });
 }
 
@@ -406,6 +432,19 @@ export const JOB_GATE = "Gate of the job alone";
 
 const ms = (value: number | undefined): string => (value === undefined ? "-" : value < 10 ? value.toFixed(3) : value.toFixed(1));
 
+/**
+ * The title of the table of the groups to read.
+ * A limit is the worst value of the freeze plus the spread of its values. Thus the margin of the limit is the spread above the worst value.
+ * A group with its lowest value in the margin is slower than each value of the freeze. A group with a lower value is in the range of the freeze, so the table does not show it.
+ */
+export const NEAR_TITLE =
+  "The groups with a lowest value above the worst value of the freeze, in the margin of the limit, or with a job beyond the limit of one job. The lowest value of the group decides";
+
+/** This function tells if the lowest value of a group is in the margin of its limit: above the worst value of the freeze. */
+export function inMargin(group: GroupCase): boolean {
+  return group.ms > group.worst;
+}
+
 /** This function gives the Markdown report of a read: the value of each case in each job, the gate, and the candidate limits. */
 export function readReport(reads: readonly JobRead[], gates: readonly JobGate[], candidate: FrozenLimits | undefined): string {
   const ids = BENCH_CUTS.map((cuts) => caseId(cuts));
@@ -431,19 +470,13 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     "| --- | --- | --- | --- |",
   );
   for (const item of run) lines.push(`| ${item.case} | ${String(item.reads)} | ${item.outcome}${item.reason === undefined ? "" : `: ${item.reason}`} | ${item.perJob} |`);
-  const near = run.flatMap((item) => item.groups.filter((group) => group.ms >= NEAR * group.limit || group.jobs.some((job) => job.outcome === "beyond")));
+  const near = run.flatMap((item) => item.groups.filter((group) => inMargin(group) || group.jobs.some((job) => job.outcome === "beyond")));
   if (near.length > 0) {
-    lines.push(
-      "",
-      `The groups with a lowest value at ${String(Math.round(NEAR * 100))}% of the limit or more, or with a job beyond the limit of one job. The lowest value of the group decides:`,
-      "",
-      "| Case | Run | CPU | Limit (ms) | Jobs: value (ms), share of the limit, outcome of the job alone | Lowest (ms) | Outcome |",
-      "| --- | --- | --- | --- | --- | --- | --- |",
-    );
+    lines.push("", `${NEAR_TITLE}:`, "", "| Case | Run | CPU | Worst of the freeze (ms) | Limit (ms) | Jobs: value (ms), share of the limit, outcome of the job alone | Lowest (ms) | Outcome |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
     for (const group of near) {
       const jobs = group.jobs.map((job) => `${job.job}: ${ms(job.ms)}, ${((100 * job.ms) / group.limit).toFixed(1)}%, ${job.outcome}`).join("<br>");
       const cpu = group.model === "other" ? `${group.cpu} (ceiling)` : group.cpu;
-      lines.push(`| ${group.case} | ${group.run} | ${cpu} | ${ms(group.limit)} (${group.kind === "group" ? "group" : "one job"}) | ${jobs} | ${ms(group.ms)} | ${group.outcome} |`);
+      lines.push(`| ${group.case} | ${group.run} | ${cpu} | ${ms(group.worst)} | ${ms(group.limit)} (${group.kind === "group" ? "group" : "one job"}) | ${jobs} | ${ms(group.ms)} | ${group.outcome} |`);
     }
   }
   const reasons = [...new Set(gates.flatMap((gate) => gate.cases.flatMap((item) => (item.reason === undefined ? [] : [`${gate.job}: ${item.reason}`]))))];
