@@ -1,5 +1,5 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
-import { calorieNeed, type ActivityLevel, type CalorieNeedTotal, type CalorieTables, type Person } from "./calorie.ts";
+import { calorieChange, calorieNeed, INFANT_FEEDINGS, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type CalorieTables, type Person } from "./calorie.ts";
 import { CALORIE_CHAIN } from "./data.ts";
 import { DIRECT_USES, FOOD_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
@@ -43,7 +43,16 @@ export interface HouseholdFragment {
   readonly direct: readonly FragmentDirectUse[];
 }
 
-/** The action for the persons with no row in the table. The only action is `leave-out`. */
+/** The age in months below which a person record must have a `feeding`: 12, the first month of the guidelines. */
+export const INFANT_MONTHS = 12;
+
+/**
+ * The age in months from which an infant cannot have `feeding: "breast-milk"`: 6.
+ * From 6 months, the infant table gives more than the change of a stage of lactation, so a part of the need is in no draw. Give `food` from this age.
+ */
+export const BREAST_MILK_MONTHS = 6;
+
+/** The action for the persons that the draw cannot serve: no row in the table, or an infant on formula. The only action is `leave-out`. */
 export type NoRowAction = "leave-out";
 
 /** The inputs of the household fragment. */
@@ -69,7 +78,7 @@ export interface HouseholdFragmentInput {
   /** The start of the `id` of each store. The default is `buy`. */
   readonly prefix?: string | undefined;
   /**
-   * The action for the persons with no row in the table. Without it, a person with no row gives no layer.
+   * The action for the persons with no row in the table, and for the infants on formula. Without it, such a person gives no layer.
    * With `leave-out`, the draw has no need of those persons, and the result lists them.
    */
   readonly noRow?: NoRowAction | undefined;
@@ -103,8 +112,15 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
   readonly need: CalorieNeedTotal;
   /** This field is true: the draw has a read for each of its users. */
   readonly needRead: true;
-  /** The persons with no row that the option `leave-out` left out of the draw. With no option, the list is empty. */
+  /** The persons with no row, and the infants on formula, that the option `leave-out` left out of the draw. With no option, the list is empty. */
   readonly leftOut: readonly Person[];
+  /** The infants on formula. The option `leave-out` left them out of the draw, so `leftOut` also lists them. */
+  readonly formula: readonly Person[];
+  /**
+   * The infants on breast milk only. Each has a line with a read in `need`, and no part of the draw.
+   * The stage of lactation of a person of the draw holds that energy.
+   */
+  readonly breastMilk: readonly Person[];
 }
 
 /** No household fragment: the draw has no read. A low rate gives too many days, so the function gives no layer. */
@@ -115,6 +131,10 @@ export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
   readonly needRead: false;
   /** The persons with no row in the table. */
   readonly noRow: readonly Person[];
+  /** The infants on formula. The fragment has no draw of formula. */
+  readonly formula: readonly Person[];
+  /** The infants on breast milk only. */
+  readonly breastMilk: readonly Person[];
   /** The reason for no layer. */
   readonly why: string;
 }
@@ -159,33 +179,80 @@ function buyListStores(
  *
  * A person with no row in the tables gives no layer, because a low rate gives too many days. The default tables give a row for each age.
  * The option `noRow: "leave-out"` leaves those persons out of the draw. A draw of 0 kcal gives no layer.
+ *
+ * Each person record below `INFANT_MONTHS` must have a `feeding`. It has no default.
+ *
+ * - `food`: the need of the infant is in the draw of food energy.
+ * - `breast-milk`: the infant has a line, and no part of the draw. It is only for an infant below `BREAST_MILK_MONTHS`.
+ *   A person of the household must have a stage of lactation. Each infant on breast milk needs one person of the draw with a stage of lactation.
+ *   When the infants are more, the function gives no layer: the change of a stage is the milk of one infant.
+ * - `formula`: the fragment has no draw of formula, so the infant gives no layer, as a person with no row. The option `leave-out` also applies.
+ *   It is only for an infant below `INFANT_MONTHS`.
+ *
  * The function is pure.
  *
  * @param input - The persons, the activity level, the catalog and the buy list, the supply part and the level of the draw
  * @returns The fragment or a no read of the draw, with the energy of the list and the gifts with no read
  * @throws RangeError for the errors of `calorieNeed`, `giftsOf` and `buyListEnergy`, except a household with no person
  * @throws RangeError when the catalog has no resource in `kcal` for a food use
+ * @throws RangeError when a record below `INFANT_MONTHS` has no `feeding`, or when a `feeding` is not a way of `INFANT_FEEDINGS`
+ * @throws RangeError for `breast-milk` from `BREAST_MILK_MONTHS`, and for `formula` from `INFANT_MONTHS`
+ * @throws RangeError when an infant drinks only breast milk and no person of the household has a stage of lactation
  */
 export function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult {
   const foodUses = (input.uses ?? DIRECT_USES).filter((use) => use.need === FOOD_NEED);
   const { stores, resources, parts } = buyListStores(input, foodUses);
+  checkFeedings(input.persons);
   if (input.persons.every((person) => person.count === 0)) {
-    return { ...parts, layer: undefined, need: undefined, needRead: false, noRow: [], why: "The household has no person, so the draw is 0 kcal." };
+    return { ...parts, layer: undefined, need: undefined, needRead: false, noRow: [], formula: [], breastMilk: [], why: "The household has no person, so the draw is 0 kcal." };
   }
-  const need = calorieNeed(input.table ?? CALORIE_CHAIN, input.persons, input.activity, 1);
+  const tables = input.table ?? CALORIE_CHAIN;
+  const need = calorieNeed(tables, input.persons, input.activity, 1);
   const noRow: Person[] = [];
+  const formula: Person[] = [];
+  const breastMilk: Person[] = [];
   let users = 0;
+  let perDay = 0;
+  // The persons of the draw with a stage of lactation, and the infants on breast milk.
+  let mothers = 0;
+  let nursed = 0;
   for (const line of need.lines) {
-    if (line.read) users += line.person.count;
-    else if (line.person.count > 0) noRow.push(line.person);
+    const { person } = line;
+    if (person.count === 0) continue;
+    if (person.feeding === "breast-milk") {
+      breastMilk.push(person);
+      nursed += person.count;
+    } else if (person.feeding === "formula") formula.push(person);
+    else if (!line.read) noRow.push(person);
+    else {
+      users += person.count;
+      perDay += line.need.value;
+      if (makesMilk(tables, person)) mothers += person.count;
+    }
   }
-  if (noRow.length > 0 && input.noRow !== "leave-out") {
-    return { ...parts, layer: undefined, need, needRead: false, noRow, why: `The table has no row for ${String(noRow.length)} person records. The option noRow: "leave-out" leaves them out of the draw.` };
+  if (breastMilk.length > 0 && !input.persons.some((person) => person.count > 0 && makesMilk(tables, person))) {
+    throw new RangeError(
+      `The infants ${breastMilk.map(nameOf).join(", ")} drink only breast milk, but no person of the household has a stage of lactation. ` +
+        "The milk comes from the food of the mother, so give the mother a stage of lactation, for example lactation-1.",
+    );
   }
-  if (users === 0 || need.need.value <= 0) {
-    return { ...parts, layer: undefined, need, needRead: false, noRow, why: "No person of the draw has a row in the table, so the draw is 0 kcal." };
+  const reasons = [
+    ...(nursed > mothers
+      ? [`${String(nursed)} infants drink only breast milk, but the draw has ${String(mothers)} persons with a stage of lactation. The change of a stage is the milk of one infant. Give feeding: food to the other infants.`]
+      : []),
+    ...(noRow.length > 0 ? [`The table has no row for ${String(noRow.length)} person records.`] : []),
+    ...(formula.length > 0 ? [`${String(formula.length)} infant records are on formula, and the fragment has no draw of formula.`] : []),
+  ];
+  if (nursed > mothers) {
+    return { ...parts, layer: undefined, need, needRead: false, noRow, formula, breastMilk, why: reasons.join(" ") };
   }
-  const draw: FragmentDraw = { need: FOOD_NEED, level: input.level, perDay: need.need.value, users, supply: input.supply ?? NEED_SUPPLIES[FOOD_NEED] };
+  if (reasons.length > 0 && input.noRow !== "leave-out") {
+    return { ...parts, layer: undefined, need, needRead: false, noRow, formula, breastMilk, why: `${reasons.join(" ")} The option noRow: "leave-out" leaves them out of the draw.` };
+  }
+  if (users === 0 || perDay <= 0) {
+    return { ...parts, layer: undefined, need, needRead: false, noRow, formula, breastMilk, why: "No person of the draw has a need of food in the draw, so the draw is 0 kcal." };
+  }
+  const draw: FragmentDraw = { need: FOOD_NEED, level: input.level, perDay, users, supply: input.supply ?? NEED_SUPPLIES[FOOD_NEED] };
   return {
     ...parts,
     layer: {
@@ -198,6 +265,45 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
     },
     need,
     needRead: true,
-    leftOut: noRow,
+    leftOut: [...noRow, ...formula],
+    formula,
+    breastMilk,
   };
+}
+
+/** This function gives the name of a person record in a message. */
+function nameOf(person: Person): string {
+  return `${String(person.sex)} of ${String(person.ageMonths)} months`;
+}
+
+/**
+ * This function examines the feeding of each record. A record below `INFANT_MONTHS` must have one.
+ * Each feeding is a way of `INFANT_FEEDINGS`, and each way holds at the age of the record.
+ */
+function checkFeedings(persons: readonly Person[]): void {
+  for (const person of persons) {
+    const { feeding } = person;
+    if (feeding === undefined) {
+      if (person.count > 0 && person.ageMonths < INFANT_MONTHS) {
+        throw new RangeError(`The persons ${nameOf(person)} are below ${String(INFANT_MONTHS)} months and have no feeding. Give feeding: ${INFANT_FEEDINGS.join(", ")}.`);
+      }
+    } else if (!(INFANT_FEEDINGS as readonly unknown[]).includes(feeding)) {
+      throw new RangeError(`The feeding ${String(feeding)} of the persons ${nameOf(person)} is not a way of ${INFANT_FEEDINGS.join(", ")}.`);
+    } else if (feeding === "breast-milk" && !(person.ageMonths < BREAST_MILK_MONTHS)) {
+      throw new RangeError(
+        `The persons ${nameOf(person)} have feeding: breast-milk, which is only for an infant below ${String(BREAST_MILK_MONTHS)} months. ` +
+          "From that age, the need is more than the change of a stage of lactation. Give feeding: food.",
+      );
+    } else if (feeding === "formula" && !(person.ageMonths < INFANT_MONTHS)) {
+      throw new RangeError(`The persons ${nameOf(person)} have feeding: formula, which is only for an infant below ${String(INFANT_MONTHS)} months. Give feeding: food.`);
+    }
+  }
+}
+
+/** This function tells if the stage of a person record is a stage that makes milk, in one of the tables. */
+function makesMilk(tables: CalorieTables, person: Person): boolean {
+  const { stage } = person;
+  if (stage === undefined) return false;
+  const list: readonly CalorieTable[] = "rows" in tables ? [tables] : tables;
+  return list.some((table) => calorieChange(table, person.sex, stage)?.milk === true);
 }

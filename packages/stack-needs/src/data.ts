@@ -28,6 +28,7 @@ const levels = (sedentary: number, moderate: number, active: number): CalorieNee
 const each = (value: number): CalorieNeed => ({ each: day(value) });
 const HEALTHY = "For women with a healthy weight before the pregnancy. Other women ask their health care provider.";
 const change = (stage: string, title: string, value: number): CalorieChange => ({ stage, title, sex: "female", change: day(value), condition: HEALTHY });
+const milk = (stage: string, title: string, value: number): CalorieChange => ({ ...change(stage, title, value), milk: true });
 
 /** The table of estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025: 68 rows, 34 for each sex, and 5 changes of pregnancy and lactation. */
 export const DGA_CALORIES: CalorieTable = {
@@ -39,8 +40,8 @@ export const DGA_CALORIES: CalorieTable = {
     change("pregnancy-1", "Pregnancy: 1st trimester", 0),
     change("pregnancy-2", "Pregnancy: 2nd trimester", 340),
     change("pregnancy-3", "Pregnancy: 3rd trimester", 452),
-    change("lactation-1", "Lactation: 1st 6 months", 330),
-    change("lactation-2", "Lactation: 2nd 6 months", 400),
+    milk("lactation-1", "Lactation: 1st 6 months", 330),
+    milk("lactation-2", "Lactation: 2nd 6 months", 400),
   ],
   rows: [
     { sex: "female", age: "12 months", from: 12, to: 14, need: each(800) },

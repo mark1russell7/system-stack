@@ -8,6 +8,7 @@
 
 ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ActivityLevel: build/index.d.ts#ActivityLevel
+BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
 CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
@@ -34,6 +35,9 @@ HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
 HouseholdFragmentRead: build/index.d.ts#HouseholdFragmentRead
 HouseholdFragmentResult: build/index.d.ts#HouseholdFragmentResult
 HouseholdStoresResult: build/index.d.ts#HouseholdStoresResult
+INFANT_FEEDINGS: build/index.d.ts#INFANT_FEEDINGS
+INFANT_MONTHS: build/index.d.ts#INFANT_MONTHS
+InfantFeeding: build/index.d.ts#InfantFeeding
 JOIN_CODES: build/index.d.ts#JOIN_CODES
 JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
@@ -70,6 +74,9 @@ export declare const ACTIVITY_LEVELS: readonly ["sedentary", "moderately-active"
 ### build/index.d.ts#ActivityLevel
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
 
+### build/index.d.ts#BREAST_MILK_MONTHS
+export declare const BREAST_MILK_MONTHS = 6;
+
 ### build/index.d.ts#CALORIE_CHAIN
 export declare const CALORIE_CHAIN: readonly CalorieTable[];
 
@@ -86,6 +93,7 @@ export interface CalorieChange {
   readonly sex: CalorieSex;
   readonly change: Quantity;
   readonly condition?: string | undefined;
+  readonly milk?: true | undefined;
 }
 
 ### build/index.d.ts#CalorieNeed
@@ -224,6 +232,8 @@ export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
   readonly need: CalorieNeedTotal | undefined;
   readonly needRead: false;
   readonly noRow: readonly Person[];
+  readonly formula: readonly Person[];
+  readonly breastMilk: readonly Person[];
   readonly why: string;
 }
 
@@ -233,6 +243,8 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
   readonly need: CalorieNeedTotal;
   readonly needRead: true;
   readonly leftOut: readonly Person[];
+  readonly formula: readonly Person[];
+  readonly breastMilk: readonly Person[];
 }
 
 ### build/index.d.ts#HouseholdFragmentResult
@@ -244,6 +256,15 @@ export interface HouseholdStoresResult {
   readonly noReads: readonly GiftNoRead[];
   readonly storesRead: boolean;
 }
+
+### build/index.d.ts#INFANT_FEEDINGS
+export declare const INFANT_FEEDINGS: readonly ["breast-milk", "formula", "food"];
+
+### build/index.d.ts#INFANT_MONTHS
+export declare const INFANT_MONTHS = 12;
+
+### build/index.d.ts#InfantFeeding
+export type InfantFeeding = (typeof INFANT_FEEDINGS)[number];
 
 ### build/index.d.ts#JOIN_CODES
 export declare const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part"];
@@ -294,6 +315,7 @@ export interface Person {
   readonly count: number;
   readonly level?: ActivityLevel | undefined;
   readonly stage?: string | undefined;
+  readonly feeding?: InfantFeeding | undefined;
 }
 
 ### build/index.d.ts#ReferenceNeed
