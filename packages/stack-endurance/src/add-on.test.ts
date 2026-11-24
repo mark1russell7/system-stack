@@ -85,14 +85,20 @@ describe("joinEndurance", () => {
     expect(all.ok && all.layer.resources).toEqual(water.resources);
   });
 
-  it("refuses one resource code with a different unit, and names the two fragments", () => {
+  it("refuses one resource code with a different unit, and names the two fragments with the record of each", () => {
     const joined = joinEndurance([
       { from: "list", layer: { ...bare, resources: [{ code: "water.stored", unit: "L" }] } },
       { from: "tank", layer: { ...bare, resources: [{ code: "water.stored", unit: "gal" }] } },
     ]);
     expect(joined).toEqual({
       ok: false,
-      errors: ['The fragments "list", "tank" each have the resource "water.stored", and the records are not equal.'],
+      errors: [
+        [
+          'The fragments "list", "tank" each have the resource "water.stored", and the records are not equal.',
+          '  "list": {"code":"water.stored","unit":"L"}',
+          '  "tank": {"code":"water.stored","unit":"gal"}',
+        ].join("\n"),
+      ],
     });
   });
 

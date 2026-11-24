@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-placement",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "The placement of the parts of a system stack as a query: a candidate for each slot, the chance that a function works, the cost, and the front of the two. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
