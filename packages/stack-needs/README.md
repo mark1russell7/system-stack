@@ -102,6 +102,17 @@ The rules of breast milk:
 - The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
 - From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
 
+The notes b and c of Table A2-3 of the guidelines (page 141) give the two changes of lactation:
+
+| Stage | The note of the source | The change |
+| --- | --- | --- |
+| `lactation-1` | 500 calories/day for the milk production, minus 170 calories/day for the weight loss after the birth. | 330 kcal/d |
+| `lactation-2` | 400 calories/day for the milk production. The source assumes a stable weight after 6 months. | 400 kcal/d |
+
+Thus below 6 months, a part of the milk comes from the stores of the mother. The draw holds only the part from food.
+The source gives the energy of the milk production, not the energy that the infant gets. It gives no change for two or more infants.
+Thus the package does not give the milk part of an infant from 6 months, and it does not give a change for twins. Each is a no read until a source gives it.
+
 A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
 ### The resources of the buy list and the join
