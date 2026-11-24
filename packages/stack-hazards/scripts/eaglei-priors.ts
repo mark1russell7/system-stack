@@ -25,9 +25,12 @@ export interface EaglePriorTables {
 
 /**
  * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
- * month. The utilities report one or two interruptions a year at a customer to EIA. A region above the limit is more
- * probably a fault of the counts than a true rate. An example is one outage that crosses the line of an event many
- * times. Such a region is not in the table, so its prior is no read.
+ * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
+ * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
+ * of an event many times. A true rate can also be above the limit, for example in Puerto Rico. Such a region is not
+ * in the table, so its prior is no read. The measures are not the same. EIA counts each interruption of more than 5
+ * minutes at a customer. The table counts the events of a county at 1% or more of its customers. So the comparison
+ * holds only for the order of the number.
  */
 export const PRIOR_LIMIT = 12;
 
@@ -102,7 +105,7 @@ export type PriorModules = Readonly<Record<"eaglei-county-priors.ts" | "eaglei-s
 
 /**
  * This function gives the texts of the two modules of the tables of a fit. The header of each tells the run of the fit
- * job, the version, the date and the DOI of the dataset, and the options of the fit.
+ * job and the options of the fit. It also tells the version, the date and the DOI of the dataset.
  */
 export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: string): PriorModules {
   const head = [
