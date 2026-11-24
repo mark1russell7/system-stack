@@ -1,6 +1,7 @@
+import { fitGammaRates, pooledRate } from "@mark1russell7/rigor-statistics";
 import type { Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
-import type { HazardList, PriorTable } from "./hazard.ts";
+import type { HazardList, PoolLaw, PriorTable } from "./hazard.ts";
 import type { OutageCount, OutageEvent } from "./outages.ts";
 
 // The yearly priors of the cases: the events in one year in an area, and the share of the events that reach a place.
@@ -89,6 +90,64 @@ export function regionRates(counts: Readonly<Record<string, AreaCount>>, observa
     if (perYear > 0) rates[code] = [perYear, Math.min(1, hits / (perYear * customers))];
   }
   return rates;
+}
+
+/** The pooled rates of the areas, and the law of each group. */
+export interface PooledRates {
+  /** The rates `[perYear, reach]` of each area with a pooled rate of more than 0, by the code of the area in its order. */
+  readonly rates: Record<string, readonly [number, number]>;
+  /** The law of each group with one observed area or more, by the code of the group in its order. */
+  readonly laws: Record<string, PoolLaw>;
+}
+
+/**
+ * This function gives a pooled rate of each area toward the areas of its group, for example a county toward the counties of its state.
+ *
+ * - The fit of each group is the gamma-Poisson law of the events of its observed areas in their years (`fitGammaRates`).
+ * - `perYear` of an area is the mean of its rate after its count (`pooledRate`). An area with few years gets a rate near the mean of its group.
+ * - `reach` of an area with events is the mean peak share of its events, as in `regionRates`. An area with no event gets the mean peak share of the events of its group.
+ * - A group with no event gets the shape `Infinity` and its pooled mean toward all groups. That fit has the events of each group in the years of its areas.
+ *   Thus its areas get a rate of more than 0, and a later event of the group does not have the chance 0.
+ * - When no group has an event, no area gets a rate, as an area with no event gets from `regionRates`.
+ *
+ * @param counts - The counts of the events of each area in one case
+ * @param observation - The years and the customers of each area
+ * @param group - This function gives the code of the group of an area, for example `eagleRegion`
+ */
+export function pooledRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string): PooledRates {
+  const members = new Map<string, string[]>();
+  for (const area of observedAreas(observation)) {
+    const code = group(area);
+    members.set(code, [...(members.get(code) ?? []), area]);
+  }
+  const rates: Record<string, readonly [number, number]> = {};
+  const laws: Record<string, PoolLaw> = {};
+  const codes = [...members.keys()].sort();
+  const unitsOf = (code: string): { count: number; exposure: number }[] =>
+    (members.get(code) ?? []).map((area) => ({ count: counts[area]?.events ?? 0, exposure: observation.years[area] ?? 0 }));
+  // The groups as units of one fit: the events of each group in the years of its areas. It gives the mean of a group with no event.
+  const groups = codes.map((code) => unitsOf(code).reduce((sum, unit) => ({ count: sum.count + unit.count, exposure: sum.exposure + unit.exposure }), { count: 0, exposure: 0 }));
+  const nation = groups.length > 0 ? fitGammaRates(groups) : { shape: Number.POSITIVE_INFINITY, mean: 0 };
+  // The mean peak share of all events, for a group with no event.
+  const allShares = codes.flatMap((code) => members.get(code) ?? []).reduce((sum, area) => sum + (counts[area]?.share ?? 0), 0);
+  const allEvents = groups.reduce((sum, unit) => sum + unit.count, 0);
+  codes.forEach((code, position) => {
+    const areas = members.get(code) ?? [];
+    const units = unitsOf(code);
+    const events = units.reduce((sum, unit) => sum + unit.count, 0);
+    const law = events > 0 ? fitGammaRates(units) : { shape: Number.POSITIVE_INFINITY, mean: pooledRate(groups[position] as { count: number; exposure: number }, nation) };
+    const shares = events > 0 ? areas.reduce((sum, area) => sum + (counts[area]?.share ?? 0), 0) : allShares;
+    const total = events > 0 ? events : allEvents;
+    laws[code] = { shape: law.shape, mean: law.mean, areas: areas.length, events, from: events > 0 ? "group" : "nation" };
+    areas.forEach((area, index) => {
+      const perYear = pooledRate(units[index] as { count: number; exposure: number }, law);
+      if (!(perYear > 0)) return;
+      const count = counts[area];
+      const reach = count !== undefined && count.events > 0 ? count.share / count.events : shares / total;
+      rates[area] = [perYear, Math.min(1, reach)];
+    });
+  });
+  return { rates: Object.fromEntries(Object.keys(rates).sort().map((area) => [area, rates[area] as readonly [number, number]])), laws };
 }
 
 /** The options of `hazardPriors`. */
