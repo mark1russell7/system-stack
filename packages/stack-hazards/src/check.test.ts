@@ -284,6 +284,35 @@ describe("the gate of the cuts and the sources", () => {
     expect(fault?.message).toMatch(/\(bad-url\)$/u);
   });
 
+  it("examines the check date of each source at the date of the gate", () => {
+    const list = withLaw(LAW);
+    const at = (date: string, maxAgeDays?: number): string[] =>
+      checkHazards(list, undefined, maxAgeDays === undefined ? { at: date } : { at: date, maxAgeDays }).map((fault) => `${fault.level}:${fault.code}:${fault.at}`);
+    // Without a date, the gate does not examine the age of a check.
+    expect(checkHazards(list)).toEqual([]);
+    expect(at("2026-11-24")).toEqual([]);
+    // A check after the date of the gate is an error.
+    expect(at("2026-11-20")).toEqual(["error:hazards-source:sources.outages"]);
+    // A check older than the limit is a warning.
+    expect(at("2027-12-01")).toEqual(["warning:hazards-source:sources.outages"]);
+    expect(at("2026-12-01", 7)).toEqual(["warning:hazards-source:sources.outages"]);
+    expect(checkHazards(list, undefined, { at: "2026-11-20" })[0]?.message).toContain("(checked-in-future)");
+    // A date of the gate that is not a date YYYY-MM-DD is a fault of the caller, not of the list.
+    expect(() => checkHazards(list, undefined, { at: "24.11.2026" })).toThrow(RangeError);
+  });
+
+  it("passes the list of the package at a date after each of its checks", () => {
+    const faults = checkHazards(HAZARD_LIST, undefined, { at: "2026-11-24" });
+    expect(faults.filter((fault) => fault.level === "error")).toEqual([]);
+    expect(faults.filter((fault) => fault.code === "hazards-source")).toEqual([]);
+  });
+
+  it("gives no error for the list of the package at the UTC date of the run", () => {
+    // The gate of each run: a check date of a source after the day of the run fails. An old check is a warning, so time alone does not fail the run.
+    const today = new Date().toISOString().slice(0, 10);
+    expect(checkHazards(HAZARD_LIST, undefined, { at: today }).filter((fault) => fault.level === "error")).toEqual([]);
+  });
+
   it("refuses a source whose id is not its key in the table, and two sources with one id", () => {
     expect(codes(withLaw(LAW, { ...SOURCE, id: "other" }))).toEqual(["hazards-source"]);
     // The gate of the guidebook gets the keys, so a second source with the id of the first gives one finding at its own key.

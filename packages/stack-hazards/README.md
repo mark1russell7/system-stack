@@ -27,7 +27,7 @@ Each function is a plain function with no clock, no network and no file.
 5. A regional law covers each region of its source, not only one chosen region. The region of the user is input data.
 6. The fits come from `@mark1russell7/rigor-statistics`. The fetches of a source go through `polite-crawler`.
 
-`checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. It refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law.
+`checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. With the option `at`, the gate also examines the check date of each source. A check after `at` is an error. A check older than `maxAgeDays` (365 by default) is a warning. The gate refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law.
 
 The gate refuses a claim of a source with no basis or with a basis that is not in `CLAIM_BASES`. It also refuses a claim of the definition with a basis. Each of these faults has the code `hazards-source`.
 
