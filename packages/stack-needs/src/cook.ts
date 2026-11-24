@@ -234,8 +234,8 @@ function yieldHeat(boil: StoveYield): { readonly perKg: number } | { readonly wh
     return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
   const startC = citedCelsius(boil.start);
   if (startC === undefined) return { why: "The boil yield of the stove has no cited start temperature. A colder start of the test gives too little fuel." };
-  // The end of the test: the field `end` of a later market. The read is by name, so the types of market 0.8.7 also compile.
-  const endC = citedCelsius((boil as { readonly end?: unknown }).end);
+  // The end of the test, the field `end` of market. The check of the value stays, because a catalog of a caller can have a bad value.
+  const endC = citedCelsius(boil.end);
   if (endC === undefined)
     return { why: "The boil yield of the stove has no cited end temperature, the boil point of the test. At a high place the test water boils below 100 °C, so 100 °C gives too little fuel." };
   if (!(startC >= 0 && startC < endC && endC <= BOIL_CELSIUS))
