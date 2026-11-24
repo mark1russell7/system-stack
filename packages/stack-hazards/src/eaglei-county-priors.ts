@@ -22,7 +22,7 @@ export const EAGLEI_COUNTY_PRIORS: PriorTable = {
   },
 };
 
-/** The gamma law of the rates of the counties of each state in each case, and the holdout of the pooled rates against the raw rates and the state rates. */
+/** The gamma law of the rates of the counties of each state in each case. The holdout compares the pooled rates with the raw rates and the state rates. */
 export const EAGLEI_COUNTY_POOLING: CountyPooling = {
   holdout: {"seed":20261124,"cases":{"infra.power.outage":{"raw":-Infinity,"pooled":-12936.2,"state":-78870.6,"lost":4,"squared":{"raw":939526,"pooled":925287,"state":23448295.7}},"met.flood":{"raw":-Infinity,"pooled":-5168.3,"state":-8333.4,"lost":341,"squared":{"raw":16431,"pooled":14440.4,"state":65815.4}},"met.heat.extreme":{"raw":-Infinity,"pooled":-2644.9,"state":-5952.3,"lost":177,"squared":{"raw":8043,"pooled":7579.9,"state":34886.8}},"met.tornado":{"raw":-Infinity,"pooled":-3480.7,"state":-3666.1,"lost":462,"squared":{"raw":5756,"pooled":3798,"state":4412.4}},"met.tropical.hurricane":{"raw":-Infinity,"pooled":-1365,"state":-1569.1,"lost":170,"squared":{"raw":2493,"pooled":1791,"state":2560.3}},"met.winter.storm":{"raw":-Infinity,"pooled":-5489.1,"state":-7200.2,"lost":324,"squared":{"raw":17702,"pooled":14348.3,"state":32211.5}}}},
   laws: {

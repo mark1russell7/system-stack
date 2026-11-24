@@ -170,7 +170,7 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       "",
       ...tableLines("EAGLEI_COUNTY_PRIORS", "The yearly priors of the power outage and of each storm case in each county, from the outages of EAGLE-I.", tables.county),
       "",
-      "/** The gamma law of the rates of the counties of each state in each case, and the holdout of the pooled rates against the raw rates and the state rates. */",
+      "/** The gamma law of the rates of the counties of each state in each case. The holdout compares the pooled rates with the raw rates and the state rates. */",
       "export const EAGLEI_COUNTY_POOLING: CountyPooling = {",
       `  holdout: ${literal(pooling.holdout)},`,
       "  laws: {",
