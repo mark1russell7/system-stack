@@ -434,6 +434,47 @@ describe("a converter with a limit for each day", () => {
     expect(enduranceOf({ ...alone, draws: alone.draws.filter((draw) => draw.need === "food") }, GRID_CUT, { at: AT }).needs["food"]?.days).toBeCloseTo(5, 9);
   });
 
+  /** A stove boils raw water to make it safe, and cooks 1 kg of rice with 1 L of safe water. Peanut butter gives 5000 kcal. */
+  function chainLayer(boil: Partial<Converter>, cook: Partial<Converter>): EnduranceLayer {
+    const layer = cookLayer(100);
+    return {
+      ...layer,
+      resources: [...layer.resources, { code: "raw", unit: "L" }, { code: "safe", unit: "L" }],
+      stores: [...layer.stores, { id: "barrel", resource: "raw", amount: 100 }],
+      converters: [
+        { id: "boil", takes: [{ resource: "raw", amount: 1 }], gives: { resource: "safe", amount: 1 }, ...boil },
+        { id: "cook", takes: [{ resource: "safe", amount: 1 }, { resource: "rice", amount: 1 }], gives: { need: "food", amount: 1000 }, ...cook },
+      ],
+    };
+  }
+
+  it("gives a maker and its taker on one device only the days of the device", () => {
+    // One pot takes 1/4 + 1/4 of a day of the stove, so 2 pots a day: 5000 / (3000 - 2000) = 5 days.
+    const even = enduranceOf(chainLayer({ device: "stove", perDay: 4 }, { device: "stove", perDay: 4 }), GRID_CUT, { at: AT }).needs["food"];
+    expect(even?.days).toBeCloseTo(5, 6);
+    expect(even?.capped).toEqual(["boil", "cook"]);
+    // One pot takes 1/2 + 1/8 of a day, so 1.6 pots a day: 5000 / (3000 - 1600) = 25/7 days.
+    const uneven = enduranceOf(chainLayer({ device: "stove", perDay: 2 }, { device: "stove", perDay: 8 }), GRID_CUT, { at: AT }).needs["food"];
+    expect(uneven?.days).toBeCloseTo(25 / 7, 6);
+    // With the boil on a kettle, the stove cooks 4 pots a day. The 100 L of raw water end at (5000 + 100000) / 3000 = 35 days.
+    const kettle = enduranceOf(chainLayer({ device: "kettle", perDay: 4 }, { device: "stove", perDay: 4 }), GRID_CUT, { at: AT }).needs["food"];
+    expect(kettle?.days).toBeCloseTo(35, 6);
+    expect(kettle).not.toHaveProperty("capped");
+  });
+
+  it("never uses more days of a device than it has in a chain on one device", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0.1, max: 10, noNaN: true }), fc.double({ min: 0.1, max: 10, noNaN: true }), fc.integer({ min: 1, max: 3 }), (boil, cook, devices) => {
+        const result = enduranceOf(chainLayer({ device: "stove", perDay: boil, devices }, { device: "stove", perDay: cook, devices }), GRID_CUT, { at: AT }).needs["food"];
+        const days = result?.days ?? 0;
+        // Each L of raw water is one boil, and each kg of rice is one pot.
+        const used = (result?.takes["raw"] ?? 0) / boil + (result?.takes["rice"] ?? 0) / cook;
+        expect(used).toBeLessThanOrEqual(devices * days * (1 + 1e-6) + 1e-9);
+        expect(result?.takes["raw"] ?? 0).toBeLessThanOrEqual(100 * (1 + 1e-9));
+      }),
+    );
+  });
+
   it("never gives more days with a limit, nor more days with fewer devices, and takes no more than the stores and the limit", () => {
     fc.assert(
       fc.property(fc.double({ min: 0, max: 60, noNaN: true }), fc.double({ min: 0, max: 5, noNaN: true }), fc.integer({ min: 1, max: 4 }), (rice, perDay, devices) => {

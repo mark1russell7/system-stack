@@ -153,7 +153,7 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     const count = converter.devices ?? 1;
     const seen = counts.get(converter.device);
     if (seen !== undefined && seen !== count)
-      add("error", "endurance-devices", converter.id, `The converter "${converter.id}" gives ${String(count)} devices "${converter.device}", and an other converter gives ${String(seen)}.`);
+      add("error", "endurance-devices", converter.id, `The converter "${converter.id}" gives the count ${String(count)} for the device "${converter.device}". An other converter gives the count ${String(seen)}.`);
     if (seen === undefined) counts.set(converter.device, count);
   }
   const caseCodes = new Set(cases.map((item) => item.case));

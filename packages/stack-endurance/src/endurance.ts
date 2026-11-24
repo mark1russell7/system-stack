@@ -190,6 +190,15 @@ function run(left: Map<string, number>, makers: Makers, converter: Converter, wa
     const copy = new Map(left);
     let need = 0;
     let short = 0;
+    // The converter takes its device-days before its inputs. Thus a maker on the same device gets only the rest.
+    const limit = daysLeft(copy, converter);
+    if (limit !== undefined && converter.perDay !== undefined && converter.perDay > 0) {
+      const wanted = runs / converter.perDay;
+      const got = Math.min(wanted, limit);
+      copy.set(runsKey(converter), limit - got);
+      need += runs;
+      short += (wanted - got) * converter.perDay;
+    }
     for (const [resource, each] of inputs) {
       need += runs * each;
       short += takeResource(copy, makers, resource, runs * each, path);
@@ -199,8 +208,6 @@ function run(left: Map<string, number>, makers: Makers, converter: Converter, wa
   const { x: runs, value: best } = largestFit(most, attempt);
   if (best === undefined) return 0;
   for (const [resource, amount] of best) left.set(resource, amount);
-  const limit = daysLeft(left, converter);
-  if (limit !== undefined && converter.perDay !== undefined && converter.perDay > 0) left.set(runsKey(converter), Math.max(0, limit - runs / converter.perDay));
   return runs;
 }
 
@@ -252,6 +259,8 @@ const USED_UP = 1e-9;
  * - A converter with a limit `perDay` runs `perDay` times `devices` times `T` times or less in `T` days. The converters of one device share it.
  * - The higher draws use the runs of a limit first.
  * - A higher draw keeps back its runs of each day for all the days of a lower draw, also when its own days are fewer. This is the safe side.
+ * - Two limited converters of one device can make the shortfall of a try decrease when the days increase. Then the fit can stop below the largest fit.
+ *   Each result is a real fit, so the days are on the safe side. A small change of a store can change the days by a large step.
  *
  * The function is pure, but for an internal count of the tries of its fits for the tests. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
  *
