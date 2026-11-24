@@ -24,6 +24,7 @@ CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 CalorieTables: build/index.d.ts#CalorieTables
 CitedFeeds: build/index.d.ts#CitedFeeds
+CitedMilk: build/index.d.ts#CitedMilk
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
 CookFragmentInput: build/index.d.ts#CookFragmentInput
@@ -68,6 +69,7 @@ JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
 LIGHT_NEED: build/index.d.ts#LIGHT_NEED
+MILK_LATER: build/index.d.ts#MILK_LATER
 NASEM_ENERGY_SOURCE: build/index.d.ts#NASEM_ENERGY_SOURCE
 NASEM_INFANT_CALORIES: build/index.d.ts#NASEM_INFANT_CALORIES
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
@@ -202,6 +204,13 @@ export type CalorieTables = CalorieTable | readonly CalorieTable[];
 
 ### build/index.d.ts#CitedFeeds
 export interface CitedFeeds {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+### build/index.d.ts#CitedMilk
+export interface CitedMilk {
   readonly perDay: number;
   readonly source: Source;
   readonly locator: string;
@@ -477,6 +486,9 @@ export interface JoinReferences {
 
 ### build/index.d.ts#LIGHT_NEED
 export declare const LIGHT_NEED = "light.see";
+
+### build/index.d.ts#MILK_LATER
+export declare const MILK_LATER: CitedMilk;
 
 ### build/index.d.ts#NASEM_ENERGY_SOURCE
 export declare const NASEM_ENERGY_SOURCE: Source;

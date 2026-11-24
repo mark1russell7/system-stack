@@ -1,7 +1,7 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
 import { canonicalUnit, quantity, valueIn } from "@mark1russell7/quantity";
 import { calorieChange, calorieNeed, INFANT_FEEDINGS, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type CalorieTables, type Person } from "./calorie.ts";
-import { CALORIE_CHAIN, FORMULA_FEEDS } from "./data.ts";
+import { CALORIE_CHAIN, FORMULA_FEEDS, MILK_LATER } from "./data.ts";
 import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: a draw of food energy, a draw of infant formula and the stores of the list.
@@ -48,8 +48,9 @@ export interface HouseholdFragment {
 export const INFANT_MONTHS = 12;
 
 /**
- * The age in months from which an infant cannot have `feeding: "breast-milk"`: 6.
- * From 6 months, the infant table gives more than the change of a stage of lactation, so a part of the need is in no draw. Give `food` from this age.
+ * The age in months from which the food draw holds a part of the need of an infant on breast milk: 6.
+ * Below this age, the infant has milk only, and the stage of lactation of the mother holds that energy.
+ * From this age, the food draw holds the need of the row minus the milk energy `MILK_LATER`.
  */
 export const BREAST_MILK_MONTHS = 6;
 
@@ -151,8 +152,8 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
    */
   readonly formula: readonly Person[];
   /**
-   * The infants on breast milk only. Each has a line with a read in `need`, and no part of the draw.
-   * The stage of lactation of a person of the draw holds that energy.
+   * The infants on breast milk. Each infant below `BREAST_MILK_MONTHS` has a line with a read in `need`, and no part of the draw.
+   * The stage of lactation of a person of the draw holds that energy. From that age, the draw holds the row minus `MILK_LATER`.
    */
   readonly breastMilk: readonly Person[];
   /** The waste of each product with opened containers, with no cold storage. With `cold: true`, the list is empty. */
@@ -169,7 +170,7 @@ export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
   readonly noRow: readonly Person[];
   /** The infants on formula. */
   readonly formula: readonly Person[];
-  /** The infants on breast milk only. */
+  /** The infants on breast milk. */
   readonly breastMilk: readonly Person[];
   /** The reason for no layer. */
   readonly why: string;
@@ -278,7 +279,8 @@ function openedStores(
  * Each person record below `INFANT_MONTHS` must have a `feeding`. It has no default.
  *
  * - `food`: the need of the infant is in the draw of food energy.
- * - `breast-milk`: the infant has a line, and no part of the draw. It is only for an infant below `BREAST_MILK_MONTHS`.
+ * - `breast-milk`: below `BREAST_MILK_MONTHS`, the infant has a line, and no part of the draw. From that age, the food draw
+ *   holds the need of the row minus the milk energy `MILK_LATER`. The feeding is only for an infant below `INFANT_MONTHS`.
  *   A person of the household must have a stage of lactation. Each infant on breast milk needs one person of the draw with a stage of lactation.
  *   When the infants are more, the function gives no layer: the change of a stage is the milk of one infant.
  * - `formula`: below `FORMULA_DRAW_MONTHS`, the whole need of the infant is in the draw of formula, because the infant has milk only.
@@ -293,7 +295,7 @@ function openedStores(
  * @throws RangeError when the catalog has no resource in `kcal` for the direct use of a draw
  * @throws RangeError when a product with opened containers gives a resource that feeds no formula draw, with no cold storage
  * @throws RangeError when a record below `INFANT_MONTHS` has no `feeding`, or when a `feeding` is not a way of `INFANT_FEEDINGS`
- * @throws RangeError for `breast-milk` from `BREAST_MILK_MONTHS`, and for `formula` from `INFANT_MONTHS`
+ * @throws RangeError for `breast-milk` and `formula` from `INFANT_MONTHS`
  * @throws RangeError when an infant drinks only breast milk and no person of the household has a stage of lactation
  */
 export function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult {
@@ -323,6 +325,14 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
     if (person.feeding === "breast-milk") {
       breastMilk.push(person);
       nursed += person.count;
+      if (person.ageMonths >= BREAST_MILK_MONTHS) {
+        // The infant also has food. The food draw holds the need of the row minus the milk energy.
+        if (!line.read) noRow.push(person);
+        else {
+          users += person.count;
+          perDay += Math.max(0, line.need.value - MILK_LATER.perDay * person.count);
+        }
+      }
     } else if (person.feeding === "formula") {
       formula.push(person);
       if (line.read && person.ageMonths < FORMULA_DRAW_MONTHS) {
@@ -339,13 +349,13 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   }
   if (breastMilk.length > 0 && !input.persons.some((person) => person.count > 0 && makesMilk(tables, person))) {
     throw new RangeError(
-      `The infants ${breastMilk.map(nameOf).join(", ")} drink only breast milk, but no person of the household has a stage of lactation. ` +
+      `The infants ${breastMilk.map(nameOf).join(", ")} drink breast milk, but no person of the household has a stage of lactation. ` +
         "The milk comes from the food of the mother, so give the mother a stage of lactation, for example lactation-1.",
     );
   }
   const reasons = [
     ...(nursed > mothers
-      ? [`${String(nursed)} infants drink only breast milk, but the draw has ${String(mothers)} persons with a stage of lactation. The change of a stage is the milk of one infant. Give feeding: food to the other infants.`]
+      ? [`${String(nursed)} infants drink breast milk, but the draw has ${String(mothers)} persons with a stage of lactation. The change of a stage is the milk of one infant. Give feeding: food to the other infants.`]
       : []),
     ...(noRow.length > 0 ? [`The table has no row for ${String(noRow.length)} person records.`] : []),
     ...(formulaLater.length > 0
@@ -409,13 +419,8 @@ function checkFeedings(persons: readonly Person[]): void {
       }
     } else if (!(INFANT_FEEDINGS as readonly unknown[]).includes(feeding)) {
       throw new RangeError(`The feeding ${String(feeding)} of the persons ${nameOf(person)} is not a way of ${INFANT_FEEDINGS.join(", ")}.`);
-    } else if (feeding === "breast-milk" && !(person.ageMonths < BREAST_MILK_MONTHS)) {
-      throw new RangeError(
-        `The persons ${nameOf(person)} have feeding: breast-milk, which is only for an infant below ${String(BREAST_MILK_MONTHS)} months. ` +
-          "From that age, the need is more than the change of a stage of lactation. Give feeding: food.",
-      );
-    } else if (feeding === "formula" && !(person.ageMonths < INFANT_MONTHS)) {
-      throw new RangeError(`The persons ${nameOf(person)} have feeding: formula, which is only for an infant below ${String(INFANT_MONTHS)} months. Give feeding: food.`);
+    } else if (feeding !== "food" && !(person.ageMonths < INFANT_MONTHS)) {
+      throw new RangeError(`The persons ${nameOf(person)} have feeding: ${feeding}, which is only for an infant below ${String(INFANT_MONTHS)} months. Give feeding: food.`);
     }
   }
 }
