@@ -4,7 +4,7 @@ import type { DirectUse } from "@mark1russell7/stack-endurance";
 import { SUPPLY_PARTS } from "@mark1russell7/stack-hazards";
 import { describe, expect, it } from "vitest";
 import { householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
-import { checkJoins, DIRECT_USES, FOOD_NEED, JOIN_CODES, NEED_SUPPLIES, NO_COOK, STORED_WATER, WATER_NEED, type JoinReferences } from "./uses.ts";
+import { checkJoins, DIRECT_USES, FOOD_NEED, FORMULA_NEED, FORMULA_READY, JOIN_CODES, NEED_SUPPLIES, NO_COOK, STORED_WATER, WATER_NEED, type JoinReferences } from "./uses.ts";
 
 /** The real reference lists: the needs of alerts and the reference parts of stack-hazards. */
 const references: JoinReferences = { needs: NEEDS, parts: SUPPLY_PARTS };
@@ -40,9 +40,11 @@ describe("the reference codes", () => {
     const unitOf = new Map(NEEDS.map((need) => [need.code, need.unit]));
     expect(unitOf.get(FOOD_NEED)).toBe("kcal");
     expect(unitOf.get(WATER_NEED)).toBe("L");
+    expect(unitOf.get(FORMULA_NEED)).toBe("kcal");
     const resourceUnit = new Map(SUPPLY_CATALOG.resources.map((resource) => [resource.code, resource.unit]));
     expect(resourceUnit.get(NO_COOK)).toBe("kcal");
     expect(resourceUnit.get(STORED_WATER)).toBe("L");
+    expect(resourceUnit.get(FORMULA_READY)).toBe("kcal");
   });
 
   it("gives a supply part of stack-hazards for each need of NEED_SUPPLIES", () => {
@@ -57,6 +59,7 @@ describe("the reference codes", () => {
     expect(typed.map((use) => [use.resource, use.need, use.amount])).toEqual([
       [STORED_WATER, WATER_NEED, 1],
       [NO_COOK, FOOD_NEED, 1],
+      [FORMULA_READY, FORMULA_NEED, 1],
     ]);
   });
 });
@@ -116,10 +119,13 @@ describe("checkJoins", () => {
     expect(codesOf(SUPPLY_CATALOG, DIRECT_USES, NEED_SUPPLIES, { needs: [], parts: [] })).toEqual([
       ["join-use-need", "use", STORED_WATER],
       ["join-use-need", "use", NO_COOK],
+      ["join-use-need", "use", FORMULA_READY],
       ["join-supply-need", "supply", WATER_NEED],
       ["join-supply-part", "supply", WATER_NEED],
       ["join-supply-need", "supply", FOOD_NEED],
       ["join-supply-part", "supply", FOOD_NEED],
+      ["join-supply-need", "supply", FORMULA_NEED],
+      ["join-supply-part", "supply", FORMULA_NEED],
     ]);
   });
 });
