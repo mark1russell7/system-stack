@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, type CitedRate, type HeatingValue, type StoveFacts, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -70,6 +70,18 @@ export const WATER_DENSITY_MAX: CookConstant = {
 };
 
 /**
+ * The least density of liquid water from 0 °C to 100 °C: 0.95865 kg/L. The USGS table gives 0.95865 g/cm3 at 100 °C, its least value.
+ * Thus 1 L of the test water of a boil yield is 0.95865 kg or more. The least mass of the test water gives the most fuel for each kg of the pot.
+ */
+export const WATER_DENSITY_MIN: CookConstant = {
+  value: 0.95865,
+  unit: "kg/L",
+  source: USGS_WATER_DENSITY_SOURCE,
+  locator: "Table of the density and the weight of water by temperature, row 212 °F/100 °C: 0.95865 g/cm3",
+  note: "The least density of the table, from 0 °C to 100 °C. Each other row is more.",
+};
+
+/**
  * The temperature at the end of the heat to boil, in °C.
  * Water boils at a lower temperature at a high place. Then the heat is less.
  * But the cook time is longer there, and the model does not give that time. Thus at a high place the fuel is not an upper limit.
@@ -114,7 +126,10 @@ export interface CookFragmentInput {
    * Give the smallest pot that the cook makes. A batch above the real pot gives too little fuel, because each pot takes its own cook time.
    */
   readonly batch: Quantity;
-  /** The stove share. Without it, the fuel of the boil is a no read, so each fuel is a no read. It has no default. */
+  /**
+   * The stove share. It has no default. Without it, only a boil yield of the stove gives the fuel of the boil.
+   * Without a share and a yield with a read, each fuel is a no read.
+   */
   readonly share?: StoveShare | undefined;
   /** The start temperature of the cook water. The default is `COLD_START_CELSIUS`. */
   readonly start?: CookStart | undefined;
@@ -193,6 +208,40 @@ function inUnit(value: number, from: string, to: string): number | undefined {
 /** A fuel rate of a stove, in an energy or in a mass for each minute. */
 type StoveRate = { readonly kind: "energy"; readonly perMin: number } | { readonly kind: "mass"; readonly perMin: number };
 
+/** This function gives a cited temperature of a boil yield in °C, or `undefined` when the value is not a finite number with a fact. */
+function citedCelsius(value: unknown): number | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const { celsius, fact } = value as { readonly celsius?: unknown; readonly fact?: unknown };
+  return typeof celsius === "number" && Number.isFinite(celsius) && typeof fact === "string" ? celsius : undefined;
+}
+
+/**
+ * This function gives the heat that 1 kg of fuel puts into the test water of a boil yield, in `kJ/kg`. Else it gives the reason of a no read.
+ * The test water takes `WATER_DENSITY_MIN`. Thus the heat is not more than the true heat, so the fuel is not less.
+ * The rise goes from the cited start to the cited end of the test, the boil point at the place of the test.
+ * A warmer start or a colder end gives less heat. Thus each one needs its citation, and a yield with no cited start or end gives a no read.
+ * An end of `BOIL_CELSIUS` is not a default: at a high place the test water boils at less, and that default gives too little fuel.
+ * A yield with the bound `most` is a best case, so it gives too little fuel and a no read. A yield with the bound `least` or no bound gives a read.
+ */
+function yieldHeat(boil: StoveYield): { readonly perKg: number } | { readonly why: string } {
+  const bound: unknown = "bound" in boil ? boil.bound : undefined;
+  if (bound !== undefined && bound !== "least")
+    return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
+  const startC = citedCelsius(boil.start);
+  if (startC === undefined) return { why: "The boil yield of the stove has no cited start temperature. A colder start of the test gives too little fuel." };
+  // The end of the test: the field `end` of a later market. The read is by name, so the types of market 0.8.7 also compile.
+  const endC = citedCelsius((boil as { readonly end?: unknown }).end);
+  if (endC === undefined)
+    return { why: "The boil yield of the stove has no cited end temperature, the boil point of the test. At a high place the test water boils below 100 °C, so 100 °C gives too little fuel." };
+  if (!(startC >= 0 && startC < endC && endC <= BOIL_CELSIUS))
+    return { why: `The boil yield goes from ${String(startC)} °C to ${String(endC)} °C. The start must be from 0 °C, and less than the end. The end must be up to ${String(BOIL_CELSIUS)} °C.` };
+  const litres = inUnit(boil.amount, boil.unit, "L");
+  const fuelKg = inUnit(boil.per.amount, boil.per.unit, "kg");
+  if (litres === undefined || fuelKg === undefined || !(litres > 0) || !(fuelKg > 0))
+    return { why: `The boil yield of the stove is ${String(boil.amount)} ${boil.unit} for each ${String(boil.per.amount)} ${boil.per.unit}, which is not a volume above 0 for a mass above 0.` };
+  return { perKg: (litres * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * (endC - startC)) / fuelKg };
+}
+
 /** This function gives the fuel rate of a stove in `kJ/min` or `kg/min`. It gives `undefined` for a rate that is not an energy or a mass in a time. */
 function stoveRate(rate: CitedRate): StoveRate | undefined {
   const minutes = inUnit(rate.per.amount, rate.per.unit, "min");
@@ -259,16 +308,22 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   else if (rate === undefined) why.push(`The fuel rate of the stove is in ${stove.rate.unit} for each ${stove.rate.per.unit}, which is not an energy or a mass in a time.`);
 
   // The heat of the stove into the pot for each minute, in kJ/min. It needs a cited share with the same heating value as the energy rate.
+  // A share or a boil yield gives the fuel of the boil. Each one that has a read gives a boil fuel, and the line takes the most.
+  const boilWhy: string[] = [];
   let potPerMin: number | undefined;
-  if (share === undefined) why.push("No cited stove share gives the part of the stove heat that goes into the pot. Thus the fuel of the boil is a no read.");
+  if (share === undefined) boilWhy.push("No cited stove share gives the part of the stove heat that goes into the pot.");
   else if (rate !== undefined) {
     if (rate.kind === "energy") {
-      if (stove.heating !== share.heating) why.push(`The stove share is for the ${share.heating} heating value, and the stove rate is for the ${String(stove.heating ?? "unknown")} heating value.`);
+      if (stove.heating !== share.heating) boilWhy.push(`The stove share is for the ${share.heating} heating value, and the stove rate is for the ${String(stove.heating ?? "unknown")} heating value.`);
       else potPerMin = rate.perMin * share.value;
-    } else if (fuelEnergy === undefined) why.push(`The fuel ${stove.fuel} has no cited energy, so its mass rate gives no heat for the boil.`);
-    else if (fuelEnergy.heating !== share.heating) why.push(`The stove share is for the ${share.heating} heating value, and the energy of the fuel ${stove.fuel} is the ${fuelEnergy.heating} value.`);
+    } else if (fuelEnergy === undefined) boilWhy.push(`The fuel ${stove.fuel} has no cited energy, so its mass rate gives no heat for the boil.`);
+    else if (fuelEnergy.heating !== share.heating) boilWhy.push(`The stove share is for the ${share.heating} heating value, and the energy of the fuel ${stove.fuel} is the ${fuelEnergy.heating} value.`);
     else potPerMin = rate.perMin * fuelEnergy.perKg * share.value;
   }
+  // The heat of 1 kg of fuel into the pot, from the boil yield of the stove. It needs no share and no energy of the fuel.
+  const fromYield = stove.boil === undefined ? { why: "The stove has no cited boil yield." } : yieldHeat(stove.boil);
+  if ("why" in fromYield) boilWhy.push(fromYield.why);
+  if (potPerMin === undefined && "why" in fromYield) why.push(`The fuel of the boil is a no read. ${boilWhy.join(" ")}`);
 
   // The fuel mass for each minute at the full rate, in kg/min. An energy rate converts only through the cited fuel energy of the same heating value.
   let fuelPerMin: number | undefined;
@@ -280,12 +335,23 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
     else fuelPerMin = rate.perMin / fuelEnergy.perKg;
   }
 
-  if (why.length > 0 || !heat.read || cookMin === undefined || potPerMin === undefined || fuelPerMin === undefined || !(potPerMin > 0)) {
+  if (why.length > 0 || !heat.read || cookMin === undefined || fuelPerMin === undefined || !(fuelPerMin > 0)) {
     const text = why.join(" ");
     return { product: product.id, resource, energy, water, heat, minutes: noRead(text), fuel: noRead(text) };
   }
-  const minutes = heat.value / potPerMin + cookMin;
-  return { product: product.id, resource, energy, water, heat, minutes: read(minutes, "min"), fuel: read(minutes * fuelPerMin, "kg") };
+  // The boil fuel in kg: from the share, the boil time at the full rate; from the yield, the heat over the heat of 1 kg of fuel.
+  const boilFuels = [
+    ...(potPerMin !== undefined && potPerMin > 0 ? [(heat.value / potPerMin) * fuelPerMin] : []),
+    ...("perKg" in fromYield ? [heat.value / fromYield.perKg] : []),
+  ];
+  // The checks above give a share above 0 or a yield with a read. The guard keeps a line with no boil fuel from a value of -Infinity.
+  if (boilFuels.length === 0) {
+    const text = `The fuel of the boil is a no read. ${boilWhy.join(" ")}`;
+    return { product: product.id, resource, energy, water, heat, minutes: noRead(text), fuel: noRead(text) };
+  }
+  const boilFuel = Math.max(...boilFuels);
+  const minutes = boilFuel / fuelPerMin + cookMin;
+  return { product: product.id, resource, energy, water, heat, minutes: read(minutes, "min"), fuel: read(boilFuel + cookMin * fuelPerMin, "kg") };
 }
 
 /** This function gives the stove facts of the input: the facts of the caller, or the facts of a product of the catalog. */
@@ -321,6 +387,10 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - The heat to boil is the mass of the water and the dry food times `WATER_SPECIFIC_HEAT` times the rise from the start to `BOIL_CELSIUS`.
  *   The water mass takes `WATER_DENSITY_MAX`. The dry food takes the specific heat of water, which is higher than its own.
  * - The boil time is the heat divided by the stove rate times the share. The time of the stove is the boil time plus the high end of the cook time.
+ * - A boil yield of the stove (`boil` of market) gives the boil fuel with no share and no fuel energy.
+ *   The boil fuel is the heat of the pot over the heat of 1 kg of fuel in the test.
+ *   The test water takes `WATER_DENSITY_MIN`, and the rise goes from the cited start to the cited end of the test. The boil time is then the boil fuel over the mass rate.
+ *   A yield with the bound `most`, or with no cited start or end, gives a no read. When the share and the yield both have a read, the line takes the most boil fuel.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
  *   The model does not give that time, so there the fuel is not an upper limit.
  * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
