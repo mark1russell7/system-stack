@@ -243,6 +243,7 @@ export const OE417_WINDOW_SEED = "oe417-attack-window";
  * @param events - The events
  * @param options - The years of the counts, the level, the count of draws and the seed
  * @throws RangeError when a year is not a whole number, when `last` is before `first`, or when the level is not between 0 and 1
+ * @throws RangeError from `dispersionTest` when the draws times the events of a window are more than 2 ** 26. With the default draws, a window of more than 671 events gives this error.
  */
 export function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417WindowOptions): Oe417Window {
   const { first, last, level = 0.05, draws = OE417_WINDOW_DRAWS, seed = OE417_WINDOW_SEED } = options;
