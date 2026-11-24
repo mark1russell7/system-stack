@@ -165,10 +165,10 @@ describe("the gate of the reference data", () => {
 
   it("examines the sources of the event records that the reasons name", () => {
     const examined = (code: string): readonly string[] | undefined => HAZARD_LIST.hazards.find((item) => item.case === code)?.examined;
-    expect(examined("infra.power.grid-collapse")).toEqual(["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21"]);
-    expect(examined("cyber.infrastructure-attack")).toEqual(["ready.cybersecurity", "cisa.ir-alert-h-16-056-01"]);
-    expect(examined("geo.space-weather.geomagnetic-storm")).toEqual(["ready.space-weather", "swpc.electric-power"]);
-    for (const id of ["doe.maria-2017-10-23", "doe.maria-2018-02-21", "cisa.ir-alert-h-16-056-01", "swpc.electric-power"]) expect(HAZARD_SOURCES[id]?.license.url, id).toContain("copyright.gov");
+    expect(examined("infra.power.grid-collapse")).toEqual(["ready.power-outages", "doe.maria-2017-10-23", "doe.maria-2018-02-21", "doe.oe-417"]);
+    expect(examined("cyber.infrastructure-attack")).toEqual(["ready.cybersecurity", "cisa.ir-alert-h-16-056-01", "doe.oe-417"]);
+    expect(examined("geo.space-weather.geomagnetic-storm")).toEqual(["ready.space-weather", "swpc.electric-power", "doe.oe-417"]);
+    for (const id of ["doe.maria-2017-10-23", "doe.maria-2018-02-21", "cisa.ir-alert-h-16-056-01", "swpc.electric-power", "doe.oe-417"]) expect(HAZARD_SOURCES[id]?.license.url, id).toContain("copyright.gov");
   });
 
   it("has a code of the alert taxonomy for each case, so that an alert can reach each case", () => {

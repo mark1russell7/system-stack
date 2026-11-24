@@ -105,14 +105,14 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 
 | No read | Its cuts | The reason |
 | --- | --- | --- |
-| `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. One event gives no law. |
-| `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. |
-| `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. |
+| `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. The OE-417 summaries give the last restoration of each event, and their long storms are not a collapse. One event gives no law. |
+| `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. Of the 42 cyber events of the OE-417 summaries, one tells of a loss of load. Two events give no law. |
+| `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. The OE-417 summaries list no event from space weather. |
 | `NO_FOLLOW_LAW` | The cuts that follow the stop of the grid in a collapse or a solar storm | The grid cut of the case has no law, and no source read gives a duration of its own. |
 | `NO_EVENT_LAW` | Each other cut | No source read gives a duration of the cut or a record of its events. |
 
 - The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid. The early counts of DOE for Puerto Rico are estimates from the load, not counts of customers.
-- The OE-417 summaries of DOE have the outages of each cause, cyber events included. Their site did not answer the read of 2026-11-22, so the dataset does not use them yet.
+- The OE-417 summaries of DOE have the outages of each cause, cyber events included. The site of DOE did not answer the reads of 2026-11-22 and 2026-11-24. The dataset read the archived copies of the summaries of 2000 to 2023 in the Wayback Machine.
 
 ## The laws from outage records
 
@@ -136,6 +136,23 @@ EAGLE-I is the dataset of the outages of each county of the United States from O
 The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. The script `scripts/eaglei-fit.ts` reads each file in range requests through `polite-crawler` and examines its MD5. The output is the artifact `eaglei-laws`. Then the script `scripts/eaglei-law.ts` makes the module `src/eaglei-law.ts` from the artifact. A state with fewer than 30 events gets no curve. The package on npm does not have the scripts.
 
 The fit job also reads the details files of NOAA Storm Events and the zone-county file of the National Weather Service. Each is in the public domain. An outage is in a case when a storm event of the case covers its county at its start. The window starts 1 hour before the event and ends 3 hours after it. The table `STORM_CLASSES` gives the event types of each case. The match is in time and place only, so it does not prove the cause of an outage.
+
+## The law of a physical attack
+
+The OE-417 annual summaries of DOE list the electric disturbance events of each year. They are a work of the United States federal government, in the public domain.
+
+| Entry | What it is |
+| --- | --- |
+| `OE417_ATTACK_EVENTS` | The 113 events of 2011 to 2023 of a physical attack, vandalism, sabotage or theft, with a loss of customers or load. Each row is as its summary prints it. |
+| `OE417_FILES` | The summary of each year: its id at DOE, its address and the archived copy that the dataset read. |
+| `oe417Hours(event)` | It gives the hours from the start of an event to its restoration, from the local times of the summary. |
+| `oe417AttackLaw(events)` | It gives a law of the duration with one Kaplan-Meier curve for the nation. |
+| `OE417_ATTACK_LAW` | The law of the 89 events with a duration of 15 minutes or more. |
+
+- An event of a suspicion (a suspected attack or a suspicious activity) is not in the set. The attack is not proved.
+- The time of the restoration in a summary is the end of the event, so no event is censored. The 14 events with no time of an end are not in the law.
+- The times are local times. An event across a change of the clock can be one hour off.
+- No case of the list uses this law yet. A case of a physical attack on the grid waits for its code in the alert taxonomy.
 
 ## The entries
 
