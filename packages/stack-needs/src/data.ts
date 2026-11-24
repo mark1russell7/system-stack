@@ -1,5 +1,5 @@
 import type { CalorieChange, CalorieNeed, CalorieTable } from "./calorie.ts";
-import type { HashedSource } from "./source.ts";
+import type { Source } from "@mark1russell7/guidebook";
 
 // The estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025. Each value is from the tables of
 // Appendix 2 of the PDF, read on 2026-11-22. A calorie of the source is a food calorie, thus 1 kcal. The source gives
@@ -12,7 +12,7 @@ import type { HashedSource } from "./source.ts";
 // this table stays the table of the 2020-2025 edition.
 
 /** The source of the calorie table: the PDF of the Dietary Guidelines for Americans, 2020-2025, 9th Edition. It is a work of the United States federal government. */
-export const DGA_SOURCE: HashedSource = {
+export const DGA_SOURCE: Source = {
   id: "dga-2020-2025",
   title: "Dietary Guidelines for Americans, 2020-2025, 9th Edition",
   url: "https://www.dietaryguidelines.gov/sites/default/files/2020-12/Dietary_Guidelines_for_Americans_2020-2025.pdf",

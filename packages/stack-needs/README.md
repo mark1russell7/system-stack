@@ -10,7 +10,6 @@ Each function is a plain function with no clock, no network and no file.
 
 | Record | What it tells |
 | --- | --- |
-| `HashedSource` | A source of `@mark1russell7/guidebook` (an id, a title, a URL, a license and the date of the check), with the SHA-256 hash of the file. |
 | `CalorieTable` | A table of estimated calorie needs from one source, with the place of the tables in the source. |
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
@@ -25,9 +24,9 @@ Each function is a plain function with no clock, no network and no file.
 4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. A stage that the table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw. One stage holds for each day of a call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
 5. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
 
-`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source. It also refuses a hash that is not 64 lowercase hexadecimal digits. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex also cover each month with no gap, from the first row to an open last row (`needs-gap`). Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
+`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex also cover each month with no gap, from the first row to an open last row (`needs-gap`). Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
 
-The field `sha256` is not in the source of guidebook yet. It moves there later.
+The source of a table is the `Source` of `@mark1russell7/guidebook`, with its field `sha256`. Before 0.3.0, the package had its own type `HashedSource` and the code `needs-hash`.
 
 ## A first look
 

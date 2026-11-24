@@ -50,7 +50,7 @@ describe("the gate of a calorie table", () => {
     const faults = checkCalorieTable(broken);
     expect(hasNeedsError(faults)).toBe(true);
     const source = faults.filter((fault) => fault.record === "source").map((fault) => fault.code);
-    expect([...source].sort()).toEqual(["bad-date", "bad-url", "empty-title", "needs-hash", "unknown-license"]);
+    expect([...source].sort()).toEqual(["bad-date", "bad-sha256", "bad-url", "empty-title", "unknown-license"]);
     expect(faults.filter((fault) => fault.record === "row").map((fault) => fault.code)).toEqual(["needs-overlap", "needs-row", "needs-row", "needs-value", "needs-value", "needs-gap", "needs-gap"]);
   });
 

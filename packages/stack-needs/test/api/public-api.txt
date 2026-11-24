@@ -26,7 +26,6 @@ FragmentDraw: build/index.d.ts#FragmentDraw
 FragmentResource: build/index.d.ts#FragmentResource
 FragmentStore: build/index.d.ts#FragmentStore
 GiftNoRead: build/index.d.ts#GiftNoRead
-HashedSource: build/index.d.ts#HashedSource
 HouseholdFragment: build/index.d.ts#HouseholdFragment
 HouseholdFragmentInput: build/index.d.ts#HouseholdFragmentInput
 HouseholdFragmentNoRead: build/index.d.ts#HouseholdFragmentNoRead
@@ -127,7 +126,7 @@ export type CalorieSex = (typeof CALORIE_SEXES)[number];
 export interface CalorieTable {
   readonly id: string;
   readonly title: string;
-  readonly source: HashedSource;
+  readonly source: Source;
   readonly locator: string;
   readonly rows: readonly CalorieRow[];
   readonly changes?: readonly CalorieChange[] | undefined;
@@ -137,7 +136,7 @@ export interface CalorieTable {
 export declare const DGA_CALORIES: CalorieTable;
 
 ### build/index.d.ts#DGA_SOURCE
-export declare const DGA_SOURCE: HashedSource;
+export declare const DGA_SOURCE: Source;
 
 ### build/index.d.ts#DIRECT_USES
 export declare const DIRECT_USES: readonly FragmentDirectUse[];
@@ -180,11 +179,6 @@ export interface GiftNoRead {
   readonly resource: string;
   readonly why: string;
 }
-
-### build/index.d.ts#HashedSource
-export type HashedSource = Source & {
-  readonly sha256?: string;
-};
 
 ### build/index.d.ts#HouseholdFragment
 export interface HouseholdFragment {
@@ -254,7 +248,7 @@ export interface JoinReferences {
 }
 
 ### build/index.d.ts#NEEDS_CODES
-export declare const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
+export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
 
 ### build/index.d.ts#NEED_SUPPLIES
 export declare const NEED_SUPPLIES: {

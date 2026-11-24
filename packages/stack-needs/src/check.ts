@@ -2,12 +2,11 @@ import { checkSources, type Finding, type FindingCode, type GateOptions } from "
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } from "./calorie.ts";
 
-// The gate of a table of calorie needs: the gate of the sources of guidebook, the form of the hash, and the rows.
+// The gate of a table of calorie needs: the gate of the sources of guidebook, and the rows.
 
 /**
- * These are the codes of the gate of the rows and the hash. Each code is an error. The gate of the sources of `@mark1russell7/guidebook` gives its own codes.
+ * These are the codes of the gate of the rows. Each code is an error. The gate of the sources of `@mark1russell7/guidebook` gives its own codes.
  *
- * - `needs-hash`: the hash of the source is not 64 lowercase hexadecimal digits.
  * - `needs-row`: a row has no age or a wrong sex. Or its range of months is not a range of whole numbers of 0 or more.
  * - `needs-overlap`: two rows of one sex have ages in common.
  * - `needs-gap`: the rows of one sex do not cover each month with no gap, from the first row to an open last row.
@@ -16,7 +15,7 @@ import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } fr
  *   change has its stage and sex. Or its value is not a finite number in a unit of energy for each day. Or its sum with
  *   the smallest need of its sex is not above 0.
  */
-export const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"] = ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
+export const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"] = ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
 
 /** A code of the gate of a table of calorie needs. */
 export type NeedsCode = (typeof NEEDS_CODES)[number];
@@ -38,7 +37,8 @@ function goodNeed(need: Quantity, positive = true): boolean {
  * This function gives each finding of a table of calorie needs. A list with no error tells that the gate passes.
  *
  * - The findings of the source come from `checkSources` of `@mark1russell7/guidebook`, with the options of the call.
- * - The form of the hash and the rows have the codes of `NEEDS_CODES`.
+ * - The hash of the source is part of the gate of the sources (`bad-sha256`).
+ * - The rows have the codes of `NEEDS_CODES`.
  *
  * The findings are in the order of the table. The function is pure.
  *
@@ -50,8 +50,6 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
   const add = (code: NeedsCode, record: "source" | "row" | "change", id: string, message: string): void => {
     findings.push({ level: "error", code, record, id, message });
   };
-  const { sha256 } = table.source;
-  if (sha256 !== undefined && !/^[0-9a-f]{64}$/u.test(sha256)) add("needs-hash", "source", table.source.id, `The hash of the source "${table.source.id}" is not 64 lowercase hexadecimal digits.`);
 
   const whole = (value: number | undefined): boolean => value === undefined || (Number.isSafeInteger(value) && value >= 0);
   const range = (row: CalorieRow): boolean => whole(row.from) && whole(row.to) && (row.to === undefined || row.to >= row.from);
