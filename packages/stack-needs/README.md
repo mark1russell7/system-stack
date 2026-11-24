@@ -109,7 +109,7 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
 | `breast-milk` | Only below 12 months. Below 6 months (`BREAST_MILK_MONTHS`), the draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. From 6 months, the infant also has food. The draw holds the need of the row minus the milk energy (`MILK_LATER`, 381 kcal/d). The result lists the infant in `breastMilk`. |
-| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. With `formulaLater: "whole"`, the formula draw holds the whole need: the upper limit of formula. The result lists each infant on formula in `formula`. |
+| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. With `formulaLater: "whole"`, the formula draw holds the whole need: the upper limit of formula. With `formulaLater: "least"`, the formula draw holds the lower limit, and the food draw holds the rest. The result lists each infant on formula in `formula`. |
 
 With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
 
@@ -118,7 +118,9 @@ The limits of formula from 6 months:
 - The upper limit is the whole need of the row. Formula cannot give more energy than the whole need. Give `formulaLater: "whole"` for this limit.
 - Table 5.2 of the WIC guide (page 137) gives the formula of one day. It is approximately 24 to 32 ounces at 6 to 8 months.
 - At 8 to 12 months, the table gives approximately 24 ounces.
-- The lower limit needs the energy of one ounce of the formula. The guide does not give it, and the label of a product gives it. Thus the lower limit is a no read.
+- The lower limit is 24 fl oz a day (`FORMULA_LATER_LEAST`). Give `formulaLater: "least"` for this limit. When the need of the row is less, the formula draw holds the need.
+- The FDC item 172319 (ready-to-feed formula) gives 63 kcal in 100 g and 30.4 g in 1 fl oz. Thus 1 fl oz gives 19.152 kcal, and 24 fl oz give 459.648 kcal.
+- The two limits give the same total energy. Only the split between the formula draw and the food draw changes.
 
 The rules of breast milk:
 

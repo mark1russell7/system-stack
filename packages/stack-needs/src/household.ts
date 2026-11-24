@@ -1,7 +1,7 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
 import { canonicalUnit, quantity, valueIn } from "@mark1russell7/quantity";
 import { calorieChange, calorieNeed, INFANT_FEEDINGS, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type CalorieTables, type Person } from "./calorie.ts";
-import { CALORIE_CHAIN, FORMULA_FEEDS, MILK_LATER } from "./data.ts";
+import { CALORIE_CHAIN, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER } from "./data.ts";
 import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: a draw of food energy, a draw of infant formula and the stores of the list.
@@ -98,8 +98,9 @@ export interface HouseholdFragmentInput {
   /**
    * The rule for an infant on formula from `FORMULA_DRAW_MONTHS`. Without it, the infant is a person with no row.
    * With `whole`, the formula draw holds the whole need of the row: the upper limit of formula. The food draw holds none of it.
+   * With `least`, the formula draw holds `FORMULA_LATER_LEAST`, or the need of the row when it is less. The food draw holds the rest.
    */
-  readonly formulaLater?: "whole" | undefined;
+  readonly formulaLater?: "whole" | "least" | undefined;
 }
 
 /** The waste of the opened containers of one product of the buy list with no cold storage. */
@@ -268,6 +269,7 @@ function openedStores(
  * - The draw of food energy has the rate of the need of its persons for one day, and its users are the persons.
  * - The draw of formula has the infants on formula below `FORMULA_DRAW_MONTHS`, with the whole need of their rows.
  *   With `formulaLater: "whole"`, it also has the older infants on formula, with the whole need of their rows.
+ *   With `formulaLater: "least"`, it has `FORMULA_LATER_LEAST` of each older infant, and the food draw has the rest.
  * - The fragment has each draw with one or more users. The draw of food energy is first.
  * - Each gift of the buy list with a read is one store, with the `id` `<prefix>:<product>:<resource>`. A gift with no read has no store.
  * - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives 1 kcal for each kcal.
@@ -291,7 +293,8 @@ function openedStores(
  *   When the infants are more, the function gives no layer: the change of a stage is the milk of one infant.
  * - `formula`: below `FORMULA_DRAW_MONTHS`, the whole need of the infant is in the draw of formula, because the infant has milk only.
  *   From `FORMULA_DRAW_MONTHS`, no cited source gives the part of formula, so the infant gives no layer, as a person with no row.
- *   The option `leave-out` also applies. The option `formulaLater: "whole"` puts the whole need in the formula draw: the upper limit. The feeding is only for an infant below `INFANT_MONTHS`.
+ *   The option `leave-out` also applies. The option `formulaLater: "whole"` puts the whole need in the formula draw: the upper limit.
+ *   The option `formulaLater: "least"` puts the lower limit in the formula draw, and the rest of the need in the food draw. The feeding is only for an infant below `INFANT_MONTHS`.
  *
  * The function is pure.
  *
@@ -345,6 +348,17 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
         formulaUsers += person.count;
         formulaPerDay += line.need.value;
         formulaLeast = Math.min(formulaLeast, line.need.value / person.count);
+      } else if (line.read && input.formulaLater === "least") {
+        // The formula draw holds the least formula of each infant. The food draw holds the rest of the need of the row.
+        const each = Math.min(FORMULA_LATER_LEAST.perDay, line.need.value / person.count);
+        formulaUsers += person.count;
+        formulaPerDay += each * person.count;
+        formulaLeast = Math.min(formulaLeast, each);
+        const rest = line.need.value - each * person.count;
+        if (rest > 0) {
+          users += person.count;
+          perDay += rest;
+        }
       } else formulaLater.push(person);
     } else if (!line.read) noRow.push(person);
     else {
