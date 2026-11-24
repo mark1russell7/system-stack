@@ -10,6 +10,7 @@ import { ENDURANCE_SCHEMA, type EnduranceLayer } from "./layer.ts";
  * - The levels are one setting: each fragment that has levels gives the same list, else the join has a fault.
  * - The records of each list are in the order of the fragments.
  * - Two resources with one code in two fragments join into one resource when their records are equal. A different field is a fault.
+ *   Its message gives the canonical JSON of the record of each fragment.
  * - A code that one fragment has two times stays in the joined layer. The gate `checkEndurance` finds it.
  * - One key of each other list in two or more fragments is a fault, also when the records are equal.
  * - The key of a direct use is its resource and its need.
@@ -22,8 +23,11 @@ import { ENDURANCE_SCHEMA, type EnduranceLayer } from "./layer.ts";
 export function joinEndurance(pieces: readonly LayerPiece<EnduranceLayer>[]): LayerParse<EnduranceLayer> {
   const levels = joinSetting(pieces, (layer) => (layer.levels.length > 0 ? layer.levels.join("\n") : undefined), "levels");
   // Two fragments can declare one resource, for example `water.stored` in `L`. Canonical JSON (RFC 8785) compares the records,
-  // so the order of the keys has no effect.
-  const resources = joinRecords(pieces, (layer) => layer.resources, (item) => item.code, "resource", { equal: (first, other) => canonicalJson(first) === canonicalJson(other) });
+  // so the order of the keys has no effect. The message of a fault gives the canonical JSON of the record of each fragment.
+  const resources = joinRecords(pieces, (layer) => layer.resources, (item) => item.code, "resource", {
+    equal: (first, other) => canonicalJson(first) === canonicalJson(other),
+    text: canonicalJson,
+  });
   const stores = joinRecords(pieces, (layer) => layer.stores, (item) => item.id, "store");
   const draws = joinRecords(pieces, (layer) => layer.draws, (item) => item.need, "draw");
   const direct = joinRecords(pieces, (layer) => layer.direct, (item) => `${item.resource}>${item.need}`, "direct use");
