@@ -360,8 +360,20 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 
 The gate refuses an empty code and two needs with one code (`daily-need-id`). It refuses a unit that `@mark1russell7/quantity` does not read (`daily-need-unit`). It also refuses a bad read or a no read with no reason (`daily-need-rate`). A bad read has no source. Or its amount is not a finite number of 0 or more in the unit of the need for each day.
 
+## The devices of the kit
+
+`deviceFragment` gives the devices of a buy list that run on cells, as converters of an endurance layer. Examples are a radio and a flashlight.
+
+- Each device of the catalog of market with a cited run time gives one converter. The field `device` of a product gives its need, its cells and its run time.
+- One run takes one cell, and gives the hours of the need for each cell. For example, 48 h on 3 cells gives 16 h for each cell.
+- One device gives its need for 24 hours in a day or less. Thus the limit `perDay` is `HOURS_IN_DAY` divided by the hours for each cell. The count of devices is the count of whole units.
+- The input `runs` gives the run time of a device of the caller, with its citation. It replaces the run time of the catalog.
+- A device with no run time gives no converter, and a no read. The radio and the flashlight of the catalog are no one model, so their run time is a no read.
+- With the input `draws`, each need of a device gives one draw at the daily rate of the need. A need with no read of its rate gives no draw, and a no read.
+- The fragment has no store. The cells come from the stores of the buy list, for example the product `power.aa-alkaline` of the catalog.
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, the daily needs, the uses, the supply parts and `checkJoins`. |
