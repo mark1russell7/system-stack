@@ -8,10 +8,12 @@
 
 ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ActivityLevel: build/index.d.ts#ActivityLevel
+BOIL_CELSIUS: build/index.d.ts#BOIL_CELSIUS
 BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
 CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
+COLD_START_CELSIUS: build/index.d.ts#COLD_START_CELSIUS
 CalorieChange: build/index.d.ts#CalorieChange
 CalorieNeed: build/index.d.ts#CalorieNeed
 CalorieNeedLine: build/index.d.ts#CalorieNeedLine
@@ -20,10 +22,22 @@ CalorieRow: build/index.d.ts#CalorieRow
 CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 CalorieTables: build/index.d.ts#CalorieTables
+CookConstant: build/index.d.ts#CookConstant
+CookFragment: build/index.d.ts#CookFragment
+CookFragmentInput: build/index.d.ts#CookFragmentInput
+CookFragmentResult: build/index.d.ts#CookFragmentResult
+CookLine: build/index.d.ts#CookLine
+CookNoRead: build/index.d.ts#CookNoRead
+CookRead: build/index.d.ts#CookRead
+CookStart: build/index.d.ts#CookStart
 DGA_CALORIES: build/index.d.ts#DGA_CALORIES
 DGA_SOURCE: build/index.d.ts#DGA_SOURCE
 DIRECT_USES: build/index.d.ts#DIRECT_USES
 FOOD_NEED: build/index.d.ts#FOOD_NEED
+FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
+FORMULA_NEED: build/index.d.ts#FORMULA_NEED
+FORMULA_READY: build/index.d.ts#FORMULA_READY
+FragmentConverter: build/index.d.ts#FragmentConverter
 FragmentDirectUse: build/index.d.ts#FragmentDirectUse
 FragmentDraw: build/index.d.ts#FragmentDraw
 FragmentResource: build/index.d.ts#FragmentResource
@@ -46,6 +60,7 @@ NASEM_ENERGY_SOURCE: build/index.d.ts#NASEM_ENERGY_SOURCE
 NASEM_INFANT_CALORIES: build/index.d.ts#NASEM_INFANT_CALORIES
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
 NEED_SUPPLIES: build/index.d.ts#NEED_SUPPLIES
+NIST_SI_GUIDE_SOURCE: build/index.d.ts#NIST_SI_GUIDE_SOURCE
 NO_COOK: build/index.d.ts#NO_COOK
 NeedsCode: build/index.d.ts#NeedsCode
 NeedsFinding: build/index.d.ts#NeedsFinding
@@ -54,7 +69,11 @@ Person: build/index.d.ts#Person
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
 STORED_WATER: build/index.d.ts#STORED_WATER
+StoveShare: build/index.d.ts#StoveShare
+USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
+WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
 WATER_NEED: build/index.d.ts#WATER_NEED
+WATER_SPECIFIC_HEAT: build/index.d.ts#WATER_SPECIFIC_HEAT
 calorieChange: build/index.d.ts#calorieChange
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
@@ -62,6 +81,7 @@ calorieRowOf: build/index.d.ts#calorieRowOf
 checkCalorieChain: build/index.d.ts#checkCalorieChain
 checkCalorieTable: build/index.d.ts#checkCalorieTable
 checkJoins: build/index.d.ts#checkJoins
+cookFragment: build/index.d.ts#cookFragment
 hasNeedsError: build/index.d.ts#hasNeedsError
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
@@ -74,6 +94,9 @@ export declare const ACTIVITY_LEVELS: readonly ["sedentary", "moderately-active"
 ### build/index.d.ts#ActivityLevel
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
 
+### build/index.d.ts#BOIL_CELSIUS
+export declare const BOIL_CELSIUS = 100;
+
 ### build/index.d.ts#BREAST_MILK_MONTHS
 export declare const BREAST_MILK_MONTHS = 6;
 
@@ -85,6 +108,9 @@ export declare const CALORIE_SEXES: readonly ["female", "male"];
 
 ### build/index.d.ts#CALORIE_TABLES
 export declare const CALORIE_TABLES: readonly CalorieTable[];
+
+### build/index.d.ts#COLD_START_CELSIUS
+export declare const COLD_START_CELSIUS = 0;
 
 ### build/index.d.ts#CalorieChange
 export interface CalorieChange {
@@ -153,6 +179,81 @@ export interface CalorieTable {
 ### build/index.d.ts#CalorieTables
 export type CalorieTables = CalorieTable | readonly CalorieTable[];
 
+### build/index.d.ts#CookConstant
+export interface CookConstant {
+  readonly value: number;
+  readonly unit: string;
+  readonly source: Source;
+  readonly locator: string;
+  readonly note: string;
+}
+
+### build/index.d.ts#CookFragment
+export interface CookFragment {
+  readonly schema: "endurance/1";
+  readonly levels: readonly string[];
+  readonly resources: readonly {
+    readonly code: string;
+    readonly unit: string;
+  }[];
+  readonly stores: readonly never[];
+  readonly draws: readonly never[];
+  readonly converters: readonly FragmentConverter[];
+}
+
+### build/index.d.ts#CookFragmentInput
+export interface CookFragmentInput {
+  readonly catalog: SupplyCatalog;
+  readonly units: Readonly<Record<string, number>>;
+  readonly stove: string | StoveFacts;
+  readonly batch: Quantity;
+  readonly share?: StoveShare | undefined;
+  readonly start?: CookStart | undefined;
+  readonly device?: string | undefined;
+  readonly prefix?: string | undefined;
+}
+
+### build/index.d.ts#CookFragmentResult
+export interface CookFragmentResult {
+  readonly layer: CookFragment;
+  readonly lines: readonly CookLine[];
+  readonly noReads: readonly CookNoRead[];
+  readonly read: boolean;
+}
+
+### build/index.d.ts#CookLine
+export interface CookLine {
+  readonly product: string;
+  readonly resource: string;
+  readonly energy: CookRead;
+  readonly water: CookRead;
+  readonly heat: CookRead;
+  readonly minutes: CookRead;
+  readonly fuel: CookRead;
+}
+
+### build/index.d.ts#CookNoRead
+export interface CookNoRead {
+  readonly resource: string;
+  readonly why: string;
+}
+
+### build/index.d.ts#CookRead
+export type CookRead = {
+  readonly read: true;
+  readonly value: number;
+  readonly unit: string;
+} | {
+  readonly read: false;
+  readonly why: string;
+};
+
+### build/index.d.ts#CookStart
+export interface CookStart {
+  readonly celsius: number;
+  readonly cite: string;
+}
+
 ### build/index.d.ts#DGA_CALORIES
 export declare const DGA_CALORIES: CalorieTable;
 
@@ -164,6 +265,29 @@ export declare const DIRECT_USES: readonly FragmentDirectUse[];
 
 ### build/index.d.ts#FOOD_NEED
 export declare const FOOD_NEED = "food.energy";
+
+### build/index.d.ts#FORMULA_DRAW_MONTHS
+export declare const FORMULA_DRAW_MONTHS = 6;
+
+### build/index.d.ts#FORMULA_NEED
+export declare const FORMULA_NEED = "food.infant-formula";
+
+### build/index.d.ts#FORMULA_READY
+export declare const FORMULA_READY = "food.infant-formula-ready";
+
+### build/index.d.ts#FragmentConverter
+export interface FragmentConverter {
+  readonly id: string;
+  readonly device?: string | undefined;
+  readonly takes: readonly {
+    readonly resource: string;
+    readonly amount: number;
+  }[];
+  readonly gives: {
+    readonly need: string;
+    readonly amount: number;
+  };
+}
 
 ### build/index.d.ts#FragmentDirectUse
 export interface FragmentDirectUse {
@@ -294,7 +418,11 @@ export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs
 export declare const NEED_SUPPLIES: {
   readonly "hydration.drink": "water.main";
   readonly "food.energy": "food.retail";
+  readonly "food.infant-formula": "food.retail";
 };
+
+### build/index.d.ts#NIST_SI_GUIDE_SOURCE
+export declare const NIST_SI_GUIDE_SOURCE: Source;
 
 ### build/index.d.ts#NO_COOK
 export declare const NO_COOK = "food.no-cook";
@@ -332,8 +460,24 @@ export interface ReferencePart {
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
 
+### build/index.d.ts#StoveShare
+export interface StoveShare {
+  readonly value: number;
+  readonly heating: HeatingValue;
+  readonly cite: string;
+}
+
+### build/index.d.ts#USGS_WATER_DENSITY_SOURCE
+export declare const USGS_WATER_DENSITY_SOURCE: Source;
+
+### build/index.d.ts#WATER_DENSITY_MAX
+export declare const WATER_DENSITY_MAX: CookConstant;
+
 ### build/index.d.ts#WATER_NEED
 export declare const WATER_NEED = "hydration.drink";
+
+### build/index.d.ts#WATER_SPECIFIC_HEAT
+export declare const WATER_SPECIFIC_HEAT: CookConstant;
 
 ### build/index.d.ts#calorieChange
 export declare function calorieChange(table: CalorieTable, sex: CalorieSex, stage: string): CalorieChange | undefined;
@@ -358,6 +502,9 @@ export declare function checkCalorieTable(table: CalorieTable, options?: GateOpt
 
 ### build/index.d.ts#checkJoins
 export declare function checkJoins(catalog: SupplyCatalog, uses: readonly FragmentDirectUse[], supplies: Readonly<Record<string, string>>, references: JoinReferences): JoinFinding[];
+
+### build/index.d.ts#cookFragment
+export declare function cookFragment(input: CookFragmentInput): CookFragmentResult;
 
 ### build/index.d.ts#hasNeedsError
 export declare function hasNeedsError(findings: readonly NeedsFinding[]): boolean;

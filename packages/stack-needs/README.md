@@ -15,7 +15,9 @@ Each function is a plain function with no clock, no network and no file.
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
-| `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, one draw and one direct use. It has the form of `EnduranceLayer`. |
+| `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, the draws and their direct uses. It has the form of `EnduranceLayer`. |
+| `CookFragment` | A fragment of an endurance layer: the resources and one cook converter for each dry resource with a read. It has the form of `EnduranceLayer`. |
+| `CookLine` | The energy, the cook water, the heat to boil, the stove time and the fuel of one pot of one dry food, each a read or a no read. |
 
 ## The rules of the data
 
@@ -23,7 +25,7 @@ Each function is a plain function with no clock, no network and no file.
 2. An age with no row in the tables gives a line with no read for that person, not an error. The total of `calorieNeed` is then a lower limit, and `read` is false.
 3. The activity level is an explicit input. The package has no default level.
 4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. The change comes from the table of the row. A stage that this table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw. One stage holds for each day of a call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
-5. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
+5. The cook converters come from the cited cook facts of the catalog, a cited stove share and cited constants. A missing fact gives a no read, not a figure. Refer to the section on the water and the fuel of a cook.
 
 `checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). The source of a table must have a publisher (`by`), a page of its terms and a hash, and HTTPS addresses (the options `require` and `https` of the gate). A missing field gives `missing-field`. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex have no gap between two rows (`needs-gap`). A table can start after month 0 and end at a closed row. Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
 
@@ -64,12 +66,14 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 
 `householdFragment` turns the persons and a buy list into a fragment of an endurance layer. The buy list is the count of units of each product of the catalog of supplies of `@mark1russell7/market`.
 
-- The fragment has one draw `food.energy`. Its rate is the need of the persons for one day, in `kcal`. Its users are the persons.
+- The draw `food.energy` has the need of the persons for one day, in `kcal`. Its users are the persons.
+- The draw `food.infant-formula` has the infants on formula below 6 months (`FORMULA_DRAW_MONTHS`), with the whole need of their rows.
+- The fragment has each draw with one or more users. The draw `food.energy` is first.
 - Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
-- The direct uses are the food uses of `uses`: each use for the need `food.energy`. The default `DIRECT_USES` gives `food.no-cook`, 1 kcal for each kcal.
-- The resources are the resources of the stores and of the food uses. The resource of each food use is in `kcal` in the catalog, or the function throws a `RangeError`.
-- The supply part of the draw is `supply`. Its default is the part of `NEED_SUPPLIES` for `food.energy`: `food.retail`.
+- The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives `food.no-cook` to the food draw and `food.infant-formula-ready` to the formula draw, 1 kcal for each kcal.
+- The resources are the resources of the stores and of the direct uses. The resource of each direct use is in `kcal` in the catalog, or the function throws a `RangeError`.
+- The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw: `food.retail`.
 - The result also has the food energy of each product (`buyListEnergy`). A caller gets the energy of the dry food for its converters from it.
 
 The result has two reads. `needRead` tells if the draw has a read, and `storesRead` tells if each gift of the buy list has a read.
@@ -90,7 +94,7 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
 | `breast-milk` | Only below 6 months (`BREAST_MILK_MONTHS`). The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. The result lists the infant in `breastMilk`. |
-| `formula` | Only below 12 months. The fragment has no draw of formula. Thus the infant gives no layer, as a person with no row. The result lists the infant in `formula`. With `noRow: "leave-out"`, the draw has no need of the infant, and `leftOut` lists the infant. |
+| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. The result lists each infant on formula in `formula`. |
 
 With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
 
@@ -100,15 +104,84 @@ The rules of breast milk:
 - The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
 - From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
 
+The notes b and c of Table A2-3 of the guidelines (page 141) give the two changes of lactation:
+
+| Stage | The note of the source | The change |
+| --- | --- | --- |
+| `lactation-1` | 500 calories/day for the milk production, minus 170 calories/day for the weight loss after the birth. | 330 kcal/d |
+| `lactation-2` | 400 calories/day for the milk production. The source assumes a stable weight after 6 months. | 400 kcal/d |
+
+Thus below 6 months, a part of the milk comes from the stores of the mother. The draw holds only the part from food.
+The source gives the energy of the milk production, not the energy that the infant gets. It gives no change for two or more infants.
+Thus the package does not give the milk part of an infant from 6 months, and it does not give a change for twins. Each is a no read until a source gives it.
+
 A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
 ### The resources of the buy list and the join
 
 The fragment has no converter. Thus, with this fragment alone, only `food.no-cook` feeds the draw. This is the worst case: no water and no fuel.
 
-A caller adds the converters for the dry food in a different fragment, with the water and the fuel of each run. Then `joinEndurance` joins the fragments. The dry food then adds days only while the water and the fuel last.
+`cookFragment` gives the converters for the dry food in a different fragment, with the water and the fuel of each pot. Then `joinEndurance` joins the fragments. The dry food then adds days only while the water and the fuel last.
 
 This fragment declares the resource codes of the buy list, for example `water.stored` in `L`. A different fragment, for example the fragment of a water tank, can declare the same resource. `joinEndurance` of `@mark1russell7/stack-endurance` joins two equal records into one. A different unit is a fault of the join.
+
+## The water and the fuel of a cook
+
+`cookFragment` turns the dry food of a buy list into converters of an endurance layer. One run of a converter is one pot. The run takes the dry food, the cook water and the fuel, and gives the food energy of the pot. Thus a dry food with no fuel or no water gives no meal.
+
+```ts
+import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
+import { cookFragment } from "@mark1russell7/stack-needs";
+
+const cook = cookFragment({
+  catalog: SUPPLY_CATALOG,
+  units: { "food.rice-white-1kg": 4 },
+  // Made-up stove and share: 227 g of propane in 90 min, and 0.5 of the higher heating value.
+  stove: { fuel: "fuel.propane", rate: { amount: 227, unit: "g", per: { amount: 90, unit: "min" }, fact: "example.stove" } },
+  share: { value: 0.5, heating: "higher", cite: "example.share" },
+  batch: { value: 0.5, unit: "kg" },
+});
+// cook.layer has the converter cook:food.grain-dry. Join it with the layer of householdFragment and a store of fuel.
+```
+
+The model of one pot:
+
+1. The cook water is `cookWater` of `@mark1russell7/market` times the dry mass. It takes `water.stored`, the resource of the drinking water.
+2. The heat to boil is the mass times 4.19002 kJ/(kg.K) times the rise to the boil (100 °C). The mass is the water and the dry food. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat. The dry food takes the specific heat of water, which is higher than its own. This term holds the heat above the true value.
+3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the water and the food. The heat of the pot itself is in the losses. It is a cited input with its heating value. It has no default.
+4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
+5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
+6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
+7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default. Give the smallest pot that the cook makes. Each pot takes its own cook time, so a batch above the real pot gives too little fuel.
+
+Each value of a line is a read or a no read with its reasons. These facts give a no read:
+
+| Missing fact | The no read |
+| --- | --- |
+| No cited cook water | The water, the heat and the fuel. A food with a cook time and no cited water has no fuel. |
+| No cited cook time | The stove time and the fuel. |
+| No cited stove rate, or a rate that is not an energy or a mass in a time | The stove time and the fuel. |
+| No cited stove share | The stove time and the fuel. The water and the heat keep their reads. |
+| A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
+| No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
+| No food energy of the product | The energy. |
+| A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
+
+A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
+
+The catalog of market gives no soak water. Thus a food that needs a soak, for example dry beans, has no soak draw. The beans of the catalog have no cited cook water, so they have no converter.
+
+The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
+
+The cited constants:
+
+| Name | Value | Source |
+| --- | --- | --- |
+| `WATER_SPECIFIC_HEAT` | 4.19002 kJ/(kg.K) | The NIST Guide to the SI (SP 811). Appendix B.8 gives 4.190 02 J for the calorie (mean). The common definition of that calorie is the mean from 0 °C to 100 °C, and SP 811 does not state the range. Footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 °C. |
+| `WATER_DENSITY_MAX` | 1 kg/L | The page Water Density of the USGS Water Science School. Its table gives 1.00000 g/cm3 at 4.0 °C, its largest value. Thus the water mass is an upper limit. |
+| `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is less. But the cook time is longer there, and the model does not give it. Thus at a high place the fuel is not an upper limit. |
+
+The two sources are works of the United States federal government (the license `us-public-domain` of guidebook).
 
 ## The uses, the supply parts and the join gate
 
@@ -116,8 +189,8 @@ The package holds one record of each use and of each default supply part. `house
 
 | Name | What it has |
 | --- | --- |
-| `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` to `food.retail`. A household with a well gives a different part. |
-| `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, 1 kcal for each kcal. |
+| `NEED_SUPPLIES` | The default reference part of each need: `hydration.drink` to `water.main`, and `food.energy` and `food.infant-formula` to `food.retail`. A household with a well gives a different part. |
+| `DIRECT_USES` | `water.stored` gives `hydration.drink`, 1 L for each L. This is a definition, not a read. `food.no-cook` gives `food.energy`, and `food.infant-formula-ready` gives `food.infant-formula`, 1 kcal for each kcal. |
 | `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
 
 `checkJoins(catalog, uses, supplies, { needs, parts })` gives one finding for each break. An empty list is a pass. Each finding is an error.
@@ -175,4 +248,4 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, the uses, the supply parts and `checkJoins`. |

@@ -3,8 +3,8 @@ import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type Cas
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
 import { DGA_CALORIES, NASEM_INFANT_CALORIES } from "./data.ts";
-import { householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
-import { FOOD_NEED, NO_COOK } from "./uses.ts";
+import { FORMULA_DRAW_MONTHS, householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
+import { FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK } from "./uses.ts";
 
 /** Two made-up adults of 33 years. Sedentary, they need 2400 + 1800 = 4200 kcal each day. */
 const adults: Person[] = [
@@ -192,19 +192,66 @@ describe("the household fragment", () => {
     expect(() => householdFragment({ ...input, persons: [adults[0] as Person, pregnant, baby] })).toThrow(/stage of lactation/);
   });
 
-  it("gives no layer for an infant on formula, and leaves the infant out with the option", () => {
+  it("puts an infant on formula below 6 months in a draw of formula, with the whole need of its row", () => {
+    // A made-up infant of 4 months. The infant table gives 546 kcal/d for the girls of 3 to 5 months.
     const baby: Person = { sex: "female", ageMonths: 4, count: 1, feeding: "formula" };
+    const result = fragmentOf({ ...input, persons: [...adults, baby] });
+    expect(result.leftOut).toEqual([]);
+    expect(result.formula).toEqual([baby]);
+    expect(result.layer.draws).toEqual([
+      { need: FOOD_NEED, level: "critical", perDay: DAILY, users: 2, supply: "food.retail" },
+      { need: FORMULA_NEED, level: "critical", perDay: 546, users: 1, supply: "food.retail" },
+    ]);
+    expect(result.layer.direct).toEqual([
+      { resource: NO_COOK, need: FOOD_NEED, amount: 1 },
+      { resource: FORMULA_READY, need: FORMULA_NEED, amount: 1 },
+    ]);
+    expect(result.layer.resources).toContainEqual({ code: FORMULA_READY, unit: "kcal" });
+  });
+
+  it("gives 0 days of formula for a buy list with no formula, and the days of the formula of the list", () => {
+    const baby: Person = { sex: "male", ageMonths: 1, count: 1, feeding: "formula" };
+    const daysOf = (more: Record<string, number>): number | undefined => {
+      const layer: EnduranceLayer = fragmentOf({ ...input, persons: [...adults, baby], units: { ...units, ...more } }).layer;
+      expect(hasEnduranceError(checkEndurance(layer))).toBe(false);
+      return enduranceOf(layer, foodCut, { at }).needs[FORMULA_NEED]?.days;
+    };
+    // The peanut butter and the rice of the list do not feed the infant.
+    expect(daysOf({})).toBe(0);
+    // The catalog gives 630 kcal for each kg of ready-to-feed formula, and the infant table gives 566 kcal/d for the boys of 0 to 2 months.
+    expect(daysOf({ "food.infant-formula-ready-1kg": 9 })).toBeCloseTo((9 * 630) / 566, 9);
+  });
+
+  it("gives only the draw of formula for a household of infants on formula", () => {
+    const babies: Person = { sex: "female", ageMonths: 0, count: 2, feeding: "formula" };
+    const { layer } = fragmentOf({ ...input, persons: [babies] });
+    expect(layer.draws).toEqual([{ need: FORMULA_NEED, level: "critical", perDay: 2 * 531, users: 2, supply: "food.retail" }]);
+    expect(layer.direct).toEqual([{ resource: FORMULA_READY, need: FORMULA_NEED, amount: 1 }]);
+  });
+
+  it("gives no layer for an infant on formula from 6 months, and leaves the infant out with the option", () => {
+    expect(FORMULA_DRAW_MONTHS).toBe(6);
+    const baby: Person = { sex: "female", ageMonths: 6, count: 1, feeding: "formula" };
     const result = householdFragment({ ...input, persons: [...adults, baby] });
     expect(result.layer).toBeUndefined();
     if (result.layer === undefined) {
       expect(result.formula).toEqual([baby]);
       expect(result.noRow).toEqual([]);
-      expect(result.why).toMatch(/formula/);
+      expect(result.why).toMatch(/6 months or more are on formula/);
     }
     const left = fragmentOf({ ...input, persons: [...adults, baby], noRow: "leave-out" });
     expect(left.leftOut).toEqual([baby]);
     expect(left.formula).toEqual([baby]);
-    expect(left.layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
+    expect(left.layer.draws).toEqual([{ need: FOOD_NEED, level: "critical", perDay: DAILY, users: 2, supply: "food.retail" }]);
+  });
+
+  it("gives a need of formula below 6 months that 32 fl oz of ready-to-feed formula covers", () => {
+    // A cross-check, not a rule. The CDC tells that infants on about 32 fl oz of formula each day need no more vitamin D.
+    // TEST VALUE: the test takes 1 g for each mL of formula, with no source. The catalog gives 63 kcal in 100 g.
+    const covered = (32 * 29.5735295625 * 63) / 100;
+    for (const row of NASEM_INFANT_CALORIES.rows.filter((item) => item.from < FORMULA_DRAW_MONTHS)) {
+      expect(row.need.each?.value, `${row.sex} ${row.age}`).toBeLessThan(covered);
+    }
   });
 
   it("gives no layer for a draw of 0 kcal", () => {

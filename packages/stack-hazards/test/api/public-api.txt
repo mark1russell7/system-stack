@@ -66,9 +66,13 @@ OE417_WINDOW_DRAWS: build/index.d.ts#OE417_WINDOW_DRAWS
 OE417_WINDOW_SEED: build/index.d.ts#OE417_WINDOW_SEED
 OE417_YEARS: build/index.d.ts#OE417_YEARS
 Observation: build/index.d.ts#Observation
+Oe417Cell: build/index.d.ts#Oe417Cell
 Oe417Event: build/index.d.ts#Oe417Event
 Oe417File: build/index.d.ts#Oe417File
+Oe417Grid: build/index.d.ts#Oe417Grid
 Oe417PriorOptions: build/index.d.ts#Oe417PriorOptions
+Oe417Read: build/index.d.ts#Oe417Read
+Oe417Rows: build/index.d.ts#Oe417Rows
 Oe417Window: build/index.d.ts#Oe417Window
 Oe417WindowOptions: build/index.d.ts#Oe417WindowOptions
 Oe417Year: build/index.d.ts#Oe417Year
@@ -83,10 +87,13 @@ PoolLaw: build/hazard.chunk.d.ts#PoolLaw
 PoolScore: build/hazard.chunk.d.ts#PoolScore
 PooledRates: build/index.d.ts#PooledRates
 PriorTable: build/hazard.chunk.d.ts#PriorTable
+ReachScore: build/hazard.chunk.d.ts#ReachScore
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
+STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
+SilentAreas: build/index.d.ts#SilentAreas
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
@@ -106,11 +113,16 @@ hazardRegions: build/index.d.ts#hazardRegions
 observedRegions: build/index.d.ts#observedRegions
 oe417AttackLaw: build/index.d.ts#oe417AttackLaw
 oe417AttackPrior: build/index.d.ts#oe417AttackPrior
+oe417Compare: build/index.d.ts#oe417Compare
 oe417Count: build/index.d.ts#oe417Count
 oe417Hours: build/index.d.ts#oe417Hours
 oe417IsAttack: build/index.d.ts#oe417IsAttack
+oe417KeptEvents: build/index.d.ts#oe417KeptEvents
 oe417LawEvents: build/index.d.ts#oe417LawEvents
+oe417PdfRows: build/index.d.ts#oe417PdfRows
 oe417PriorWindow: build/index.d.ts#oe417PriorWindow
+oe417SheetRows: build/index.d.ts#oe417SheetRows
+oe417YearCounts: build/index.d.ts#oe417YearCounts
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
@@ -120,6 +132,7 @@ stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
+withoutSilentAreas: build/index.d.ts#withoutSilentAreas
 zoneCounties: build/index.d.ts#zoneCounties
 
 ## ./county-priors (build/eaglei-county-priors.d.ts): names
@@ -158,6 +171,10 @@ type ClaimBasis = (typeof CLAIM_BASES)[number];
 interface CountyPooling {
   readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
   readonly holdout: PoolHoldout;
+  readonly silent: {
+    readonly areas: number;
+    readonly expected: number;
+  };
 }
 
 ### build/hazard.chunk.d.ts#DurationLaw
@@ -250,6 +267,11 @@ interface PoolScore {
     readonly state: number;
     readonly areas: number;
   };
+  readonly reach: {
+    readonly areas: number;
+    readonly plain: ReachScore;
+    readonly events: ReachScore;
+  };
 }
 
 ### build/hazard.chunk.d.ts#PriorTable
@@ -260,6 +282,12 @@ interface PriorTable {
   readonly method: string;
   readonly codes: readonly string[];
   readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+}
+
+### build/hazard.chunk.d.ts#ReachScore
+interface ReachScore {
+  readonly bias: number;
+  readonly error: number;
 }
 
 ### build/hazard.chunk.d.ts#Regions
@@ -309,7 +337,7 @@ export interface CoverageTally {
 }
 
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS
-export declare const EAGLEI_NATION_CUSTOMERS = 155605385;
+export declare const EAGLEI_NATION_CUSTOMERS = 154857853;
 
 ### build/index.d.ts#EAGLEI_STATE_PRIORS
 export declare const EAGLEI_STATE_PRIORS: PriorTable;
@@ -441,6 +469,12 @@ export interface Observation {
   readonly customers: Readonly<Record<string, number>>;
 }
 
+### build/index.d.ts#Oe417Cell
+export interface Oe417Cell {
+  readonly value: string | number | null;
+  readonly text: string;
+}
+
 ### build/index.d.ts#Oe417Event
 export interface Oe417Event {
   readonly year: number;
@@ -460,12 +494,27 @@ export interface Oe417File {
   readonly archive: string;
 }
 
+### build/index.d.ts#Oe417Grid
+export type Oe417Grid = readonly (readonly (Oe417Cell | undefined | null)[])[];
+
 ### build/index.d.ts#Oe417PriorOptions
 export interface Oe417PriorOptions {
   readonly first: number;
   readonly last: number;
   readonly customers: number;
   readonly note?: string | undefined;
+}
+
+### build/index.d.ts#Oe417Read
+export interface Oe417Read {
+  readonly years: Readonly<Record<string, Oe417Year>>;
+  readonly events: readonly Oe417Event[];
+}
+
+### build/index.d.ts#Oe417Rows
+export interface Oe417Rows {
+  readonly events: readonly Oe417Event[];
+  readonly copies: number;
 }
 
 ### build/index.d.ts#Oe417Window
@@ -565,6 +614,16 @@ export interface RegionCurve {
 ### build/index.d.ts#STORM_CLASSES
 export declare const STORM_CLASSES: Readonly<Record<string, readonly string[]>>;
 
+### build/index.d.ts#STORM_STATE_CODES
+export declare const STORM_STATE_CODES: Readonly<Record<string, string>>;
+
+### build/index.d.ts#SilentAreas
+export interface SilentAreas {
+  readonly observation: Observation;
+  readonly silent: readonly string[];
+  readonly expected: number;
+}
+
 ### build/index.d.ts#StormArea
 export type StormArea = "C" | "Z" | "M";
 
@@ -640,6 +699,9 @@ export declare function oe417AttackLaw(events: readonly Oe417Event[], options?: 
 ### build/index.d.ts#oe417AttackPrior
 export declare function oe417AttackPrior(events: readonly Oe417Event[], options: Oe417PriorOptions): PriorTable;
 
+### build/index.d.ts#oe417Compare
+export declare function oe417Compare(read: Oe417Read, years: Readonly<Record<string, Oe417Year>>, events: readonly Oe417Event[], fresh?: string[]): string[];
+
 ### build/index.d.ts#oe417Count
 export declare function oe417Count(text: string): number;
 
@@ -649,11 +711,23 @@ export declare function oe417Hours(event: Oe417Event): number | undefined;
 ### build/index.d.ts#oe417IsAttack
 export declare function oe417IsAttack(type: string): boolean;
 
+### build/index.d.ts#oe417KeptEvents
+export declare function oe417KeptEvents(rows: Oe417Rows): Oe417Event[];
+
 ### build/index.d.ts#oe417LawEvents
 export declare function oe417LawEvents(events: readonly Oe417Event[]): Oe417Event[];
 
+### build/index.d.ts#oe417PdfRows
+export declare function oe417PdfRows(year: number, text: string): Oe417Rows;
+
 ### build/index.d.ts#oe417PriorWindow
 export declare function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417WindowOptions): Oe417Window;
+
+### build/index.d.ts#oe417SheetRows
+export declare function oe417SheetRows(year: number, grid: Oe417Grid): Oe417Rows;
+
+### build/index.d.ts#oe417YearCounts
+export declare function oe417YearCounts(rows: Oe417Rows): Oe417Year;
 
 ### build/index.d.ts#outageCurves
 export declare function outageCurves(events: readonly OutageEvent[], region: (area: string) => string, options?: SurvivalOptions): Readonly<Record<string, RegionCurve>>;
@@ -681,6 +755,9 @@ export declare function supplyState(hazard: Hazard, part: string, options?: Basi
 
 ### build/index.d.ts#survivalOf
 export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;
+
+### build/index.d.ts#withoutSilentAreas
+export declare function withoutSilentAreas(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation, group: (area: string) => string): SilentAreas;
 
 ### build/index.d.ts#zoneCounties
 export declare function zoneCounties(text: string): Map<string, readonly string[]>;

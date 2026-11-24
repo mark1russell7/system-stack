@@ -8,12 +8,19 @@ import { valueIn } from "@mark1russell7/quantity";
 /** The code of the need of the food draw: food energy, in `kcal` for each day. */
 export const FOOD_NEED = "food.energy";
 
+/**
+ * The code of the need of the infants on formula below `FORMULA_DRAW_MONTHS`, in `kcal` for each day.
+ * It is a need of its own. Thus the food of the adults does not feed the infants, and the formula does not feed the adults.
+ */
+export const FORMULA_NEED = "food.infant-formula";
 /** The code of the need of drinking water, in `L` for each day. */
 export const WATER_NEED = "hydration.drink";
 
 /** The resource of the food to eat with no water and no fuel, in `kcal`. It has a direct use for the food draw. */
 export const NO_COOK = "food.no-cook";
 
+/** The resource of the ready-to-feed infant formula, in `kcal`. It has a direct use for the formula need. It needs no water and no fuel. */
+export const FORMULA_READY = "food.infant-formula-ready";
 /** The resource of the stored drinking water, in `L`. It has a direct use for the water need. */
 export const STORED_WATER = "water.stored";
 
@@ -29,9 +36,10 @@ export interface FragmentDirectUse {
  * The parts are `id` values of `SUPPLY_PARTS` of `@mark1russell7/stack-hazards`. A household with a well gives a different part.
  * The type has the exact keys. The annotation replaces `as const`, because the package has isolated declarations.
  */
-export const NEED_SUPPLIES: { readonly "hydration.drink": "water.main"; readonly "food.energy": "food.retail" } = {
+export const NEED_SUPPLIES: { readonly "hydration.drink": "water.main"; readonly "food.energy": "food.retail"; readonly "food.infant-formula": "food.retail" } = {
   "hydration.drink": "water.main",
   "food.energy": "food.retail",
+  "food.infant-formula": "food.retail",
 };
 
 /**
@@ -39,12 +47,14 @@ export const NEED_SUPPLIES: { readonly "hydration.drink": "water.main"; readonly
  *
  * - 1 L of stored drinking water gives 1 L of drink. This is a definition, not a read.
  * - 1 kcal of food to eat with no water and no fuel gives 1 kcal of food energy.
+ * - 1 kcal of ready-to-feed infant formula gives 1 kcal of the formula need.
  *
  * These records have the form of `DirectUse` of `@mark1russell7/stack-endurance`.
  */
 export const DIRECT_USES: readonly FragmentDirectUse[] = [
   { resource: STORED_WATER, need: WATER_NEED, amount: 1 },
   { resource: NO_COOK, need: FOOD_NEED, amount: 1 },
+  { resource: FORMULA_READY, need: FORMULA_NEED, amount: 1 },
 ];
 
 /**
