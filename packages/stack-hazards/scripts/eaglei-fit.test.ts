@@ -3,9 +3,10 @@ import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, raiseCustomers, ranges, sweepTable, yearsOf, type EagleLaws } from "./eaglei-fit.ts";
+import { caseOverlap, EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, raiseCustomers, ranges, sweepTable, yearsOf, type EagleLaws } from "./eaglei-fit.ts";
 import { RANGE_TRIES, type FitContext } from "./fetch.ts";
 import { STORM_BASE, stormFiles } from "./storm-files.ts";
+import type { OutageEvent } from "../src/outages.ts";
 import { STORM_CLASSES } from "../src/storms.ts";
 
 // A made-up article on fake hosts. The code 90 is not the code of a state or a territory.
@@ -331,5 +332,16 @@ describe("fitEagle", () => {
     const wrong = article((file) => (file["name"] === "eaglei_outages_2021.csv" ? { ...file, computed_md5: md5("other") } : file));
     await expect(fitEagle(context(fake(wrong).transport), { now: () => new Date() })).rejects.toThrow(/MD5 of eaglei_outages_2021\.csv/);
     await expect(fitEagle(context(fake(article(), { redirect: 200 }).transport), { now: () => new Date() })).rejects.toThrow(/not a redirect/);
+  });
+});
+
+describe("caseOverlap", () => {
+  it("counts each outage of the storm cases one time, and the outages in two cases or more", () => {
+    const [a, b, c] = [{}, {}, {}] as unknown as OutageEvent[];
+    if (a === undefined || b === undefined || c === undefined) throw new Error("No events.");
+    // The outage b is in three cases. An outage two times in one list counts one time in that case.
+    expect(caseOverlap([[a, b], [b, c], [b, b]])).toEqual({ events: 3, multiple: 1 });
+    expect(caseOverlap([[a], [c]])).toEqual({ events: 2, multiple: 0 });
+    expect(caseOverlap([])).toEqual({ events: 0, multiple: 0 });
   });
 });
