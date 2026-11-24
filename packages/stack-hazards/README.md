@@ -45,6 +45,20 @@ if (storm !== undefined) {
 }
 ```
 
+The option `region` gives the region of the user: one region, or one region for each scheme. Each law reads the region with its scheme. The laws of EAGLE-I have the scheme `us-state-fips`, and the law of a physical attack has the scheme `us-nation` with the code `US`. A law with no region of its scheme gives a cut with no curve, which is no read.
+
+```ts
+const attack = hazardOf(HAZARD_LIST, "infra.power.physical-attack");
+if (attack !== undefined) {
+  // One list of regions: the state laws and the law of the nation in one call.
+  const region = [
+    { scheme: "us-state-fips", code: "37" },
+    { scheme: "us-nation", code: "US" },
+  ];
+  console.log(hazardCase(HAZARD_LIST, attack, { region }).cuts[0]?.duration !== undefined); // true
+}
+```
+
 A part of a stack that needs a public supply names a reference id in its needs. Or the option `parts` maps each reference id to the ids of the stack. An empty list tells that the stack does not have the supply.
 
 ## Told effects and assessed risks

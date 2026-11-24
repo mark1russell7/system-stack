@@ -122,7 +122,7 @@ export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
   ...EAGLEI_CAUSE_SOURCES,
 };
 
-/** The duration of each cut with no law yet. Only the grid cuts have laws, from EAGLE-I: for all causes, and for each storm case. */
+/** The duration of each cut with no law yet. Only the grid cuts have laws: from EAGLE-I for all causes and for each storm case, and from the OE-417 summaries for a physical attack. */
 export const NO_LAW: NoLaw = { read: false, reason: "No source with a law of the duration of this cut is read yet." };
 
 /** The duration of the grid cut of a storm case with no state of 30 outages of EAGLE-I in the storm events of the case. */
@@ -169,8 +169,8 @@ const assessed = (source: string, says: string): Claim => ({ source, basis: "ass
 const defined = (says: string): Claim => ({ definition: true, says });
 
 /**
- * This function gives the cuts that a stop of the grid causes, from the page on power outages. A power outage and a long collapse of the grid share them.
- * The two cases have different reasons for no law.
+ * This function gives the cuts that a stop of the grid causes, from the page on power outages. A power outage, a physical attack on the grid and a long collapse of the grid share them.
+ * A long collapse has a different reason for no law.
  */
 const outageEffects = (duration: NoLaw): HazardCut[] => [
   { part: "phone.network", title: "No telephone service", claims: [told("ready.power-outages", "The page tells that a power outage can stop communications.")], duration },

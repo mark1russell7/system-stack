@@ -28,6 +28,7 @@ HazardCode: build/index.d.ts#HazardCode
 HazardCut: build/index.d.ts#HazardCut
 HazardFault: build/index.d.ts#HazardFault
 HazardList: build/index.d.ts#HazardList
+HazardRegion: build/index.d.ts#HazardRegion
 IsoDate: build/index.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
 License: build/index.d.ts#License
@@ -178,10 +179,7 @@ export interface Hazard {
 
 ### build/index.d.ts#HazardCaseOptions
 export interface HazardCaseOptions extends BasisOptions {
-  readonly region?: {
-    readonly scheme: string;
-    readonly code: string;
-  } | undefined;
+  readonly region?: HazardRegion | readonly HazardRegion[] | undefined;
   readonly parts?: Readonly<Record<string, readonly string[]>> | undefined;
 }
 
@@ -206,6 +204,12 @@ export interface HazardList {
   readonly schema: typeof HAZARDS_SCHEMA;
   readonly sources: Readonly<Record<string, Source>>;
   readonly hazards: readonly Hazard[];
+}
+
+### build/index.d.ts#HazardRegion
+export interface HazardRegion {
+  readonly scheme: string;
+  readonly code: string;
 }
 
 ### build/index.d.ts#IsoDate
