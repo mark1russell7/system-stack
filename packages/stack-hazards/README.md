@@ -230,6 +230,13 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `OE417_LAST_YEAR`, `OE417_COUNTS_FIRST` | The last year of the summaries (2023), and the first year with an event of the law (2011). |
 | `OE417_PRIOR_FIRST` | 2015, the first year of the prior. A test calculates it again with `oe417PriorWindow`. |
 | `OE417_NATION_PRIORS` | The prior of 2015 to 2023: 66 events in 9 years, with the customers `EAGLEI_NATION_CUSTOMERS`. |
+| `oe417SheetRows(year, grid)` | It reads the events of a summary of 2002 to 2023 from the cells of its sheet. It finds the columns by their labels and counts the second rows. |
+| `oe417PdfRows(year, text)` | It reads the events of a summary of 2000 or 2001 from its PDF text. The counts are exact. The area and the counts of customers are best effort, and the restoration is `null`. |
+| `oe417YearCounts(rows)`, `oe417KeptEvents(rows)` | They give the counts of a summary by the terms of the dataset, and the events that `OE417_ATTACK_EVENTS` holds. |
+| `oe417Compare(read, years, events)` | It lists each difference between a read and the dataset. |
+
+The script `scripts/oe417-read.ts` fetches the archived summaries and gives them to these functions. The workflow `oe417-read` starts it in CI with `--check`. The check passes when the read equals `OE417_YEARS` and `OE417_ATTACK_EVENTS`.
+To add a new year, give the option `--extra` a JSON file of entries like those of `OE417_FILES`, or give the workflow the same JSON in its input `extra`. The script then lists the new year and its events.
 
 The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
 

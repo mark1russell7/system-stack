@@ -46,6 +46,7 @@
     "@mark1russell7/system-stack": "workspace:*"
   },
   "devDependencies": {
+    "@e965/xlsx": "0.20.3",
     "@mark1russell7/alerts": "^0.1.12",
     "@mark1russell7/cue": "^2.0.0",
     "@mark1russell7/optional": "^1.5.0",
