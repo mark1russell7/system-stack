@@ -91,13 +91,28 @@ export function regionRates(counts: Readonly<Record<string, AreaCount>>, observa
   return rates;
 }
 
+/** The options of `hazardPriors`. */
+export interface HazardPriorOptions extends Pick<HazardCaseOptions, "region"> {
+  /**
+   * The place of each prior, for example the place that `yearShortfall` of stack-endurance reads.
+   * The default is the region of the table that gives the prior.
+   */
+  readonly place?: string | undefined;
+}
+
 /**
  * This function gives the yearly prior of each case of a list at the region of the user, as the records `Prior` of the core.
  * For each case, the first region of the option with a table of the case in its scheme gives the prior. A region that the table observes with no event of the case has a prior of 0.
  * A case with no table for a region of the option has no prior. That is no read, not a prior of 0.
- * The place of a prior is the scheme and the code of its region, for example `us-county-fips:37183`. The function is pure.
+ * The place of a prior is the option `place`. With no option, it is the scheme and the code of its region, for example `us-county-fips:37183`.
+ * After a fall back to a larger region, that default is the larger region, not the place of the user. Thus a caller that finds a prior by its place gives the option.
+ * The function is pure.
+ *
+ * @throws RangeError when the option `place` is empty or has a space at an end
  */
-export function hazardPriors(list: HazardList, options: Pick<HazardCaseOptions, "region"> = {}): Prior[] {
+export function hazardPriors(list: HazardList, options: HazardPriorOptions = {}): Prior[] {
+  const { place } = options;
+  if (place !== undefined && (place === "" || place !== place.trim())) throw new RangeError(`The place "${place}" is empty or has a space at an end.`);
   const regions = hazardRegions(options.region);
   const tables = list.priors ?? [];
   const priors: Prior[] = [];
@@ -107,7 +122,7 @@ export function hazardPriors(list: HazardList, options: Pick<HazardCaseOptions, 
       if (table === undefined) continue;
       const [perYear, reach] = table.rates[hazard.case]?.[region.code] ?? [0, 0];
       const source = list.sources[table.source]?.url ?? table.source;
-      priors.push({ case: hazard.case, place: `${region.scheme}:${region.code}`, perYear, reach, source, asOf: table.asOf });
+      priors.push({ case: hazard.case, place: place ?? `${region.scheme}:${region.code}`, perYear, reach, source, asOf: table.asOf });
       break;
     }
   }
