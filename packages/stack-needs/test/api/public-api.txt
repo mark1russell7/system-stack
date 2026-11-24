@@ -23,6 +23,9 @@ CalorieRow: build/index.d.ts#CalorieRow
 CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 CalorieTables: build/index.d.ts#CalorieTables
+CitedFeeds: build/index.d.ts#CitedFeeds
+CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
+CitedMilk: build/index.d.ts#CitedMilk
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
 CookFragmentInput: build/index.d.ts#CookFragmentInput
@@ -42,8 +45,11 @@ DailyNeedFinding: build/index.d.ts#DailyNeedFinding
 DailyNeedUsers: build/index.d.ts#DailyNeedUsers
 DailyRateNoRead: build/index.d.ts#DailyRateNoRead
 DailyRateRead: build/index.d.ts#DailyRateRead
+FDC_SR_LEGACY_SOURCE: build/index.d.ts#FDC_SR_LEGACY_SOURCE
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
+FORMULA_FEEDS: build/index.d.ts#FORMULA_FEEDS
+FORMULA_LATER_LEAST: build/index.d.ts#FORMULA_LATER_LEAST
 FORMULA_NEED: build/index.d.ts#FORMULA_NEED
 FORMULA_READY: build/index.d.ts#FORMULA_READY
 FragmentConverter: build/index.d.ts#FragmentConverter
@@ -66,6 +72,7 @@ JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
 LIGHT_NEED: build/index.d.ts#LIGHT_NEED
+MILK_LATER: build/index.d.ts#MILK_LATER
 NASEM_ENERGY_SOURCE: build/index.d.ts#NASEM_ENERGY_SOURCE
 NASEM_INFANT_CALORIES: build/index.d.ts#NASEM_INFANT_CALORIES
 NEEDS_CODES: build/index.d.ts#NEEDS_CODES
@@ -77,6 +84,7 @@ NWS_RECEIVERS_SOURCE: build/index.d.ts#NWS_RECEIVERS_SOURCE
 NeedsCode: build/index.d.ts#NeedsCode
 NeedsFinding: build/index.d.ts#NeedsFinding
 NoRowAction: build/index.d.ts#NoRowAction
+OpenedWaste: build/index.d.ts#OpenedWaste
 Person: build/index.d.ts#Person
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
@@ -87,6 +95,7 @@ WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
 WATER_NEED: build/index.d.ts#WATER_NEED
 WATER_SPECIFIC_HEAT: build/index.d.ts#WATER_SPECIFIC_HEAT
+WIC_INFANT_SOURCE: build/index.d.ts#WIC_INFANT_SOURCE
 calorieChange: build/index.d.ts#calorieChange
 calorieNeed: build/index.d.ts#calorieNeed
 calorieRow: build/index.d.ts#calorieRow
@@ -195,6 +204,31 @@ export interface CalorieTable {
 
 ### build/index.d.ts#CalorieTables
 export type CalorieTables = CalorieTable | readonly CalorieTable[];
+
+### build/index.d.ts#CitedFeeds
+export interface CitedFeeds {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+### build/index.d.ts#CitedFormulaLeast
+export interface CitedFormulaLeast {
+  readonly perDay: number;
+  readonly ounces: number;
+  readonly ouncesSource: Source;
+  readonly ouncesLocator: string;
+  readonly kcalPerOunce: number;
+  readonly kcalSource: Source;
+  readonly kcalLocator: string;
+}
+
+### build/index.d.ts#CitedMilk
+export interface CitedMilk {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
 
 ### build/index.d.ts#CookConstant
 export interface CookConstant {
@@ -317,11 +351,20 @@ export interface DailyRateRead {
   readonly note: string;
 }
 
+### build/index.d.ts#FDC_SR_LEGACY_SOURCE
+export declare const FDC_SR_LEGACY_SOURCE: Source;
+
 ### build/index.d.ts#FOOD_NEED
 export declare const FOOD_NEED = "food.energy";
 
 ### build/index.d.ts#FORMULA_DRAW_MONTHS
 export declare const FORMULA_DRAW_MONTHS = 6;
+
+### build/index.d.ts#FORMULA_FEEDS
+export declare const FORMULA_FEEDS: CitedFeeds;
+
+### build/index.d.ts#FORMULA_LATER_LEAST
+export declare const FORMULA_LATER_LEAST: CitedFormulaLeast;
 
 ### build/index.d.ts#FORMULA_NEED
 export declare const FORMULA_NEED = "food.infant-formula";
@@ -402,6 +445,8 @@ export interface HouseholdFragmentInput {
   readonly table?: CalorieTables | undefined;
   readonly prefix?: string | undefined;
   readonly noRow?: NoRowAction | undefined;
+  readonly cold?: boolean | undefined;
+  readonly formulaLater?: "whole" | "least" | undefined;
 }
 
 ### build/index.d.ts#HouseholdFragmentNoRead
@@ -423,6 +468,7 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
   readonly leftOut: readonly Person[];
   readonly formula: readonly Person[];
   readonly breastMilk: readonly Person[];
+  readonly waste: readonly OpenedWaste[];
 }
 
 ### build/index.d.ts#HouseholdFragmentResult
@@ -462,6 +508,9 @@ export interface JoinReferences {
 ### build/index.d.ts#LIGHT_NEED
 export declare const LIGHT_NEED = "light.see";
 
+### build/index.d.ts#MILK_LATER
+export declare const MILK_LATER: CitedMilk;
+
 ### build/index.d.ts#NASEM_ENERGY_SOURCE
 export declare const NASEM_ENERGY_SOURCE: Source;
 
@@ -498,6 +547,17 @@ export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | 
 
 ### build/index.d.ts#NoRowAction
 export type NoRowAction = "leave-out";
+
+### build/index.d.ts#OpenedWaste
+export interface OpenedWaste {
+  readonly product: string;
+  readonly resource: string;
+  readonly containers: number;
+  readonly container: number;
+  readonly feed: number;
+  readonly used: number;
+  readonly waste: number;
+}
 
 ### build/index.d.ts#Person
 export interface Person {
@@ -544,6 +604,9 @@ export declare const WATER_NEED = "hydration.drink";
 
 ### build/index.d.ts#WATER_SPECIFIC_HEAT
 export declare const WATER_SPECIFIC_HEAT: CookConstant;
+
+### build/index.d.ts#WIC_INFANT_SOURCE
+export declare const WIC_INFANT_SOURCE: Source;
 
 ### build/index.d.ts#calorieChange
 export declare function calorieChange(table: CalorieTable, sex: CalorieSex, stage: string): CalorieChange | undefined;

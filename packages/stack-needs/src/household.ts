@@ -1,6 +1,7 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
+import { canonicalUnit, quantity, valueIn } from "@mark1russell7/quantity";
 import { calorieChange, calorieNeed, INFANT_FEEDINGS, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type CalorieTables, type Person } from "./calorie.ts";
-import { CALORIE_CHAIN } from "./data.ts";
+import { CALORIE_CHAIN, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER } from "./data.ts";
 import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: a draw of food energy, a draw of infant formula and the stores of the list.
@@ -47,8 +48,9 @@ export interface HouseholdFragment {
 export const INFANT_MONTHS = 12;
 
 /**
- * The age in months from which an infant cannot have `feeding: "breast-milk"`: 6.
- * From 6 months, the infant table gives more than the change of a stage of lactation, so a part of the need is in no draw. Give `food` from this age.
+ * The age in months from which the food draw holds a part of the need of an infant on breast milk: 6.
+ * Below this age, the infant has milk only, and the stage of lactation of the mother holds that energy.
+ * From this age, the food draw holds the need of the row minus the milk energy `MILK_LATER`.
  */
 export const BREAST_MILK_MONTHS = 6;
 
@@ -88,6 +90,33 @@ export interface HouseholdFragmentInput {
    * With `leave-out`, the draw has no need of those persons, and the result lists them.
    */
   readonly noRow?: NoRowAction | undefined;
+  /**
+   * True when the household has cold storage for an opened container. The default is false: the worst case of no power.
+   * Then an opened container of formula serves one feed, and the rest is waste.
+   */
+  readonly cold?: boolean | undefined;
+  /**
+   * The rule for an infant on formula from `FORMULA_DRAW_MONTHS`. Without it, the infant is a person with no row.
+   * With `whole`, the formula draw holds the whole need of the row: the upper limit of formula. The food draw holds none of it.
+   * With `least`, the formula draw holds `FORMULA_LATER_LEAST`, or the need of the row when it is less. The food draw holds the rest.
+   */
+  readonly formulaLater?: "whole" | "least" | undefined;
+}
+
+/** The waste of the opened containers of one product of the buy list with no cold storage. */
+export interface OpenedWaste {
+  readonly product: string;
+  readonly resource: string;
+  /** The count of containers in the buy list. */
+  readonly containers: number;
+  /** The energy of one container, in `kcal`. */
+  readonly container: number;
+  /** The energy of the smallest feed of the formula draw, in `kcal`. */
+  readonly feed: number;
+  /** The energy that the infants use from the containers, in `kcal`. It is the amount of the store. */
+  readonly used: number;
+  /** The energy of the containers that is waste, in `kcal`. */
+  readonly waste: number;
 }
 
 /** A gift of the buy list with no read. The fragment has no store for it. A no read is not 0. */
@@ -129,10 +158,12 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
    */
   readonly formula: readonly Person[];
   /**
-   * The infants on breast milk only. Each has a line with a read in `need`, and no part of the draw.
-   * The stage of lactation of a person of the draw holds that energy.
+   * The infants on breast milk. Each infant below `BREAST_MILK_MONTHS` has a line with a read in `need`, and no part of the draw.
+   * The stage of lactation of a person of the draw holds that energy. From that age, the draw holds the row minus `MILK_LATER`.
    */
   readonly breastMilk: readonly Person[];
+  /** The waste of each product with opened containers, with no cold storage. With `cold: true`, the list is empty. */
+  readonly waste: readonly OpenedWaste[];
 }
 
 /** No household fragment: the draw has no read. A low rate gives too many days, so the function gives no layer. */
@@ -145,7 +176,7 @@ export interface HouseholdFragmentNoRead extends HouseholdStoresResult {
   readonly noRow: readonly Person[];
   /** The infants on formula. */
   readonly formula: readonly Person[];
-  /** The infants on breast milk only. */
+  /** The infants on breast milk. */
   readonly breastMilk: readonly Person[];
   /** The reason for no layer. */
   readonly why: string;
@@ -185,10 +216,60 @@ function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[]
 }
 
 /**
+ * This function applies the rule of an opened container with no cold storage to the stores of the buy list.
+ * An opened container serves one feed. A feed that is more than a container takes more containers, and the rest of the last is waste.
+ * Thus each container gives `feed / ceil(feed / container)` kcal. The feed is the smallest feed of the formula draw, the worst case.
+ * A product with a container of no read gives no store, and a gift with no read.
+ *
+ * @throws RangeError when a product with opened containers gives a resource that feeds no formula draw
+ */
+function openedStores(
+  input: HouseholdFragmentInput,
+  stores: readonly FragmentStore[],
+  noReads: readonly GiftNoRead[],
+  feed: number | undefined,
+): { stores: FragmentStore[]; noReads: GiftNoRead[]; waste: OpenedWaste[] } {
+  const out = { stores: [...stores], noReads: [...noReads], waste: [] as OpenedWaste[] };
+  if (input.cold === true) return out;
+  const prefix = input.prefix ?? "buy";
+  const formulaResources = new Set((input.uses ?? DIRECT_USES).filter((use) => use.need === FORMULA_NEED).map((use) => use.resource));
+  for (const [id, count] of Object.entries(input.units)) {
+    const product = input.catalog.products.find((each) => each.id === id);
+    const opened = product?.opened;
+    if (product === undefined || opened === undefined || !(count > 0)) continue;
+    for (const store of stores.filter((each) => each.id.startsWith(`${prefix}:${id}:`))) {
+      if (!formulaResources.has(store.resource)) {
+        throw new RangeError(`The product ${id} spoils after its container is opened, and its resource ${store.resource} feeds no formula draw. Only the formula draw has a cited size of one feed.`);
+      }
+      if (feed === undefined) continue;
+      const { container } = opened;
+      const size = product.size;
+      out.stores = out.stores.filter((each) => each.id !== store.id);
+      if (!container.read || size === undefined || !size.read) {
+        const why = container.read ? "The size of the product is no read." : `The size of a container is no read: ${container.why}`;
+        out.noReads.push({ product: id, resource: store.resource, why: `With no cold storage, an opened container serves one feed (fact ${opened.noCold}). ${why}` });
+        continue;
+      }
+      const unit = canonicalUnit(container.unit);
+      const perUnit = Math.round(valueIn(quantity(size.amount, canonicalUnit(size.unit)), unit) / valueIn(quantity(container.amount, unit), unit));
+      const containers = count * perUnit;
+      const each = store.amount / containers;
+      // A small margin keeps a feed of exactly k containers at k containers.
+      const used = containers * (feed / Math.ceil(feed / each - 1e-9));
+      out.stores.push({ ...store, amount: used });
+      out.waste.push({ product: id, resource: store.resource, containers, container: each, feed, used, waste: store.amount - used });
+    }
+  }
+  return out;
+}
+
+/**
  * This function joins a household and a buy list into a fragment of an endurance layer.
  *
  * - The draw of food energy has the rate of the need of its persons for one day, and its users are the persons.
  * - The draw of formula has the infants on formula below `FORMULA_DRAW_MONTHS`, with the whole need of their rows.
+ *   With `formulaLater: "whole"`, it also has the older infants on formula, with the whole need of their rows.
+ *   With `formulaLater: "least"`, it has `FORMULA_LATER_LEAST` of each older infant, and the food draw has the rest.
  * - The fragment has each draw with one or more users. The draw of food energy is first.
  * - Each gift of the buy list with a read is one store, with the `id` `<prefix>:<product>:<resource>`. A gift with no read has no store.
  * - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives 1 kcal for each kcal.
@@ -196,6 +277,9 @@ function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[]
  * - The resources are the resources of the stores and of the direct uses, with the units of the catalog.
  * - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw.
  * - The fragment has no converter. `cookFragment` gives the converters for the dry food, with the water and the fuel of each pot.
+ * - With no cold storage (the default), an opened container of formula serves one feed. The store has only the energy of the feeds,
+ *   and `waste` gives the rest. The smallest feed is the smallest need of an infant of the draw, divided by `FORMULA_FEEDS`.
+ *   A container of no read gives no store and a gift with no read, so the stores are a lower limit.
  *
  * A person with no row in the tables gives no layer, because a low rate gives too many days. The default tables give a row for each age.
  * The option `noRow: "leave-out"` leaves those persons out of the draw. A draw of 0 kcal gives no layer.
@@ -203,12 +287,14 @@ function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[]
  * Each person record below `INFANT_MONTHS` must have a `feeding`. It has no default.
  *
  * - `food`: the need of the infant is in the draw of food energy.
- * - `breast-milk`: the infant has a line, and no part of the draw. It is only for an infant below `BREAST_MILK_MONTHS`.
+ * - `breast-milk`: below `BREAST_MILK_MONTHS`, the infant has a line, and no part of the draw. From that age, the food draw
+ *   holds the need of the row minus the milk energy `MILK_LATER`. The feeding is only for an infant below `INFANT_MONTHS`.
  *   A person of the household must have a stage of lactation. Each infant on breast milk needs one person of the draw with a stage of lactation.
  *   When the infants are more, the function gives no layer: the change of a stage is the milk of one infant.
  * - `formula`: below `FORMULA_DRAW_MONTHS`, the whole need of the infant is in the draw of formula, because the infant has milk only.
  *   From `FORMULA_DRAW_MONTHS`, no cited source gives the part of formula, so the infant gives no layer, as a person with no row.
- *   The option `leave-out` also applies. The feeding is only for an infant below `INFANT_MONTHS`.
+ *   The option `leave-out` also applies. The option `formulaLater: "whole"` puts the whole need in the formula draw: the upper limit.
+ *   The option `formulaLater: "least"` puts the lower limit in the formula draw, and the rest of the need in the food draw. The feeding is only for an infant below `INFANT_MONTHS`.
  *
  * The function is pure.
  *
@@ -216,8 +302,9 @@ function layerResources(catalog: SupplyCatalog, stores: readonly FragmentStore[]
  * @returns The fragment or a no read of the draw, with the energy of the list and the gifts with no read
  * @throws RangeError for the errors of `calorieNeed`, `giftsOf` and `buyListEnergy`, except a household with no person
  * @throws RangeError when the catalog has no resource in `kcal` for the direct use of a draw
+ * @throws RangeError when a product with opened containers gives a resource that feeds no formula draw, with no cold storage
  * @throws RangeError when a record below `INFANT_MONTHS` has no `feeding`, or when a `feeding` is not a way of `INFANT_FEEDINGS`
- * @throws RangeError for `breast-milk` from `BREAST_MILK_MONTHS`, and for `formula` from `INFANT_MONTHS`
+ * @throws RangeError for `breast-milk` and `formula` from `INFANT_MONTHS`
  * @throws RangeError when an infant drinks only breast milk and no person of the household has a stage of lactation
  */
 export function householdFragment(input: HouseholdFragmentInput): HouseholdFragmentResult {
@@ -236,6 +323,8 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   let perDay = 0;
   let formulaUsers = 0;
   let formulaPerDay = 0;
+  // The smallest daily need of one infant of the formula draw, for the smallest feed.
+  let formulaLeast = Number.POSITIVE_INFINITY;
   // The persons of the draw with a stage of lactation, and the infants on breast milk.
   let mothers = 0;
   let nursed = 0;
@@ -245,11 +334,31 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
     if (person.feeding === "breast-milk") {
       breastMilk.push(person);
       nursed += person.count;
+      if (person.ageMonths >= BREAST_MILK_MONTHS) {
+        // The infant also has food. The food draw holds the need of the row minus the milk energy.
+        if (!line.read) noRow.push(person);
+        else {
+          users += person.count;
+          perDay += Math.max(0, line.need.value - MILK_LATER.perDay * person.count);
+        }
+      }
     } else if (person.feeding === "formula") {
       formula.push(person);
-      if (line.read && person.ageMonths < FORMULA_DRAW_MONTHS) {
+      if (line.read && (person.ageMonths < FORMULA_DRAW_MONTHS || input.formulaLater === "whole")) {
         formulaUsers += person.count;
         formulaPerDay += line.need.value;
+        formulaLeast = Math.min(formulaLeast, line.need.value / person.count);
+      } else if (line.read && input.formulaLater === "least") {
+        // The formula draw holds the least formula of each infant. The food draw holds the rest of the need of the row.
+        const each = Math.min(FORMULA_LATER_LEAST.perDay, line.need.value / person.count);
+        formulaUsers += person.count;
+        formulaPerDay += each * person.count;
+        formulaLeast = Math.min(formulaLeast, each);
+        const rest = line.need.value - each * person.count;
+        if (rest > 0) {
+          users += person.count;
+          perDay += rest;
+        }
       } else formulaLater.push(person);
     } else if (!line.read) noRow.push(person);
     else {
@@ -260,13 +369,13 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   }
   if (breastMilk.length > 0 && !input.persons.some((person) => person.count > 0 && makesMilk(tables, person))) {
     throw new RangeError(
-      `The infants ${breastMilk.map(nameOf).join(", ")} drink only breast milk, but no person of the household has a stage of lactation. ` +
+      `The infants ${breastMilk.map(nameOf).join(", ")} drink breast milk, but no person of the household has a stage of lactation. ` +
         "The milk comes from the food of the mother, so give the mother a stage of lactation, for example lactation-1.",
     );
   }
   const reasons = [
     ...(nursed > mothers
-      ? [`${String(nursed)} infants drink only breast milk, but the draw has ${String(mothers)} persons with a stage of lactation. The change of a stage is the milk of one infant. Give feeding: food to the other infants.`]
+      ? [`${String(nursed)} infants drink breast milk, but the draw has ${String(mothers)} persons with a stage of lactation. The change of a stage is the milk of one infant. Give feeding: food to the other infants.`]
       : []),
     ...(noRow.length > 0 ? [`The table has no row for ${String(noRow.length)} person records.`] : []),
     ...(formulaLater.length > 0
@@ -289,13 +398,17 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   }
   const needs = new Set(draws.map((draw) => draw.need));
   const uses = (input.uses ?? DIRECT_USES).filter((use) => needs.has(use.need));
+  const feed = formulaUsers > 0 && formulaPerDay > 0 ? formulaLeast / FORMULA_FEEDS.perDay : undefined;
+  const opened = openedStores(input, stores, parts.noReads, feed);
   return {
     ...parts,
+    noReads: opened.noReads,
+    storesRead: opened.noReads.length === 0,
     layer: {
       schema: "endurance/1",
       levels: [...(input.levels ?? [])],
-      resources: layerResources(input.catalog, stores, uses),
-      stores,
+      resources: layerResources(input.catalog, opened.stores, uses),
+      stores: opened.stores,
       draws,
       direct: uses.map((use) => ({ ...use })),
     },
@@ -304,6 +417,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
     leftOut: [...noRow, ...formulaLater],
     formula,
     breastMilk,
+    waste: opened.waste,
   };
 }
 
@@ -325,13 +439,8 @@ function checkFeedings(persons: readonly Person[]): void {
       }
     } else if (!(INFANT_FEEDINGS as readonly unknown[]).includes(feeding)) {
       throw new RangeError(`The feeding ${String(feeding)} of the persons ${nameOf(person)} is not a way of ${INFANT_FEEDINGS.join(", ")}.`);
-    } else if (feeding === "breast-milk" && !(person.ageMonths < BREAST_MILK_MONTHS)) {
-      throw new RangeError(
-        `The persons ${nameOf(person)} have feeding: breast-milk, which is only for an infant below ${String(BREAST_MILK_MONTHS)} months. ` +
-          "From that age, the need is more than the change of a stage of lactation. Give feeding: food.",
-      );
-    } else if (feeding === "formula" && !(person.ageMonths < INFANT_MONTHS)) {
-      throw new RangeError(`The persons ${nameOf(person)} have feeding: formula, which is only for an infant below ${String(INFANT_MONTHS)} months. Give feeding: food.`);
+    } else if (feeding !== "food" && !(person.ageMonths < INFANT_MONTHS)) {
+      throw new RangeError(`The persons ${nameOf(person)} have feeding: ${feeding}, which is only for an infant below ${String(INFANT_MONTHS)} months. Give feeding: food.`);
     }
   }
 }

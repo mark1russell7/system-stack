@@ -16,6 +16,7 @@ Each function is a plain function with no clock, no network and no file.
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
 | `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, the draws and their direct uses. It has the form of `EnduranceLayer`. |
+| `OpenedWaste` | The containers of one product with no cold storage: the count, the energy of one container, the feed, the energy used and the waste. |
 | `CookFragment` | A fragment of an endurance layer: the resources and one cook converter for each dry resource with a read. It has the form of `EnduranceLayer`. |
 | `CookLine` | The energy, the cook water, the heat to boil, the stove time and the fuel of one pot of one dry food, each a read or a no read. |
 
@@ -71,12 +72,26 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 - The fragment has each draw with one or more users. The draw `food.energy` is first.
 - Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
+- With no cold storage, an opened container of formula serves one feed. This is the default (`cold` is false), the worst case of no power. The next section tells the rule.
 - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives `food.no-cook` to the food draw and `food.infant-formula-ready` to the formula draw, 1 kcal for each kcal.
 - The resources are the resources of the stores and of the direct uses. The resource of each direct use is in `kcal` in the catalog, or the function throws a `RangeError`.
 - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw: `food.retail`.
 - The result also has the food energy of each product (`buyListEnergy`). A caller gets the energy of the dry food for its converters from it.
 
 The result has two reads. `needRead` tells if the draw has a read, and `storesRead` tells if each gift of the buy list has a read.
+
+### Opened containers with no cold storage
+
+The WIC guide of the USDA (page 106) tells this rule: with limited access to a refrigerator, use formula immediately after a ready-to-feed container is opened. The catalog of market gives the rule as the field `opened` of a product, with the size of one container.
+
+| Step | Value |
+| --- | --- |
+| Feeds in one day | 8 (`FORMULA_FEEDS`). Table 5.2 of the WIC guide (page 137) gives a feed every 3 to 4 hours. More feeds give smaller feeds, so 8 is the worst case. |
+| One feed | The smallest need of an infant of the formula draw, divided by 8 |
+| Energy that one container gives | `feed / ceil(feed / container)`. A feed that is more than a container takes more containers, and the rest of the last is waste. |
+| Store | The count of containers times the energy that one container gives. `waste` gives the rest for each product. |
+
+A product with a container of no read gives no store. It is in `noReads`, so the stores are a lower limit. The 1 kg formula of the catalog has no container size yet. The option `cold: true` gives the whole energy of each container. Only the formula draw has a cited size of one feed. Thus a product with opened containers that feeds no formula draw makes the function throw a `RangeError`.
 
 ### A person with no row
 
@@ -93,16 +108,25 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | `feeding` | The draw of food energy |
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
-| `breast-milk` | Only below 6 months (`BREAST_MILK_MONTHS`). The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. The result lists the infant in `breastMilk`. |
-| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. The result lists each infant on formula in `formula`. |
+| `breast-milk` | Only below 12 months. Below 6 months (`BREAST_MILK_MONTHS`), the draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. From 6 months, the infant also has food. The draw holds the need of the row minus the milk energy (`MILK_LATER`, 381 kcal/d). The result lists the infant in `breastMilk`. |
+| `formula` | Only below 12 months. Below 6 months (`FORMULA_DRAW_MONTHS`), the draw `food.infant-formula` holds the whole need of the infant, because the infant has milk only. Only the formula of the buy list feeds it, so a list with no formula gives 0 days. From 6 months, no cited source gives the part of formula. Thus the infant gives no layer, as a person with no row. With `noRow: "leave-out"`, no draw has the need of the infant, and `leftOut` lists the infant. With `formulaLater: "whole"`, the formula draw holds the whole need: the upper limit of formula. With `formulaLater: "least"`, the formula draw holds the lower limit, and the food draw holds the rest. The result lists each infant on formula in `formula`. |
 
 With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
+
+The limits of formula from 6 months:
+
+- The upper limit is the whole need of the row. Formula cannot give more energy than the whole need. Give `formulaLater: "whole"` for this limit.
+- Table 5.2 of the WIC guide (page 137) gives the formula of one day. It is approximately 24 to 32 ounces at 6 to 8 months.
+- At 8 to 12 months, the table gives approximately 24 ounces.
+- The lower limit is 24 fl oz a day (`FORMULA_LATER_LEAST`). Give `formulaLater: "least"` for this limit. When the need of the row is less, the formula draw holds the need.
+- The FDC item 172319 (ready-to-feed formula) gives 63 kcal in 100 g and 30.4 g in 1 fl oz. Thus 1 fl oz gives 19.152 kcal, and 24 fl oz give 459.648 kcal.
+- The two limits give the same total energy. Only the split between the formula draw and the food draw changes.
 
 The rules of breast milk:
 
 - A person of the household must have a stage of lactation, or the function gives a `RangeError`.
 - The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
-- From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
+- From 6 months, the food draw holds the need of the row minus 381 kcal/d of milk. The next sections give the sources.
 
 The notes b and c of Table A2-3 of the guidelines (page 141) give the two changes of lactation:
 
@@ -113,7 +137,19 @@ The notes b and c of Table A2-3 of the guidelines (page 141) give the two change
 
 Thus below 6 months, a part of the milk comes from the stores of the mother. The draw holds only the part from food.
 The source gives the energy of the milk production, not the energy that the infant gets. It gives no change for two or more infants.
-Thus the package does not give the milk part of an infant from 6 months, and it does not give a change for twins. Each is a no read until a source gives it.
+
+Table 5-14 of the NASEM report (2023, page 97) gives the milk of the first year. The milk energy is the milk times 0.67 kcal/g:
+
+| Time after the birth | Milk (g/d) | Milk energy (kcal/d) | The women of the source |
+| --- | --- | --- | --- |
+| 0 to 2 months | 732 | 490 | Only breastfeed |
+| 3 to 4 months | 779 | 522 | Only breastfeed |
+| 5 months | 826 | 553 | Only breastfeed |
+| 6 months | 894 | 599 | Only breastfeed |
+| 7 to 12 months | 568 | 381 | Partly breastfeed |
+
+From 6 months, the infant also has food. Thus the package takes 381 kcal/d of milk from 6 months (`MILK_LATER`). Less milk gives a larger draw, so this is the worst case.
+The NASEM report gives no change for a mother of two or more infants. Thus twins on breast milk stay a no read: the function gives no layer.
 
 A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
