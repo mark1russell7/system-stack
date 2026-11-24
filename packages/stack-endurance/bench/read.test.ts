@@ -17,7 +17,8 @@ import {
   MIN_READ_JOBS,
   MIN_RUNS,
   modelTables,
-  NEAR,
+  NEAR_TITLE,
+  inMargin,
   readReport,
   RECORD_SCHEMA,
   runCases,
@@ -298,13 +299,38 @@ describe("the groups of a run", () => {
     const run = gates(records);
     const report = readReport(records.map(jobRead), run, undefined);
     expect(report).toContain("| m12 | 3 | within | beyond |");
-    expect(report).toContain(`The groups with a lowest value at ${String(NEAR * 100)}% of the limit or more, or with a job beyond the limit of one job. The lowest value of the group decides:`);
+    expect(report).toContain(`${NEAR_TITLE}:`);
     const m12 = groupCases(run, "m12")[0];
     expect(m12?.kind).toBe("group");
-    expect(report).toContain(`| m12 | r-1 | cpu-a | ${(m12?.limit ?? 0).toFixed(1)} (group) | a-1: ${(m12?.ms ?? 0).toFixed(1)}, `);
+    expect(report).toContain(`| m12 | r-1 | cpu-a | ${(m12?.worst ?? 0).toFixed(1)} | ${(m12?.limit ?? 0).toFixed(1)} (group) | a-1: ${(m12?.ms ?? 0).toFixed(1)}, `);
     expect(report).toMatch(/a-3: [\d.]+, 1\d\d\.\d%, beyond \| [\d.]+ \| within \|/);
     const quiet = gates([jobRecord("a-1", 1), jobRecord("a-2", 1), jobRecord("a-3", 1)]);
-    expect(readReport([], quiet, undefined)).not.toContain("The groups with a lowest value at");
+    expect(readReport([], quiet, undefined)).not.toContain(NEAR_TITLE);
+  });
+
+  it("report a group in the margin of its limit, and leave out a group in the range of the freeze", () => {
+    // The group limit of cpu-a is the worst value of the freeze (the job of scale 1.1) plus the spread of the values (1.1 - 0.98).
+    const slow = gates([jobRecord("a-1", 1.12), jobRecord("a-2", 1.15), jobRecord("a-3", 1.15)]);
+    const m12 = groupCases(slow, "m12")[0];
+    expect(m12?.kind).toBe("group");
+    expect(m12?.worst).toBe(mixed().groups["m12"]?.["cpu-a"]?.worst);
+    expect(m12?.outcome).toBe("within");
+    expect(m12 !== undefined && inMargin(m12)).toBe(true);
+    expect(readReport([], slow, undefined)).toContain(NEAR_TITLE);
+    const freeze = gates([jobRecord("a-1", 1.09), jobRecord("a-2", 1.15), jobRecord("a-3", 1.15)]);
+    const range = groupCases(freeze, "m12")[0];
+    expect(range !== undefined && inMargin(range)).toBe(false);
+    expect(readReport([], freeze, undefined)).not.toContain(NEAR_TITLE);
+  });
+
+  it("read a pair with one no read against the limit of one job", () => {
+    const noisy = jobRecord("a-1", 1, (round) => (round % 2 === 0 ? 1.3 : 0.75));
+    const run = gates([noisy, jobRecord("a-2", 1.15)]);
+    expect(run[0]?.gate.outcome).toBe("no read");
+    const m12 = groupCases(run, "m12");
+    expect(m12.map((group) => [group.jobs.map((job) => job.job), group.kind])).toEqual([[["a-2"], "job"]]);
+    expect(m12[0]?.limit).toBe(run[1]?.cases.find((item) => item.case === "m12")?.limit);
+    expect(m12[0]?.worst).toBe(run[1]?.cases.find((item) => item.case === "m12")?.worst);
   });
 
   it("title the column of each job as the gate of the job alone, so a job that blocks in a run that passes is clear", () => {
