@@ -6,7 +6,7 @@ import type { Converter, EnduranceLayer } from "./layer.ts";
 // The gate of an endurance layer: the meaning of a layer with a correct form, for its base stack.
 
 /**
- * These are the codes of the gate. Each code is an error, except `endurance-no-way` and `endurance-cut-no-curve`, which are warnings.
+ * These are the codes of the gate. Each code is an error, except `endurance-device-mix`, `endurance-no-way` and `endurance-cut-no-curve`, which are warnings.
  *
  * - `endurance-twice`: two or more records of one list have one key. A key is a level, a resource, a store, a need, a converter or a case.
  *   The key of a prior is its case and its place. A converter takes each resource on one line, and a case cuts each part one time.
@@ -21,6 +21,8 @@ import type { Converter, EnduranceLayer } from "./layer.ts";
  * - `endurance-prior-case`: a prior names a case that the layer does not have.
  * - `endurance-cycle`: converters make a resource from itself, through one converter or a chain. One fault names each cycle.
  * - `endurance-devices`: two converters of one device give two different counts of devices.
+ * - `endurance-device-mix` (warning): a device has a converter with a limit `perDay` and a converter with no limit. The
+ *   converter with no limit uses no device-days, so its runs do not reduce the runs of the limited converter.
  * - `endurance-no-way` (warning): a draw has no direct use and no converter, so it holds 0 days when its supply stops.
  * - `endurance-cut-no-curve` (warning): a cut has no curve of its duration. The draws whose stop it can be part of are no read in the shortfall.
  */
@@ -36,6 +38,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-devices",
+  "endurance-device-mix",
   "endurance-no-way",
   "endurance-cut-no-curve",
 ] = [
@@ -50,6 +53,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-devices",
+  "endurance-device-mix",
   "endurance-no-way",
   "endurance-cut-no-curve",
 ];
@@ -155,6 +159,16 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     if (seen !== undefined && seen !== count)
       add("error", "endurance-devices", converter.id, `The converter "${converter.id}" gives the count ${String(count)} for the device "${converter.device}". An other converter gives the count ${String(seen)}.`);
     if (seen === undefined) counts.set(converter.device, count);
+  }
+  // One fault names each device with a limited converter and a converter with no limit, at the first converter with no limit.
+  const mixed = new Set<string>();
+  for (const converter of converters) {
+    const device = converter.device;
+    if (device === undefined || converter.perDay !== undefined || mixed.has(device)) continue;
+    const limited = converters.find((other) => other.device === device && other.perDay !== undefined);
+    if (limited === undefined) continue;
+    mixed.add(device);
+    add("warning", "endurance-device-mix", converter.id, `The device "${device}" has the limited converter "${limited.id}" and the converter "${converter.id}" with no limit. "${converter.id}" uses no device-days.`);
   }
   const caseCodes = new Set(cases.map((item) => item.case));
   for (const item of cases) {
