@@ -8,6 +8,7 @@ import { DIRECT_USES, FOOD_NEED, FORMULA_NEED, NEED_SUPPLIES, type FragmentDirec
 // The records have the form of the records of `@mark1russell7/stack-endurance`. An add-on does not import a different add-on, so the form is a copy.
 // A test assigns the layer to `EnduranceLayer` of stack-endurance. That test is the type gate of the copy.
 // The fragment has no converter. `cookFragment` gives the converters of the dry food, with the water and the fuel of each pot.
+// `formulaMixFragment` gives the converter of the infant formula powder, with its water.
 
 /** A resource of a store, with its unit. */
 export interface FragmentResource {
@@ -277,6 +278,7 @@ function openedStores(
  * - The resources are the resources of the stores and of the direct uses, with the units of the catalog.
  * - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw.
  * - The fragment has no converter. `cookFragment` gives the converters for the dry food, with the water and the fuel of each pot.
+ *   `formulaMixFragment` gives the converter of `food.infant-formula-powder`. The powder has a store, and no direct use.
  * - With no cold storage (the default), an opened container of formula serves one feed. The store has only the energy of the feeds,
  *   and `waste` gives the rest. The smallest feed is the smallest need of an infant of the draw, divided by `FORMULA_FEEDS`.
  *   A container of no read gives no store and a gift with no read, so the stores are a lower limit.

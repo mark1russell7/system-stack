@@ -159,6 +159,8 @@ The fragment has no converter. Thus, with this fragment alone, only `food.no-coo
 
 `cookFragment` gives the converters for the dry food in a different fragment, with the water and the fuel of each pot. Then `joinEndurance` joins the fragments. The dry food then adds days only while the water and the fuel last.
 
+`formulaMixFragment` gives the converter of the infant formula powder in a different fragment, with its water. The powder then adds days of formula only while the water lasts.
+
 This fragment declares the resource codes of the buy list, for example `water.stored` in `L`. A different fragment, for example the fragment of a water tank, can declare the same resource. `joinEndurance` of `@mark1russell7/stack-endurance` joins two equal records into one. A different unit is a fault of the join.
 
 ## The water and the fuel of a cook
@@ -218,6 +220,58 @@ The cited constants:
 | `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is less. But the cook time is longer there, and the model does not give it. Thus at a high place the fuel is not an upper limit. |
 
 The two sources are works of the United States federal government (the license `us-public-domain` of guidebook).
+
+## The water of infant formula powder
+
+`formulaMixFragment` turns the infant formula powder of a buy list into one converter of an endurance layer. The converter needs no fuel. One run is 1 kg of powder. The run takes the powder and its mix water, and gives the energy of the powder as ready formula. Thus a powder with no water gives no feed.
+
+```ts
+import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
+import { formulaMixFragment } from "@mark1russell7/stack-needs";
+
+const mix = formulaMixFragment({ catalog: SUPPLY_CATALOG, units: { "food.infant-formula-powder-1kg": 2 } });
+// mix.layer has the converter mix:food.infant-formula-powder. Join it with the layer of householdFragment and a store of water.
+```
+
+The records of the converter:
+
+| Field | Value for 1 kg of the catalog powder |
+| --- | --- |
+| `takes` | 1 kg of `food.infant-formula-powder`, and 7.3175 L of `water.stored` |
+| `gives` | 5240 kcal of `food.infant-formula-ready`, the resource of the ready formula |
+| `id` | `mix:food.infant-formula-powder`. The option `prefix` changes the start. |
+
+The direct use of `food.infant-formula-ready` then feeds the formula draw. The powder has a store in the household fragment, and no direct use. `cookFragment` does not cook it.
+
+### The mix rule
+
+The rule is a mass balance. It assumes that the prepared powder has the energy in 100 g of the ready-to-feed item of the same store brand. The reason: FoodData Central gives these two items of one brand, and no catalog record cites the mix ratio of a label. A label-cited mix ratio replaces this assumption.
+
+1. The powder gives 524 kcal in 100 g, and the ready-to-feed item gives 63 kcal in 100 g.
+2. Thus 100 g of prepared formula holds 100 × 63 / 524 = 12.023 g of powder and 87.977 g of mix water.
+3. The mix water is 1.39646 g for each kcal, and 7.3175 kg for each kg of powder (`formulaMixWater`).
+4. The water mass converts to a volume at `WATER_DENSITY_MAX`, 1 kg/L. Water above 4 °C is less dense, so the true volume is a little more.
+5. The energy of each powder product comes from its food energy in the catalog. Two products can give powder. Then the converter takes the most water and the least energy of their lines.
+
+`formulaMixCheck` gives an independent check of the rule. The rule does not use the water of the two items. The powder holds 2 g of water in 100 g, thus 0.240 g in 12.023 g. The predicted water of 100 g of prepared formula is 87.977 + 0.240 = 88.218 g. The FDC item 172319 gives 88.1 g, 0.13% less.
+
+These facts give a no read, and then the powder has no converter:
+
+| Missing fact | The no read |
+| --- | --- |
+| No food energy of the product, or an energy in a unit that does not convert to kcal | The energy and the water |
+| A product that gives more than one food | The energy and the water |
+| An energy of the powder that is not more than the 630 kcal/kg of the ready-to-feed item | The water |
+
+The water is `water.stored`, the store of the drinking water, as for a cook. The WIC guide tells to use bottled water after a disaster or in a power cut. A store of water from the tap is safe water only when its source is safe. A drinking draw at a higher level takes its water first. Thus, when a case cuts the water supply, the powder can add 0 days.
+
+The WIC guide tells to prepare powder one bottle at a time, for one feed. Thus the mix has no waste of an opened container. The rule of opened containers applies only to a product with the field `opened`.
+
+The cited constant:
+
+| Name | Value | Source |
+| --- | --- | --- |
+| `FORMULA_MIX` | 524 kcal and 2 g of water in 100 g of powder. 63 kcal and 88.1 g of water in 100 g of ready-to-feed formula. | FoodData Central, SR Legacy (April 2018, CC0 1.0): FDC ID 173554 (store brand, powder) and FDC ID 172319 (store brand, ready-to-feed), `food_nutrient.csv`. The water source is the WIC guide, page 106. |
 
 ## The uses, the supply parts and the join gate
 
@@ -304,4 +358,4 @@ The gate refuses an empty code and two needs with one code (`daily-need-id`). It
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, the uses, the supply parts and `checkJoins`. |

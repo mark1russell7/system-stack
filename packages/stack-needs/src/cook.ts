@@ -1,7 +1,7 @@
 import type { Source } from "@mark1russell7/guidebook";
 import { fuelEnergyPerMass, giftsOf, cookWater, type CitedRate, type HeatingValue, type StoveFacts, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
-import { FOOD_NEED, STORED_WATER } from "./uses.ts";
+import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
 // The water and the fuel to cook the dry food of a buy list, as converters of an endurance layer.
 // One run of a converter is one pot: the dry food, the cook water and the fuel of the pot give the food energy of the pot.
@@ -297,8 +297,12 @@ function isFood(catalog: SupplyCatalog, code: string): boolean {
   return catalog.resources.find((item) => item.code === code)?.kind === "food";
 }
 
-/** This function tells if a resource of the catalog is a dry food: a food resource in a unit of mass. */
+/**
+ * This function tells if a resource of the catalog is a dry food to cook: a food resource in a unit of mass.
+ * `FORMULA_POWDER` is not a food to cook: `formulaMixFragment` mixes it with water, with no fuel.
+ */
 function isDryFood(catalog: SupplyCatalog, code: string): boolean {
+  if (code === FORMULA_POWDER) return false;
   const resource = catalog.resources.find((item) => item.code === code);
   return resource !== undefined && resource.kind === "food" && inUnit(1, resource.unit, "kg") !== undefined;
 }
@@ -316,7 +320,9 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   The model does not give that time, so there the fuel is not an upper limit.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
- * A dry food is a gift of a food resource in a unit of mass. Each missing fact gives a line with no read and its reasons, not a figure.
+ * A dry food is a gift of a food resource in a unit of mass, except `FORMULA_POWDER`. `formulaMixFragment` gives its converter.
+ * Each missing fact gives a line with no read and its reasons, not a figure.
+ *
  * Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines:
  * the most water, the most fuel and the least food energy. When a line of the resource has no read, the resource has no converter.
  * A store of the resource from a different fragment gets the converter of this list.
