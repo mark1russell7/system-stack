@@ -407,6 +407,7 @@ export interface OutageOptions {
 export interface OutageReader {
   add(count: OutageCount): void;
   finish(): OutageRuns;
+  finishEach(joins: readonly number[]): OutageRuns[];
 }
 
 ### build/index.d.ts#OutageRuns

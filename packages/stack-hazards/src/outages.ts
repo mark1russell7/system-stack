@@ -24,7 +24,7 @@ export interface OutageEvent {
   readonly seconds: number;
   /** The largest count of the run. */
   readonly peak: number;
-  /** When `censored` is true, a gap of the collection or the end of the data stopped the observation. Then `seconds` is a lower bound. */
+  /** When `censored` is true, a gap of the collection, a line with no count or the end of the data stopped the observation. Then `seconds` is a lower bound. */
   readonly censored: boolean;
 }
 
@@ -42,8 +42,7 @@ export interface OutageOptions {
    * The join time in seconds. It is the longest step from the end of a run to the start of the next run of its area in one event.
    * The default is 0: each run is an event.
    * One outage that moves across the threshold gives many short runs. With a join time, those runs are one event.
-   * Two runs are not one event when the first run has no observed end or the second run has no known start.
-   * A gap of the collection between them also keeps them apart.
+   * On a regular collection, two runs of one area are 2 intervals or more apart. Thus a join time under 2 intervals joins no run.
    */
   readonly join?: number | undefined;
 }
@@ -78,6 +77,13 @@ export interface OutageReader {
   add(count: OutageCount): void;
   /** This function gives the events and the tally. After it, the reader takes no count. */
   finish(): OutageRuns;
+  /**
+   * This function gives the events and the tally for each join time, in the order of the join times. After it, the reader takes no count.
+   * The runs do not change with the join time, so one read gives the events of many join times.
+   *
+   * @throws RangeError when a join time is not a finite number of 0 or more
+   */
+  finishEach(joins: readonly number[]): OutageRuns[];
 }
 
 interface Run {
@@ -85,8 +91,8 @@ interface Run {
   readonly start: number;
   last: number;
   peak: number;
-  /** A line with no count stopped the observation of the run. */
-  stopped: boolean;
+  /** The time of the first line with no count of the area after the run. */
+  miss: number | undefined;
   /** The run starts at the next time of its area after a line with no count, so its start is not known. */
   blind: boolean;
 }
@@ -95,6 +101,8 @@ interface AreaState {
   readonly limit: number | undefined;
   last: number;
   run: Run | undefined;
+  /** The last run of the area that ended, until a line with no count gives its time `miss`. */
+  ended: Run | undefined;
   /** The last line of the area has no count. */
   missed: boolean;
 }
@@ -116,13 +124,15 @@ function lowerBound(sorted: Float64Array, value: number): number {
  *
  * - The threshold of an area is the larger of `least` and `share` times its customers, up to the next whole number.
  * - A run ends at a count under the threshold, or at a time of the collection with no count of the area.
- * - The end of a run is observed when the collection has a time within 1.5 intervals after the run. Else the event is censored.
- * - The start of a run is known when the collection has a time within 1.5 intervals before the run. Else the run is truncated.
- * - A line with no count stops the observation of its area. An open run is censored. A run at the next time of the area is truncated.
+ * - A line with no count stops the observation of its area. A run at the next time of the area has no known start.
  * - With the option `join`, a run that starts within the join time after the end of the run before it is part of that run.
- *   It is not part of it when the run before it was stopped or when it has no known start.
- *   A gap of the collection between the two runs also keeps them apart.
- *   The event then has the start of the first run, the end of the last run and the largest peak.
+ *   The event has the start of the first run, the end of the last run and the largest peak.
+ *   A gap of the collection or a line with no count between the runs is inside the event. Then the peak is a lower limit.
+ * - The start of an event is known when the collection has a time within 1.5 intervals before the event. Else the event is truncated.
+ *   A run after a line with no count also has no known start.
+ * - The end of an event is observed when the collection continues after the event for the join time and one more time at least.
+ *   Each step of the collection to that time is 1.5 intervals or less, and the area has no line with no count up to it.
+ *   Else the event is censored. With a join time of 0, the collection has a time within 1.5 intervals after the event.
  *
  * @param options - The customers of each area and the threshold
  * @returns The reader
@@ -151,10 +161,55 @@ export function outageReader(options: OutageOptions): OutageReader {
     if (state === undefined) {
       const customers = options.customers.get(area);
       const limit = share === 0 ? least : customers === undefined ? undefined : Math.max(least, Math.ceil(share * customers));
-      state = { limit, last: Number.NEGATIVE_INFINITY, run: undefined, missed: false };
+      state = { limit, last: Number.NEGATIVE_INFINITY, run: undefined, ended: undefined, missed: false };
       areas.set(area, state);
     }
     return state;
+  };
+
+  // The events of one join time. The runs of each area are in the order of their times, so the chain of an area is the last chain of that area.
+  const chains = (each: number, sorted: Float64Array): OutageRuns => {
+    const events: OutageEvent[] = [];
+    let truncated = 0;
+    let joined = 0;
+    const close = (chain: Run): void => {
+      const before = sorted[lowerBound(sorted, chain.start) - 1];
+      if (chain.blind || before === undefined || chain.start - before > gap) {
+        truncated += 1;
+        return;
+      }
+      // The end is observed when the collection has no gap from the last time to the first time at the join time after it, or later.
+      const at = lowerBound(sorted, chain.last);
+      const end = Math.max(at + 1, lowerBound(sorted, chain.last + each));
+      let censored = end >= sorted.length || (chain.miss !== undefined && chain.miss <= (sorted[end] ?? Number.POSITIVE_INFINITY));
+      for (let index = at; !censored && index < end; index += 1) censored = (sorted[index + 1] ?? 0) - (sorted[index] ?? 0) > gap;
+      events.push({ area: chain.area, start: chain.start, seconds: chain.last - chain.start + interval, peak: chain.peak, censored });
+    };
+    const open = new Map<string, Run>();
+    for (const run of runs) {
+      const chain = open.get(run.area);
+      if (chain !== undefined && run.start - chain.last <= each) {
+        chain.last = run.last;
+        chain.peak = Math.max(chain.peak, run.peak);
+        chain.miss = run.miss;
+        joined += 1;
+        continue;
+      }
+      if (chain !== undefined) close(chain);
+      open.set(run.area, { ...run });
+    }
+    for (const chain of open.values()) close(chain);
+    events.sort((a, b) => a.start - b.start || (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
+    return { events, tally: { counts, times: sorted.length, repeats, unknown, missing, truncated, joined } };
+  };
+
+  const finishEach = (joins: readonly number[]): OutageRuns[] => {
+    if (!joins.every((each) => Number.isFinite(each) && each >= 0)) throw new RangeError("outageReader: a join time is not a finite number of 0 or more.");
+    if (finished) throw new Error("outageReader: the read is finished.");
+    finished = true;
+    for (const state of areas.values()) if (state.run !== undefined) runs.push(state.run);
+    const sorted = Float64Array.from(times).sort();
+    return joins.map((each) => chains(each, sorted));
   };
 
   return {
@@ -179,10 +234,11 @@ export function outageReader(options: OutageOptions): OutageReader {
       if (out === undefined) {
         missing += 1;
         if (run !== undefined) {
-          run.stopped = true;
+          run.miss = time;
           runs.push(run);
           state.run = undefined;
-        }
+          state.ended = run;
+        } else if (state.ended !== undefined && state.ended.miss === undefined) state.ended.miss = time;
         state.missed = true;
         return;
       }
@@ -194,53 +250,19 @@ export function outageReader(options: OutageOptions): OutageReader {
         run.peak = Math.max(run.peak, out);
         return;
       }
-      if (run !== undefined) runs.push(run);
-      state.run = inside ? { area, start: time, last: time, peak: out, stopped: false, blind } : undefined;
+      if (run !== undefined) {
+        runs.push(run);
+        state.ended = run;
+      }
+      state.run = inside ? { area, start: time, last: time, peak: out, miss: undefined, blind } : undefined;
     },
 
     finish(): OutageRuns {
-      finished = true;
-      for (const state of areas.values()) if (state.run !== undefined) runs.push(state.run);
-      const sorted = Float64Array.from(times).sort();
-      // The collection has no gap from one time to a later time.
-      const covered = (from: number, to: number): boolean => {
-        for (let index = lowerBound(sorted, from); index + 1 < sorted.length && (sorted[index] ?? to) < to; index += 1) {
-          if ((sorted[index + 1] ?? 0) - (sorted[index] ?? 0) > gap) return false;
-        }
-        return true;
-      };
-      // The runs of each area end in the order of their times, so the run before a run of an area is the last run of the area in `joinedRuns`.
-      const joinedRuns: Run[] = [];
-      const lastOf = new Map<string, Run>();
-      let joined = 0;
-      for (const run of runs) {
-        const before = lastOf.get(run.area);
-        if (join > 0 && before !== undefined && !before.stopped && !run.blind && run.start - before.last <= join && covered(before.last, run.start)) {
-          before.last = run.last;
-          before.peak = Math.max(before.peak, run.peak);
-          before.stopped = run.stopped;
-          joined += 1;
-          continue;
-        }
-        const copy = { ...run };
-        joinedRuns.push(copy);
-        lastOf.set(run.area, copy);
-      }
-      const events: OutageEvent[] = [];
-      let truncated = 0;
-      for (const run of joinedRuns) {
-        const first = lowerBound(sorted, run.start);
-        const before = sorted[first - 1];
-        if (run.blind || before === undefined || run.start - before > gap) {
-          truncated += 1;
-          continue;
-        }
-        const after = sorted[lowerBound(sorted, run.last) + 1];
-        const censored = run.stopped || after === undefined || after - run.last > gap;
-        events.push({ area: run.area, start: run.start, seconds: run.last - run.start + interval, peak: run.peak, censored });
-      }
-      events.sort((a, b) => a.start - b.start || (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
-      return { events, tally: { counts, times: sorted.length, repeats, unknown, missing, truncated, joined } };
+      const [result] = finishEach([join]);
+      if (result === undefined) throw new Error("outageReader: no result.");
+      return result;
     },
+
+    finishEach,
   };
 }

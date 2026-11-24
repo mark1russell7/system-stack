@@ -4,7 +4,8 @@
  * The job reads the record of the figshare article of the dataset, the customers of each county and the outage file of each year.
  * Each request goes through `polite-crawler`, with one pace for each host. A file comes in range requests, and the job examines its MD5.
  * The job gives the counts to `outageReader` and writes the curve of each state to a JSON file.
- * It also writes the counts of the yearly priors: the years and the customers of each county, and the events and the peak shares of each case in each county.
+ * It also writes the counts of the yearly priors: the years and the customers of each county.
+ * It also writes the events and the peak shares of each case in each county.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
@@ -185,7 +186,7 @@ export interface JoinSweep {
   readonly events: number;
   readonly joined: number;
   readonly truncated: number;
-  /** The median over the observed counties of the events at one customer in one year (perYear * reach). */
+  /** The median of the events at one customer in one year (perYear * reach), over the counties with an event. A county with no event has no rate. */
   readonly median: number;
   /** The largest of these rates, and its county. */
   readonly most: { readonly area: string; readonly rate: number } | undefined;
@@ -271,8 +272,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   for await (const bytes of fileChunks(context, files.customers)) parts.push(bytes);
   const customers = eagleCustomers(Buffer.concat(parts).toString("utf8"));
   const reader = outageReader({ customers, share: options.share, join: options.join });
-  const sweepJoins = (options.sweep ?? []).filter((join) => join !== (options.join ?? 0));
-  const sweepReaders = sweepJoins.map((join) => outageReader({ customers, share: options.share, join }));
+  const joins = [options.join ?? 0, ...(options.sweep ?? []).filter((join) => join !== (options.join ?? 0))];
   const coverage = coverageTally();
   let lines = 0;
   let skipped = 0;
@@ -284,12 +284,13 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
       if (count === undefined) skipped += 1;
       else {
         reader.add(count);
-        for (const other of sweepReaders) other.add(count);
         coverage.add(count);
       }
     }
   }
-  const main = reader.finish();
+  const results = reader.finishEach(joins);
+  const main = results[0];
+  if (main === undefined) throw new Error("fitEagle: the reader gave no result.");
   const { events, tally } = main;
   const causes = options.storms === undefined ? undefined : await causeLaws(context, events, files.years, options.storms);
   const inCase = new Set([...(causes?.lists.values() ?? [])].flat());
@@ -299,7 +300,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const sweep =
     options.sweep === undefined
       ? undefined
-      : [{ join: options.join ?? 0, runs: main }, ...sweepJoins.map((join, index) => ({ join, runs: sweepReaders[index]?.finish() ?? main }))]
+      : joins.map((join, index) => ({ join, runs: results[index] ?? main }))
           .sort((a, b) => a.join - b.join)
           .map(({ join, runs }) => joinSweep(join, runs, priors.observation, customers));
   const { version, modified, license, doi } = files;
