@@ -182,6 +182,37 @@ describe("the programs of the forecast", () => {
     const tree = useSpace(layer(capped("a", 20)), [], { today });
     for (const program of [GROSS_USED, LAST_DAY, BASE_DAY, BASE_GROSS, USE_RATE, MONTH_END, LIMIT_DAY, LIMIT_IN_MONTH]) expect(evaluateService(program, tree, "a").ok).toBe(false);
   });
+
+  it("give the same values as the function, for generated reads", () => {
+    const service = capped("a", 20, 3);
+    const oneRead = fc.record({
+      day: fc.integer({ min: 1, max: 16 }),
+      amount: fc.double({ min: 0, max: 30, noNaN: true }),
+      gross: fc.option(fc.double({ min: 0, max: 40, noNaN: true }), { nil: undefined }),
+    });
+    fc.assert(
+      fc.property(fc.array(oneRead, { maxLength: 6 }), (list) => {
+        const reads = list.map((one) => on(one.day, one.amount, one.gross));
+        const tree = useSpace(layer(service), reads, { today });
+        const number = (program: Parameters<typeof evaluateService>[0]): number | undefined => {
+          const result = evaluateService(program, tree, "a");
+          return result.ok && typeof result.value === "number" ? result.value : undefined;
+        };
+        const inMonth = evaluateService(LIMIT_IN_MONTH, tree, "a");
+        const day = inMonth.ok && inMonth.value === true ? number(LIMIT_DAY) : undefined;
+        expect(forecastOf(service, reads)).toEqual({
+          part: "a",
+          gross: number(GROSS_USED),
+          from: number(BASE_DAY),
+          to: number(LAST_DAY),
+          rate: number(USE_RATE),
+          end: number(MONTH_END),
+          limitDate: day === undefined ? undefined : `2026-11-${String(day).padStart(2, "0")}`,
+        });
+      }),
+      { seed: 20261124, numRuns: 100 },
+    );
+  });
 });
 
 describe("the forecast and the limit", () => {
