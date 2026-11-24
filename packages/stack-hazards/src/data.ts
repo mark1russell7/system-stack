@@ -1,127 +1,117 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
 import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_ATTACK_LAW, OE417_SOURCE } from "./oe417.ts";
-import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
+import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type HazardSource, type NoLaw } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
 // Each claim is in own words. The dataset holds no quote. A cut that no source names is not in the list: it is no read.
 
-const FEDERAL = "Public domain (a work of the United States federal government)";
-const FEMA: License = { name: FEDERAL, url: "https://www.fema.gov/about/website-information#copyright" };
-const NWS: License = { name: FEDERAL, url: "https://www.weather.gov/disclaimer" };
-/** The law that puts the works of the United States federal government in the public domain (17 U.S.C. 105). */
-const FEDERAL_WORK: License = { name: FEDERAL, url: "https://www.copyright.gov/title17/92chap1.html#105" };
+/** A work of the United States federal government is in the public domain (17 U.S.C. 105). */
+const FEDERAL = "us-public-domain";
+/** The page of the copyright law of the federal works (17 U.S.C. 105). */
+const FEDERAL_TERMS = "https://www.copyright.gov/title17/92chap1.html#105";
+const FEMA_TERMS = "https://www.fema.gov/about/website-information#copyright";
+const NWS_TERMS = "https://www.weather.gov/disclaimer";
 const READ = "2026-11-21";
 const READ_CASES = "2026-11-22";
 
-const ready = (name: string, path: string, updated: string, read: string = READ): Source => ({
-  name,
-  url: `https://www.ready.gov/${path}`,
-  publisher: "FEMA (Ready.gov)",
-  license: FEMA,
-  updated,
-  read,
-});
-const dhs = (name: string, path: string, updated?: string): Source => ({
-  name,
-  url: `https://www.dhs.gov/sites/default/files/${path}`,
-  publisher: "U.S. Department of Homeland Security",
-  license: FEDERAL_WORK,
-  updated,
-  read: READ_CASES,
-});
-const doe = (name: string, path: string, updated: IsoDate): Source => ({
-  name,
-  url: `https://www.energy.gov/sites/${path}`,
-  publisher: "U.S. Department of Energy",
-  license: FEDERAL_WORK,
-  updated,
-  read: READ_CASES,
-});
-const cisa = (name: string, path: string): Source => ({ name, url: `https://www.cisa.gov/${path}`, publisher: "CISA", license: FEDERAL_WORK, read: READ_CASES });
-const nws = (name: string, path: string): Source => ({ name, url: `https://www.weather.gov/safety/${path}`, publisher: "National Weather Service", license: NWS, read: READ });
+/** The fields of a federal source that the table of the sources does not give: its id, its license and the page of its terms. */
+type Federal = Omit<HazardSource, "id" | "license" | "terms">;
+
+/** This function gives the record of a federal source with its id. The default page of the terms is the copyright law. */
+const federal = (id: string, source: Federal, terms: string = FEDERAL_TERMS): HazardSource => ({ id, ...source, license: FEDERAL, terms });
+
+const ready = (id: string, title: string, path: string, updated: string, checked: string = READ): HazardSource =>
+  federal(id, { title, url: `https://www.ready.gov/${path}`, by: "FEMA (Ready.gov)", updated, checked }, FEMA_TERMS);
+const dhs = (id: string, title: string, path: string, updated?: string): HazardSource =>
+  federal(id, { title, url: `https://www.dhs.gov/sites/default/files/${path}`, by: "U.S. Department of Homeland Security", updated, checked: READ_CASES });
+const doe = (id: string, title: string, path: string, updated: IsoDate): HazardSource =>
+  federal(id, { title, url: `https://www.energy.gov/sites/${path}`, by: "U.S. Department of Energy", updated, checked: READ_CASES });
+const cisa = (id: string, title: string, path: string): HazardSource => federal(id, { title, url: `https://www.cisa.gov/${path}`, by: "CISA", checked: READ_CASES });
+const nws = (id: string, title: string, path: string): HazardSource =>
+  federal(id, { title, url: `https://www.weather.gov/safety/${path}`, by: "National Weather Service", checked: READ }, NWS_TERMS);
+
+/** This function gives the table of the sources by id, from a list of sources. */
+const byId = (sources: readonly HazardSource[]): Readonly<Record<string, HazardSource>> => Object.fromEntries(sources.map((source) => [source.id, source]));
 
 /** The sources of the reference data, by id. */
-export const HAZARD_SOURCES: Readonly<Record<string, Source>> = {
-  "ready.power-outages": ready("Power outages", "power-outages", "2026-06-04"),
-  "ready.winter-weather": ready("Winter weather", "winter-weather", "2026-11-03"),
-  "ready.heat": ready("Extreme heat", "heat", "2026-07-16"),
-  "ready.hurricanes": ready("Hurricanes", "hurricanes", "2026-10-16"),
-  "ready.floods": ready("Floods", "floods", "2026-11-18"),
-  "ready.tornadoes": ready("Tornadoes", "tornadoes", "2026-06-02"),
-  "ready.earthquakes": ready("Earthquakes", "earthquakes", "2026-09-09"),
-  "ready.wildfires": ready("Wildfires", "wildfires", "2026-11-18"),
-  "ready.home-fires": ready("Home fires", "home-fires", "2026-02-26"),
-  "ready.hazardous-materials": ready("Hazardous materials incidents", "hazardous-materials-incidents", "2023-04-24"),
-  "ready.radiological-dispersion-device": ready("Radiological dispersion device", "radiological-dispersion-device", "2025-01-07"),
-  "ready.pandemic": ready("Pandemic", "pandemic", "2026-03-05"),
-  "ready.radiation": ready("Radiation emergencies", "radiation", "2025-01-07", READ_CASES),
-  "ready.space-weather": ready("Space weather", "space-weather", "2026-03-05", READ_CASES),
-  "ready.cybersecurity": ready("Cybersecurity", "cybersecurity", "2026-02-20", READ_CASES),
-  "ready.financial-preparedness": ready("Financial preparedness", "financial-preparedness", "2026-03-13", READ_CASES),
-  "ready.food": ready("Food", "food", "2026-03-12", READ_CASES),
-  "cdc.community-mitigation": {
-    name: "Community mitigation guidelines to prevent pandemic influenza, United States, 2017",
+export const HAZARD_SOURCES: Readonly<Record<string, HazardSource>> = byId([
+  ready("ready.power-outages", "Power outages", "power-outages", "2026-06-04"),
+  ready("ready.winter-weather", "Winter weather", "winter-weather", "2026-11-03"),
+  ready("ready.heat", "Extreme heat", "heat", "2026-07-16"),
+  ready("ready.hurricanes", "Hurricanes", "hurricanes", "2026-10-16"),
+  ready("ready.floods", "Floods", "floods", "2026-11-18"),
+  ready("ready.tornadoes", "Tornadoes", "tornadoes", "2026-06-02"),
+  ready("ready.earthquakes", "Earthquakes", "earthquakes", "2026-09-09"),
+  ready("ready.wildfires", "Wildfires", "wildfires", "2026-11-18"),
+  ready("ready.home-fires", "Home fires", "home-fires", "2026-02-26"),
+  ready("ready.hazardous-materials", "Hazardous materials incidents", "hazardous-materials-incidents", "2023-04-24"),
+  ready("ready.radiological-dispersion-device", "Radiological dispersion device", "radiological-dispersion-device", "2025-01-07"),
+  ready("ready.pandemic", "Pandemic", "pandemic", "2026-03-05"),
+  ready("ready.radiation", "Radiation emergencies", "radiation", "2025-01-07", READ_CASES),
+  ready("ready.space-weather", "Space weather", "space-weather", "2026-03-05", READ_CASES),
+  ready("ready.cybersecurity", "Cybersecurity", "cybersecurity", "2026-02-20", READ_CASES),
+  ready("ready.financial-preparedness", "Financial preparedness", "financial-preparedness", "2026-03-13", READ_CASES),
+  ready("ready.food", "Food", "food", "2026-03-12", READ_CASES),
+  federal("cdc.community-mitigation", {
+    title: "Community mitigation guidelines to prevent pandemic influenza, United States, 2017",
     url: "https://www.cdc.gov/mmwr/volumes/66/rr/rr6601a1.htm",
-    publisher: "CDC (MMWR Recommendations and Reports)",
-    license: FEDERAL_WORK,
+    by: "CDC (MMWR Recommendations and Reports)",
     updated: "2017-04-21",
-    read: READ_CASES,
-  },
-  "ready.mass-gatherings": ready("Mass gathering incidents", "public-spaces", "2026-05-13", READ_CASES),
-  "cisa.physical-security": cisa("Physical security", "topics/physical-security"),
-  "fema.cpg-201": {
-    name: "Threat and hazard identification and risk assessment (THIRA) and stakeholder preparedness review (SPR) guide, CPG 201, 3rd edition",
+    checked: READ_CASES,
+  }),
+  ready("ready.mass-gatherings", "Mass gathering incidents", "public-spaces", "2026-05-13", READ_CASES),
+  cisa("cisa.physical-security", "Physical security", "topics/physical-security"),
+  federal("fema.cpg-201", {
+    title: "Threat and hazard identification and risk assessment (THIRA) and stakeholder preparedness review (SPR) guide, CPG 201, 3rd edition",
     url: "https://www.fema.gov/sites/default/files/2020-04/CPG201Final20180525.pdf",
-    publisher: "FEMA",
-    license: FEDERAL_WORK,
-    read: READ_CASES,
-  },
+    by: "FEMA",
+    checked: READ_CASES,
+  }),
   // A joint advisory: CISA, NSA and FBI, with US and foreign partners. The claims are facts in own words, not quotes.
-  "cisa.aa24-038a": {
-    name: "PRC state-sponsored actors compromise and maintain persistent access to U.S. critical infrastructure (AA24-038A)",
+  federal("cisa.aa24-038a", {
+    title: "PRC state-sponsored actors compromise and maintain persistent access to U.S. critical infrastructure (AA24-038A)",
     url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-038a",
-    publisher: "CISA, NSA and FBI",
-    license: FEDERAL_WORK,
+    by: "CISA, NSA and FBI",
+    note: "A joint advisory with agencies of other countries. The list uses only a summary of it, not a quote.",
     updated: "2024-02-07",
-    read: READ_CASES,
-  },
-  "cisa.emp": cisa("Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
-  "cisa.ir-alert-h-16-056-01": {
-    name: "Cyber-attack against Ukrainian critical infrastructure (IR-ALERT-H-16-056-01)",
+    checked: READ_CASES,
+  }),
+  cisa("cisa.emp", "Electromagnetic pulse", "topics/risk-management/electromagnetic-pulse"),
+  federal("cisa.ir-alert-h-16-056-01", {
+    title: "Cyber-attack against Ukrainian critical infrastructure (IR-ALERT-H-16-056-01)",
     url: "https://www.cisa.gov/news-events/ics-alerts/ir-alert-h-16-056-01",
-    publisher: "CISA",
-    license: FEDERAL_WORK,
+    by: "CISA",
     updated: "2021-07-20",
-    read: READ_CASES,
-  },
-  "swpc.electric-power": {
-    name: "Electric power transmission",
+    checked: READ_CASES,
+  }),
+  federal("swpc.electric-power", {
+    title: "Electric power transmission",
     url: "https://www.spaceweather.gov/impacts/electric-power-transmission",
-    publisher: "NOAA Space Weather Prediction Center",
-    license: FEDERAL_WORK,
-    read: READ_CASES,
-  },
-  "doe.maria-2017-10-23": doe("Hurricanes Maria and Irma event summary, October 23, 2017", "prod/files/2017/10/f38/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20October%2023%2C%202017.pdf", "2017-10-23"),
-  "doe.maria-2018-02-21": doe("Hurricanes Maria and Irma event summary, February 21, 2018", "default/files/2018/02/f49/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20February%2021%2C%202018.pdf", "2018-02-21"),
-  "dhs.ai-framework": dhs(
+    by: "NOAA Space Weather Prediction Center",
+    checked: READ_CASES,
+  }),
+  doe("doe.maria-2017-10-23", "Hurricanes Maria and Irma event summary, October 23, 2017", "prod/files/2017/10/f38/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20October%2023%2C%202017.pdf", "2017-10-23"),
+  doe("doe.maria-2018-02-21", "Hurricanes Maria and Irma event summary, February 21, 2018", "default/files/2018/02/f49/Hurricanes%20Maria%20and%20Irma%20Event%20Summary%20February%2021%2C%202018.pdf", "2018-02-21"),
+  dhs(
+    "dhs.ai-framework",
     "Roles and responsibilities framework for artificial intelligence in critical infrastructure",
     "2024-11/24_1114_dhs_ai-roles-and-responsibilities-framework-508.pdf",
     "2024-11-14",
   ),
-  "dhs.ai-guidelines": dhs("Mitigating AI risk: safety and security guidelines for critical infrastructure owners and operators", "2024-04/24_0426_dhs_ai-ci-safety-security-guidelines-508c.pdf"),
-  "nws.hurricane": nws("Hurricane safety", "hurricane"),
-  "nws.tornado": nws("Tornado safety", "tornado"),
-  "nws.winter": nws("Winter safety", "winter"),
-  "nws.flood": nws("Flood safety", "flood"),
-  "nws.wildfire": nws("Wildfire safety", "wildfire"),
-  "nws.heat": nws("Heat safety", "heat"),
-  "doe.oe-417": OE417_SOURCE,
-  "eaglei.outages": EAGLEI_SOURCE,
-  "noaa.storm-events": STORM_EVENTS_SOURCE,
-  "nws.zone-county": ZONE_COUNTY_SOURCE,
-  ...EAGLEI_CAUSE_SOURCES,
-};
+  dhs("dhs.ai-guidelines", "Mitigating AI risk: safety and security guidelines for critical infrastructure owners and operators", "2024-04/24_0426_dhs_ai-ci-safety-security-guidelines-508c.pdf"),
+  nws("nws.hurricane", "Hurricane safety", "hurricane"),
+  nws("nws.tornado", "Tornado safety", "tornado"),
+  nws("nws.winter", "Winter safety", "winter"),
+  nws("nws.flood", "Flood safety", "flood"),
+  nws("nws.wildfire", "Wildfire safety", "wildfire"),
+  nws("nws.heat", "Heat safety", "heat"),
+  OE417_SOURCE,
+  EAGLEI_SOURCE,
+  STORM_EVENTS_SOURCE,
+  ZONE_COUNTY_SOURCE,
+  ...Object.values(EAGLEI_CAUSE_SOURCES),
+]);
 
 /** The duration of each cut with no law yet. Only the grid cuts have laws: from EAGLE-I for all causes and for each storm case, and from the OE-417 summaries for a physical attack. */
 export const NO_LAW: NoLaw = { read: false, reason: "No source with a law of the duration of this cut is read yet." };

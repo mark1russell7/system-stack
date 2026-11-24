@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { countOf } from "@mark1russell7/text";
-import type { DurationLaw, Source } from "../src/hazard.ts";
+import type { DurationLaw, HazardSource } from "../src/hazard.ts";
 import { LAWS_SCHEMA, type CauseLaws, type EagleLaws } from "./eaglei-fit.ts";
 import { ZONE_FILE } from "./storm-files.ts";
 
@@ -14,13 +14,22 @@ export const EAGLEI_SOURCE_ID = "eaglei.outages";
 /** The least count of events of a state for a curve. A state with fewer events gets no curve, and it is not a region of the source. */
 export const MIN_EVENTS = 30;
 
-/** The license that the converter accepts. A change of the license of the dataset stops the converter. */
-export const EAGLEI_LICENSE = { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/" } as const;
+/** The id of the source of the storm events of NOAA in the table of the sources. */
+export const STORM_EVENTS_SOURCE_ID = "noaa.storm-events";
 
-const FEDERAL = "Public domain (a work of the United States federal government)";
+/** The id of the source of the zone-county file of the NWS in the table of the sources. */
+export const ZONE_COUNTY_SOURCE_ID = "nws.zone-county";
+
+/**
+ * The license that the converter accepts. A change of the license of the dataset stops the converter.
+ * The field `name` is the name in the record of the fit. The field `id` is the license of the guidebook, and `url` is the page of its terms.
+ */
+export const EAGLEI_LICENSE = { name: "CC BY 4.0", id: "cc-by-4.0", url: "https://creativecommons.org/licenses/by/4.0/" } as const;
+
 // NOAA is a federal agency. The law 17 U.S.C. 105 puts each work of the federal government in the public domain.
-const STORMS_LICENSE = { name: FEDERAL, url: "https://www.copyright.gov/title17/92chap1.html#105" } as const;
-const ZONES_LICENSE = { name: FEDERAL, url: "https://www.weather.gov/disclaimer" } as const;
+const FEDERAL = "us-public-domain";
+const STORMS_TERMS = "https://www.copyright.gov/title17/92chap1.html#105";
+const ZONES_TERMS = "https://www.weather.gov/disclaimer";
 
 /** This function gives the id of the source of the law of a storm case, for example `eaglei.met.tornado`. */
 export const causeSourceId = (name: string): string => `eaglei.${name}`;
@@ -31,7 +40,7 @@ export const causeSourceId = (name: string): string => `eaglei.${name}`;
  */
 export interface CauseLaw {
   readonly id: string;
-  readonly source: Source;
+  readonly source: HazardSource;
   readonly law: DurationLaw;
 }
 
@@ -39,13 +48,13 @@ export interface CauseLaw {
 export interface CauseLawSet {
   /** The law of each case with one state of `MIN_EVENTS` events or more, by the code of the case. */
   readonly laws: Readonly<Record<string, CauseLaw>>;
-  readonly storms: Source;
-  readonly zones: Source;
+  readonly storms: HazardSource;
+  readonly zones: HazardSource;
 }
 
 /** The source and the laws of the grid cut from one fit, and the states with too few events. */
 export interface EagleLaw {
-  readonly source: Source;
+  readonly source: HazardSource;
   readonly law: DurationLaw;
   /** The codes of the states with fewer than `MIN_EVENTS` events. */
   readonly dropped: readonly string[];
@@ -55,9 +64,9 @@ export interface EagleLaw {
 const hours = (seconds: number): string => countOf(seconds / 3600, "hour");
 
 /** This function gives the law of each storm case with one state of `MIN_EVENTS` events or more, and the sources of the causes. */
-function causeLaws(causes: CauseLaws, eaglei: Source, scheme: string): CauseLawSet {
+function causeLaws(causes: CauseLaws, eaglei: HazardSource, scheme: string): CauseLawSet {
   const { before, after } = causes.options;
-  const { read } = eaglei;
+  const { checked } = eaglei;
   const method = `product limit with right censoring, over the outages that start in a county from ${hours(before)} before to ${hours(after)} after a storm event of the case`;
   const laws = Object.entries(causes.cases).flatMap(([name, entry]): [string, CauseLaw][] => {
     const kept = Object.keys(entry.regions)
@@ -67,7 +76,7 @@ function causeLaws(causes: CauseLaws, eaglei: Source, scheme: string): CauseLawS
     const id = causeSourceId(name);
     const count = kept.reduce((sum, code) => sum + (entry.regions[code]?.count ?? 0), 0);
     const curves = Object.fromEntries(kept.map((code) => [code, entry.regions[code]?.curve ?? []]));
-    const source: Source = { ...eaglei, name: `${eaglei.name}, in the storm events of the case ${name}`, regions: { scheme, codes: kept } };
+    const source: HazardSource = { ...eaglei, id, title: `${eaglei.title}, in the storm events of the case ${name}`, regions: { scheme, codes: kept } };
     return [[name, { id, source, law: { read: true, source: id, fit: { family: "kaplan-meier", method, count }, scheme, curves } }]];
   });
   const updated = causes.storms.files
@@ -79,8 +88,25 @@ function causeLaws(causes: CauseLaws, eaglei: Source, scheme: string): CauseLawS
     .at(-1);
   return {
     laws: Object.fromEntries(laws),
-    storms: { name: "NOAA Storm Events Database", url: "https://www.ncei.noaa.gov/stormevents/", publisher: "NOAA National Centers for Environmental Information", license: { ...STORMS_LICENSE }, updated, read },
-    zones: { name: `The zone-county file of the NWS (${causes.storms.zones})`, url: ZONE_FILE, publisher: "National Weather Service", license: { ...ZONES_LICENSE }, read },
+    storms: {
+      id: STORM_EVENTS_SOURCE_ID,
+      title: "NOAA Storm Events Database",
+      url: "https://www.ncei.noaa.gov/stormevents/",
+      by: "NOAA National Centers for Environmental Information",
+      license: FEDERAL,
+      terms: STORMS_TERMS,
+      updated,
+      checked,
+    },
+    zones: {
+      id: ZONE_COUNTY_SOURCE_ID,
+      title: `The zone-county file of the NWS (${causes.storms.zones})`,
+      url: ZONE_FILE,
+      by: "National Weather Service",
+      license: FEDERAL,
+      terms: ZONES_TERMS,
+      checked,
+    },
   };
 }
 
@@ -99,13 +125,15 @@ export function eagleLaw(laws: EagleLaws): EagleLaw {
   const kept = codes.filter((code) => (laws.regions[code]?.count ?? 0) >= MIN_EVENTS);
   if (kept.length === 0) throw new RangeError(`eagleLaw: no state has ${String(MIN_EVENTS)} events or more.`);
   if (laws.causes === undefined) throw new RangeError("eagleLaw: the record has no causes. The fit job gives them with the storm events.");
-  const source: Source = {
-    name: `EAGLE-I outage records of the counties of the United States (version ${String(laws.source.version)})`,
+  const source: HazardSource = {
+    id: EAGLEI_SOURCE_ID,
+    title: `EAGLE-I outage records of the counties of the United States (version ${String(laws.source.version)})`,
     url: `https://doi.org/${laws.source.doi}`,
-    publisher: "Oak Ridge National Laboratory",
-    license: { ...EAGLEI_LICENSE },
+    by: "Oak Ridge National Laboratory",
+    license: EAGLEI_LICENSE.id,
+    terms: EAGLEI_LICENSE.url,
     updated: laws.source.modified.slice(0, 10),
-    read: laws.read.slice(0, 10),
+    checked: laws.read.slice(0, 10),
     regions: { scheme: laws.scheme, codes: kept },
   };
   const curves = Object.fromEntries(kept.map((code) => [code, laws.regions[code]?.curve ?? []]));
@@ -126,7 +154,7 @@ function curveLines(curves: DurationLaw["curves"], codes: readonly string[], ind
 }
 
 /** This function gives the JSON of a source, with its codes of regions on one line. */
-const sourceText = (source: Source, indent: number): string =>
+const sourceText = (source: HazardSource, indent: number): string =>
   JSON.stringify(source, null, 2)
     .replace(/"codes": \[[^\]]*\]/u, () => `"codes": ${JSON.stringify(source.regions?.codes ?? [])}`)
     .replaceAll("\n", `\n${" ".repeat(indent)}`);
@@ -152,10 +180,10 @@ export function lawModule({ source, law, causes }: EagleLaw): string {
   return [
     "// This module is made by `scripts/eaglei-law.ts` from the artifact `eaglei-laws` of the workflow `hazards-fit`. Do not change it by hand.",
     "// The curves are a derived work of the EAGLE-I dataset (CC BY 4.0). They read no outage under 15 minutes.",
-    'import type { DurationLaw, Source } from "./hazard.ts";',
+    'import type { DurationLaw, HazardSource } from "./hazard.ts";',
     "",
     "/** The source of the law of the grid cut: the county outage records of EAGLE-I. */",
-    `export const EAGLEI_SOURCE: Source = ${sourceText(source, 0)};`,
+    `export const EAGLEI_SOURCE: HazardSource = ${sourceText(source, 0)};`,
     "",
     "/** The law of the duration of a stop of the grid, for all causes: one survival curve in days for each state. */",
     "export const EAGLEI_GRID_LAW: DurationLaw = {",
@@ -169,13 +197,13 @@ export function lawModule({ source, law, causes }: EagleLaw): string {
     "};",
     "",
     "/** The source of the causes of the storm cases: the storm events of NOAA. */",
-    `export const STORM_EVENTS_SOURCE: Source = ${JSON.stringify(causes.storms, null, 2)};`,
+    `export const STORM_EVENTS_SOURCE: HazardSource = ${JSON.stringify(causes.storms, null, 2)};`,
     "",
     "/** The source of the counties of each forecast zone of the storm events. */",
-    `export const ZONE_COUNTY_SOURCE: Source = ${JSON.stringify(causes.zones, null, 2)};`,
+    `export const ZONE_COUNTY_SOURCE: HazardSource = ${JSON.stringify(causes.zones, null, 2)};`,
     "",
     "/** The source of the law of each storm case, by its id: the outages of EAGLE-I in the storm events of the case. */",
-    "export const EAGLEI_CAUSE_SOURCES: Readonly<Record<string, Source>> = {",
+    "export const EAGLEI_CAUSE_SOURCES: Readonly<Record<string, HazardSource>> = {",
     ...sourceLines,
     "};",
     "",

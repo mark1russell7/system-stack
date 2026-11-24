@@ -11,7 +11,7 @@ Each function is a plain function with no clock, no network and no file.
 | Record | What it tells |
 | --- | --- |
 | `SUPPLY_PARTS` | The reference parts: the public supplies that a case can stop, for example `power.grid` and `water.main`. Each one is a failure domain of many stacks. |
-| `Source` | A public page or dataset: its URL, its publisher, its license, the date of its last change and the date of the read. |
+| `HazardSource` | A public page or dataset. It is the `Source` record of [`@mark1russell7/guidebook`](https://github.com/mark1russell7/guidebook), with the regions of the source. |
 | `Claim` | The reason for a cut: a source that tells that the case can stop the part, or the definition of the case. The text is in own words, not a quote. A claim of a source has a basis. |
 | `ClaimBasis` | The basis of a claim of a source. `told`: what the event does when it happens. `assessed`: a judgment about the threat itself. |
 | `DurationLaw` | A survival curve of the duration for each region of its source, with its fit. |
@@ -27,7 +27,7 @@ Each function is a plain function with no clock, no network and no file.
 5. A regional law covers each region of its source, not only one chosen region. The region of the user is input data.
 6. The fits come from `@mark1russell7/rigor-statistics`. The fetches of a source go through `polite-crawler`.
 
-`checkHazards` is the gate of the rules. It refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law.
+`checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. It refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law.
 
 The gate refuses a claim of a source with no basis or with a basis that is not in `CLAIM_BASES`. It also refuses a claim of the definition with a basis. Each of these faults has the code `hazards-source`.
 
@@ -88,6 +88,26 @@ With no option, or with `assessed: "keep"`, the output is the same as before the
 Only three sources have assessed claims: the DHS framework for AI, the CISA page on the electromagnetic pulse and the advisory AA24-038A. The CISA page tells only a potential of damage from an attack. Each other claim of a source is told.
 
 ## The sources
+
+The format of the list is `hazards/2`. Each source is the source record of `@mark1russell7/guidebook`, so each package that cites a source has one source gate. The table `sources` keeps each source by its id, and the field `id` of each source is its key.
+
+| Field | What it tells |
+| --- | --- |
+| `id` | The id of the source. It is the key of the source in the table `sources`. |
+| `title` | A short name of the source. |
+| `url` | The HTTPS address of the page or the dataset. |
+| `by` | The organization that publishes the source. A list of hazards must have it, because it is the credit of a CC BY source. |
+| `license` | A license of the guidebook, for example `us-public-domain` or `cc-by-4.0`. |
+| `terms` | The HTTPS address of the page that tells the terms of the reuse. A list of hazards must have it, because it is the evidence of the license. |
+| `updated` | The date that the source shows as its last change. It is not after the date `checked`. |
+| `checked` | The date of the read of the source. |
+| `regions` | The regions that the source covers. A source of a law of a duration must have its regions. This field is the extension of stack-hazards. |
+
+The gate gives the code `hazards-license` for a license that the guidebook does not know. It also gives this code for a license that does not permit a summary, because the claims are summaries in own words. The license of the source of a law or a table of priors must permit a fact. Each other fault of the source gate has the code `hazards-source`, and its message ends with the code of the guidebook.
+
+The list has three rules that the source gate of the guidebook does not have at this time. A source has an HTTPS address and a publisher (`by`), else the code is `hazards-source`. A source has an HTTPS page of its terms, else the code is `hazards-license`. A source with a fault of its license gives one finding: its laws and tables of priors give no second finding.
+
+In the format `hazards/1`, a source had the fields `name`, `publisher`, `read` and a license with a name and a URL. The format `hazards/2` has the fields `title`, `by`, `checked`, `license` and `terms` in their place.
 
 The claims of the cases of 0.1.0 come from the hazard pages of FEMA (Ready.gov) and of the National Weather Service. Each is a work of the United States federal government, in the public domain. The record of each source has the page of its terms of reuse.
 

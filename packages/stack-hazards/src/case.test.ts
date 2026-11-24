@@ -72,7 +72,7 @@ describe("a hazard case as the values of CaseCuts", () => {
     const list: HazardList = {
       schema: HAZARDS_SCHEMA,
       sources: {
-        outages: { name: "Outages", url: "https://data.example.net/outages", publisher: "An agency", license: { name: "Public domain", url: "https://data.example.net/terms" }, read: "2026-11-21", regions: { scheme: "test-region", codes: ["A"] } },
+        outages: { id: "outages", title: "Outages", url: "https://data.example.net/outages", by: "An agency", license: "public-domain", terms: "https://data.example.net/terms", checked: "2026-11-21", regions: { scheme: "test-region", codes: ["A"] } },
       },
       hazards: [
         {
@@ -125,14 +125,14 @@ describe("a hazard case as the values of CaseCuts", () => {
     ];
     const told = { source: "page", basis: "told", says: "A page tells it." } as const;
     const risk = { source: "advisory", basis: "assessed", says: "An advisory assesses it." } as const;
-    const terms = { name: "Public domain", url: "https://data.example.net/terms" };
+    const terms = { license: "public-domain", terms: "https://data.example.net/terms" } as const;
     const law = { read: true, source: "outages", fit: { family: "exponential", method: "maximum likelihood", count: 9 }, scheme: "test-region", curves: { A: curve } } as const;
     const list: HazardList = {
       schema: HAZARDS_SCHEMA,
       sources: {
-        page: { name: "A page", url: "https://data.example.net/page", publisher: "An agency", license: terms, read: "2026-11-22" },
-        advisory: { name: "An advisory", url: "https://data.example.net/advisory", publisher: "An agency", license: terms, read: "2026-11-22" },
-        outages: { name: "Outages", url: "https://data.example.net/outages", publisher: "An agency", license: terms, read: "2026-11-22", regions: { scheme: "test-region", codes: ["A"] } },
+        page: { id: "page", title: "A page", url: "https://data.example.net/page", by: "An agency", ...terms, checked: "2026-11-22" },
+        advisory: { id: "advisory", title: "An advisory", url: "https://data.example.net/advisory", by: "An agency", ...terms, checked: "2026-11-22" },
+        outages: { id: "outages", title: "Outages", url: "https://data.example.net/outages", by: "An agency", ...terms, checked: "2026-11-22", regions: { scheme: "test-region", codes: ["A"] } },
       },
       hazards: [
         {

@@ -1,9 +1,10 @@
+import { checkSources, isWebAddress, LICENSES, permits, type FindingCode, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
-import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults } from "./priors.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
-// Each claim of a source has a basis.
+// Each claim of a source has a basis. The fields of each source go through the source gate of @mark1russell7/guidebook.
 
 /**
  * These are the codes of the gate. Each code is an error, except `hazards-no-law`, which is a warning.
@@ -12,14 +13,19 @@ import { priorTableFaults } from "./priors.ts";
  * - `hazards-part-unknown`: a cut names a part that is not a reference part.
  * - `hazards-no-claim`: a cut has no claim.
  * - `hazards-source`: a claim, a law or the list `examined` names a source that the table does not have.
- *   Or a source has no name, no URL, no publisher or a wrong date.
+ *   Or the id of a source is not its key in the table.
+ *   Or the source gate of the guidebook (`checkSources`) gives an error for a source, other than `unknown-license`.
+ *   The message ends with the code of the guidebook, for example `(bad-url)`.
  *   Or a claim of a source has no basis of `CLAIM_BASES`, or a claim of the definition has a basis.
- * - `hazards-license`: a source has no license name or no license URL.
+ * - `hazards-license`: a source has a license that the guidebook does not know (`unknown-license`).
+ *   Or its license does not permit a summary, so the list can only link to it.
+ *   Or the license of the source of a law does not permit a fact.
  * - `hazards-law-region`: the source of a law has no regions, or the law has another scheme.
  *   Or the law has no curve for a region of its source.
  * - `hazards-fit`: the fit of a law has no family, no method, or a count of events that is not a whole number above 0.
  * - `hazards-curve`: a curve of a law does not have the form of a survival curve.
- * - `hazards-prior`: a table of priors names a source that the table of the sources does not have, or a source with no license.
+ * - `hazards-prior`: a table of priors names a source that the table of the sources does not have.
+ *   Or the license of its source does not permit a fact.
  *   Or it has no method, a wrong date, a case that is not in the list, or a region that is not in its codes.
  *   Or it has a rate that is not a count of 0 or more with a share from 0 to 1.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
@@ -56,11 +62,26 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
   };
   const known = new Set(parts.map((part) => part.id));
 
-  for (const [id, source] of Object.entries(list.sources)) {
+  const entries = Object.entries(list.sources);
+  for (const [id, source] of entries) {
     const at = `sources.${id}`;
-    for (const fault of sourceFaults(source)) add("error", "hazards-source", at, `The source "${id}" ${fault}.`);
-    if (source.license.name.trim() === "" || source.license.url.trim() === "") add("error", "hazards-license", at, `The source "${id}" has no license name or no license URL.`);
+    if (source.id !== id) add("error", "hazards-source", at, `The source "${id}" has the id "${source.id}". The id of a source must be its key.`);
+    if (knownLicense(source) && !permits(source.license, "summary")) {
+      add("error", "hazards-license", at, `The license "${source.license}" of the source "${id}" does not permit a summary, so the list can only link to it.`);
+    }
+    // Three rules of the list that the source gate of the guidebook does not have at this time. They move to options of that gate.
+    // A web address that is not HTTPS: the source gate gives the fault of an address that is not a web address, also for an empty page of the terms.
+    if (isWebAddress(source.url) && !source.url.startsWith("https://")) add("error", "hazards-source", at, `The source "${id}" has no HTTPS URL.`);
+    if (typeof source.by !== "string" || source.by.trim() === "") add("error", "hazards-source", at, `The source "${id}" has no publisher (by).`);
+    if (typeof source.terms !== "string") add("error", "hazards-license", at, `The source "${id}" has no page of its terms.`);
+    else if (isWebAddress(source.terms) && !source.terms.startsWith("https://")) add("error", "hazards-license", at, `The page of the terms of the source "${id}" has no HTTPS URL.`);
   }
+  // The gate of the guidebook gets the key of each source as its id, so the path of each finding is a key of the table.
+  for (const finding of checkSources(entries.map(([id, source]) => ({ ...source, id })))) {
+    add(finding.level, sourceCode(finding.code), `sources.${finding.id}`, `${finding.message} (${finding.code})`);
+  }
+  // A source with a fault of its license gives one finding. The laws and the tables of priors of that source give no second finding.
+  const badLicense = new Set(faults.filter((fault) => fault.code === "hazards-license").map((fault) => fault.at.slice("sources.".length)));
   const sourceAt = (at: string, id: string): void => {
     if (list.sources[id] === undefined) add("error", "hazards-source", at, `"${at}" names the source "${id}", and the table of the sources does not have it.`);
   };
@@ -82,7 +103,11 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
         const fault = basisFault(claim);
         if (fault !== undefined) add("error", "hazards-source", at, `A claim of the cut "${at}" ${fault}.`);
       }
-      if (item.duration.read) for (const [code, message] of lawFaults(item.duration, list.sources)) add("error", code, at, `The law of the cut "${at}": ${message}`);
+      if (item.duration.read) {
+        for (const [code, message] of lawFaults(item.duration, list.sources)) {
+          if (code !== "hazards-license" || !badLicense.has(item.duration.source)) add("error", code, at, `The law of the cut "${at}": ${message}`);
+        }
+      }
       else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
     }
   }
@@ -90,7 +115,7 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     const at = `priors.${String(index)}`;
     const source = list.sources[table.source];
     if (source === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" names the source "${table.source}", and the table of the sources does not have it.`);
-    else if (source.license.name.trim() === "" || source.license.url.trim() === "") add("error", "hazards-prior", at, `The source "${table.source}" of the table of priors "${at}" has no license.`);
+    else if (!badLicense.has(table.source) && !permitsUse(source, "fact")) add("error", "hazards-prior", at, `The license of the source "${table.source}" of the table of priors "${at}" does not permit a fact.`);
     if (dayNumber(table.asOf) === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" has a date that is not a date YYYY-MM-DD.`);
     for (const fault of priorTableFaults(table, cases)) add("error", "hazards-prior", at, `The table of priors "${at}" ${fault}.`);
   }
@@ -108,15 +133,19 @@ function basisFault(claim: Claim): string | undefined {
   return (CLAIM_BASES as readonly unknown[]).includes(basis) ? undefined : `has the basis "${String(basis)}", which is not one of ${CLAIM_BASES.join(", ")}`;
 }
 
-/** This function gives the faults of the fields of a source, as the ends of sentences. */
-function sourceFaults(source: Source): string[] {
-  const faults: string[] = [];
-  if (source.name.trim() === "") faults.push("has no name");
-  if (!/^https:\/\/\S+$/u.test(source.url)) faults.push("has no HTTPS URL");
-  if (source.publisher.trim() === "") faults.push("has no publisher");
-  if (dayNumber(source.read) === undefined) faults.push("has a date of the read that is not a date YYYY-MM-DD");
-  if (source.updated !== undefined && dayNumber(source.updated) === undefined) faults.push("has a date of the last change that is not a date YYYY-MM-DD");
-  return faults;
+/** This function gives the code of the gate for a code of the source gate of the guidebook. */
+function sourceCode(code: FindingCode): HazardCode {
+  return code === "unknown-license" ? "hazards-license" : "hazards-source";
+}
+
+/** This function tells if the license of a source is a license that the guidebook knows. A list from JSON can have another value. */
+function knownLicense(source: HazardSource): boolean {
+  return (LICENSES as readonly unknown[]).includes(source.license);
+}
+
+/** This function tells if the license of a source is known and permits a use. */
+function permitsUse(source: HazardSource, use: Use): boolean {
+  return knownLicense(source) && permits(source.license, use);
 }
 
 /** This function gives the faults of a law of a duration with their codes. */
@@ -124,7 +153,7 @@ function lawFaults(law: DurationLaw, sources: HazardList["sources"]): [HazardCod
   const faults: [HazardCode, string][] = [];
   const source = sources[law.source];
   if (source === undefined) return [["hazards-source", `the table of the sources does not have the source "${law.source}".`]];
-  if (source.license.name.trim() === "" || source.license.url.trim() === "") faults.push(["hazards-license", `the source "${law.source}" has no license.`]);
+  if (!permitsUse(source, "fact")) faults.push(["hazards-license", `the license of the source "${law.source}" does not permit a fact.`]);
   const { family, method, count } = law.fit;
   if (family.trim() === "" || method.trim() === "" || !Number.isInteger(count) || count < 1) faults.push(["hazards-fit", "the fit has no family, no method, or no count of events above 0."]);
   if (source.regions === undefined) faults.push(["hazards-law-region", `the source "${law.source}" has no regions.`]);

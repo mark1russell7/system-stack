@@ -33,9 +33,9 @@ HazardFault: build/index.d.ts#HazardFault
 HazardList: build/hazard.chunk.d.ts#HazardList
 HazardPriorOptions: build/index.d.ts#HazardPriorOptions
 HazardRegion: build/index.d.ts#HazardRegion
+HazardSource: build/hazard.chunk.d.ts#HazardSource
 IsoDate: build/hazard.chunk.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
-License: build/hazard.chunk.d.ts#License
 NO_COLLAPSE_LAW: build/index.d.ts#NO_COLLAPSE_LAW
 NO_CYBER_LAW: build/index.d.ts#NO_CYBER_LAW
 NO_EVENT_LAW: build/index.d.ts#NO_EVENT_LAW
@@ -70,7 +70,6 @@ RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
-Source: build/hazard.chunk.d.ts#Source
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
@@ -147,7 +146,7 @@ interface Fit {
 }
 
 ### build/hazard.chunk.d.ts#HAZARDS_SCHEMA
-declare const HAZARDS_SCHEMA = "hazards/1";
+declare const HAZARDS_SCHEMA = "hazards/2";
 
 ### build/hazard.chunk.d.ts#Hazard
 interface Hazard {
@@ -168,19 +167,20 @@ interface HazardCut {
 ### build/hazard.chunk.d.ts#HazardList
 interface HazardList {
   readonly schema: typeof HAZARDS_SCHEMA;
-  readonly sources: Readonly<Record<string, Source>>;
+  readonly sources: Readonly<Record<string, HazardSource>>;
   readonly hazards: readonly Hazard[];
   readonly priors?: readonly PriorTable[] | undefined;
 }
 
+### build/hazard.chunk.d.ts#HazardSource
+type HazardSource = Source & {
+  readonly by: string;
+  readonly terms: string;
+  readonly regions?: Regions | undefined;
+};
+
 ### build/hazard.chunk.d.ts#IsoDate
 type IsoDate = string;
-
-### build/hazard.chunk.d.ts#License
-interface License {
-  readonly name: string;
-  readonly url: string;
-}
 
 ### build/hazard.chunk.d.ts#NoLaw
 interface NoLaw {
@@ -206,17 +206,6 @@ interface Regions {
 
 ### build/hazard.chunk.d.ts#SUPPLY_PARTS
 declare const SUPPLY_PARTS: readonly Part[];
-
-### build/hazard.chunk.d.ts#Source
-interface Source {
-  readonly name: string;
-  readonly url: string;
-  readonly publisher: string;
-  readonly license: License;
-  readonly updated?: IsoDate | undefined;
-  readonly read: IsoDate;
-  readonly regions?: Regions | undefined;
-}
 
 ### build/index.d.ts#AreaCount
 export interface AreaCount {
@@ -271,7 +260,7 @@ export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unkn
 export declare const HAZARD_LIST: HazardList;
 
 ### build/index.d.ts#HAZARD_SOURCES
-export declare const HAZARD_SOURCES: Readonly<Record<string, Source>>;
+export declare const HAZARD_SOURCES: Readonly<Record<string, HazardSource>>;
 
 ### build/index.d.ts#HazardCaseOptions
 export interface HazardCaseOptions extends BasisOptions {
@@ -347,7 +336,7 @@ export declare const OE417_LEAST_HOURS = .25;
 export declare const OE417_NOT_ATTACK_TERMS: RegExp;
 
 ### build/index.d.ts#OE417_SOURCE
-export declare const OE417_SOURCE: Source;
+export declare const OE417_SOURCE: HazardSource;
 
 ### build/index.d.ts#OE417_SPACE_WEATHER_TERMS
 export declare const OE417_SPACE_WEATHER_TERMS: RegExp;

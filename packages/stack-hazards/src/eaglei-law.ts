@@ -1,18 +1,17 @@
 // This module is made by `scripts/eaglei-law.ts` from the artifact `eaglei-laws` of the workflow `hazards-fit`. Do not change it by hand.
 // The curves are a derived work of the EAGLE-I dataset (CC BY 4.0). They read no outage under 15 minutes.
-import type { DurationLaw, Source } from "./hazard.ts";
+import type { DurationLaw, HazardSource } from "./hazard.ts";
 
 /** The source of the law of the grid cut: the county outage records of EAGLE-I. */
-export const EAGLEI_SOURCE: Source = {
-  "name": "EAGLE-I outage records of the counties of the United States (version 4)",
+export const EAGLEI_SOURCE: HazardSource = {
+  "id": "eaglei.outages",
+  "title": "EAGLE-I outage records of the counties of the United States (version 4)",
   "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-  "publisher": "Oak Ridge National Laboratory",
-  "license": {
-    "name": "CC BY 4.0",
-    "url": "https://creativecommons.org/licenses/by/4.0/"
-  },
+  "by": "Oak Ridge National Laboratory",
+  "license": "cc-by-4.0",
+  "terms": "https://creativecommons.org/licenses/by/4.0/",
   "updated": "2026-02-25",
-  "read": "2026-11-22",
+  "checked": "2026-11-22",
   "regions": {
     "scheme": "us-state-fips",
     "codes": ["01","02","04","05","06","08","09","10","11","12","13","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","44","45","46","47","48","49","50","51","53","54","55","56","72","78"]
@@ -83,102 +82,95 @@ export const EAGLEI_GRID_LAW: DurationLaw = {
 };
 
 /** The source of the causes of the storm cases: the storm events of NOAA. */
-export const STORM_EVENTS_SOURCE: Source = {
-  "name": "NOAA Storm Events Database",
+export const STORM_EVENTS_SOURCE: HazardSource = {
+  "id": "noaa.storm-events",
+  "title": "NOAA Storm Events Database",
   "url": "https://www.ncei.noaa.gov/stormevents/",
-  "publisher": "NOAA National Centers for Environmental Information",
-  "license": {
-    "name": "Public domain (a work of the United States federal government)",
-    "url": "https://www.copyright.gov/title17/92chap1.html#105"
-  },
+  "by": "NOAA National Centers for Environmental Information",
+  "license": "us-public-domain",
+  "terms": "https://www.copyright.gov/title17/92chap1.html#105",
   "updated": "2026-11-19",
-  "read": "2026-11-22"
+  "checked": "2026-11-22"
 };
 
 /** The source of the counties of each forecast zone of the storm events. */
-export const ZONE_COUNTY_SOURCE: Source = {
-  "name": "The zone-county file of the NWS (bp16ap26.dbx)",
+export const ZONE_COUNTY_SOURCE: HazardSource = {
+  "id": "nws.zone-county",
+  "title": "The zone-county file of the NWS (bp16ap26.dbx)",
   "url": "https://www.weather.gov/source/gis/Shapefiles/County/bp16ap26.dbx",
-  "publisher": "National Weather Service",
-  "license": {
-    "name": "Public domain (a work of the United States federal government)",
-    "url": "https://www.weather.gov/disclaimer"
-  },
-  "read": "2026-11-22"
+  "by": "National Weather Service",
+  "license": "us-public-domain",
+  "terms": "https://www.weather.gov/disclaimer",
+  "checked": "2026-11-22"
 };
 
 /** The source of the law of each storm case, by its id: the outages of EAGLE-I in the storm events of the case. */
-export const EAGLEI_CAUSE_SOURCES: Readonly<Record<string, Source>> = {
+export const EAGLEI_CAUSE_SOURCES: Readonly<Record<string, HazardSource>> = {
   "eaglei.met.winter.storm": {
-    "name": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.winter.storm",
+    "id": "eaglei.met.winter.storm",
+    "title": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.winter.storm",
     "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-    "publisher": "Oak Ridge National Laboratory",
-    "license": {
-      "name": "CC BY 4.0",
-      "url": "https://creativecommons.org/licenses/by/4.0/"
-    },
+    "by": "Oak Ridge National Laboratory",
+    "license": "cc-by-4.0",
+    "terms": "https://creativecommons.org/licenses/by/4.0/",
     "updated": "2026-02-25",
-    "read": "2026-11-22",
+    "checked": "2026-11-22",
     "regions": {
       "scheme": "us-state-fips",
       "codes": ["01","04","05","06","08","09","12","13","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","44","45","46","47","48","49","50","51","53","54","55","56"]
     }
   },
   "eaglei.met.heat.extreme": {
-    "name": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.heat.extreme",
+    "id": "eaglei.met.heat.extreme",
+    "title": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.heat.extreme",
     "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-    "publisher": "Oak Ridge National Laboratory",
-    "license": {
-      "name": "CC BY 4.0",
-      "url": "https://creativecommons.org/licenses/by/4.0/"
-    },
+    "by": "Oak Ridge National Laboratory",
+    "license": "cc-by-4.0",
+    "terms": "https://creativecommons.org/licenses/by/4.0/",
     "updated": "2026-02-25",
-    "read": "2026-11-22",
+    "checked": "2026-11-22",
     "regions": {
       "scheme": "us-state-fips",
       "codes": ["01","04","05","06","12","16","17","18","19","21","22","23","24","27","28","29","34","36","37","40","41","42","46","47","48","50","51","55","56"]
     }
   },
   "eaglei.met.tropical.hurricane": {
-    "name": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.tropical.hurricane",
+    "id": "eaglei.met.tropical.hurricane",
+    "title": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.tropical.hurricane",
     "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-    "publisher": "Oak Ridge National Laboratory",
-    "license": {
-      "name": "CC BY 4.0",
-      "url": "https://creativecommons.org/licenses/by/4.0/"
-    },
+    "by": "Oak Ridge National Laboratory",
+    "license": "cc-by-4.0",
+    "terms": "https://creativecommons.org/licenses/by/4.0/",
     "updated": "2026-02-25",
-    "read": "2026-11-22",
+    "checked": "2026-11-22",
     "regions": {
       "scheme": "us-state-fips",
       "codes": ["01","12","13","22","28","37","45","48","51"]
     }
   },
   "eaglei.met.flood": {
-    "name": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.flood",
+    "id": "eaglei.met.flood",
+    "title": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.flood",
     "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-    "publisher": "Oak Ridge National Laboratory",
-    "license": {
-      "name": "CC BY 4.0",
-      "url": "https://creativecommons.org/licenses/by/4.0/"
-    },
+    "by": "Oak Ridge National Laboratory",
+    "license": "cc-by-4.0",
+    "terms": "https://creativecommons.org/licenses/by/4.0/",
     "updated": "2026-02-25",
-    "read": "2026-11-22",
+    "checked": "2026-11-22",
     "regions": {
       "scheme": "us-state-fips",
       "codes": ["01","04","05","06","08","09","12","13","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","39","40","41","42","45","46","47","48","49","50","51","53","54","55"]
     }
   },
   "eaglei.met.tornado": {
-    "name": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.tornado",
+    "id": "eaglei.met.tornado",
+    "title": "EAGLE-I outage records of the counties of the United States (version 4), in the storm events of the case met.tornado",
     "url": "https://doi.org/10.6084/m9.figshare.24237376.v4",
-    "publisher": "Oak Ridge National Laboratory",
-    "license": {
-      "name": "CC BY 4.0",
-      "url": "https://creativecommons.org/licenses/by/4.0/"
-    },
+    "by": "Oak Ridge National Laboratory",
+    "license": "cc-by-4.0",
+    "terms": "https://creativecommons.org/licenses/by/4.0/",
     "updated": "2026-02-25",
-    "read": "2026-11-22",
+    "checked": "2026-11-22",
     "regions": {
       "scheme": "us-state-fips",
       "codes": ["01","05","12","13","17","18","19","20","21","22","24","26","27","28","29","36","37","38","39","40","42","45","46","47","48","51","55"]

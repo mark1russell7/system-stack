@@ -82,11 +82,13 @@ describe("outageCurves", () => {
       schema: HAZARDS_SCHEMA,
       sources: {
         outages: {
-          name: "A dataset of outages",
+          id: "outages",
+          title: "A dataset of outages",
           url: "https://data.example.net/outages",
-          publisher: "An agency",
-          license: { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/" },
-          read: "2026-11-22",
+          by: "An agency",
+          license: "cc-by-4.0",
+          terms: "https://creativecommons.org/licenses/by/4.0/",
+          checked: "2026-11-22",
           regions: { scheme: "test-region", codes: ["01", "02"] },
         },
       },

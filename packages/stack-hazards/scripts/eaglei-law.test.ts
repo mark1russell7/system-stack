@@ -4,7 +4,7 @@ import { HAZARDS_SCHEMA } from "../src/hazard.ts";
 import { outageCurves } from "../src/law.ts";
 import type { OutageEvent } from "../src/outages.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, type EagleLaws } from "./eaglei-fit.ts";
-import { EAGLEI_SOURCE_ID, MIN_EVENTS, causeSourceId, eagleLaw, lawModule } from "./eaglei-law.ts";
+import { EAGLEI_SOURCE_ID, MIN_EVENTS, STORM_EVENTS_SOURCE_ID, ZONE_COUNTY_SOURCE_ID, causeSourceId, eagleLaw, lawModule } from "./eaglei-law.ts";
 
 // Made-up states: the codes 98 and 99 are not codes of states. The state 98 has too few events for a curve.
 const event = (area: string, minutes: number, censored = false): OutageEvent => ({ area, start: 0, seconds: minutes * 60, peak: 10, censored });
@@ -49,7 +49,7 @@ describe("eagleLaw", () => {
   it("keeps each state with enough events, and gives a law that passes the gate", () => {
     const { source, law, dropped } = eagleLaw(record());
     expect(dropped).toEqual(["98"]);
-    expect(source).toMatchObject({ url: "https://doi.org/10.0000/test.1", updated: "2026-02-25", read: "2026-11-22", regions: { scheme: "us-state-fips", codes: ["99"] } });
+    expect(source).toMatchObject({ id: EAGLEI_SOURCE_ID, url: "https://doi.org/10.0000/test.1", license: "cc-by-4.0", terms: "https://creativecommons.org/licenses/by/4.0/", updated: "2026-02-25", checked: "2026-11-22", regions: { scheme: "us-state-fips", codes: ["99"] } });
     expect(law).toMatchObject({ source: EAGLEI_SOURCE_ID, scheme: "us-state-fips", fit: { family: "kaplan-meier", count: MIN_EVENTS } });
     expect(Object.keys(law.curves)).toEqual(["99"]);
     const faults = checkHazards({
@@ -80,19 +80,19 @@ describe("eagleLaw", () => {
     expect(Object.keys(causes.laws)).toEqual(["met.tornado"]);
     const tornado = causes.laws["met.tornado"];
     expect(tornado?.id).toBe(causeSourceId("met.tornado"));
-    expect(tornado?.source).toMatchObject({ url: source.url, license: source.license, read: "2026-11-22", regions: { scheme: "us-state-fips", codes: ["99"] } });
+    expect(tornado?.source).toMatchObject({ id: tornado?.id, url: source.url, license: source.license, terms: source.terms, checked: "2026-11-22", regions: { scheme: "us-state-fips", codes: ["99"] } });
     expect(tornado?.law).toMatchObject({ source: "eaglei.met.tornado", fit: { family: "kaplan-meier", count: MIN_EVENTS } });
     expect(tornado?.law.fit.method).toContain("from 1 hour before to 3 hours after a storm event of the case");
-    expect(causes.storms).toMatchObject({ publisher: "NOAA National Centers for Environmental Information", updated: "2026-03-01", read: "2026-11-22" });
-    expect(causes.zones).toMatchObject({ url: "https://www.weather.gov/source/gis/Shapefiles/County/bp16ap26.dbx", read: "2026-11-22" });
+    expect(causes.storms).toMatchObject({ id: STORM_EVENTS_SOURCE_ID, by: "NOAA National Centers for Environmental Information", license: "us-public-domain", updated: "2026-03-01", checked: "2026-11-22" });
+    expect(causes.zones).toMatchObject({ id: ZONE_COUNTY_SOURCE_ID, url: "https://www.weather.gov/source/gis/Shapefiles/County/bp16ap26.dbx", license: "us-public-domain", checked: "2026-11-22" });
     const faults = checkHazards({
       schema: HAZARDS_SCHEMA,
-      sources: { [EAGLEI_SOURCE_ID]: source, "noaa.storm-events": causes.storms, "nws.zone-county": causes.zones, ...(tornado === undefined ? {} : { [tornado.id]: tornado.source }) },
+      sources: { [EAGLEI_SOURCE_ID]: source, [STORM_EVENTS_SOURCE_ID]: causes.storms, [ZONE_COUNTY_SOURCE_ID]: causes.zones, ...(tornado === undefined ? {} : { [tornado.id]: tornado.source }) },
       hazards: [
         {
           case: "met.tornado",
           title: "Tornado",
-          examined: [EAGLEI_SOURCE_ID, "noaa.storm-events", "nws.zone-county"],
+          examined: [EAGLEI_SOURCE_ID, STORM_EVENTS_SOURCE_ID, ZONE_COUNTY_SOURCE_ID],
           cuts: [{ part: "power.grid", title: "No power", claims: [{ definition: true, says: "The case cuts the grid." }], duration: tornado?.law ?? { read: false, reason: "none" } }],
         },
       ],
@@ -105,7 +105,7 @@ describe("lawModule", () => {
   it("gives a module whose source and curves read back to the same values", () => {
     const result = eagleLaw(record());
     const text = lawModule(result);
-    const source = /export const EAGLEI_SOURCE: Source = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
+    const source = /export const EAGLEI_SOURCE: HazardSource = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
     expect(JSON.parse(source)).toEqual(result.source);
     const curves = text.split("\n").flatMap((line) => {
       const match = /^ {4}("\d+"): (.*),$/u.exec(line);
@@ -118,7 +118,7 @@ describe("lawModule", () => {
     expect(text).toContain('    "codes": ["99"]');
     expect(text).toContain(`    fit: ${JSON.stringify(tornado?.law.fit)},`);
     expect(text).toContain(`      "99": ${JSON.stringify(tornado?.law.curves["99"])},`);
-    const storms = /export const STORM_EVENTS_SOURCE: Source = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
+    const storms = /export const STORM_EVENTS_SOURCE: HazardSource = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
     expect(JSON.parse(storms)).toEqual(result.causes.storms);
     expect(text).not.toContain("met.flood");
   });
