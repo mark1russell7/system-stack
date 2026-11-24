@@ -22,6 +22,7 @@ describe("the daily needs of the kit", () => {
 
   it("gives the alert receiver 24 hours each day for each household, from two public-domain pages of the National Weather Service", () => {
     expect(watch?.users).toBe("household");
+    expect(DAILY_NEEDS.find((need) => need.code === LIGHT_NEED)?.users).toBe("household");
     expect(watch?.rate).toMatchObject({ read: true, perDay: { value: 24, unit: "h/d" } });
     if (watch?.rate.read !== true) throw new Error("no read");
     expect(watch.rate.sources.map((source) => source.url)).toEqual(["https://www.weather.gov/nwr/nwr_receivers", "https://www.weather.gov/nwr/nwr_warning"]);
@@ -40,8 +41,8 @@ describe("the daily needs of the kit", () => {
 describe("the gate of the daily needs", () => {
   const source = { id: "s", title: "S", url: "https://example.org/s", license: "us-public-domain" as const, checked: "2026-11-24", by: "Example", terms: "https://example.org/terms" };
 
-  it("has two codes", () => {
-    expect(DAILY_NEED_CODES).toEqual(["daily-need-id", "daily-need-rate"]);
+  it("has three codes", () => {
+    expect(DAILY_NEED_CODES).toEqual(["daily-need-id", "daily-need-unit", "daily-need-rate"]);
   });
 
   it("refuses an empty code and two needs with one code", () => {
@@ -59,6 +60,10 @@ describe("the gate of the daily needs", () => {
 
   it("accepts a rate in a unit that converts, for example minutes for each day for a need in hours", () => {
     expect(codes(withRate({ read: true, perDay: { value: 90, unit: "min/d" }, sources: [source], note: "n" }))).toEqual([]);
+  });
+
+  it("refuses a unit that quantity does not read, also on a no read", () => {
+    expect(codes(withRate({ read: false, why: "No source." }, "not-a-unit"))).toEqual(["daily-need-unit"]);
   });
 
   it("refuses a no read with no reason", () => {
