@@ -313,4 +313,23 @@ describe("hazardPriors", () => {
     expect(prior([{ ...county, rates: { "met.flood": { A1: [1, 1.5] } } }])).toHaveLength(1);
     expect(prior([{ ...county, rates: { "met.flood": { A1: [Number.NaN, 0.5] } } }])).toHaveLength(1);
   });
+
+  it("refuses an empty scheme, a region two times, a rate that is not a pair, and two tables with the same scheme, case and region", () => {
+    const prior = (tables: readonly unknown[]): string[] => checkHazards({ ...list, priors: tables as PriorTable[] }).filter((fault) => fault.code === "hazards-prior").map((fault) => fault.message);
+    expect(prior([{ ...county, scheme: "" }])).toHaveLength(1);
+    expect(prior([{ ...county, scheme: " test-county" }])).toHaveLength(1);
+    expect(prior([{ ...county, codes: [...county.codes, county.codes[0]] }])).toHaveLength(1);
+    // A table from JSON can have any shape. The gate gives a fault, and it does not throw.
+    for (const rate of [1, [1], [1, 0.5, 2], null, "1,0.5", ["1", 0.5]]) expect(prior([{ ...county, rates: { "met.flood": { A1: rate } } }]), JSON.stringify(rate)).toHaveLength(1);
+    expect(prior([{ ...county, rates: { "met.flood": null } }])).toHaveLength(1);
+    expect(prior([{ ...county, rates: { "met.flood": [[1, 0.5]] } }])).toHaveLength(1);
+    // Two tables of one scheme overlap in each case of the two and each region of the two: one fault for the pair, with the count.
+    const overlap = prior([county, region, { ...county, asOf: "2026-03-01" }]);
+    expect(overlap).toHaveLength(1);
+    expect(overlap[0]).toContain('"priors.0" and "priors.2"');
+    expect(overlap[0]).toContain("4 pairs of a case and a region");
+    // Two tables of one scheme with no shared case, or no shared region, do not overlap.
+    expect(prior([county, { ...county, rates: { "met.tornado": { A1: [1, 0.5] } } }])).toEqual([]);
+    expect(prior([county, { ...county, codes: ["Z9"], rates: {} }])).toEqual([]);
+  });
 });
