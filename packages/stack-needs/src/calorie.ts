@@ -1,5 +1,5 @@
 import { quantity, valueIn, type Quantity } from "@mark1russell7/quantity";
-import type { HashedSource } from "./source.ts";
+import type { Source } from "@mark1russell7/guidebook";
 
 // The energy need of the persons of a household, from a cited table of estimated calorie needs.
 // The package names no person. The persons and their activity level are input data.
@@ -57,7 +57,7 @@ export interface CalorieTable {
   /** The id, for example `dga.2020-2025:calorie-needs`. */
   readonly id: string;
   readonly title: string;
-  readonly source: HashedSource;
+  readonly source: Source;
   /** The place of the tables in the source: the tables and their pages. */
   readonly locator: string;
   /** The rows of the table. The age ranges of the rows of one sex do not overlap. */

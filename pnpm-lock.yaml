@@ -372,8 +372,8 @@ importers:
   packages/stack-needs:
     dependencies:
       '@mark1russell7/guidebook':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.3.0
+        version: 0.3.0
       '@mark1russell7/market':
         specifier: ^0.3.1
         version: 0.3.1
