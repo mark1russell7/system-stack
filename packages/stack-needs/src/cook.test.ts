@@ -309,7 +309,9 @@ describe("the cook fragment", () => {
       expect(value.read && value.value).toBeCloseTo(2 * yieldBoil(10) + 20 * 0.01, 12);
       const mostYield = fuelOf(withFactor({ bound: "most" }, adverse(2)));
       expect(mostYield.read).toBe(false);
-      if (!mostYield.read) expect(mostYield.why).toMatch(/most yield with a most adverse factor/);
+      if (!mostYield.read) expect(mostYield.why).toMatch(/most yield with an adverse factor that has the bound most or a typical range/);
+      // A factor with no range gives no spread.
+      expect(lineOf(cookFragment({ ...noShare, stove: withFactor({}, adverse(2)) }).lines, "test.grain-1kg").fuelSpread).toBeUndefined();
       // A least factor gives too little fuel. A factor below 1 or not finite is a bad value of a catalog of a caller.
       const least = fuelOf(withFactor({}, adverse(2, "least")));
       expect(least.read).toBe(false);
@@ -324,7 +326,35 @@ describe("the cook fragment", () => {
       expect(one.read && one.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
     });
 
-    it("gives the canister stove of the catalog an estimate of the fuel: its calm yield times its most adverse factor of 4", () => {
+    it("takes a factor with a typical range as an estimate, also from a most yield, and gives the fuel at each end of the range", () => {
+      const lineWith = (more: object, factor: object): CookLine =>
+        lineOf(cookFragment({ ...noShare, stove: { ...yieldStove(10, more), ...factor } as StoveFacts }).lines, "test.grain-1kg");
+      const cook = 20 * 0.01;
+      for (const more of [{ bound: "most" }, {}]) {
+        const line = lineWith(more, { adverse: { factor: 3, typical: { low: 2, high: 4 }, fact } });
+        expect(line.fuel.read && line.fuel.value).toBeCloseTo(3 * yieldBoil(10) + cook, 12);
+        expect(line.fuelSpread?.unit).toBe("kg");
+        expect(line.fuelSpread?.low).toBeCloseTo(2 * yieldBoil(10) + cook, 12);
+        expect(line.fuelSpread?.high).toBeCloseTo(4 * yieldBoil(10) + cook, 12);
+      }
+      // A bound and a range, a bad range, or a factor outside its range is a bad value of a catalog of a caller.
+      const bad: [object, RegExp][] = [
+        [{ factor: 4, typical: { low: 3, high: 4 }, bound: "most", fact }, /a bound and a typical range/],
+        [{ factor: 4, typical: { low: 4, high: 3 }, fact }, /1 <= low <= high/],
+        [{ factor: 1, typical: { low: 0.5, high: 2 }, fact }, /1 <= low <= high/],
+        [{ factor: 4, typical: { low: 3, high: Number.POSITIVE_INFINITY }, fact }, /1 <= low <= high/],
+        [{ factor: 4, typical: { low: 3 }, fact }, /1 <= low <= high/],
+        [{ factor: 5, typical: { low: 3, high: 4 }, fact }, /outside its typical range 3 to 4/],
+      ];
+      for (const [adverse, why] of bad) {
+        const line = lineWith({}, { adverse });
+        expect(line.fuel.read).toBe(false);
+        if (!line.fuel.read) expect(line.fuel.why).toMatch(why);
+        expect(line.fuelSpread).toBeUndefined();
+      }
+    });
+
+    it("gives the canister stove of the catalog an estimate of the fuel: its calm yield times the factor 4, the high end of its typical range of 3 to 4", () => {
       const line = cookFragment({ catalog: SUPPLY_CATALOG, units: { "food.rice-white-1kg": 1 }, stove: "heat.stove-canister-1-burner", batch: { value: 0.5, unit: "kg" } }).lines[0];
       if (line === undefined || !line.water.read || !line.fuel.read || !line.minutes.read) throw new Error("The canister line has no read.");
       // The pot of 0.5 kg starts at 0 °C. The test boils 16 L from 21 °C to 100 °C with 227 g of fuel.
@@ -335,6 +365,8 @@ describe("the cook fragment", () => {
       // The rice cooks for 18 min at most after the boil, at the full rate of 227 g each hour.
       expect(line.fuel.value).toBeCloseTo(boil + 18 * perMin, 12);
       expect(line.minutes.value).toBeCloseTo(boil / perMin + 18, 9);
+      expect(line.fuelSpread?.low).toBeCloseTo(heat / (calmPerKg / 3) + 18 * perMin, 12);
+      expect(line.fuelSpread?.high).toBeCloseTo(line.fuel.value, 12);
     });
   });
 

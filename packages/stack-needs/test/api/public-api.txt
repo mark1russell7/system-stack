@@ -387,6 +387,11 @@ export interface CookLine {
   readonly heat: CookRead;
   readonly minutes: CookRead;
   readonly fuel: CookRead;
+  readonly fuelSpread?: {
+    readonly low: number;
+    readonly high: number;
+    readonly unit: "kg";
+  } | undefined;
 }
 
 ### build/index.d.ts#CookNoRead

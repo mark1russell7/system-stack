@@ -197,6 +197,12 @@ export interface CookLine {
   readonly minutes: CookRead;
   /** The fuel of one pot, in `kg`. */
   readonly fuel: CookRead;
+  /**
+   * The fuel of one pot at the low end and at the high end of the typical range of the adverse factor, in `kg`.
+   * The value of `fuel` is an estimate in this spread. The spread makes no claim of a floor or a ceiling.
+   * A line has the field only when the stove has a typical range and the fuel has a read.
+   */
+  readonly fuelSpread?: { readonly low: number; readonly high: number; readonly unit: "kg" } | undefined;
 }
 
 /** A converter of the cook fragment, with the form of `Converter` of `@mark1russell7/stack-endurance`. */
@@ -267,10 +273,16 @@ function citedCelsius(value: unknown): number | undefined {
  * The factor is relative to the cited calm yield. Thus the heat of 1 kg of fuel is the calm heat over the factor.
  * - A factor with the bound `most` gives the boil fuel at the top of its cited range. It also takes a yield with the bound `most`.
  *   The fuel is an estimate, not a proven upper limit: a source can give a typical range, not a ceiling.
- * - A factor with no bound is the value. It takes a yield with the bound `least` or no bound, as the calm case does.
+ * - A factor with a typical range (`typical`) and no bound is an estimate in that range. It also takes a yield with the bound `most`.
+ *   The function also gives the heat at each end of the range (`spread`), so a line can show the fuel at each end.
+ * - A factor with no bound and no range is the value. It takes a yield with the bound `least` or no bound, as the calm case does.
  * - A factor with the bound `least` gives too little fuel, so it gives a no read. So does a factor that is not a finite number of 1 or more.
+ * - A factor with a bound and a range, a range that is not `1 <= low <= high`, or a factor outside its range gives a no read.
  */
-function yieldHeat(boil: StoveYield, adverse: StoveFactor | undefined): { readonly perKg: number } | { readonly why: string } {
+function yieldHeat(
+  boil: StoveYield,
+  adverse: StoveFactor | undefined,
+): { readonly perKg: number; readonly spread?: { readonly atLow: number; readonly atHigh: number } } | { readonly why: string } {
   const factorBound: unknown = adverse !== undefined && "bound" in adverse ? adverse.bound : undefined;
   const factor: unknown = adverse?.factor;
   if (adverse !== undefined) {
@@ -279,10 +291,22 @@ function yieldHeat(boil: StoveYield, adverse: StoveFactor | undefined): { readon
     if (factorBound !== undefined && factorBound !== "most")
       return { why: `The adverse factor of the stove has the bound ${String(factorBound)}. Only a factor with the bound most or no bound gives the boil fuel.${factorBound === "least" ? " A least factor gives too little fuel." : ""}` };
   }
+  // The typical range of the factor. The check of the range stays, because a catalog of a caller can have a bad value.
+  const typical: unknown = adverse !== undefined && "typical" in adverse ? adverse.typical : undefined;
+  let range: { readonly low: number; readonly high: number } | undefined;
+  if (typical !== undefined) {
+    if (factorBound !== undefined) return { why: "The adverse factor of the stove has a bound and a typical range. A typical range is not a bound, so the factor must have only one of the two." };
+    const low: unknown = typeof typical === "object" && typical !== null && "low" in typical ? typical.low : undefined;
+    const high: unknown = typeof typical === "object" && typical !== null && "high" in typical ? typical.high : undefined;
+    if (typeof low !== "number" || typeof high !== "number" || !Number.isFinite(low) || !Number.isFinite(high) || !(low >= 1) || !(high >= low))
+      return { why: "The typical range of the adverse factor of the stove must have finite numbers with 1 <= low <= high." };
+    if (typeof factor === "number" && !(factor >= low && factor <= high)) return { why: `The adverse factor of the stove is ${String(factor)}, outside its typical range ${String(low)} to ${String(high)}.` };
+    range = { low, high };
+  }
   const bound: unknown = "bound" in boil ? boil.bound : undefined;
-  const upper = adverse !== undefined && factorBound === "most";
-  if (bound !== undefined && bound !== "least" && !(bound === "most" && upper))
-    return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel, or a most yield with a most adverse factor.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
+  const estimate = adverse !== undefined && (factorBound === "most" || range !== undefined);
+  if (bound !== undefined && bound !== "least" && !(bound === "most" && estimate))
+    return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel, or a most yield with an adverse factor that has the bound most or a typical range.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
   const startC = citedCelsius(boil.start);
   if (startC === undefined) return { why: "The boil yield of the stove has no cited start temperature. A colder start of the test gives too little fuel." };
   // The end of the test, the field `end` of market. The check of the value stays, because a catalog of a caller can have a bad value.
@@ -296,7 +320,8 @@ function yieldHeat(boil: StoveYield, adverse: StoveFactor | undefined): { readon
   if (litres === undefined || fuelKg === undefined || !(litres > 0) || !(fuelKg > 0))
     return { why: `The boil yield of the stove is ${String(boil.amount)} ${boil.unit} for each ${String(boil.per.amount)} ${boil.per.unit}, which is not a volume above 0 for a mass above 0.` };
   const calm = (litres * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * (endC - startC)) / fuelKg;
-  return { perKg: typeof factor === "number" ? calm / factor : calm };
+  const perKg = typeof factor === "number" ? calm / factor : calm;
+  return range === undefined ? { perKg } : { perKg, spread: { atLow: calm / range.low, atHigh: calm / range.high } };
 }
 
 /** This function gives the fuel rate of a stove in `kJ/min` or `kg/min`. It gives `undefined` for a rate that is not an energy or a mass in a time. */
@@ -406,10 +431,8 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
     return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text) };
   }
   // The boil fuel in kg: from the share, the boil time at the full rate; from the yield, the heat over the heat of 1 kg of fuel.
-  const boilFuels = [
-    ...(potPerMin !== undefined && potPerMin > 0 ? [(heat.value / potPerMin) * fuelPerMin] : []),
-    ...("perKg" in fromYield ? [heat.value / fromYield.perKg] : []),
-  ];
+  const shareFuels = potPerMin !== undefined && potPerMin > 0 ? [(heat.value / potPerMin) * fuelPerMin] : [];
+  const boilFuels = [...shareFuels, ...("perKg" in fromYield ? [heat.value / fromYield.perKg] : [])];
   // The checks above give a share above 0 or a yield with a read. The guard keeps a line with no boil fuel from a value of -Infinity.
   if (boilFuels.length === 0) {
     const text = `The fuel of the boil is a no read. ${boilWhy.join(" ")}`;
@@ -417,7 +440,13 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   }
   const boilFuel = Math.max(...boilFuels);
   const minutes = boilFuel / fuelPerMin + cookMin;
-  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel: read(boilFuel + cookMin * fuelPerMin, "kg") };
+  const fuel = read(boilFuel + cookMin * fuelPerMin, "kg");
+  // The fuel at each end of the typical range of the adverse factor. The share fuel stays in the most, as in the value.
+  const spread = "spread" in fromYield ? fromYield.spread : undefined;
+  if (spread === undefined) return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel };
+  const potFuel = (perKg: number): number => Math.max(...shareFuels, heat.value / perKg) + cookMin * fuelPerMin;
+  const fuelSpread = { low: potFuel(spread.atLow), high: potFuel(spread.atHigh), unit: "kg" as const };
+  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, fuelSpread };
 }
 
 /** This function gives the stove facts of the input: the facts of the caller, or the facts of a product of the catalog. */
@@ -459,6 +488,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   A yield with the bound `most`, or with no cited start or end, gives a no read. When the share and the yield both have a read, the line takes the most boil fuel.
  * - The adverse factor of the stove (`adverse` of market) multiplies the boil fuel of the yield, for cold, snow melt and wind. The cook part stays the rate times the cook time.
  *   A factor with the bound `most` gives the boil fuel at the top of its cited range, also from a yield with the bound `most`. That fuel is an estimate.
+ *   So is the fuel from a factor with a typical range. The line then gives the fuel at each end of the range (`fuelSpread`).
  *   A factor with no bound is the value.
  *   A factor with the bound `least` gives a no read of the yield.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
