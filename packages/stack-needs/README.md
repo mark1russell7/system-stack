@@ -354,7 +354,7 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 | `warmth.shelter` | `kWh` | household | no read |
 
 - `alert.watch` comes from two pages of the National Weather Service (read on 2026-11-24). Many receivers have a muted standby mode that turns on when a warning comes. Warnings also come at night. Thus a receiver stays on and listens at all hours, so 24 hours each day. One receiver for each home is a choice of this model, not of the pages. The pages are in the public domain (the license `us-public-domain`).
-- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device.
+- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device. `lightNeed` gives a read from the point of the home and its awake window.
 - `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need.
 - A user gives each no read as input data.
 - The rate of a device is a fact of the device, not of the need. An example is the watts of a radio in standby.
@@ -363,8 +363,34 @@ The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table 
 
 The gate refuses an empty code and two needs with one code (`daily-need-id`). It refuses a unit that `@mark1russell7/quantity` does not read (`daily-need-unit`). It also refuses a bad read or a no read with no reason (`daily-need-rate`). A bad read has no source. Or its amount is not a finite number of 0 or more in the unit of the need for each day.
 
+## The devices of the kit
+
+`deviceFragment` gives the devices of a buy list that run on cells, as converters of an endurance layer. Examples are a radio and a flashlight.
+
+- Each device of the catalog of market with a cited run time gives one converter. The field `device` of a product gives its need, its cells and its run time.
+- One run takes one cell, and gives the hours of the need for each cell. For example, 48 h on 3 cells gives 16 h for each cell.
+- One device gives its need for 24 hours in a day or less. Thus the limit `perDay` is `HOURS_IN_DAY` divided by the hours for each cell. The count of devices is the count of whole units.
+- The input `runs` gives the run time of a device of the caller, with its citation. It replaces the run time of the catalog.
+- A device with no run time gives no converter, and a no read. The radio and the flashlight of the catalog are no one model, so their run time is a no read.
+- With the input `draws`, each need of a device gives one draw at the daily rate of the need. A need with no read of its rate gives no draw, and a no read.
+- The fragment has no store. The cells come from the stores of the buy list, for example the product `power.aa-alkaline` of the catalog.
+
+## The hours of light
+
+`lightHours` gives the dark hours of the awake window of a household on each date of a plan. `lightNeed` changes them into a read of the need `light.see`.
+
+- The input is the point of the home, the awake window in local time, the first date and the count of days. The point and the window are input data of the household.
+- The light is the time from the sunrise to the sunset of `sunDay` of `@mark1russell7/geo`. A polar day is light, and a polar night is dark.
+- The awake window is a `TimeWindow` of `@mark1russell7/algebra/clock`. It follows the wall clock, also at a change of the clock.
+- A local date is the time from its local midnight to the next local midnight. A window across midnight gives its hours to each date by the clock.
+- The result gives each day, the most of the worst day and the mean.
+- The rate of `lightNeed` is the most. One light that is on in those hours is a choice of this model, not of the sources.
+- The sources are the pages "Position of the Sun" and "Sunrise equation" of Wikipedia (license `cc-by-sa-4.0`). The code uses their formulas, not their text.
+
+The read goes into `deviceFragment` through the input `needs`. Then the need of light gets a draw.
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, `cookFragment` and its constants, `formulaMixFragment` and `FORMULA_MIX`, `deviceFragment`, `lightHours`, `lightNeed`, the daily needs, the uses, the supply parts and `checkJoins`. |
