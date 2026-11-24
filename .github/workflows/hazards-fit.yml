@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       raise:
-        description: Read the files two times, and use the count of 4 readings of a county as its customers when the file gives fewer
+        description: Read the files two times, and use the count that a county reached on 4 different days as its customers when the file gives fewer
         type: boolean
         default: true
 

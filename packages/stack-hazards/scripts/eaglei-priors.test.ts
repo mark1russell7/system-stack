@@ -36,6 +36,12 @@ describe("eaglePriors", () => {
     // The state pools 99001 and 99003: 3 events in one year that reach 900 customers in one year, of the 4000 customers of the two counties.
     expect(state.rates[OUTAGE_CASE]?.["99"]).toEqual([3, 0.075]);
     expect(eaglePriors(record({ options: { share: 0.05, interval: 900 } })).county.method).toContain("at or above 5% of its customers");
+    expect(county.method).toContain("storm events of NOAA. A region");
+    expect(county.method).not.toContain("too few customers");
+    // With the option raise, the method tells that the customers of some counties come from their counts.
+    const raised = eaglePriors(record({ options: { share: 0.01, interval: 900, raise: true }, raised: { "99001": { file: 10, fit: 40 } } }));
+    expect(raised.county.method).toContain("storm events of NOAA. The file of the customers gives too few customers to some counties. For 1 counties, the customers are the count that the county reached on 4 different days. A region");
+    expect(raised.state.method).toContain("For 1 counties");
   });
 
   it("passes the gate with the cases and the source of the dataset", () => {

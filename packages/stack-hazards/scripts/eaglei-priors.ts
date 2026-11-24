@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import type { PriorTable } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
 import { observedRegions, regionRates } from "../src/priors.ts";
-import { LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
+import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 
 export { PRIOR_LIMIT };
@@ -51,12 +51,17 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
         }),
       ),
     );
+    // The customers of a county are the customers of the file, or a count that the county reached on 4 days when the fit has the option raise.
+    const raise =
+      laws.raised === undefined
+        ? ""
+        : `The file of the customers gives too few customers to some counties. For ${String(Object.keys(laws.raised).length)} counties, the customers are the count that the county reached on ${String(HELD_DAYS)} different days. `;
     const limit = `A region with more than ${String(PRIOR_LIMIT)} events at one customer in one year in a case is not in the table, so its prior is no read: ${String(over.size)} regions.`;
     return {
       source: EAGLEI_SOURCE_ID,
       asOf: laws.source.modified.slice(0, 10),
       scheme,
-      method: `${method} ${common(laws.options.share ?? DEFAULT_SHARE)}${limit}`,
+      method: `${method} ${common(laws.options.share ?? DEFAULT_SHARE)} ${raise}${limit}`,
       codes: codes.filter((code) => !over.has(code)),
       rates: Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
     };
