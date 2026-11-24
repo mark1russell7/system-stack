@@ -25,7 +25,7 @@ describe("the priors of the reference list", () => {
   });
 
   it("holds the events at one customer in one year of the tables: a median in a band, no region above the limit and no more left-out regions", () => {
-    for (const [table, most] of [[EAGLEI_COUNTY_PRIORS, 31], [EAGLEI_STATE_PRIORS, 2]] as const) {
+    for (const [table, most] of [[EAGLEI_COUNTY_PRIORS, 4], [EAGLEI_STATE_PRIORS, 1]] as const) {
       const products = Object.values(table.rates["infra.power.outage"] ?? {}).map(([perYear, reach]) => perYear * reach).sort((a, b) => a - b);
       const median = products[Math.floor(products.length / 2)]!;
       // The utilities report one or two interruptions a year at a customer. The counts here start at 1% of a county.
