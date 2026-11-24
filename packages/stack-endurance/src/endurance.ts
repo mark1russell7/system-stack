@@ -121,6 +121,25 @@ function waysOf(layer: EnduranceLayer, need: string, stoppedParts: ReadonlySet<s
 // A chain: the resources on the path of a take. A maker does not take a resource of its own path, so a cycle of the layer stops there.
 const NO_PATH: ReadonlySet<string> = new Set();
 
+// The device-days that are left to the converters with a limit `perDay` are in the map of the resources, under a key that
+// no code of a resource has. Thus each copy of the map in a try copies them too. The converters of one device share one
+// key, and a converter with no device has a key of its own. One run of a converter uses `1 / perDay` of a device-day.
+const RUNS = "\u0000runs:";
+
+function runsKey(converter: Converter): string {
+  return converter.device === undefined ? `${RUNS}converter:${converter.id}` : `${RUNS}device:${converter.device}`;
+}
+
+/** This function gives the device-days that a converter has left in `left`, or undefined with no limit. */
+function daysLeft(left: ReadonlyMap<string, number>, converter: Converter): number | undefined {
+  return converter.perDay === undefined ? undefined : left.get(runsKey(converter));
+}
+
+/** This function gives the map with no runs left of the converters: a map of the resources only. */
+function resourcesOnly(left: ReadonlyMap<string, number>): Map<string, number> {
+  return new Map([...left].filter(([key]) => !key.startsWith(RUNS)));
+}
+
 /**
  * This function gives the most of a resource that `left` gives: its stock, and the runs of each maker.
  * It is an upper limit. When two inputs come from one resource, the true amount can be less.
@@ -135,7 +154,8 @@ function mostResource(left: ReadonlyMap<string, number>, makers: Makers, resourc
 
 /** This function gives the most runs of a converter that `left` gives. It is an upper limit, as for `mostResource`. */
 function mostRuns(left: ReadonlyMap<string, number>, makers: Makers, converter: Converter, path: ReadonlySet<string>): number {
-  let runs = Infinity;
+  const limit = daysLeft(left, converter);
+  let runs = limit === undefined ? Infinity : limit * (converter.perDay ?? 0);
   for (const [resource, each] of inputsOf(converter)) runs = Math.min(runs, mostResource(left, makers, resource, path) / each);
   return Number.isFinite(runs) ? runs : 0;
 }
@@ -179,6 +199,8 @@ function run(left: Map<string, number>, makers: Makers, converter: Converter, wa
   const { x: runs, value: best } = largestFit(most, attempt);
   if (best === undefined) return 0;
   for (const [resource, amount] of best) left.set(resource, amount);
+  const limit = daysLeft(left, converter);
+  if (limit !== undefined && converter.perDay !== undefined && converter.perDay > 0) left.set(runsKey(converter), Math.max(0, limit - runs / converter.perDay));
   return runs;
 }
 
@@ -227,6 +249,9 @@ const USED_UP = 1e-9;
  * - The take order is a rule, not the best share: the direct uses in the order of the list, then the converters. The days are the days of this order.
  * - A converter whose device stops gives nothing. A store whose part stops gives nothing.
  * - A converter can give a resource. A take of a resource uses the stock first, then the converters that make it, through each chain.
+ * - A converter with a limit `perDay` runs `perDay` times `devices` times `T` times or less in `T` days. The converters of one device share it.
+ * - The higher draws use the runs of a limit first.
+ * - A higher draw keeps back its runs of each day for all the days of a lower draw, also when its own days are fewer. This is the safe side.
  *
  * The function is pure, but for an internal count of the tries of its fits for the tests. It throws a `RangeError` for a date that is not `YYYY-MM-DD`. The gate `checkEndurance` examines the layer before.
  *
@@ -240,15 +265,33 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
   const start = storeAmounts(layer, options.at, stoppedParts);
   const makers = makersOf(layer, stoppedParts);
   const stocked = new Set(layer.stores.map((store) => store.resource));
+  const limited = (layer.converters ?? []).filter((converter) => converter.perDay !== undefined && canRun(converter, stoppedParts));
+  // The count of devices of each key. The gate refuses two counts for one device.
+  const devices = new Map(limited.map((converter) => [runsKey(converter), converter.devices ?? 1]));
+  // The device-days of each key in `days`: its devices less the device-days of each day of the higher draws, times the days.
+  // A higher draw keeps back its device-days of each day for all the days, also after its own days end. This is the safe side.
+  const giveRuns = (left: Map<string, number>, used: ReadonlyMap<string, number>, days: number): void => {
+    for (const [key, count] of devices) left.set(key, Math.max(0, count - (used.get(key) ?? 0)) * days);
+  };
   const done: { readonly ways: Ways; readonly demand: number; readonly days: number }[] = [];
-  const needs: Record<string, { days: number; binding: string[]; takes: Record<string, number> }> = {};
+  const needs: Record<string, { days: number; binding: string[]; takes: Record<string, number>; capped?: string[] }> = {};
   for (const draw of caseDraws(layer, caseCuts, stoppedParts)) {
     const ways = waysOf(layer, draw.need, stoppedParts, makers);
     const demand = drawDemand(draw, caseCuts);
-    const before = new Map(start);
-    for (const higher of done) take(before, higher.ways, higher.days * higher.demand);
+    let before = new Map(start);
+    // Each higher draw takes again, in its own days. Its device-days of each day count against the lower draws.
+    const used = new Map<string, number>();
+    for (const higher of done) {
+      giveRuns(before, used, higher.days);
+      const given = new Map(before);
+      take(before, higher.ways, higher.days * higher.demand);
+      if (!(higher.days > 0)) continue;
+      for (const key of devices.keys()) used.set(key, (used.get(key) ?? 0) + ((given.get(key) ?? 0) - (before.get(key) ?? 0)) / higher.days);
+    }
+    before = resourcesOnly(before);
     const after = (days: number): { left: Map<string, number>; short: number } => {
       const left = new Map(before);
+      giveRuns(left, used, days);
       return { left, short: take(left, ways, days * demand) };
     };
     // The upper limit: the days that the draw holds when it takes all the stores itself. `largestFit` finds the days below it.
@@ -258,16 +301,29 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
     });
     const low = fit.x;
     const left = fit.value ?? after(low).left;
+    // The binding resources are of the stores only: a used-up limit of runs is in `capped`, not here.
+    const stores = resourcesOnly(left);
     const binding = [...inputClosure(ways)]
       .filter((resource) => !makers.has(resource) || stocked.has(resource))
-      .filter((resource) => mostResource(left, makers, resource, NO_PATH) <= USED_UP * Math.max(1, start.get(resource) ?? 0))
+      .filter((resource) => mostResource(stores, makers, resource, NO_PATH) <= USED_UP * Math.max(1, start.get(resource) ?? 0))
       .sort();
     const takes: Record<string, number> = {};
     for (const [resource, amount] of before) {
       const taken = amount - (left.get(resource) ?? 0);
       if (taken > 0) takes[resource] = taken;
     }
-    needs[draw.need] = { days: low, binding, takes };
+    // A limit stops the draw when its limit gives the converter no runs left, and its inputs give more runs.
+    // The runs left are the device-days left times `perDay`. Thus a limit of 0 stops the draw, also with its device-days left.
+    const reach = new Set([...ways.converters, ...[...inputClosure(ways)].flatMap((resource) => makers.get(resource) ?? [])]);
+    const runsLeft = (converter: Converter): number => (daysLeft(left, converter) ?? 0) * (converter.perDay ?? 0);
+    const runsGiven = (converter: Converter): number => (devices.get(runsKey(converter)) ?? 1) * (converter.perDay ?? 0) * low;
+    const capped = limited
+      .filter((converter) => reach.has(converter))
+      .filter((converter) => runsLeft(converter) <= USED_UP * Math.max(1, runsGiven(converter)))
+      .filter((converter) => mostRuns(stores, makers, converter, NO_PATH) > USED_UP)
+      .map((converter) => converter.id)
+      .sort();
+    needs[draw.need] = capped.length === 0 ? { days: low, binding, takes } : { days: low, binding, takes, capped };
     done.push({ ways, demand, days: low });
   }
   return { case: caseCuts.case, at: options.at, needs };

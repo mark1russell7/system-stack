@@ -33,6 +33,8 @@ const converter = z.strictObject({
   device: id.optional(),
   takes: z.array(z.strictObject({ resource: id, amount })).readonly(),
   gives: z.union([z.strictObject({ need: id, amount }), z.strictObject({ resource: id, amount })]),
+  perDay: amount.optional(),
+  devices: amount.optional(),
 });
 
 const point = z.tuple([z.number(), z.number()]).readonly();

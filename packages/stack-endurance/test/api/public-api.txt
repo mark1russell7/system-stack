@@ -83,7 +83,7 @@ export interface CaseOptions {
 }
 
 ### build/index.d.ts#ENDURANCE_CODES
-export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-no-way", "endurance-cut-no-curve"];
+export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-no-way", "endurance-cut-no-curve"];
 
 ### build/index.d.ts#EnduranceCode
 export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
@@ -226,6 +226,8 @@ interface Converter {
     readonly amount: number;
   }[];
   readonly gives: Gift;
+  readonly perDay?: number | undefined;
+  readonly devices?: number | undefined;
 }
 
 ### build/layer.chunk.d.ts#DirectUse
@@ -249,6 +251,7 @@ interface DrawEndurance {
   readonly days: number;
   readonly binding: readonly string[];
   readonly takes: Readonly<Record<string, number>>;
+  readonly capped?: readonly string[] | undefined;
 }
 
 ### build/layer.chunk.d.ts#ENDURANCE_SCHEMA

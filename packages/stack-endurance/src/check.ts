@@ -20,6 +20,7 @@ import type { Converter, EnduranceLayer } from "./layer.ts";
  *   Or its days do not increase, or its chance increases.
  * - `endurance-prior-case`: a prior names a case that the layer does not have.
  * - `endurance-cycle`: converters make a resource from itself, through one converter or a chain. One fault names each cycle.
+ * - `endurance-devices`: two converters of one device give two different counts of devices.
  * - `endurance-no-way` (warning): a draw has no direct use and no converter, so it holds 0 days when its supply stops.
  * - `endurance-cut-no-curve` (warning): a cut has no curve of its duration. The draws whose stop it can be part of are no read in the shortfall.
  */
@@ -34,6 +35,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-curve",
   "endurance-prior-case",
   "endurance-cycle",
+  "endurance-devices",
   "endurance-no-way",
   "endurance-cut-no-curve",
 ] = [
@@ -47,6 +49,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-curve",
   "endurance-prior-case",
   "endurance-cycle",
+  "endurance-devices",
   "endurance-no-way",
   "endurance-cut-no-curve",
 ];
@@ -140,6 +143,18 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     if (made !== undefined) resource(converter.id, made);
     if (!converter.takes.some((input) => input.amount > 0) || converter.gives.amount === 0) add("error", "endurance-converter-empty", converter.id, `The converter "${converter.id}" takes nothing, or it gives nothing.`);
     part(converter.id, "device", converter.device);
+    if (converter.perDay !== undefined) range(converter.id, "rate perDay", converter.perDay);
+    if (converter.devices !== undefined && !(Number.isSafeInteger(converter.devices) && converter.devices >= 1))
+      add("error", "endurance-range", converter.id, `The count of devices of "${converter.id}" is ${String(converter.devices)}. It must be a whole number of 1 or more.`);
+  }
+  const counts = new Map<string, number>();
+  for (const converter of converters) {
+    if (converter.device === undefined) continue;
+    const count = converter.devices ?? 1;
+    const seen = counts.get(converter.device);
+    if (seen !== undefined && seen !== count)
+      add("error", "endurance-devices", converter.id, `The converter "${converter.id}" gives ${String(count)} devices "${converter.device}", and an other converter gives ${String(seen)}.`);
+    if (seen === undefined) counts.set(converter.device, count);
   }
   const caseCodes = new Set(cases.map((item) => item.case));
   for (const item of cases) {
