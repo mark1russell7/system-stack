@@ -208,14 +208,17 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | A boil yield with the bound `most`, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
+| A cited soak rate that does not convert to `L/kg`, for example a rate for each volume with no bulk mass | The soak water. The resource then has no converter. |
 | No food energy of the product | The energy. |
 | A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
 
 A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
 
-Market gives the soak water of a dry food with `soakWater`. This function does not take it. Thus the water of a food with a soak, for example dry beans, is a lower limit. The cook water of beans and pasta gives their converters.
+The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water. Thus the soak adds to the water take, and it adds no heat and no fuel.
+For example, the dry beans of the catalog take 3.65 L/kg of soak water and 3.65 L/kg of cook water. A product with no cited soak takes no soak water.
 
 The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
+`jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.
 
 The cited constants:
 
