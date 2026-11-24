@@ -33,7 +33,8 @@ export const USGS_WATER_DENSITY_SOURCE: Source = {
 
 /**
  * The source of the check of the range of the specific heat: the fluid data of water in the NIST Chemistry WebBook (Standard Reference Data 69).
- * NIST keeps the copyright of its standard reference data (15 USC 290e). Thus the model cites only facts from it, with a citation.
+ * NIST keeps the copyright of its standard reference data (15 USC 290e). Its terms do not permit a copy without prior permission, and they tell nothing about facts.
+ * The model takes only facts from it, with a citation. That use rests on US law, which gives no copyright to facts. It does not rest on the terms of NIST.
  */
 export const NIST_WEBBOOK_WATER_SOURCE: Source = {
   id: "nist-webbook-fluid-water",
