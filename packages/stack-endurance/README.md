@@ -71,12 +71,13 @@ Two groups of cuts that share no minimal set are independent, so the independent
 - Each draw of the set gets `d` times its demand. The takes of a resource are not more than its stock plus the gifts of its makers.
 - The runs of a converter with a limit `perDay` are not more than `perDay` times `devices` times `d`. The converters of one device share the limit.
 - After the largest `d`, the program takes the smallest sum of the shares of the stocks. Thus the takes have no waste.
+- A third objective takes the fewest device-days of the converters. Thus the runs are not more than the plan uses.
 - The draws that are not in the set are outside this plan. They take nothing.
 - A draw of the set whose supply works, or whose demand is 0, holds without end. It goes in `holds`, as `enduranceOf` leaves it out.
 - A need code that is not the need of a draw is an error, a `RangeError`.
 - A store gives all of its amount when its due date is after the date of the query. This is the rule of `enduranceOf`.
 - `binding` gives the resources with a store that the optimum uses up. `takes` gives the takes of each draw. `runs` gives the runs of each converter.
-- `capped` gives the converters whose limit `perDay` stops more runs at the optimum.
+- `capped` gives the converters of the plan whose limit `perDay` stops more runs at the optimum. A maker that the plan does not use is not in the list.
 
 An example: a tank holds 20 L of water. The drink takes 3 L each day, at the higher level. Only a cook feeds the food, 2000 kcal each day. One run of the cook takes 1 L of water, 0.5 kg of grain and 0.125 kg of fuel, and gives 2000 kcal.
 

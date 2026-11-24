@@ -34,7 +34,8 @@ export interface JointDays {
   /** The count of runs of each converter at the optimum, by the `id` of the converter. A converter with no run is not in the record. */
   readonly runs: Readonly<Record<string, number>>;
   /**
-   * The converters of the plan whose limit `perDay` stops more runs at the optimum, in the order of their `id`.
+   * The converters of the plan whose limit `perDay` stops more runs at the optimum, in the order of their `id`. A converter of the plan
+   * gives a need of the plan, or makes an input of the plan through each chain.
    * The list is empty when `days` is `Infinity` or 0. Else it has each converter of the plan with a limit of 0.
    */
   readonly capped: readonly string[];
@@ -68,6 +69,7 @@ const exact = (value: number): Rational => fromFloat(value);
  * - The runs of a converter with a limit `perDay` are not more than `perDay` times `devices` times `d`. The converters of one device share it, as in `enduranceOf`.
  * - A store counts with all of its amount when its due date is after `at`, as in `enduranceOf`. A due date in the span has no effect.
  * - After the largest `d`, a second objective takes the smallest sum of the shares of the stocks. Thus the takes have no waste.
+ * - A third objective takes the fewest device-days of the converters. Thus the runs are not more than the plan uses.
  * - The draws that are not in the set are outside this plan. They take nothing in the program.
  * - A need of the set whose supply works, or whose demand is 0, holds without end. It goes in `holds`, as `enduranceOf` leaves it out.
  *
@@ -174,12 +176,20 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
   const most: Row = new Map([[days, ONE]]);
   const least: Row = new Map();
   for (const shares of shareCol) for (const [resource, index] of shares) addTo(least, index, div(ONE, exact(stock.get(resource) ?? 1)));
+  // The third objective takes the fewest device-days: the runs over `perDay`, or the runs with no limit. Thus a converter whose inputs cost
+  // no stock does not give more runs than the plan uses, and `runs` and `capped` have one value.
+  const fewest: Row = new Map();
+  for (const [converter, indexes] of runCols) {
+    const weight = converter.perDay !== undefined && converter.perDay > 0 ? div(ONE, exact(converter.perDay)) : ONE;
+    for (const index of indexes) addTo(fewest, index, weight);
+  }
   const objectives: Objective[] = [
     { sense: "max", coefficients: dense(most, count) },
     { sense: "min", coefficients: dense(least, count) },
+    { sense: "min", coefficients: dense(fewest, count) },
   ];
   const solved = solveLexicographic(constraints, objectives);
-  // The point 0 is feasible and the second objective is not less than 0. So only an unbounded first stage has no optimum.
+  // The point 0 is feasible and the later objectives are not less than 0. So only an unbounded first stage has no optimum.
   if (solved.status !== "optimal") return endless;
 
   const x = solved.x;
@@ -199,7 +209,10 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
   makers.forEach((maker, m) => ran(maker, makerCol.reduce((sum, row) => add(sum, at(row[m] as number)), ZERO)));
 
   const withStore = new Set(layer.stores.map((store) => store.resource));
-  const binding = [...inputClosure(direct.map((use) => use.resource), cooks, makers)]
+  const closure = inputClosure(direct.map((use) => use.resource), cooks, makers);
+  // The converters that the plan can use: the converters that give a need of the plan, and the makers of the resources of the closure.
+  const reach = new Set([...cooks, ...makers.filter((maker) => closure.has(giftResource(maker) ?? ""))]);
+  const binding = [...closure]
     .filter((resource) => withStore.has(resource))
     .filter((resource) => {
       // A resource with no live stock has no share, so its take is 0 and it is used up.
@@ -217,6 +230,7 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
         ...[...runCols.keys()].filter((converter) => converter.perDay !== undefined && !(converter.perDay > 0)),
         ...[...limits.values()].filter(({ row }) => sign(used(row)) === 0).flatMap(({ converters }) => converters),
       ]
+        .filter((converter) => reach.has(converter))
         .map((converter) => converter.id)
         .sort()
     : [];

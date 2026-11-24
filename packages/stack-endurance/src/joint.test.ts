@@ -130,6 +130,27 @@ describe("jointDays", () => {
     expect(jointDays(apart, DRY, { at: AT }, ["food"]).days).toBe(1000 / 2);
   });
 
+  it("gives a free maker only the runs that the plan uses, and does not name it in capped", () => {
+    // A loop of two makers gives water back for each liter that it takes, so its runs cost no stock. The gate refuses such a loop.
+    // A still with a limit of 0 makes a resource that the plan does not use.
+    const layer: EnduranceLayer = {
+      ...POT,
+      resources: [...POT.resources, { code: "sky", unit: "L" }, { code: "spirit", unit: "L" }],
+      converters: [
+        ...(POT.converters ?? []),
+        { id: "catch", device: "roof", perDay: 100, takes: [{ resource: "sky", amount: 1 }], gives: { resource: "water", amount: 1 } },
+        { id: "lift", takes: [{ resource: "water", amount: 1 }], gives: { resource: "sky", amount: 1 } },
+        { id: "still", device: "still", perDay: 0, takes: [{ resource: "fuel", amount: 1 }], gives: { resource: "spirit", amount: 1 } },
+      ],
+    };
+    const joint = jointDays(layer, DRY, { at: AT }, ["drink", "food"]);
+    expect(joint.days).toBe(5);
+    // The loop gives no water to the plan, so the plan uses 0 runs of it.
+    expect(joint.runs).toEqual({ cook: 5 });
+    expect(joint.capped).toEqual([]);
+    expect(joint.takes).toEqual({ drink: { water: 15 }, food: { water: 5, grain: 2.5, fuel: 0.625 } });
+  });
+
   it("does not use a converter whose device stops", () => {
     const joint = jointDays(POT, DRY, { at: AT, down: ["stove"] }, ["drink", "food"]);
     expect(joint.days).toBe(0);
@@ -204,9 +225,47 @@ describe("jointDays", () => {
   });
 });
 
+describe("the size of the program", () => {
+  // A layer of 10 draws and 20 resources: the scale of a real plan. The time limit is loose. CI holds the timed runs.
+  it("solves 10 draws and 20 resources in less than 10 s", () => {
+    const resources = Array.from({ length: 20 }, (_, j) => ({ code: `r${j}`, unit: "u" }));
+    const stores: Store[] = resources.map((resource, j) => ({ id: `s${j}`, resource: resource.code, amount: 100 + 7 * j }));
+    const draws = Array.from({ length: 10 }, (_, i) => ({ need: `n${i}`, level: i % 2 === 0 ? "life" : "health", perDay: 1 + (i % 3), supply: "main" }));
+    const direct: DirectUse[] = draws.flatMap((draw, i) => [
+      { resource: `r${i}`, need: draw.need, amount: 1 },
+      { resource: `r${i + 10}`, need: draw.need, amount: 0.5 },
+    ]);
+    const converters: Converter[] = [
+      ...draws
+        .filter((_, i) => i % 2 === 0)
+        .map((draw, k) => ({
+          id: `cook${k}`,
+          takes: [{ resource: `r${(2 * k + 1) % 20}`, amount: 1 }, { resource: `r${(2 * k + 5) % 20}`, amount: 0.25 }],
+          gives: { need: draw.need, amount: 4 },
+        })),
+      ...[0, 1, 2].map((k) => ({ id: `make${k}`, device: `d${k}`, perDay: 10, takes: [{ resource: `r${15 + k}`, amount: 1 }], gives: { resource: `r${k}`, amount: 1 } })),
+    ];
+    const layer: EnduranceLayer = { schema: ENDURANCE_SCHEMA, levels: ["life", "health"], resources, stores, draws, direct, converters };
+    const cut: CaseCuts = { ...DRY, cuts: DRY.cuts.slice(0, 1) };
+    const start = performance.now();
+    const joint = jointDays(layer, cut, { at: AT }, draws.map((draw) => draw.need));
+    const seconds = (performance.now() - start) / 1000;
+    console.log(`jointDays: 10 draws and 20 resources in ${seconds.toFixed(3)} s, ${joint.days} days`);
+    expect(seconds).toBeLessThan(10);
+    expect(joint.plan).toHaveLength(10);
+    expect(joint.days).toBeGreaterThan(0);
+    expect(Number.isFinite(joint.days)).toBe(true);
+    const total = new Map<string, number>();
+    for (const takes of Object.values(joint.takes)) for (const [resource, amount] of Object.entries(takes)) total.set(resource, (total.get(resource) ?? 0) + amount);
+    for (const [resource, taken] of total) expect(taken, resource).toBeLessThanOrEqual((stores.find((store) => store.resource === resource)?.amount ?? 0) * (1 + 1e-12));
+  }, 20_000);
+});
+
 describe("the laws of jointDays", () => {
   const storm = SAMPLE_ENDURANCE.cases?.find((item) => item.case === "storm") as CaseCuts;
-  const parts = (count: number) => fc.array(fc.double({ min: 0, max: 2, noNaN: true }), { minLength: count, maxLength: count });
+  // The factors are multiples of 1/8, so the exact rationals stay small and each case is fast.
+  const parts = (count: number) => fc.array(fc.integer({ min: 0, max: 16 }).map((n) => n / 8), { minLength: count, maxLength: count });
+  const LAWS = { ...SEED, numRuns: 30 };
 
   function scaled(layer: EnduranceLayer, factors: readonly number[]): EnduranceLayer {
     return { ...layer, stores: layer.stores.map((store, at) => ({ ...store, amount: store.amount * (factors[at] ?? 1) })) };
@@ -224,11 +283,11 @@ describe("the laws of jointDays", () => {
   }
 
   it("keeps the joint days under the days alone, and the takes under the stocks, in the storm of the sample", () => {
-    fc.assert(fc.property(parts(SAMPLE_ENDURANCE.stores.length), (factors) => laws(scaled(SAMPLE_ENDURANCE, factors), storm)), SEED);
+    fc.assert(fc.property(parts(SAMPLE_ENDURANCE.stores.length), (factors) => laws(scaled(SAMPLE_ENDURANCE, factors), storm)), LAWS);
   });
 
   it("keeps the joint days under the days alone, and the takes under the stocks, with the cook", () => {
-    fc.assert(fc.property(parts(POT.stores.length), (factors) => laws(scaled(POT, factors), DRY)), SEED);
+    fc.assert(fc.property(parts(POT.stores.length), (factors) => laws(scaled(POT, factors), DRY)), LAWS);
   });
 
   it("gives the days of enduranceOf to a set of one draw that alone takes its inputs", () => {
