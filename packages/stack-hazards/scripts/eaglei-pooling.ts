@@ -54,6 +54,29 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
   const squared = { raw: 0, pooled: 0, state: 0 };
   const seen = { raw: 0, pooled: 0, state: 0, areas: 0 };
   let lost = 0;
+  // The events-weighted reach of each state in the fit half, and of all states for a state with no event.
+  const shares = new Map<string, { share: number; events: number }>();
+  for (const area of areas) {
+    const sum = shares.get(eagleRegion(area)) ?? { share: 0, events: 0 };
+    sum.share += fit[area]?.share ?? 0;
+    sum.events += fit[area]?.events ?? 0;
+    shares.set(eagleRegion(area), sum);
+  }
+  const all = [...shares.values()].reduce((sum, item) => ({ share: sum.share + item.share, events: sum.events + item.events }), { share: 0, events: 0 });
+  const reach = { areas: 0, plain: { bias: 0, error: 0 }, events: { bias: 0, error: 0 } };
+  for (const area of areas) {
+    const held = score[area];
+    if ((fit[area]?.events ?? 0) > 0 || held === undefined || held.events === 0) continue;
+    const truth = held.share / held.events;
+    const state = shares.get(eagleRegion(area)) ?? { share: 0, events: 0 };
+    const weighted = state.events > 0 ? state.share / state.events : all.events > 0 ? all.share / all.events : 0;
+    const rates = { plain: pooled.rates[area]?.[1] ?? 0, events: Math.min(1, weighted) };
+    for (const method of ["plain", "events"] as const) {
+      reach[method].bias += rates[method] - truth;
+      reach[method].error += Math.abs(rates[method] - truth);
+    }
+    reach.areas += 1;
+  }
   for (const area of areas) {
     const years = observation.years[area] ?? 0;
     const count = score[area]?.events ?? 0;
@@ -69,7 +92,7 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
     if (rate.raw > 0) seen.areas += 1;
     if (rate.raw === 0 && count > 0) lost += 1;
   }
-  return { ...sums, lost, squared, seen };
+  return { ...sums, lost, squared, seen, reach };
 }
 
 /** The mean of some scores. */
@@ -82,6 +105,11 @@ function meanScore(scores: readonly PoolScore[]): PoolScore {
     lost: mean((score) => score.lost),
     squared: { raw: mean((score) => score.squared.raw), pooled: mean((score) => score.squared.pooled), state: mean((score) => score.squared.state) },
     seen: { raw: mean((score) => score.seen.raw), pooled: mean((score) => score.seen.pooled), state: mean((score) => score.seen.state), areas: mean((score) => score.seen.areas) },
+    reach: {
+      areas: mean((score) => score.reach.areas),
+      plain: { bias: mean((score) => score.reach.plain.bias), error: mean((score) => score.reach.plain.error) },
+      events: { bias: mean((score) => score.reach.events.bias), error: mean((score) => score.reach.events.error) },
+    },
   };
 }
 

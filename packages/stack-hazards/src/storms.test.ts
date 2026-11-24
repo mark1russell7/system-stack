@@ -27,6 +27,18 @@ describe("stormLine", () => {
     expect(stormLine(line)).toMatchObject({ kind: "Z", area: "20083", begin: at("2023-01-31T07:05:00Z"), end: at("2023-02-02T06:59:00Z") });
   });
 
+  it("gives a row of a territory the FIPS code of the Census Bureau: 99 is 72 (Puerto Rico), 96 is 78 (Virgin Islands)", () => {
+    const pr = row("201709 20 600", "201709 20 1800", "Hurricane", "C", 127, "AST-4").replace(`"KANSAS",20,`, `"PUERTO RICO",99,`);
+    const vi = row("201709 6 1200", "201709 6 2000", "Hurricane", "Z", 2, "AST-4").replace(`"KANSAS",20,`, `"VIRGIN ISLANDS",96,`);
+    expect(stormLine(pr)).toMatchObject({ kind: "C", area: "72127", begin: at("2017-09-20T10:00:00Z") });
+    expect(stormLine(vi)).toMatchObject({ kind: "Z", area: "78002" });
+    const zones = zoneCounties("VI|002|SJU|St. Croix|VI002|St. Croix|78010|C|sc|17.7|-64.7\n");
+    const index = stormCauses(STORM_CLASSES, zones);
+    const one = stormLine(vi);
+    if (one !== undefined) index.add(one);
+    expect(index.causes({ area: "78010", start: at("2017-09-06T18:00:00Z") })).toEqual(["met.tropical.hurricane"]);
+  });
+
   it("gives undefined for the header, a part of a broken line and a wrong field", () => {
     expect(stormLine(HEADER)).toBeUndefined();
     expect(stormLine('the rest of a narrative", "0"')).toBeUndefined();

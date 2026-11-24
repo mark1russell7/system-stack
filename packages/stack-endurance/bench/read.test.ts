@@ -8,6 +8,8 @@ import {
   AA_CASE,
   freezeLimits,
   groupCases,
+  groupTables,
+  JOB_GATE,
   jobGate,
   jobRead,
   limitFaults,
@@ -182,10 +184,10 @@ describe("the limits of each CPU model", () => {
     const file = freezeLimits([{ ...(JOBS[0] as JobRecord), run: "r-9", commit: "a".repeat(40) }, ...JOBS.slice(1)].map(jobRead), STAMP);
     expect(file.jobs[0]).toEqual({ job: "job-1", cpu: "cpu-a", run: "r-9", commit: "a".repeat(40) });
     expect(file.jobs[1]).toEqual({ job: "job-2", cpu: "cpu-a", run: "job-2", commit: STAMP.commit });
-    expect(limitFaults({ ...file, jobs: file.jobs.map((job, index) => (index === 0 ? { ...job, run: "", commit: "abc" } : job)) })).toEqual([
-      "The job job-1 has no run.",
-      "The job job-1 has no full SHA of its commit.",
-    ]);
+    const faults = limitFaults({ ...file, jobs: file.jobs.map((job, index) => (index === 0 ? { ...job, run: "", commit: "abc" } : job)) });
+    expect(faults.filter((fault) => fault.startsWith("The job "))).toEqual(["The job job-1 has no run.", "The job job-1 has no full SHA of its commit."]);
+    // The run of a job also names a group, so a changed run changes the group limits.
+    expect(faults.filter((fault) => !fault.startsWith("The job "))).toEqual(IDS.map((id) => `The group limit of ${id} on cpu-a is not runLimit of the lowest value of each run of its jobs.`));
   });
 });
 
@@ -296,16 +298,98 @@ describe("the groups of a run", () => {
     const run = gates(records);
     const report = readReport(records.map(jobRead), run, undefined);
     expect(report).toContain("| m12 | 3 | within | beyond |");
-    expect(report).toContain(`The groups with a job at ${String(NEAR * 100)}% of the limit or more. The lowest value of the group decides:`);
+    expect(report).toContain(`The groups with a lowest value at ${String(NEAR * 100)}% of the limit or more, or with a job beyond the limit of one job. The lowest value of the group decides:`);
     const m12 = groupCases(run, "m12")[0];
-    expect(report).toContain(`| m12 | r-1 | cpu-a | ${(m12?.limit ?? 0).toFixed(1)} | a-1: ${(m12?.ms ?? 0).toFixed(1)}, `);
+    expect(m12?.kind).toBe("group");
+    expect(report).toContain(`| m12 | r-1 | cpu-a | ${(m12?.limit ?? 0).toFixed(1)} (group) | a-1: ${(m12?.ms ?? 0).toFixed(1)}, `);
     expect(report).toMatch(/a-3: [\d.]+, 1\d\d\.\d%, beyond \| [\d.]+ \| within \|/);
     const quiet = gates([jobRecord("a-1", 1), jobRecord("a-2", 1), jobRecord("a-3", 1)]);
-    expect(readReport([], quiet, undefined)).not.toContain("The groups with a job at");
+    expect(readReport([], quiet, undefined)).not.toContain("The groups with a lowest value at");
+  });
+
+  it("title the column of each job as the gate of the job alone, so a job that blocks in a run that passes is clear", () => {
+    const records = [jobRecord("a-1", 1), jobRecord("a-2", 1.02), jobRecord("a-3", 1.5)].map((record) => inRun(record));
+    const run = gates(records);
+    const report = readReport(records.map(jobRead), run, undefined);
+    expect(JOB_GATE).toBe("Gate of the job alone");
+    expect(report).toContain(`| A/A spread | ${JOB_GATE} |`);
+    expect(report).toMatch(/\| a-3 \| cpu-a \| .* \| block \|/);
+    expect(runGate(run).outcome).toBe("pass");
   });
 
   it("mark a group at the ceiling in the report", () => {
     const run = gates([jobRecord("b-3", 3, () => 1, B)]);
     expect(readReport([], run, undefined)).toContain("| cpu-b (ceiling) |");
+  });
+});
+
+describe("the group limits", () => {
+  // 5 runs of cpu-a. The runs r-1 and r-5 each hold one slow machine, and the runs r-2 and r-4 hold 1 job.
+  const runs: readonly (readonly [string, readonly number[]])[] = [
+    ["r-1", [1, 1.3]],
+    ["r-2", [1.02]],
+    ["r-3", [0.98, 1]],
+    ["r-4", [1.04]],
+    ["r-5", [1.01, 1.2]],
+  ];
+  const records = (sets = runs): JobRecord[] => sets.flatMap(([run, scales]) => scales.map((scale, index) => ({ ...jobRecord(`${run}-${String(index + 1)}`, scale), run })));
+  const file = (): FrozenLimits => freezeLimits(records().map(jobRead), STAMP);
+  const m12 = (record: JobRecord): number => jobRead(record).cases.find((item) => item.case === "m12")?.ms ?? 0;
+
+  it("are runLimit of the lowest value of each run of the model, with the run of each value", () => {
+    const limits = file();
+    const lows = runs.map(([run]) => Math.min(...records().filter((record) => record.run === run).map(m12)));
+    expect(limits.groups["m12"]?.["cpu-a"]).toEqual({ ...runLimit(lows), runs: runs.map(([run]) => run) });
+    expect(groupTables(limits.jobs, limits.cases)).toEqual(limits.groups);
+    // The slow machines widen the limit of one job, and they do not widen the group limit.
+    expect(limits.groups["m12"]?.["cpu-a"]?.limit ?? Infinity).toBeLessThan(modelTables(limits)["m12"]?.["cpu-a"]?.limit ?? 0);
+    expect(limitFaults(limits)).toEqual([]);
+  });
+
+  it("read a group of 2 jobs or more against the group limit, and a group of 1 job against the limit of one job", () => {
+    const limits = file();
+    const group = limits.groups["m12"]?.["cpu-a"]?.limit ?? 0;
+    const single = modelTables(limits)["m12"]?.["cpu-a"]?.limit ?? 0;
+    // A uniform slowdown that puts each job between the two limits.
+    const scale = (group + single) / 2 / m12(jobRecord("x", 1));
+    const pair = [jobRecord("p-1", scale), jobRecord("p-2", scale)].map((record) => jobGate(jobRead({ ...record, run: "r-9" }), limits));
+    expect(pair[0]?.cases.find((item) => item.case === "m12")).toMatchObject({ outcome: "within", limit: single, groupLimit: group });
+    expect(groupCases(pair, "m12").map((item) => [item.kind, item.limit, item.outcome])).toEqual([["group", group, "beyond"]]);
+    const lone = [jobGate(jobRead({ ...jobRecord("l-1", scale), run: "r-9" }), limits)];
+    expect(groupCases(lone, "m12").map((item) => [item.kind, item.limit, item.outcome])).toEqual([["job", single, "within"]]);
+  });
+
+  it("need jobs of 5 runs or more on the model: 4 runs give no group limit, and the model reads at the ceiling", () => {
+    const four = freezeLimits(records(runs.slice(0, 4)).map(jobRead), STAMP);
+    expect(MIN_RUNS).toBe(5);
+    expect(four.groups["m12"]).toEqual({});
+    const pair = [jobRecord("p-1", 1), jobRecord("p-2", 1)].map((record) => jobGate(jobRead({ ...record, run: "r-9" }), four));
+    expect(pair[0]?.cases.find((item) => item.case === "m12")?.groupLimit).toBeUndefined();
+    expect(groupCases(pair, "m12").map((item) => [item.model, item.kind, item.jobs.length])).toEqual([
+      ["other", "job", 1],
+      ["other", "job", 1],
+    ]);
+  });
+
+  it("show a group limit that the jobs do not give as a fault", () => {
+    const limits = file();
+    const entry = limits.groups["m12"]?.["cpu-a"];
+    if (entry === undefined) throw new Error("no group limit");
+    const fault = "The group limit of m12 on cpu-a is not runLimit of the lowest value of each run of its jobs.";
+    expect(limitFaults({ ...limits, groups: { ...limits.groups, m12: { "cpu-a": { ...entry, limit: entry.limit * 1.1 } } } })).toEqual([fault]);
+    expect(limitFaults({ ...limits, groups: { ...limits.groups, m12: {} } })).toEqual([fault]);
+    expect(limitFaults({ ...limits, groups: { ...limits.groups, m12: { "cpu-a": entry, "cpu-b": entry } } })).toEqual([
+      "The group limit of m12 on cpu-b is not runLimit of the lowest value of each run of its jobs.",
+    ]);
+  });
+
+  it("in bench/limits.json are at most the limit of one job, for each model with its own limit", () => {
+    const limits = JSON.parse(readFileSync(new URL("./limits.json", import.meta.url), "utf8")) as FrozenLimits;
+    const tables = modelTables(limits);
+    for (const id of IDS) {
+      const models = Object.keys(tables[id] ?? {}).filter((model) => model !== "other");
+      expect(Object.keys(limits.groups[id] ?? {}).sort()).toEqual(models.sort());
+      for (const model of models) expect(limits.groups[id]?.[model]?.limit ?? Infinity).toBeLessThanOrEqual(tables[id]?.[model]?.limit ?? 0);
+    }
   });
 });

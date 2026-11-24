@@ -335,6 +335,9 @@ importers:
         specifier: workspace:*
         version: link:../system-stack
     devDependencies:
+      '@e965/xlsx':
+        specifier: 0.20.3
+        version: 0.20.3
       '@mark1russell7/alerts':
         specifier: ^0.1.12
         version: 0.1.12
@@ -378,15 +381,15 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0
       '@mark1russell7/market':
-        specifier: ^0.8.1
-        version: 0.8.1
+        specifier: ^0.8.2
+        version: 0.8.2
       '@mark1russell7/quantity':
         specifier: ^0.4.4
         version: 0.4.5(zod@4.6.7)
     devDependencies:
       '@mark1russell7/alerts':
-        specifier: ^0.1.5
-        version: 0.1.5
+        specifier: ^0.1.26
+        version: 0.1.26
       '@mark1russell7/cue':
         specifier: ^2.0.0
         version: 2.1.4
@@ -671,6 +674,11 @@ packages:
     resolution: {integrity: sha512-tEj8X2No2A1c9NDnZECxiiJ8TP3vmFlN9tLlLeSaMqVW4tUmVG2R4qpv/eP4zymWxnymYLkLcIYVV0VcWj3RCQ==}
     engines: {node: '>= 20.12.0'}
 
+  '@e965/xlsx@0.20.3':
+    resolution: {integrity: sha512-703RN/3OdsRD5mtse2HBX7Um7xwaP9tlswEG6svOtjqokXoX7rJdQj7DyabD2I+xk22RgaIIU+R6BHgkpZGB/w==}
+    engines: {node: '>=0.8'}
+    hasBin: true
+
   '@emnapi/core@2.0.0-beta.2':
     resolution: {integrity: sha512-MzCVoWtcg4Pm2B3je5mMvYMvj3MmBKw+fU7vbsJc9/iT8ip6/eYIHo/Dsm/mr+wsHB6SEyJDuxB09Yy6r/8+4A==}
 
@@ -850,8 +858,8 @@ packages:
     resolution: {integrity: sha512-rm0tf1RzSurGbXhNOlXAm8+9g+gKQpoAotPmGtIMHsKYcTEFPMD0Bxeov/Vs7UCw3MgmlokdDEnsvsKleFo6dA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/alerts@0.1.5':
-    resolution: {integrity: sha512-JdGbmS0qOkeReVXH3k15M36LRZT/JH684p5oyLttULGy6oTusfku7q2N4zmbBMqV2/8jIXN+wa0pDhcjJS4r5A==}
+  '@mark1russell7/alerts@0.1.26':
+    resolution: {integrity: sha512-a7hrLDWIwhh8/uutblRVJU7nO4X4WYRhN9GCsn/a7RyOeU7iyNi16bsWKxKzmWVNs393iUGewJ2jL+w2RcLnnQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/algebra@0.8.10':
@@ -929,8 +937,8 @@ packages:
     resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/market@0.8.1':
-    resolution: {integrity: sha512-SWWhxvKCxVMkScRS4J6Id+bQSzLoxi0LQYRFsHFIbB0u2u5YYU8fT41ybh+1ttLFgM9SMQqGmEHk7ki3fAvysg==}
+  '@mark1russell7/market@0.8.2':
+    resolution: {integrity: sha512-0JM8urUi3AgmihFjc3tzPtCYcca9qQ45xjqNadB/CnRdPXzZ3TCcpFJVG6hWjpPDxPYCeX2fLLLqyXGT6wSc2w==}
     engines: {node: '>=22'}
 
   '@mark1russell7/optional@1.5.0':
@@ -2337,6 +2345,8 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 2.0.0
 
+  '@e965/xlsx@0.20.3': {}
+
   '@emnapi/core@2.0.0-beta.2':
     dependencies:
       '@emnapi/wasi-threads': 2.2.0
@@ -2453,7 +2463,7 @@ snapshots:
       '@mark1russell7/text': 0.0.17
       zod: 4.6.7
 
-  '@mark1russell7/alerts@0.1.5':
+  '@mark1russell7/alerts@0.1.26':
     dependencies:
       '@mark1russell7/algebra': 0.9.10(zod@4.6.7)
       '@mark1russell7/collections': 0.11.2(zod@4.6.7)
@@ -2462,7 +2472,7 @@ snapshots:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.1.19
-      '@mark1russell7/rigor-statistics': 0.2.22
+      '@mark1russell7/rigor-statistics': 0.2.23
       '@mark1russell7/text': 0.0.17
       zod: 4.6.7
 
@@ -2536,7 +2546,7 @@ snapshots:
 
   '@mark1russell7/interval@0.1.0': {}
 
-  '@mark1russell7/market@0.8.1':
+  '@mark1russell7/market@0.8.2':
     dependencies:
       '@mark1russell7/guidebook': 0.4.0
       '@mark1russell7/optional': 1.5.0
