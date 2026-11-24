@@ -10,6 +10,7 @@ ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ALERT_WATCH_NEED: build/index.d.ts#ALERT_WATCH_NEED
 ActivityLevel: build/index.d.ts#ActivityLevel
 BOIL_CELSIUS: build/index.d.ts#BOIL_CELSIUS
+BOTTLED_WATER: build/index.d.ts#BOTTLED_WATER
 BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
@@ -26,6 +27,7 @@ CalorieTables: build/index.d.ts#CalorieTables
 CitedFeeds: build/index.d.ts#CitedFeeds
 CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
 CitedFormulaMix: build/index.d.ts#CitedFormulaMix
+CitedFormulaWater: build/index.d.ts#CitedFormulaWater
 CitedMilk: build/index.d.ts#CitedMilk
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
@@ -55,6 +57,7 @@ FORMULA_MIX: build/index.d.ts#FORMULA_MIX
 FORMULA_NEED: build/index.d.ts#FORMULA_NEED
 FORMULA_POWDER: build/index.d.ts#FORMULA_POWDER
 FORMULA_READY: build/index.d.ts#FORMULA_READY
+FORMULA_WATER: build/index.d.ts#FORMULA_WATER
 FormulaMixCheck: build/index.d.ts#FormulaMixCheck
 FormulaMixInput: build/index.d.ts#FormulaMixInput
 FormulaMixLine: build/index.d.ts#FormulaMixLine
@@ -95,10 +98,13 @@ NeedsFinding: build/index.d.ts#NeedsFinding
 NoRowAction: build/index.d.ts#NoRowAction
 OpenedWaste: build/index.d.ts#OpenedWaste
 Person: build/index.d.ts#Person
+RESOURCE_SUBSETS: build/index.d.ts#RESOURCE_SUBSETS
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
+ResourceSubset: build/index.d.ts#ResourceSubset
 STORED_WATER: build/index.d.ts#STORED_WATER
 StoveShare: build/index.d.ts#StoveShare
+SubsetConverter: build/index.d.ts#SubsetConverter
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
@@ -121,6 +127,7 @@ formulaMixWater: build/index.d.ts#formulaMixWater
 hasNeedsError: build/index.d.ts#hasNeedsError
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
+subsetConverters: build/index.d.ts#subsetConverters
 
 ## Declarations
 
@@ -135,6 +142,9 @@ export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
 
 ### build/index.d.ts#BOIL_CELSIUS
 export declare const BOIL_CELSIUS = 100;
+
+### build/index.d.ts#BOTTLED_WATER
+export declare const BOTTLED_WATER = "water.bottled";
 
 ### build/index.d.ts#BREAST_MILK_MONTHS
 export declare const BREAST_MILK_MONTHS = 6;
@@ -246,6 +256,19 @@ export interface CitedFormulaMix {
   readonly locator: string;
   readonly waterSource: Source;
   readonly waterLocator: string;
+}
+
+### build/index.d.ts#CitedFormulaWater
+export interface CitedFormulaWater {
+  readonly resource: string;
+  readonly quote: string;
+  readonly otherwise: string;
+  readonly cleaning: {
+    readonly read: false;
+    readonly why: string;
+  };
+  readonly source: Source;
+  readonly locator: string;
 }
 
 ### build/index.d.ts#CitedMilk
@@ -403,6 +426,9 @@ export declare const FORMULA_POWDER = "food.infant-formula-powder";
 ### build/index.d.ts#FORMULA_READY
 export declare const FORMULA_READY = "food.infant-formula-ready";
 
+### build/index.d.ts#FORMULA_WATER
+export declare const FORMULA_WATER: CitedFormulaWater;
+
 ### build/index.d.ts#FormulaMixCheck
 export interface FormulaMixCheck {
   readonly powder: number;
@@ -417,6 +443,7 @@ export interface FormulaMixInput {
   readonly catalog: SupplyCatalog;
   readonly units: Readonly<Record<string, number>>;
   readonly mix?: CitedFormulaMix | undefined;
+  readonly water?: CitedFormulaWater | undefined;
   readonly prefix?: string | undefined;
 }
 
@@ -433,6 +460,8 @@ export interface FormulaMixResult {
   readonly lines: readonly FormulaMixLine[];
   readonly why: string | undefined;
   readonly read: boolean;
+  readonly bottled: readonly string[];
+  readonly waterWhy: string | undefined;
 }
 
 ### build/index.d.ts#FragmentConverter
@@ -493,6 +522,7 @@ export interface HouseholdFragment {
   readonly stores: readonly FragmentStore[];
   readonly draws: readonly FragmentDraw[];
   readonly direct: readonly FragmentDirectUse[];
+  readonly converters: readonly SubsetConverter[];
 }
 
 ### build/index.d.ts#HouseholdFragmentInput
@@ -503,6 +533,7 @@ export interface HouseholdFragmentInput {
   readonly units: Readonly<Record<string, number>>;
   readonly supply?: string | undefined;
   readonly uses?: readonly FragmentDirectUse[] | undefined;
+  readonly subsets?: readonly ResourceSubset[] | undefined;
   readonly level: string;
   readonly levels?: readonly string[] | undefined;
   readonly table?: CalorieTables | undefined;
@@ -658,6 +689,9 @@ export interface Person {
   readonly feeding?: InfantFeeding | undefined;
 }
 
+### build/index.d.ts#RESOURCE_SUBSETS
+export declare const RESOURCE_SUBSETS: readonly ResourceSubset[];
+
 ### build/index.d.ts#ReferenceNeed
 export interface ReferenceNeed {
   readonly code: string;
@@ -669,6 +703,12 @@ export interface ReferencePart {
   readonly id: string;
 }
 
+### build/index.d.ts#ResourceSubset
+export interface ResourceSubset {
+  readonly resource: string;
+  readonly of: string;
+}
+
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
 
@@ -677,6 +717,19 @@ export interface StoveShare {
   readonly value: number;
   readonly heating: HeatingValue;
   readonly cite: string;
+}
+
+### build/index.d.ts#SubsetConverter
+export interface SubsetConverter {
+  readonly id: string;
+  readonly takes: readonly {
+    readonly resource: string;
+    readonly amount: number;
+  }[];
+  readonly gives: {
+    readonly resource: string;
+    readonly amount: number;
+  };
 }
 
 ### build/index.d.ts#USGS_WATER_DENSITY_SOURCE
@@ -747,3 +800,6 @@ export declare function householdFragment(input: HouseholdFragmentInput): Househ
 
 ### build/index.d.ts#isActivityLevel
 export declare function isActivityLevel(level: unknown): level is ActivityLevel;
+
+### build/index.d.ts#subsetConverters
+export declare function subsetConverters(catalog: SupplyCatalog, resources: Iterable<string>, subsets?: readonly ResourceSubset[], prefix?: string): SubsetConverter[];

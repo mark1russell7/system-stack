@@ -23,11 +23,78 @@ export const NO_COOK = "food.no-cook";
 export const FORMULA_READY = "food.infant-formula-ready";
 /**
  * The resource of the infant formula powder, in `kg`. It has no direct use. `formulaMixFragment` mixes it with
- * `STORED_WATER` into `FORMULA_READY`. `cookFragment` does not cook it.
+ * `BOTTLED_WATER` into `FORMULA_READY`. `cookFragment` does not cook it.
  */
 export const FORMULA_POWDER = "food.infant-formula-powder";
 /** The resource of the stored drinking water, in `L`. It has a direct use for the water need. */
 export const STORED_WATER = "water.stored";
+/**
+ * The resource of the commercially bottled water, in `L`. `formulaMixFragment` takes only this water for the powder.
+ * `RESOURCE_SUBSETS` makes it also `STORED_WATER`, so the drinking draw and the cook converters use it too.
+ */
+export const BOTTLED_WATER = "water.bottled";
+
+/**
+ * A subset of a resource: each unit of `resource` is also a unit of `of`. The reverse is not true.
+ * Thus a rule that needs `resource` takes only it, and a rule that takes `of` also takes `resource`.
+ */
+export interface ResourceSubset {
+  readonly resource: string;
+  readonly of: string;
+}
+
+/**
+ * The subsets of the resources of the buy list.
+ *
+ * - `water.bottled` is a subset of `water.stored`. Commercially bottled water is also stored drinking water.
+ *   The WIC guide tells to mix infant formula powder only with bottled water. A store of tap water is not bottled water.
+ *
+ * Each subset is a definition, not a read. `subsetConverters` gives one converter for each subset.
+ */
+export const RESOURCE_SUBSETS: readonly ResourceSubset[] = [{ resource: BOTTLED_WATER, of: STORED_WATER }];
+
+/** A converter of one resource into a different resource, with the form of `Converter` of `@mark1russell7/stack-endurance`. */
+export interface SubsetConverter {
+  readonly id: string;
+  readonly takes: readonly { readonly resource: string; readonly amount: number }[];
+  readonly gives: { readonly resource: string; readonly amount: number };
+}
+
+/**
+ * This function gives the converters of the subsets whose resource is in `resources`.
+ *
+ * - One run takes 1 unit of the subset resource and gives the same amount of the wider resource, in the unit of that resource.
+ *   The converter has no device and no limit.
+ * - The endurance query decides how a draw of the wider resource shares the subset store. A take of a resource uses its own stock first,
+ *   then its converters. Thus a drinking draw takes the tap water first, then the bottled water.
+ * - The `id` of each converter is `<prefix>:subset:<resource>`.
+ *
+ * The function is pure.
+ *
+ * @param catalog - The catalog of supplies of `@mark1russell7/market`
+ * @param resources - The codes of the resources of the stores, for example the resources of a buy list
+ * @param subsets - The subsets. The default is `RESOURCE_SUBSETS`.
+ * @param prefix - The start of the `id` of each converter. The default is `buy`.
+ * @returns The converters, in the order of the subsets
+ * @throws RangeError when the catalog has no resource of a subset, or when the units of a subset do not convert
+ * @throws RangeError when a subset names one resource two times
+ */
+export function subsetConverters(catalog: SupplyCatalog, resources: Iterable<string>, subsets: readonly ResourceSubset[] = RESOURCE_SUBSETS, prefix = "buy"): SubsetConverter[] {
+  const have = new Set(resources);
+  const unitOf = new Map(catalog.resources.map((resource) => [resource.code, resource.unit] as const));
+  const out: SubsetConverter[] = [];
+  for (const subset of subsets) {
+    if (!have.has(subset.resource)) continue;
+    if (subset.resource === subset.of) throw new RangeError(`The subset of ${subset.resource} names the same resource two times.`);
+    const from = unitOf.get(subset.resource);
+    const to = unitOf.get(subset.of);
+    if (from === undefined || to === undefined) throw new RangeError(`The catalog has no resource "${from === undefined ? subset.resource : subset.of}" for the subset of ${subset.resource} in ${subset.of}.`);
+    const factor = factorOf(from, to);
+    if (factor === undefined) throw new RangeError(`The subset of ${subset.resource} in ${subset.of} takes ${from}, which does not convert to ${to}.`);
+    out.push({ id: `${prefix}:subset:${subset.resource}`, takes: [{ resource: subset.resource, amount: 1 }], gives: { resource: subset.of, amount: factor } });
+  }
+  return out;
+}
 
 /** The direct use of a resource for a need: 1 unit of the resource gives `amount` of the need. */
 export interface FragmentDirectUse {

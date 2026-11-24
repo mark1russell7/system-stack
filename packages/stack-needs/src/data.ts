@@ -228,6 +228,36 @@ export const FORMULA_MIX: CitedFormulaMix = {
   waterLocator: "Page 106, Guidelines for Using Infant Formula When Access to Common Kitchen Appliances Is Limited, and Natural Disaster or Power Outage",
 };
 
+/** The rule of the mix water of infant formula after a disaster or in a power cut, with its quotes and its citation. */
+export interface CitedFormulaWater {
+  /** The code of the only resource that the mix takes as its water. */
+  readonly resource: string;
+  /** The words of the source for the mix water. */
+  readonly quote: string;
+  /** The words of the source for a household with no bottled water and no ready-to-feed formula. */
+  readonly otherwise: string;
+  /** The water to clean the bottles and the nipples. The source gives no amount, so it is a no read. */
+  readonly cleaning: { readonly read: false; readonly why: string };
+  readonly source: Source;
+  readonly locator: string;
+}
+
+/**
+ * The rule of the mix water: only commercially bottled water, `water.bottled`. The WIC guide gives the rule from the CDC.
+ * The guide also tells to use ready-to-feed formula when possible. The cleaning water has no amount, so the model has no draw for it.
+ */
+export const FORMULA_WATER: CitedFormulaWater = {
+  resource: "water.bottled",
+  quote: "Use bottled water to prepare powdered or liquid concentrated infant formula.",
+  otherwise: "If bottled water or ready-to-feed formulas are not available, discuss options with a health care provider.",
+  cleaning: {
+    read: false,
+    why: "The guide tells to clean bottles and nipples with bottled, boiled, or treated water before each use. It gives no amount of water.",
+  },
+  source: WIC_INFANT_SOURCE,
+  locator: "Page 107, the box Natural Disaster or Power Outage: Infant Formula Guidelines, from the CDC",
+};
+
 /** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
 export const NASEM_ENERGY_SOURCE: Source = {
   id: "nasem-dri-energy-2023",
