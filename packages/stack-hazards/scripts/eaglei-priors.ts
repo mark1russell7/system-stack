@@ -38,6 +38,9 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
   if (laws.schema !== LAWS_SCHEMA) throw new RangeError(`eaglePriors: the schema "${String(laws.schema)}" is not "${LAWS_SCHEMA}".`);
   if (laws.source.license !== EAGLEI_LICENSE.name) throw new RangeError(`eaglePriors: the license "${laws.source.license}" is not "${EAGLEI_LICENSE.name}".`);
   const priors = laws.priors;
+  // A record of the rule of 4 readings (before 0.4.1) has raised counties but no days in its peaks. Its raised customers do not follow the rule of 4 days.
+  if (laws.raised !== undefined && (laws.peaks === undefined || Object.values(laws.peaks).some((peak) => peak.days === undefined)))
+    throw new RangeError("eaglePriors: the record has raised counties but no days in its peaks. A fit of this version uses the rule of 4 days and gives them.");
   if (priors === undefined) throw new RangeError("eaglePriors: the record has no counts of the priors. A fit job of this version gives them.");
   const table = (scheme: string, region: (area: string) => string, method: string): PriorTable => {
     const codes = observedRegions(priors.observation, region);

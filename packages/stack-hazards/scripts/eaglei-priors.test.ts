@@ -39,7 +39,7 @@ describe("eaglePriors", () => {
     expect(county.method).toContain("storm events of NOAA. A region");
     expect(county.method).not.toContain("too few customers");
     // With the option raise, the method tells that the customers of some counties come from their counts.
-    const raised = eaglePriors(record({ options: { share: 0.01, interval: 900, raise: true }, raised: { "99001": { file: 10, fit: 40 } } }));
+    const raised = eaglePriors(record({ options: { share: 0.01, interval: 900, raise: true }, raised: { "99001": { file: 10, fit: 40 } }, peaks: { "99001": { peak: 50, held: 40, over: 9, days: 5 } } }));
     expect(raised.county.method).toContain("storm events of NOAA. The file of the customers gives too few customers to some counties. For 1 counties, the customers are the count that the county reached on 4 different days. A region");
     expect(raised.state.method).toContain("For 1 counties");
   });
@@ -60,10 +60,16 @@ describe("eaglePriors", () => {
     expect(county.method).toContain(`more than ${String(PRIOR_LIMIT)} events at one customer in one year in a case is not in the table, so its prior is no read: 1 regions.`);
   });
 
-  it("refuses a record with another schema, another license or no counts of the priors", () => {
+  it("refuses a record with another schema, another license, no counts of the priors or raised counties of the old rule", () => {
     expect(() => eaglePriors(record({ schema: "other" as typeof LAWS_SCHEMA }))).toThrow(RangeError);
     expect(() => eaglePriors(record({ source: { ...record().source, license: "CC BY-NC 4.0" } }))).toThrow(RangeError);
     expect(() => eaglePriors(record({ priors: undefined }))).toThrow(RangeError);
+    // A record of the rule of 4 readings: raised counties, and peaks with no days.
+    const raised = { "99001": { file: 10, fit: 40 } };
+    expect(() => eaglePriors(record({ raised, peaks: { "99001": { peak: 50, held: 40, over: 6 } } }))).toThrow(/no days in its peaks/u);
+    expect(() => eaglePriors(record({ raised }))).toThrow(/no days in its peaks/u);
+    // A record with no raised counties and old peaks is a fit with no option raise: its tables do not change.
+    expect(() => eaglePriors(record({ peaks: { "99001": { peak: 50, held: 40, over: 6 } } }))).not.toThrow();
   });
 });
 
