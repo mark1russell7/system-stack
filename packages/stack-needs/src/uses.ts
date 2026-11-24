@@ -138,14 +138,20 @@ export const DIRECT_USES: readonly FragmentDirectUse[] = [
  * - `join-use-amount`: the amount of a direct use is not the factor from the unit of its resource to the unit of its need.
  * - `join-supply-need`: a supply names a need that is not in the reference needs.
  * - `join-supply-part`: a supply names a part that is not in the reference parts.
+ * - `join-subset-resource`: a subset names a resource that is not in the catalog.
+ * - `join-subset-same`: a subset names one resource two times.
+ * - `join-subset-unit`: the unit of the resource of a subset does not convert to the unit of the wider resource.
  */
-export const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part"] = [
+export const JOIN_CODES: readonly ["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-need", "join-supply-part", "join-subset-resource", "join-subset-same", "join-subset-unit"] = [
   "join-use-resource",
   "join-use-need",
   "join-use-unit",
   "join-use-amount",
   "join-supply-need",
   "join-supply-part",
+  "join-subset-resource",
+  "join-subset-same",
+  "join-subset-unit",
 ];
 
 /** A code of the join gate. */
@@ -154,8 +160,9 @@ export type JoinCode = (typeof JOIN_CODES)[number];
 /**
  * A finding of the join gate, in the form of a finding of `@mark1russell7/guidebook`. Each finding of the gate is an error.
  * The record is `use` for a direct use, with the resource of the use as its `id`. It is `supply` for a supply, with the need as its `id`.
+ * It is `subset` for a subset, with the resource of the subset as its `id`.
  */
-export type JoinFinding = Finding<JoinCode, "use" | "supply">;
+export type JoinFinding = Finding<JoinCode, "use" | "supply" | "subset">;
 
 /** This function gives the factor from a unit to a different unit, or `undefined` when the units do not convert. */
 function factorOf(from: string, to: string): number | undefined {
@@ -193,13 +200,16 @@ export interface JoinReferences {
  * - The unit of the resource of each direct use converts to the unit of its need.
  * - The amount of each direct use is the factor of that conversion. A direct use is a definition, so a different rate is a converter with a cited source.
  * - Each supply names a reference need and a reference part.
+ * - The two resources of each subset are different resources of the catalog, and the unit of the subset converts to the unit of the wider resource.
+ *   Thus `subsetConverters` does not throw for a buy list of the catalog.
  *
- * The findings are in the order of the uses, then in the order of the supplies. The function is pure.
+ * The findings are in the order of the uses, then of the supplies, then of the subsets. The function is pure.
  *
  * @param catalog - The catalog of supplies of `@mark1russell7/market`
  * @param uses - The direct uses, for example `DIRECT_USES`
  * @param supplies - The part that supplies each need, by the code of the need, for example `NEED_SUPPLIES`
  * @param references - The reference needs and the reference parts
+ * @param subsets - The subsets of the resources. The default is `RESOURCE_SUBSETS`.
  * @returns The findings of the joins. An empty list is a pass.
  */
 export function checkJoins(
@@ -207,9 +217,10 @@ export function checkJoins(
   uses: readonly FragmentDirectUse[],
   supplies: Readonly<Record<string, string>>,
   references: JoinReferences,
+  subsets: readonly ResourceSubset[] = RESOURCE_SUBSETS,
 ): JoinFinding[] {
   const findings: JoinFinding[] = [];
-  const add = (code: JoinCode, record: "use" | "supply", id: string, message: string): void => {
+  const add = (code: JoinCode, record: "use" | "supply" | "subset", id: string, message: string): void => {
     findings.push({ level: "error", code, record, id, message });
   };
   const units = new Map(catalog.resources.map((resource) => [resource.code, resource.unit] as const));
@@ -236,6 +247,20 @@ export function checkJoins(
   for (const [need, part] of Object.entries(supplies)) {
     if (!needs.has(need)) add("join-supply-need", "supply", need, `The supply of ${need} names no reference need.`);
     if (!parts.has(part)) add("join-supply-part", "supply", need, `The supply of ${need} names the part ${part}, which is not a reference part.`);
+  }
+  for (const subset of subsets) {
+    if (subset.resource === subset.of) {
+      add("join-subset-same", "subset", subset.resource, `The subset of ${subset.resource} names the same resource two times.`);
+      continue;
+    }
+    const from = units.get(subset.resource);
+    const to = units.get(subset.of);
+    for (const [code, unit] of [[subset.resource, from], [subset.of, to]] as const) {
+      if (unit === undefined) add("join-subset-resource", "subset", subset.resource, `The subset of ${subset.resource} in ${subset.of} names ${code}, which is not a resource of the catalog.`);
+    }
+    if (from !== undefined && to !== undefined && factorOf(from, to) === undefined) {
+      add("join-subset-unit", "subset", subset.resource, `The subset of ${subset.resource} in ${subset.of} takes ${from}, which does not convert to ${to}.`);
+    }
   }
   return findings;
 }

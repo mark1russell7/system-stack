@@ -45,6 +45,13 @@ const CATALOG: SupplyCatalog = {
   ],
 };
 
+/** These subsets have one break each: an unknown resource, one resource two times, and units that do not convert. */
+const BAD_SUBSETS = [
+  { resource: "water.unknown", of: STORED_WATER },
+  { resource: STORED_WATER, of: STORED_WATER },
+  { resource: NO_COOK, of: STORED_WATER },
+];
+
 /** This function gives the codes, the records and the ids of the findings of a call. */
 function codesOf(...args: Parameters<typeof checkJoins>): [string, string, string][] {
   return checkJoins(...args).map((finding): [string, string, string] => [finding.code, finding.record, finding.id]);
@@ -116,7 +123,7 @@ describe("checkJoins", () => {
     expect(codesOf(SUPPLY_CATALOG, [], { [WATER_NEED]: "part.unknown" }, references)).toEqual([["join-supply-part", "supply", WATER_NEED]]);
   });
 
-  it("gives each finding as an error, in the order of the uses and then the supplies", () => {
+  it("gives each finding as an error, in the order of the uses, the supplies and the subsets", () => {
     const uses = [
       { resource: "water.unknown", need: WATER_NEED, amount: 1 },
       { resource: STORED_WATER, need: "need.unknown", amount: 1 },
@@ -124,10 +131,29 @@ describe("checkJoins", () => {
       { resource: STORED_WATER, need: WATER_NEED, amount: 2 },
     ];
     const supplies = { [WATER_NEED]: "part.unknown", "need.unknown": "water.main" };
-    const findings = checkJoins(SUPPLY_CATALOG, uses, supplies, references);
-    expect(findings.map((finding) => finding.code)).toEqual(["join-use-resource", "join-use-need", "join-use-unit", "join-use-amount", "join-supply-part", "join-supply-need"]);
+    const findings = checkJoins(SUPPLY_CATALOG, uses, supplies, references, BAD_SUBSETS);
+    expect(findings.map((finding) => finding.code)).toEqual([
+      "join-use-resource",
+      "join-use-need",
+      "join-use-unit",
+      "join-use-amount",
+      "join-supply-part",
+      "join-supply-need",
+      "join-subset-resource",
+      "join-subset-same",
+      "join-subset-unit",
+    ]);
     expect(new Set(findings.map((finding) => finding.code))).toEqual(new Set(JOIN_CODES));
     for (const finding of findings) expect(finding.level).toBe("error");
+  });
+
+  it("finds each break of a subset, so subsetConverters does not throw for a catalog that passes", () => {
+    expect(codesOf(SUPPLY_CATALOG, [], {}, references, BAD_SUBSETS)).toEqual([
+      ["join-subset-resource", "subset", "water.unknown"],
+      ["join-subset-same", "subset", STORED_WATER],
+      ["join-subset-unit", "subset", NO_COOK],
+    ]);
+    expect(codesOf(SUPPLY_CATALOG, [], {}, references, [])).toEqual([]);
   });
 
   it("uses only the reference lists of the call", () => {

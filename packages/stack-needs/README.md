@@ -314,9 +314,9 @@ The package holds one record of each use and of each default supply part. `house
 | `subsetConverters` | The converter of each subset whose resource has a store. One run gives the same amount of the wider resource, in its unit. |
 | `checkJoins` | The join gate of a catalog, the direct uses and the supply parts with the reference lists. |
 
-`checkJoins(catalog, uses, supplies, { needs, parts })` gives one finding for each break. An empty list is a pass. Each finding is an error.
+`checkJoins(catalog, uses, supplies, { needs, parts }, subsets)` gives one finding for each break. The default of `subsets` is `RESOURCE_SUBSETS`. An empty list is a pass. Each finding is an error.
 
-A finding has the form of a finding of `@mark1russell7/guidebook`, the same form as the findings of `checkCalorieTable`. Its record is `use` or `supply`. The `id` of a `use` finding is the resource of the use. The `id` of a `supply` finding is the need.
+A finding has the form of a finding of `@mark1russell7/guidebook`, the same form as the findings of `checkCalorieTable`. Its record is `use`, `supply` or `subset`. The `id` of a `use` or a `subset` finding is its resource. The `id` of a `supply` finding is the need.
 
 | Code | Record | The break |
 | --- | --- | --- |
@@ -326,6 +326,9 @@ A finding has the form of a finding of `@mark1russell7/guidebook`, the same form
 | `join-use-amount` | `use` | The amount of a direct use is not the factor from the unit of its resource to the unit of its need. |
 | `join-supply-need` | `supply` | A supply names a need that is not a reference need. |
 | `join-supply-part` | `supply` | A supply names a part that is not a reference part. |
+| `join-subset-resource` | `subset` | A subset names a resource that is not in the catalog. |
+| `join-subset-same` | `subset` | A subset names one resource two times. |
+| `join-subset-unit` | `subset` | The unit of the resource of a subset does not convert to the unit of the wider resource. |
 
 A direct use is a definition. Thus its amount is the factor of the units, from `valueIn` of `@mark1russell7/quantity`. For example, a use in `gal` for a need in `L` gives 3.785411784 L for each gal. A different rate is a converter, and a converter has a cited source.
 
