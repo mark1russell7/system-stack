@@ -64,7 +64,7 @@ export function supplyState(hazard: Hazard, part: string, options: BasisOptions 
  * The option `assessed` can drop the claims of assessed risks. A cut with only assessed claims then has no `duration`. The function is pure.
  */
 export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCaseOptions = {}): CaseCuts {
-  const regions = regionList(options.region);
+  const regions = hazardRegions(options.region);
   const cuts = hazard.cuts.flatMap((cut): Cut[] => {
     const item = basisCut(cut, options);
     const ids = options.parts?.[item.part] ?? [item.part];
@@ -77,8 +77,8 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
   return { case: hazard.case, title: hazard.title, cuts };
 }
 
-/** This function gives the regions of the option `region` as a list. */
-function regionList(region: HazardCaseOptions["region"]): readonly HazardRegion[] {
+/** This function gives the regions of the option `region` as a list: no region, one region, or the list as it is. */
+export function hazardRegions(region: HazardCaseOptions["region"]): readonly HazardRegion[] {
   if (region === undefined) return [];
   return "scheme" in region ? [region] : region;
 }

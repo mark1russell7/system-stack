@@ -143,6 +143,11 @@ describe("fitEagle", () => {
     expect(laws.source.files.map((file) => file.name)).toEqual(["MCC.csv", "eaglei_outages_2020.csv", "eaglei_outages_2021.csv"]);
     expect(laws.events).toBe(1);
     expect(laws.skipped).toBe(2);
+    // The files list both counties in 2020 and 2021. The county 99009 has 1 customer out of 100000, under the threshold, so it has no event.
+    expect(laws.priors).toEqual({
+      observation: { years: { "99001": 2, "99009": 2 }, customers: { "99001": 1000, "99009": 100_000 } },
+      counts: { "infra.power.outage": { "99001": { events: 1, share: 0.04 } } },
+    });
     expect(Object.keys(laws.regions)).toEqual(["99"]);
     expect(laws.regions["99"]).toMatchObject({ count: 1, censored: 0, open: 0, median: 5400 / 86_400 });
     const hosts = asked.map((url) => new URL(url).host);
@@ -165,6 +170,9 @@ describe("fitEagle", () => {
     expect(causes?.cases["met.winter.storm"]).toMatchObject({ events: 1, regions: { "99": { count: 1, median: 5400 / 86_400 } } });
     expect(causes?.cases["met.tornado"]?.events).toBe(1);
     expect(causes?.cases["met.flood"]).toEqual({ types: STORM_CLASSES["met.flood"], events: 0, regions: {} });
+    // The one event is in a winter storm and a tornado, so the power outage, which counts the events in no storm case, has no event.
+    const one = { "99001": { events: 1, share: 0.04 } };
+    expect(laws.priors?.counts).toEqual({ "infra.power.outage": {}, "met.winter.storm": one, "met.heat.extreme": {}, "met.tropical.hurricane": {}, "met.flood": {}, "met.tornado": one });
     expect(laws.regions).toEqual((await fitEagle(context(fake(article()).transport), { now: () => new Date() })).regions);
   });
 

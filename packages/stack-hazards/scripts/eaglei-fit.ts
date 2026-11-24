@@ -4,6 +4,7 @@
  * The job reads the record of the figshare article of the dataset, the customers of each county and the outage file of each year.
  * Each request goes through `polite-crawler`, with one pace for each host. A file comes in range requests, and the job examines its MD5.
  * The job gives the counts to `outageReader` and writes the curve of each state to a JSON file.
+ * It also writes the counts of the yearly priors: the years and the customers of each county, and the events and the peak shares of each case in each county.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
@@ -17,6 +18,7 @@ import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
 import { outageReader, type OutageEvent, type OutageTally } from "../src/outages.ts";
+import { areaCounts, coverageTally, type AreaCount, type Observation } from "../src/priors.ts";
 import { CAUSE_AFTER, CAUSE_BEFORE, STORM_CLASSES, type CauseOptions } from "../src/storms.ts";
 import { TryFault, get, passing, withTries, type FitContext } from "./fetch.ts";
 import { readStorms, type StormRecord } from "./storm-files.ts";
@@ -159,6 +161,17 @@ export interface CauseLaws {
   readonly cases: Readonly<Record<string, { readonly types: readonly string[]; readonly events: number; readonly regions: Readonly<Record<string, RegionCurve>> }>>;
 }
 
+/** The code of the case of a power outage. Its prior counts the events in no storm case, so that a storm outage counts in one case only. */
+export const OUTAGE_CASE = "infra.power.outage";
+
+/** The counts of the yearly priors of a fit. */
+export interface EaglePriors {
+  /** The years in which the files list each county, and the customers of each county. */
+  readonly observation: Observation;
+  /** The counts of each case in each county with customers, by the code of the case. */
+  readonly counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>;
+}
+
 /** The output of a fit: the source, the options, the counts and the curve of each state. */
 export interface EagleLaws {
   readonly schema: typeof LAWS_SCHEMA;
@@ -179,10 +192,17 @@ export interface EagleLaws {
   readonly events: number;
   readonly regions: Readonly<Record<string, RegionCurve>>;
   readonly causes?: CauseLaws | undefined;
+  /** The counts of the yearly priors. A record of a fit before them does not have them. */
+  readonly priors?: EaglePriors | undefined;
 }
 
 /** This function reads the storm events of the years of the outage files and of the year before them. It gives the curves of each case. */
-async function causeLaws(context: FitContext, events: readonly OutageEvent[], years: readonly { readonly year: number }[], storms: NonNullable<FitOptions["storms"]>): Promise<CauseLaws> {
+async function causeLaws(
+  context: FitContext,
+  events: readonly OutageEvent[],
+  years: readonly { readonly year: number }[],
+  storms: NonNullable<FitOptions["storms"]>,
+): Promise<{ laws: CauseLaws; lists: ReadonlyMap<string, readonly OutageEvent[]> }> {
   const first = years[0]?.year ?? 0;
   const last = years.at(-1)?.year ?? 0;
   const before = storms.options?.before ?? CAUSE_BEFORE;
@@ -191,7 +211,7 @@ async function causeLaws(context: FitContext, events: readonly OutageEvent[], ye
   const lists = new Map<string, OutageEvent[]>(Object.keys(storms.classes).map((name) => [name, []]));
   for (const event of events) for (const name of index.causes(event)) lists.get(name)?.push(event);
   const cases = Object.fromEntries([...lists].map(([name, list]) => [name, { types: storms.classes[name] ?? [], events: list.length, regions: outageCurves(list, eagleRegion) }]));
-  return { storms: { ...record, tally: index.tally() }, options: { before, after }, cases };
+  return { laws: { storms: { ...record, tally: index.tally() }, options: { before, after }, cases }, lists };
 }
 
 /**
@@ -205,7 +225,9 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const files = eagleFiles(JSON.parse(record.body), options.years);
   const parts: Uint8Array[] = [];
   for await (const bytes of fileChunks(context, files.customers)) parts.push(bytes);
-  const reader = outageReader({ customers: eagleCustomers(Buffer.concat(parts).toString("utf8")), share: options.share });
+  const customers = eagleCustomers(Buffer.concat(parts).toString("utf8"));
+  const reader = outageReader({ customers, share: options.share });
+  const coverage = coverageTally();
   let lines = 0;
   let skipped = 0;
   for (const { file } of files.years) {
@@ -214,11 +236,18 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
       lines += 1;
       const count = eagleLine(line);
       if (count === undefined) skipped += 1;
-      else reader.add(count);
+      else {
+        reader.add(count);
+        coverage.add(count);
+      }
     }
   }
   const { events, tally } = reader.finish();
   const causes = options.storms === undefined ? undefined : await causeLaws(context, events, files.years, options.storms);
+  const inCase = new Set([...(causes?.lists.values() ?? [])].flat());
+  const counts: Record<string, Readonly<Record<string, AreaCount>>> = { [OUTAGE_CASE]: areaCounts(events.filter((event) => !inCase.has(event)), customers) };
+  for (const [name, list] of causes?.lists ?? []) counts[name] = areaCounts(list, customers);
+  const priors: EaglePriors = { observation: { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) }, counts };
   const { version, modified, license, doi } = files;
   return {
     schema: LAWS_SCHEMA,
@@ -231,7 +260,8 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     tally,
     events: events.length,
     regions: outageCurves(events, eagleRegion),
-    causes,
+    causes: causes?.laws,
+    priors,
   };
 }
 

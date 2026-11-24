@@ -1,5 +1,6 @@
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type Source } from "./hazard.ts";
+import { priorTableFaults } from "./priors.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
 // Each claim of a source has a basis.
@@ -18,6 +19,8 @@ import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardLis
  *   Or the law has no curve for a region of its source.
  * - `hazards-fit`: the fit of a law has no family, no method, or a count of events that is not a whole number above 0.
  * - `hazards-curve`: a curve of a law does not have the form of a survival curve.
+ * - `hazards-prior`: a table of priors names a source that the table of the sources does not have, or a source with no license.
+ *   Or it has no method, a wrong date, a case that is not in the list, a region that is not in its codes, or a rate that is not a count of 0 or more with a share from 0 to 1.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
  */
 export const HAZARD_CODES: readonly [
@@ -29,8 +32,9 @@ export const HAZARD_CODES: readonly [
   "hazards-law-region",
   "hazards-fit",
   "hazards-curve",
+  "hazards-prior",
   "hazards-no-law",
-] = ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-no-law"];
+] = ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-no-law"];
 
 /** A code of the gate of a list of hazard cases. */
 export type HazardCode = (typeof HAZARD_CODES)[number];
@@ -80,6 +84,14 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
       if (item.duration.read) for (const [code, message] of lawFaults(item.duration, list.sources)) add("error", code, at, `The law of the cut "${at}": ${message}`);
       else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
     }
+  }
+  for (const [index, table] of (list.priors ?? []).entries()) {
+    const at = `priors.${String(index)}`;
+    const source = list.sources[table.source];
+    if (source === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" names the source "${table.source}", and the table of the sources does not have it.`);
+    else if (source.license.name.trim() === "" || source.license.url.trim() === "") add("error", "hazards-prior", at, `The source "${table.source}" of the table of priors "${at}" has no license.`);
+    if (dayNumber(table.asOf) === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" has a date that is not a date YYYY-MM-DD.`);
+    for (const fault of priorTableFaults(table, cases)) add("error", "hazards-prior", at, `The table of priors "${at}" ${fault}.`);
   }
   return faults;
 }
