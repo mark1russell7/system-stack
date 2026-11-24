@@ -1,8 +1,8 @@
-import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
+import { SUPPLY_CATALOG, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { DGA_CALORIES, NASEM_INFANT_CALORIES } from "./data.ts";
+import { DGA_CALORIES, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER, NASEM_INFANT_CALORIES } from "./data.ts";
 import { FORMULA_DRAW_MONTHS, householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
 import { FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK } from "./uses.ts";
 
@@ -25,6 +25,14 @@ const at = "2026-11-22";
 
 /** A made-up infant of 6 months that eats the food of the household. The guidelines have no row below 12 months. The infant table gives 604 kcal/d. */
 const infant: Person = { sex: "female", ageMonths: 6, count: 1, feeding: "food" };
+
+/** This function gives the catalog with a made-up container of the 1 kg formula, in grams. */
+function withContainer(grams: number): SupplyCatalog {
+  const products = SUPPLY_CATALOG.products.map((each) =>
+    each.id === "food.infant-formula-ready-1kg" && each.opened !== undefined ? { ...each, opened: { ...each.opened, container: { read: true as const, amount: grams, unit: "g", definition: "A test container." } } } : each,
+  );
+  return { ...SUPPLY_CATALOG, products };
+}
 
 /** This function gives the fragment of a call, and fails the test when the call gives no layer. */
 function fragmentOf(of: HouseholdFragmentInput): HouseholdFragmentRead {
@@ -156,15 +164,31 @@ describe("the household fragment", () => {
     expect(DGA_CALORIES.changes?.filter((change) => change.milk === true).map((change) => change.stage)).toEqual(["lactation-1", "lactation-2"]);
   });
 
-  it("refuses breast milk from 6 months and formula from 12 months", () => {
+  it("refuses breast milk and formula from 12 months", () => {
     const mother: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "lactation-2" };
     const man = adults[0] as Person;
-    for (const [ageMonths, feeding] of [[6, "breast-milk"], [9, "breast-milk"], [14, "breast-milk"], [12, "formula"], [14, "formula"]] as const) {
+    for (const [ageMonths, feeding] of [[12, "breast-milk"], [14, "breast-milk"], [12, "formula"], [14, "formula"]] as const) {
       expect(() => householdFragment({ ...input, persons: [man, mother, { sex: "female", ageMonths, count: 1, feeding }] }), `${String(ageMonths)} ${feeding}`).toThrow(/Give feeding: food/);
     }
     expect(() => householdFragment({ ...input, persons: [{ ...man, feeding: "breast-milk" }, mother] })).toThrow(/only for an infant/);
     expect(fragmentOf({ ...input, persons: [man, mother, { sex: "female", ageMonths: 5, count: 1, feeding: "breast-milk" }] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400, users: 2 });
     expect(fragmentOf({ ...input, persons: [man, mother, { sex: "female", ageMonths: 14, count: 1, feeding: "food" }] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400 + 800, users: 3 });
+  });
+
+  it("puts the need of an infant on breast milk from 6 months minus the milk energy in the food draw", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months and 745 kcal/d for the boys of 9 to 11 months.
+    // Table 5-14 of the NASEM report gives 381 kcal/d of milk energy from 6 months, and the stage lactation-2 adds 400 kcal/d.
+    const man = adults[0] as Person;
+    const mother: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "lactation-2" };
+    const girl: Person = { sex: "female", ageMonths: 6, count: 1, feeding: "breast-milk" };
+    const result = fragmentOf({ ...input, persons: [man, mother, girl] });
+    expect(result.layer.draws).toEqual([{ need: FOOD_NEED, level: "critical", perDay: DAILY + 400 + (604 - MILK_LATER.perDay), users: 3, supply: "food.retail" }]);
+    expect(result.breastMilk).toEqual([girl]);
+    const boy: Person = { sex: "male", ageMonths: 11, count: 1, feeding: "breast-milk" };
+    expect(fragmentOf({ ...input, persons: [man, mother, boy] }).layer.draws[0]).toMatchObject({ perDay: DAILY + 400 + (745 - 381), users: 3 });
+    // The rule of one infant for each person with a stage of lactation holds from 6 months.
+    const twins = householdFragment({ ...input, persons: [man, mother, { ...boy, count: 2 }] });
+    expect(twins.layer === undefined ? twins.why : "").toMatch(/2 infants drink breast milk, but the draw has 1 persons/);
   });
 
   it("gives no layer when the infants on breast milk are more than the persons of the draw with a stage of lactation", () => {
@@ -174,7 +198,7 @@ describe("the household fragment", () => {
     for (const noRow of [undefined, "leave-out"] as const) {
       const result = householdFragment({ ...input, persons: [man, mother, twins], noRow });
       expect(result.layer).toBeUndefined();
-      expect(result.layer === undefined ? result.why : "").toMatch(/2 infants drink only breast milk, but the draw has 1 persons/);
+      expect(result.layer === undefined ? result.why : "").toMatch(/2 infants drink breast milk, but the draw has 1 persons/);
     }
     const two = fragmentOf({ ...input, persons: [man, { ...mother, count: 2 }, twins] });
     expect(two.layer.draws[0]).toMatchObject({ perDay: 2400 + 2 * (1800 + 330), users: 3 });
@@ -212,7 +236,7 @@ describe("the household fragment", () => {
   it("gives 0 days of formula for a buy list with no formula, and the days of the formula of the list", () => {
     const baby: Person = { sex: "male", ageMonths: 1, count: 1, feeding: "formula" };
     const daysOf = (more: Record<string, number>): number | undefined => {
-      const layer: EnduranceLayer = fragmentOf({ ...input, persons: [...adults, baby], units: { ...units, ...more } }).layer;
+      const layer: EnduranceLayer = fragmentOf({ ...input, persons: [...adults, baby], units: { ...units, ...more }, cold: true }).layer;
       expect(hasEnduranceError(checkEndurance(layer))).toBe(false);
       return enduranceOf(layer, foodCut, { at }).needs[FORMULA_NEED]?.days;
     };
@@ -220,6 +244,86 @@ describe("the household fragment", () => {
     expect(daysOf({})).toBe(0);
     // The catalog gives 630 kcal for each kg of ready-to-feed formula, and the infant table gives 566 kcal/d for the boys of 0 to 2 months.
     expect(daysOf({ "food.infant-formula-ready-1kg": 9 })).toBeCloseTo((9 * 630) / 566, 9);
+  });
+
+  it("gives no store of the 1 kg formula with no cold storage, because its container size is no read", () => {
+    const baby: Person = { sex: "male", ageMonths: 1, count: 1, feeding: "formula" };
+    const result = fragmentOf({ ...input, persons: [...adults, baby], units: { ...units, "food.infant-formula-ready-1kg": 9 } });
+    expect(result.layer.stores.map((store) => store.resource)).not.toContain(FORMULA_READY);
+    expect(result.storesRead).toBe(false);
+    expect(result.noReads).toEqual([
+      { product: "food.infant-formula-ready-1kg", resource: FORMULA_READY, why: expect.stringMatching(/^With no cold storage, an opened container serves one feed \(fact wic\.formula-opened\)\. The size of a container is no read: /) },
+    ]);
+    expect(result.waste).toEqual([]);
+    expect(enduranceOf(result.layer, foodCut, { at }).needs[FORMULA_NEED]?.days).toBe(0);
+  });
+
+  it("gives one feed for each opened container with no cold storage, and the rest as waste", () => {
+    // TEST VALUES: made-up containers of 250 g and of 50 g. The catalog gives 63 kcal in 100 g.
+    // The infant table gives 566 kcal/d for the boys of 0 to 2 months, so the smallest feed is 566 / 8 kcal.
+    const baby: Person = { sex: "male", ageMonths: 1, count: 1, feeding: "formula" };
+    const feed = 566 / FORMULA_FEEDS.perDay;
+    const run = (grams: number, cold?: boolean) => {
+      const catalog = withContainer(grams);
+      const result = fragmentOf({ ...input, catalog, persons: [...adults, baby], units: { ...units, "food.infant-formula-ready-1kg": 9 }, cold });
+      return { result, days: enduranceOf(result.layer, foodCut, { at }).needs[FORMULA_NEED]?.days };
+    };
+    // A container of 250 g gives 157.5 kcal, more than a feed: 36 containers give 36 feeds, thus 36 / 8 days.
+    const big = run(250);
+    expect(big.days).toBeCloseTo(36 / 8, 9);
+    expect(big.result.storesRead).toBe(true);
+    expect(big.result.waste).toEqual([
+      { product: "food.infant-formula-ready-1kg", resource: FORMULA_READY, containers: 36, container: expect.closeTo(157.5, 9), feed: expect.closeTo(feed, 9), used: expect.closeTo(36 * feed, 9), waste: expect.closeTo(9 * 630 - 36 * feed, 9) },
+    ]);
+    // A container of 50 g gives 31.5 kcal. A feed takes 3 containers, so each container gives a third of a feed.
+    const small = run(50);
+    expect(small.result.waste[0]?.containers).toBe(180);
+    expect(small.days).toBeCloseTo(180 / 3 / 8, 9);
+    // With cold storage, the store is the whole energy of the list.
+    const cold = run(250, true);
+    expect(cold.days).toBeCloseTo((9 * 630) / 566, 9);
+    expect(cold.result.waste).toEqual([]);
+  });
+
+  it("keeps the formula store when no infant is on formula, and refuses opened containers of a resource that feeds no formula draw", () => {
+    const keep = fragmentOf({ ...input, catalog: withContainer(250), units: { ...units, "food.infant-formula-ready-1kg": 2 } });
+    expect(keep.layer.stores).toContainEqual({ id: "buy:food.infant-formula-ready-1kg:food.infant-formula-ready", resource: FORMULA_READY, amount: 2 * 630 });
+    expect(keep.waste).toEqual([]);
+    const peanut = SUPPLY_CATALOG.products.find((each) => each.id === "food.peanut-butter-1kg")!;
+    const opened: SupplyProduct = { ...peanut, opened: { container: { read: true, amount: 1, unit: "kg", size: true }, noCold: "wic.formula-opened" } };
+    const catalog: SupplyCatalog = { ...SUPPLY_CATALOG, products: SUPPLY_CATALOG.products.map((each) => (each.id === opened.id ? opened : each)) };
+    expect(() => householdFragment({ ...input, catalog })).toThrow(/food\.peanut-butter-1kg spoils after its container is opened, and its resource food\.no-cook feeds no formula draw/);
+    expect(householdFragment({ ...input, catalog, cold: true }).layer).toBeDefined();
+  });
+
+  it("puts the whole need of an infant on formula from 6 months in the formula draw with formulaLater: whole", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months.
+    const girl: Person = { sex: "female", ageMonths: 7, count: 1, feeding: "formula" };
+    const without = householdFragment({ ...input, persons: [...adults, girl] });
+    expect(without.layer).toBeUndefined();
+    const whole = fragmentOf({ ...input, persons: [...adults, girl], formulaLater: "whole" });
+    expect(whole.layer.draws).toEqual([
+      { need: FOOD_NEED, level: "critical", perDay: DAILY, users: 2, supply: "food.retail" },
+      { need: FORMULA_NEED, level: "critical", perDay: 604, users: 1, supply: "food.retail" },
+    ]);
+    expect(whole.leftOut).toEqual([]);
+    expect(whole.formula).toEqual([girl]);
+  });
+
+  it("puts the least formula of an infant from 6 months in the formula draw and the rest in the food draw with formulaLater: least", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months. The least formula is 24 fl oz at 19.152 kcal/fl oz.
+    const girls: Person = { sex: "female", ageMonths: 7, count: 2, feeding: "formula" };
+    const least = fragmentOf({ ...input, persons: [...adults, girls], formulaLater: "least" });
+    expect(FORMULA_LATER_LEAST.perDay).toBeCloseTo(459.648, 9);
+    expect(least.layer.draws).toEqual([
+      { need: FOOD_NEED, level: "critical", perDay: expect.closeTo(DAILY + 2 * (604 - 459.648), 9), users: 4, supply: "food.retail" },
+      { need: FORMULA_NEED, level: "critical", perDay: expect.closeTo(2 * 459.648, 9), users: 2, supply: "food.retail" },
+    ]);
+    expect(least.leftOut).toEqual([]);
+    // The low and the high give the same total energy. Only the split between the draws differs.
+    const whole = fragmentOf({ ...input, persons: [...adults, girls], formulaLater: "whole" });
+    const total = (layer: EnduranceLayer): number => layer.draws.reduce((sum, draw) => sum + draw.perDay, 0);
+    expect(total(least.layer)).toBeCloseTo(total(whole.layer), 9);
   });
 
   it("gives only the draw of formula for a household of infants on formula", () => {

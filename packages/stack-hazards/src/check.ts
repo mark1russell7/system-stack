@@ -1,7 +1,7 @@
 import { checkSources, LICENSES, permits, type FindingCode, type GateOptions, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
-import { priorTableFaults } from "./priors.ts";
+import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
 // Each claim of a source has a basis. The fields of each source go through the source gate of @mark1russell7/guidebook.
@@ -27,7 +27,9 @@ import { priorTableFaults } from "./priors.ts";
  * - `hazards-prior`: a table of priors names a source that the table of the sources does not have.
  *   Or the license of its source does not permit a fact.
  *   Or it has no method, a wrong date, a case that is not in the list, or a region that is not in its codes.
- *   Or it has a rate that is not a count of 0 or more with a share from 0 to 1.
+ *   Or its scheme is empty, or a region is two times in its codes.
+ *   Or it has a rate that is not a pair of a count of 0 or more and a share from 0 to 1.
+ *   Or two tables have the same scheme, case and region.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
  */
 export const HAZARD_CODES: readonly [
@@ -122,6 +124,7 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
     if (dayNumber(table.asOf) === undefined) add("error", "hazards-prior", at, `The table of priors "${at}" has a date that is not a date YYYY-MM-DD.`);
     for (const fault of priorTableFaults(table, cases)) add("error", "hazards-prior", at, `The table of priors "${at}" ${fault}.`);
   }
+  for (const overlap of priorTableOverlaps(list.priors ?? [])) add("error", "hazards-prior", "priors", `The tables of priors ${overlap}.`);
   return faults;
 }
 

@@ -1,3 +1,4 @@
+import { isRecord } from "@mark1russell7/optional/read";
 import { fitGammaRates, pooledRate } from "@mark1russell7/rigor-statistics";
 import type { Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
@@ -90,6 +91,50 @@ export function regionRates(counts: Readonly<Record<string, AreaCount>>, observa
     if (perYear > 0) rates[code] = [perYear, Math.min(1, hits / (perYear * customers))];
   }
   return rates;
+}
+
+/**
+ * This function gives the observation of the regions: each region with one observed area or more is an area of its own.
+ * - The years of a region are the plain mean of the years of its observed areas. Thus the events of a region over its years are its events in one year.
+ * - The customers of a region are the sum of the customers of its observed areas.
+ * Give the result and `regionCounts` to `pooledRates` to pool the regions, for example the states toward the nation.
+ */
+export function regionObservation(observation: Observation, region: (area: string) => string): Observation {
+  const sums = new Map<string, { years: number; customers: number; areas: number }>();
+  for (const area of observedAreas(observation)) {
+    const code = region(area);
+    const sum = sums.get(code) ?? { years: 0, customers: 0, areas: 0 };
+    sum.years += observation.years[area] ?? 0;
+    sum.customers += observation.customers[area] ?? 0;
+    sum.areas += 1;
+    sums.set(code, sum);
+  }
+  const codes = [...sums.keys()].sort();
+  const sumOf = (code: string): { years: number; customers: number; areas: number } => sums.get(code) ?? { years: 0, customers: 0, areas: 1 };
+  return {
+    years: Object.fromEntries(codes.map((code) => [code, sumOf(code).years / sumOf(code).areas])),
+    customers: Object.fromEntries(codes.map((code) => [code, sumOf(code).customers])),
+  };
+}
+
+/**
+ * This function gives the counts of the events of each region with one observed area or more, in the order of the codes.
+ * - `events` of a region is the sum of the events of its observed areas.
+ * - `share` of a region is the sum of the peak share of each event over the customers of the region.
+ *   One event reaches its share of its area, times the customers of the area over the customers of the region.
+ */
+export function regionCounts(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, AreaCount> {
+  const regions = regionObservation(observation, region);
+  const sums = new Map<string, { events: number; share: number }>();
+  for (const area of observedAreas(observation)) {
+    const code = region(area);
+    const count = counts[area] ?? { events: 0, share: 0 };
+    const sum = sums.get(code) ?? { events: 0, share: 0 };
+    sum.events += count.events;
+    sum.share += (count.share * (observation.customers[area] ?? 0)) / (regions.customers[code] ?? 1);
+    sums.set(code, sum);
+  }
+  return Object.fromEntries([...sums.keys()].sort().map((code) => [code, sums.get(code) ?? { events: 0, share: 0 }]));
 }
 
 /** The pooled rates of the areas, and the law of each group. */
@@ -243,17 +288,60 @@ function observedAreas(observation: Observation): string[] {
     .sort();
 }
 
-/** This function gives the faults of a table of priors as the ends of sentences. The codes of the cases are the codes of the list. */
+/**
+ * This function gives the faults of a table of priors as the ends of sentences. The codes of the cases are the codes of the list.
+ * It examines the shape of each rate, so a table from JSON with a bad shape gives a fault and not an error.
+ */
 export function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[] {
   const faults: string[] = [];
   if (table.method.trim() === "") faults.push("has no method");
-  const codes = new Set(table.codes);
+  if (table.scheme.trim() === "" || table.scheme !== table.scheme.trim()) faults.push("has a scheme that is empty or has a space at an end");
+  const codes = new Set<string>();
+  for (const code of table.codes) {
+    if (codes.has(code)) faults.push(`has the region "${code}" two times in its codes`);
+    codes.add(code);
+  }
   for (const [code, rates] of Object.entries(table.rates)) {
     if (!cases.has(code)) faults.push(`has the case "${code}", which is not a case of the list`);
-    for (const [region, [perYear, reach]] of Object.entries(rates)) {
+    if (!isRecord(rates)) {
+      faults.push(`has rates of "${code}" that are not a record of regions`);
+      continue;
+    }
+    for (const [region, rate] of Object.entries(rates)) {
       if (!codes.has(region)) faults.push(`has a rate of "${code}" for the region "${region}", which is not in its codes`);
-      if (!(Number.isFinite(perYear) && perYear >= 0 && reach >= 0 && reach <= 1)) faults.push(`has a rate of "${code}" in "${region}" that is not a count of 0 or more with a share from 0 to 1`);
+      const pair: unknown = rate;
+      const [perYear, reach]: readonly unknown[] = Array.isArray(pair) && pair.length === 2 ? pair : [];
+      if (!(typeof perYear === "number" && Number.isFinite(perYear) && perYear >= 0 && typeof reach === "number" && reach >= 0 && reach <= 1))
+        faults.push(`has a rate of "${code}" in "${region}" that is not a pair of a count of 0 or more and a share from 0 to 1`);
     }
   }
   return faults;
+}
+
+/**
+ * This function gives the overlaps of the tables of priors as the ends of sentences, one for each pair of tables.
+ * Two tables overlap when they have the same scheme, a case of the two and a region in the codes of the two.
+ * `hazardPriors` takes the first table, so the later table of an overlap gives no prior there.
+ */
+export function priorTableOverlaps(tables: readonly PriorTable[]): string[] {
+  const first = new Map<string, number>();
+  const overlaps = new Map<string, { readonly example: string; count: number }>();
+  for (const [index, table] of tables.entries()) {
+    const rateCases = Object.keys(table.rates);
+    for (const region of new Set(table.codes)) {
+      for (const name of rateCases) {
+        const key = JSON.stringify([table.scheme, name, region]);
+        const earlier = first.get(key);
+        if (earlier === undefined) {
+          first.set(key, index);
+          continue;
+        }
+        const pair = `"priors.${String(earlier)}" and "priors.${String(index)}"`;
+        const found = overlaps.get(pair);
+        if (found === undefined) overlaps.set(pair, { example: `the case "${name}" in the region "${region}" of the scheme "${table.scheme}"`, count: 1 });
+        else found.count += 1;
+      }
+    }
+  }
+  return [...overlaps].map(([pair, { example, count }]) => `${pair} both give ${example}, and ${String(count)} pair${count === 1 ? "" : "s"} of a case and a region in all. Only the first table gives a prior there`);
 }

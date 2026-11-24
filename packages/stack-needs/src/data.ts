@@ -129,6 +129,105 @@ export const DGA_CALORIES: CalorieTable = {
 // The report is all rights reserved. The values are facts with a citation, and the gate of the sources permits them.
 // The Infant Nutrition and Feeding guide of the WIC program of the USDA (read on 2026-11-24) gives no table of daily needs.
 
+/** The source of the feeds of formula: the PDF of the infant guide of the WIC program. It is a work of the United States federal government. */
+export const WIC_INFANT_SOURCE: Source = {
+  id: "wic-infant-guide-2019",
+  title: "Infant Nutrition and Feeding: A Guide for Use in the WIC and CSF Programs",
+  url: "https://wicworks.fna.usda.gov/sites/default/files/media/document/infant-feeding-guide.pdf",
+  license: "us-public-domain",
+  checked: "2026-11-24",
+  by: "USDA Food and Nutrition Service",
+  terms: "https://wicworks.fna.usda.gov/resources/infant-nutrition-and-feeding-guide",
+  sha256: "d0c043cc70dedf16920673f57cc4771692974db30761df351faec4e56db45b1d",
+};
+
+/** A count of feeds in one day, with its source and its place in the source. */
+export interface CitedFeeds {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+/**
+ * The most feeds of formula in one day below 6 months: 8. Table 5.2 of the WIC guide gives 2 to 3 ounces every 3 to 4 hours.
+ * 24 hours divided by 3 hours is 8. More feeds give smaller feeds and thus more waste, so this value is the most feeds.
+ */
+export const FORMULA_FEEDS: CitedFeeds = { perDay: 8, source: WIC_INFANT_SOURCE, locator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137" };
+
+/** The source of the energy and the water of the infant formula items: the SR Legacy file of FoodData Central. */
+export const FDC_SR_LEGACY_SOURCE: Source = {
+  id: "fdc-sr-legacy-2018-04",
+  title: "FoodData Central, SR Legacy (April 2018)",
+  url: "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+  license: "cc0",
+  checked: "2026-11-24",
+  by: "USDA Agricultural Research Service",
+  terms: "https://fdc.nal.usda.gov/download-datasets",
+  sha256: "b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0",
+};
+
+/** The energy of the least formula of one infant for one day, from a cited volume and a cited energy of one fluid ounce. */
+export interface CitedFormulaLeast {
+  /** The energy, in `kcal`: `ounces` times `kcalPerOunce`. */
+  readonly perDay: number;
+  readonly ounces: number;
+  readonly ouncesSource: Source;
+  readonly ouncesLocator: string;
+  readonly kcalPerOunce: number;
+  readonly kcalSource: Source;
+  readonly kcalLocator: string;
+}
+
+/**
+ * The least formula of one infant from 6 months: 24 fl oz a day. Table 5.2 of the WIC guide gives 24 to 32 ounces at 6 to 8 months,
+ * and 24 ounces at 8 to 12 months. The FDC item 172319 gives 63 kcal in 100 g and 30.4 g in 1 fl oz, thus 19.152 kcal in 1 fl oz.
+ */
+export const FORMULA_LATER_LEAST: CitedFormulaLeast = {
+  perDay: 24 * 19.152,
+  ounces: 24,
+  ouncesSource: WIC_INFANT_SOURCE,
+  ouncesLocator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137",
+  kcalPerOunce: 19.152,
+  kcalSource: FDC_SR_LEGACY_SOURCE,
+  kcalLocator: "FDC ID 172319: 63 kcal in 100 g (food_nutrient.csv), and 30.4 g in 1 fl oz (food_portion.csv)",
+};
+
+/**
+ * The facts of the mix rule: the energy and the water of a powder and of a ready-to-feed item of one store brand.
+ * `formulaMixWater` gives the rule, and `formulaMixCheck` gives its check.
+ */
+export interface CitedFormulaMix {
+  /** The energy of the powder, in `kcal` in 100 g. */
+  readonly powderKcal: number;
+  /** The water of the powder, in `g` in 100 g. Only the check of the rule uses it. */
+  readonly powderWater: number;
+  /** The energy of the ready-to-feed item, in `kcal` in 100 g. */
+  readonly readyKcal: number;
+  /** The water of the ready-to-feed item, in `g` in 100 g. Only the check of the rule uses it. */
+  readonly readyWater: number;
+  readonly source: Source;
+  readonly locator: string;
+  /** The source that tells to mix the powder with safe water, one bottle at a time. */
+  readonly waterSource: Source;
+  readonly waterLocator: string;
+}
+
+/**
+ * The facts of the mix rule: the FDC items 173554 (store brand, powder) and 172319 (store brand, ready-to-feed).
+ * The powder gives 524 kcal and 2 g of water in 100 g. The ready-to-feed item gives 63 kcal and 88.1 g of water in 100 g.
+ * The WIC guide tells to mix powder one bottle at a time, and to use bottled water after a disaster or in a power cut.
+ */
+export const FORMULA_MIX: CitedFormulaMix = {
+  powderKcal: 524,
+  powderWater: 2,
+  readyKcal: 63,
+  readyWater: 88.1,
+  source: FDC_SR_LEGACY_SOURCE,
+  locator: "FDC ID 173554: 524 kcal (nutrient 1008) and 2 g of water (nutrient 1051) in 100 g. FDC ID 172319: 63 kcal and 88.1 g of water in 100 g (food_nutrient.csv)",
+  waterSource: WIC_INFANT_SOURCE,
+  waterLocator: "Page 106, Guidelines for Using Infant Formula When Access to Common Kitchen Appliances Is Limited, and Natural Disaster or Power Outage",
+};
+
 /** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
 export const NASEM_ENERGY_SOURCE: Source = {
   id: "nasem-dri-energy-2023",
@@ -141,6 +240,20 @@ export const NASEM_ENERGY_SOURCE: Source = {
   note: "DOI 10.17226/26818. The terms are on the first page of the PDF. The table cites its values as facts and copies no text.",
   sha256: "e6a7d9c9104053d4925c621b659b06de4c8dd6c64ed4534e6f5bc5cf0dd41b27",
 };
+
+/** The energy of the breast milk of one infant for one day, with its source and its place in the source. */
+export interface CitedMilk {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+/**
+ * The energy of the breast milk of one infant from 6 months: 381 kcal/d. Table 5-14 of the NASEM report gives 568 g/d of milk
+ * at 7 to 12 months for women that partly breastfeed, at 0.67 kcal/g. Its value at 6 months, 599 kcal/d, is for women that
+ * only breastfeed. An infant from 6 months also has food, so the lower value gives the larger draw, the worst case.
+ */
+export const MILK_LATER: CitedMilk = { perDay: 381, source: NASEM_ENERGY_SOURCE, locator: "Table 5-14, Energy Cost of Milk Production in Breastfeeding Women During the First Year Postpartum, page 97" };
 
 /**
  * The table of the Estimated Energy Requirements of the ages of 0 to 35 months, from the report Dietary Reference Intakes

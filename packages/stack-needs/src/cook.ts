@@ -1,7 +1,7 @@
 import type { Source } from "@mark1russell7/guidebook";
 import { fuelEnergyPerMass, giftsOf, cookWater, type CitedRate, type HeatingValue, type StoveFacts, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
-import { FOOD_NEED, STORED_WATER } from "./uses.ts";
+import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
 // The water and the fuel to cook the dry food of a buy list, as converters of an endurance layer.
 // One run of a converter is one pot: the dry food, the cook water and the fuel of the pot give the food energy of the pot.
@@ -220,6 +220,7 @@ interface StoveContext {
 /**
  * This function gives the cook line of one dry food. Each missing fact gives a no read with its reason.
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
+ * Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read.
  * At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
  */
 function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
@@ -249,8 +250,12 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   if (time === undefined) why.push(`The catalog cites no cook time for the product ${product.id}.`);
   else if (cookMin === undefined) why.push(`The cook time of the product ${product.id} is in ${time.unit}, which does not convert to min.`);
 
-  const rate = stove.rate === undefined ? undefined : stoveRate(stove.rate);
+  // Only a rate with no bound is the value. A least rate gives too little fuel for the cook time, and an unknown bound has no side.
+  const bound: unknown = stove.rate !== undefined && "bound" in stove.rate ? stove.rate.bound : undefined;
+  const rate = stove.rate === undefined || bound !== undefined ? undefined : stoveRate(stove.rate);
   if (stove.rate === undefined) why.push(`The stove of ${stove.fuel} has no cited fuel rate.`);
+  else if (bound !== undefined)
+    why.push(`The fuel rate of the stove has the bound ${String(bound)}. Only a rate with no bound is the value.${bound === "least" ? " A least rate gives too little fuel for the cook time." : ""}`);
   else if (rate === undefined) why.push(`The fuel rate of the stove is in ${stove.rate.unit} for each ${stove.rate.per.unit}, which is not an energy or a mass in a time.`);
 
   // The heat of the stove into the pot for each minute, in kJ/min. It needs a cited share with the same heating value as the energy rate.
@@ -297,8 +302,12 @@ function isFood(catalog: SupplyCatalog, code: string): boolean {
   return catalog.resources.find((item) => item.code === code)?.kind === "food";
 }
 
-/** This function tells if a resource of the catalog is a dry food: a food resource in a unit of mass. */
+/**
+ * This function tells if a resource of the catalog is a dry food to cook: a food resource in a unit of mass.
+ * `FORMULA_POWDER` is not a food to cook: `formulaMixFragment` mixes it with water, with no fuel.
+ */
 function isDryFood(catalog: SupplyCatalog, code: string): boolean {
+  if (code === FORMULA_POWDER) return false;
   const resource = catalog.resources.find((item) => item.code === code);
   return resource !== undefined && resource.kind === "food" && inUnit(1, resource.unit, "kg") !== undefined;
 }
@@ -314,9 +323,12 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - The boil time is the heat divided by the stove rate times the share. The time of the stove is the boil time plus the high end of the cook time.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
  *   The model does not give that time, so there the fuel is not an upper limit.
+ * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
- * A dry food is a gift of a food resource in a unit of mass. Each missing fact gives a line with no read and its reasons, not a figure.
+ * A dry food is a gift of a food resource in a unit of mass, except `FORMULA_POWDER`. `formulaMixFragment` gives its converter.
+ * Each missing fact gives a line with no read and its reasons, not a figure.
+ *
  * Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines:
  * the most water, the most fuel and the least food energy. When a line of the resource has no read, the resource has no converter.
  * A store of the resource from a different fragment gets the converter of this list.

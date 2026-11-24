@@ -77,7 +77,7 @@ export type CalorieTables = CalorieTable | readonly CalorieTable[];
 /**
  * The ways to feed an infant.
  *
- * - `breast-milk`: only the milk of a person of the household.
+ * - `breast-milk`: the milk of a person of the household. Below 6 months, the infant has only milk. From 6 months, the infant also has food.
  * - `formula`: infant formula.
  * - `food`: the food of the household, also with milk.
  */

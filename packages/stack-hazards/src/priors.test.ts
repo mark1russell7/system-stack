@@ -5,9 +5,9 @@ import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
 import type { OutageEvent } from "./outages.ts";
 import { HAZARD_LIST } from "./data.ts";
 import { EAGLEI_COUNTY_POOLING, EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
-import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
+import { EAGLEI_STATE_POOLING, EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_NATION_PRIORS } from "./oe417.ts";
-import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionRates, withoutSilentAreas, type Observation } from "./priors.ts";
+import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionCounts, regionObservation, regionRates, withoutSilentAreas, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
 const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, seconds: 3600, peak, censored: false });
@@ -185,6 +185,52 @@ describe("the pooled rates of the areas", () => {
   });
 });
 
+describe("the pooled rates of the states", () => {
+  // The state 01 has two observed counties with events. The state 02 has one observed county with no event. The county 02003 has no year.
+  const observation: Observation = { years: { "01001": 2, "01003": 4, "02001": 3, "02003": 0 }, customers: { "01001": 1000, "01003": 3000, "02001": 500, "02003": 500 } };
+  const counts = { "01001": { events: 4, share: 1 }, "01003": { events: 2, share: 1.5 }, "02003": { events: 9, share: 9 } };
+
+  it("makes each state an area: the plain mean of the years of its counties, the sum of their customers, events and shares of the state", () => {
+    expect(regionObservation(observation, state)).toEqual({ years: { "01": 3, "02": 3 }, customers: { "01": 4000, "02": 500 } });
+    const regions = regionCounts(counts, observation, state);
+    // The share of the state 01: 1 * 1000 / 4000 + 1.5 * 3000 / 4000 = 1.375. The county 02003 has no year, so it is not observed.
+    expect(regions).toEqual({ "01": { events: 6, share: 1.375 }, "02": { events: 0, share: 0 } });
+    // With equal years, the rates of the states as areas are the rates of `regionRates`.
+    const equal: Observation = { years: { "01001": 4, "01003": 4 }, customers: observation.customers };
+    const [perYear, reach] = regionRates(counts, equal, state)["01"] ?? [0, 0];
+    const own = regionRates(regionCounts(counts, equal, state), regionObservation(equal, state), (area) => area)["01"] ?? [0, 0];
+    expect(own[0]).toBeCloseTo(perYear, 12);
+    expect(own[1]).toBeCloseTo(reach, 12);
+  });
+
+  it("gives a state with no event a rate above 0 when the states are pooled toward the nation", () => {
+    const { rates, laws } = pooledRates(regionCounts(counts, observation, state), regionObservation(observation, state), () => "nation");
+    expect(laws["nation"]).toMatchObject({ areas: 2, events: 6, from: "group" });
+    expect(rates["02"]?.[0]).toBeGreaterThan(0);
+    // The reach of the state with no event is the reach of the one state with events: 1.375 / 6.
+    expect(rates["02"]?.[1]).toBeCloseTo(1.375 / 6, 12);
+  });
+
+  it("holds the gate of the committed table: no state has a prior of 0, and the pooled rates pass the holdout in each case", () => {
+    const cases = Object.keys(EAGLEI_STATE_PRIORS.rates).sort();
+    for (const name of cases) for (const code of EAGLEI_STATE_PRIORS.codes) expect(EAGLEI_STATE_PRIORS.rates[name]?.[code]?.[0], `${name} ${code}`).toBeGreaterThan(0);
+    expect(EAGLEI_STATE_POOLING.holdout.rounds).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(EAGLEI_STATE_POOLING.holdout.cases)).toEqual(cases);
+    expect(Object.keys(EAGLEI_STATE_POOLING.laws).sort()).toEqual(cases);
+    for (const name of cases) {
+      const score = EAGLEI_STATE_POOLING.holdout.cases[name];
+      // The pooled score is finite, also when a state with no event in the fit half has events in the score half. It is above the score of one rate for the nation.
+      expect(Number.isFinite(score?.pooled), name).toBe(true);
+      expect(score?.pooled, name).toBeGreaterThan(score?.state ?? Number.POSITIVE_INFINITY);
+      // On the states with events in the fit half, the pooled score is at most 1% under the raw score. The squared error is at most 5% above the raw error.
+      expect(score?.seen.pooled, name).toBeGreaterThanOrEqual(1.01 * (score?.seen.raw ?? 0));
+      expect(score?.squared.pooled, name).toBeLessThanOrEqual(1.05 * (score?.squared.raw ?? 0));
+    }
+    // In some cases, the raw rates lose a state: it has no event in the fit half and events in the score half.
+    expect(Object.values(EAGLEI_STATE_POOLING.holdout.cases).some((score) => score.raw === Number.NEGATIVE_INFINITY && score.lost > 0)).toBe(true);
+  });
+});
+
 describe("the silent areas", () => {
   const observation: Observation = { years: { "99001": 3, "99003": 1, "98001": 2, "97001": 5 }, customers: { "99001": 3000, "99003": 1000, "98001": 10 } };
 
@@ -266,5 +312,24 @@ describe("hazardPriors", () => {
     expect(prior([{ ...county, rates: { "met.flood": { A1: [-1, 0.5] } } }])).toHaveLength(1);
     expect(prior([{ ...county, rates: { "met.flood": { A1: [1, 1.5] } } }])).toHaveLength(1);
     expect(prior([{ ...county, rates: { "met.flood": { A1: [Number.NaN, 0.5] } } }])).toHaveLength(1);
+  });
+
+  it("refuses an empty scheme, a region two times, a rate that is not a pair, and two tables with the same scheme, case and region", () => {
+    const prior = (tables: readonly unknown[]): string[] => checkHazards({ ...list, priors: tables as PriorTable[] }).filter((fault) => fault.code === "hazards-prior").map((fault) => fault.message);
+    expect(prior([{ ...county, scheme: "" }])).toHaveLength(1);
+    expect(prior([{ ...county, scheme: " test-county" }])).toHaveLength(1);
+    expect(prior([{ ...county, codes: [...county.codes, county.codes[0]] }])).toHaveLength(1);
+    // A table from JSON can have any shape. The gate gives a fault, and it does not throw.
+    for (const rate of [1, [1], [1, 0.5, 2], null, "1,0.5", ["1", 0.5]]) expect(prior([{ ...county, rates: { "met.flood": { A1: rate } } }]), JSON.stringify(rate)).toHaveLength(1);
+    expect(prior([{ ...county, rates: { "met.flood": null } }])).toHaveLength(1);
+    expect(prior([{ ...county, rates: { "met.flood": [[1, 0.5]] } }])).toHaveLength(1);
+    // Two tables of one scheme overlap in each case of the two and each region of the two: one fault for the pair, with the count.
+    const overlap = prior([county, region, { ...county, asOf: "2026-03-01" }]);
+    expect(overlap).toHaveLength(1);
+    expect(overlap[0]).toContain('"priors.0" and "priors.2"');
+    expect(overlap[0]).toContain("4 pairs of a case and a region");
+    // Two tables of one scheme with no shared case, or no shared region, do not overlap.
+    expect(prior([county, { ...county, rates: { "met.tornado": { A1: [1, 0.5] } } }])).toEqual([]);
+    expect(prior([county, { ...county, codes: ["Z9"], rates: {} }])).toEqual([]);
   });
 });

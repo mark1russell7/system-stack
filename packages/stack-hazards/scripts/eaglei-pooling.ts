@@ -5,7 +5,7 @@ import type { PoolHoldout, PoolScore } from "../src/hazard.ts";
 import { pooledRates, type AreaCount, type Observation } from "../src/priors.ts";
 import type { EaglePriors } from "./eaglei-fit.ts";
 
-// The gate of the pooled county rates: a holdout by the thinning of the counts.
+// The gate of the pooled rates of the counties and of the states: a holdout by the thinning of the counts.
 // The record of a fit has the total events of each county, not the events of each year. Thus a holdout of the later years is not possible.
 // Each event goes to the fit half or to the score half with the chance 1/2. Each half of a Poisson count is then an independent
 // Poisson count with half the rate. A method fits its rates on the fit half, and the score half scores them.
@@ -36,19 +36,22 @@ function logLikelihood(count: number, years: number, rate: number): number {
   return gammaPoissonLogLikelihood([{ count, exposure: years }], Number.POSITIVE_INFINITY, rate);
 }
 
-/** This function gives the scores of the methods of one case on one split. */
-export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Readonly<Record<string, AreaCount>>, observation: Observation): PoolScore {
-  const pooled = pooledRates(fit, observation, eagleRegion);
+/**
+ * This function gives the scores of the methods of one case on one split.
+ * The default group of an area is its state (`eagleRegion`). With the states as the areas and one group for the nation, it scores the pooled state rates.
+ */
+export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string = eagleRegion): PoolScore {
+  const pooled = pooledRates(fit, observation, group);
   const areas = Object.keys(observation.years)
     .filter((area) => (observation.years[area] ?? 0) > 0 && (observation.customers[area] ?? 0) > 0)
     .sort();
   // One rate for each state: the events of its observed counties over their years.
   const totals = new Map<string, { events: number; years: number }>();
   for (const area of areas) {
-    const total = totals.get(eagleRegion(area)) ?? { events: 0, years: 0 };
+    const total = totals.get(group(area)) ?? { events: 0, years: 0 };
     total.events += fit[area]?.events ?? 0;
     total.years += observation.years[area] ?? 0;
-    totals.set(eagleRegion(area), total);
+    totals.set(group(area), total);
   }
   const sums = { raw: 0, pooled: 0, state: 0 };
   const squared = { raw: 0, pooled: 0, state: 0 };
@@ -57,10 +60,10 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
   // The events-weighted reach of each state in the fit half, and of all states for a state with no event.
   const shares = new Map<string, { share: number; events: number }>();
   for (const area of areas) {
-    const sum = shares.get(eagleRegion(area)) ?? { share: 0, events: 0 };
+    const sum = shares.get(group(area)) ?? { share: 0, events: 0 };
     sum.share += fit[area]?.share ?? 0;
     sum.events += fit[area]?.events ?? 0;
-    shares.set(eagleRegion(area), sum);
+    shares.set(group(area), sum);
   }
   const all = [...shares.values()].reduce((sum, item) => ({ share: sum.share + item.share, events: sum.events + item.events }), { share: 0, events: 0 });
   const reach = { areas: 0, plain: { bias: 0, error: 0 }, events: { bias: 0, error: 0 } };
@@ -68,7 +71,7 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
     const held = score[area];
     if ((fit[area]?.events ?? 0) > 0 || held === undefined || held.events === 0) continue;
     const truth = held.share / held.events;
-    const state = shares.get(eagleRegion(area)) ?? { share: 0, events: 0 };
+    const state = shares.get(group(area)) ?? { share: 0, events: 0 };
     const weighted = state.events > 0 ? state.share / state.events : all.events > 0 ? all.share / all.events : 0;
     const rates = { plain: pooled.rates[area]?.[1] ?? 0, events: Math.min(1, weighted) };
     for (const method of ["plain", "events"] as const) {
@@ -80,7 +83,7 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
   for (const area of areas) {
     const years = observation.years[area] ?? 0;
     const count = score[area]?.events ?? 0;
-    const code = eagleRegion(area);
+    const code = group(area);
     const total = totals.get(code) ?? { events: 0, years: 1 };
     const law = pooled.laws[code];
     const rate = { raw: (fit[area]?.events ?? 0) / years, pooled: pooled.rates[area]?.[0] ?? 0, state: law?.from === "nation" ? law.mean : total.events / total.years };
@@ -116,8 +119,9 @@ function meanScore(scores: readonly PoolScore[]): PoolScore {
 /**
  * This function gives the holdout of each case of the counts of a fit: the mean scores of some splits.
  * Each case has its own stream of draws, so a new case does not change the scores of the other cases.
+ * The option `group` gives the group of each area, as in `poolScore`.
  */
-export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEED, rounds: number = POOL_HOLDOUT_ROUNDS): PoolHoldout {
+export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEED, rounds: number = POOL_HOLDOUT_ROUNDS, group: (area: string) => string = eagleRegion): PoolHoldout {
   if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`poolHoldout: rounds is a whole number from 1, not ${rounds}.`);
   const draws = random(seed);
   const cases: Record<string, PoolScore> = {};
@@ -126,7 +130,7 @@ export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEE
     const scores: PoolScore[] = [];
     for (let round = 0; round < rounds; round++) {
       const [fit, score] = thinCounts(priors.counts[name] ?? {}, () => stream.chance(0.5));
-      scores.push(poolScore(fit, score, priors.observation));
+      scores.push(poolScore(fit, score, priors.observation, group));
     }
     cases[name] = meanScore(scores);
   }
