@@ -196,6 +196,18 @@ export interface PoolScore {
    * Each raw rate of these counties is above 0, so each score is finite. It compares the raw rates with the other methods when `raw` is `-Infinity`.
    */
   readonly seen: { readonly raw: number; readonly pooled: number; readonly state: number; readonly areas: number };
+  /**
+   * The scores of the reach of some counties, and the count of these counties. Each such county has no event in the fit half and one event or more in the score half.
+   * The reach of the score half of a county is the mean peak share of its events. Each score is a sum over the counties: the error (the reach of the method minus the reach of the score half) and its absolute value.
+   * `plain` is the plain mean of the reach of the counties of the state with events (`pooledRates`). `events` is the mean peak share of the events of the state.
+   */
+  readonly reach: { readonly areas: number; readonly plain: ReachScore; readonly events: ReachScore };
+}
+
+/** The sums of the errors of a reach over some counties, and of their absolute values. */
+export interface ReachScore {
+  readonly bias: number;
+  readonly error: number;
 }
 
 /** The holdout of each case of a fit, with its seed. */
@@ -211,4 +223,6 @@ export interface CountyPooling {
   /** The law of each state with an observed county, by the code of the case and the code of the state. */
   readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
   readonly holdout: PoolHoldout;
+  /** The counties with no event in any case, which are not observed (`withoutSilentAreas`), and the count of such counties that the laws expect. */
+  readonly silent: { readonly areas: number; readonly expected: number };
 }
