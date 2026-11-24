@@ -89,12 +89,18 @@ The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). 
 | `feeding` | The draw of food energy |
 | --- | --- |
 | `food` | The draw holds the need of the infant, from the infant table. |
-| `breast-milk` | The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. A person of the household must have a stage of lactation, or the function gives a `RangeError`. The result lists the infant in `breastMilk`. |
-| `formula` | The fragment has no draw of formula. Thus the infant gives no layer, as a person with no row. The result lists the infant in `formula`. With `noRow: "leave-out"`, the draw has no need of the infant, and `leftOut` lists the infant. |
+| `breast-milk` | Only below 6 months (`BREAST_MILK_MONTHS`). The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. The result lists the infant in `breastMilk`. |
+| `formula` | Only below 12 months. The fragment has no draw of formula. Thus the infant gives no layer, as a person with no row. The result lists the infant in `formula`. With `noRow: "leave-out"`, the draw has no need of the infant, and `leftOut` lists the infant. |
 
-The line of each infant in `need` has a read in each case, so `need` gives the energy of the whole household.
+With the default tables, the line of each infant in `need` has a read, so `need` gives the energy of the whole household.
 
-A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. After 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
+The rules of breast milk:
+
+- A person of the household must have a stage of lactation, or the function gives a `RangeError`.
+- The change of a stage is the milk of one infant. Thus each infant on breast milk needs one person of the draw with a stage of lactation. When the infants are more, the function gives no layer, also with `leave-out`. A person that the draw leaves out does not count.
+- From 6 months, the infant table gives 604 to 745 kcal/d, and the change of the stage is 400 kcal/d. Thus a part of the need is in no draw, and the function gives a `RangeError`. Give `food` from 6 months.
+
+A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. From 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
 ### The resources of the buy list and the join
 

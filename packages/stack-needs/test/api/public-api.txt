@@ -8,6 +8,7 @@
 
 ACTIVITY_LEVELS: build/index.d.ts#ACTIVITY_LEVELS
 ActivityLevel: build/index.d.ts#ActivityLevel
+BREAST_MILK_MONTHS: build/index.d.ts#BREAST_MILK_MONTHS
 CALORIE_CHAIN: build/index.d.ts#CALORIE_CHAIN
 CALORIE_SEXES: build/index.d.ts#CALORIE_SEXES
 CALORIE_TABLES: build/index.d.ts#CALORIE_TABLES
@@ -72,6 +73,9 @@ export declare const ACTIVITY_LEVELS: readonly ["sedentary", "moderately-active"
 
 ### build/index.d.ts#ActivityLevel
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
+
+### build/index.d.ts#BREAST_MILK_MONTHS
+export declare const BREAST_MILK_MONTHS = 6;
 
 ### build/index.d.ts#CALORIE_CHAIN
 export declare const CALORIE_CHAIN: readonly CalorieTable[];
@@ -239,6 +243,7 @@ export interface HouseholdFragmentRead extends HouseholdStoresResult {
   readonly need: CalorieNeedTotal;
   readonly needRead: true;
   readonly leftOut: readonly Person[];
+  readonly formula: readonly Person[];
   readonly breastMilk: readonly Person[];
 }
 
