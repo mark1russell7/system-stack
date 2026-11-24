@@ -377,6 +377,12 @@ importers:
 
   packages/stack-needs:
     dependencies:
+      '@mark1russell7/algebra':
+        specifier: ^0.9.11
+        version: 0.9.11(zod@4.6.7)
+      '@mark1russell7/geo':
+        specifier: ^0.5.13
+        version: 0.5.13
       '@mark1russell7/guidebook':
         specifier: ^0.4.0
         version: 0.4.0
@@ -880,6 +886,15 @@ packages:
       zod:
         optional: true
 
+  '@mark1russell7/algebra@0.9.11':
+    resolution: {integrity: sha512-zaaSfjiUu+5fnwfQeJg3LusRc/1oumZ7ofQhH+3v+rjHKP5xxYb6xGAA76P8gRVEbFTyzQOzpIOCvOJe74NyxQ==}
+    engines: {node: '>=22.19'}
+    peerDependencies:
+      zod: ^4.1.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
   '@mark1russell7/api-report@0.5.18':
     resolution: {integrity: sha512-iDfFuVuhWP3597ic1Yx93cin1f9o2bP2McRfnFlb8xHh4jUza0PsunTTQPlXei103JjeMEMz3kwqbPcYsySzNw==}
     engines: {node: '>=22'}
@@ -925,8 +940,8 @@ packages:
     resolution: {integrity: sha512-2p3FGGlLJiHdPE3JFl41CjrS7nkewLbb0QKKhWLHEpjWHP1KT60IKSb7hP8kcF++Yof0XW6wwctQDnQ3p8jZeg==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/geo@0.5.4':
-    resolution: {integrity: sha512-HHlt/0QqP5yOswCNOmPxDnduEN//I6KUJpcC0z3RG/Xi1Q6v/+4d1CkzWUWtV8glKP5R6MvJfGpVfc98m+6XXQ==}
+  '@mark1russell7/geo@0.5.13':
+    resolution: {integrity: sha512-Z5FIUCzFSGS6GB6iSvZmfzJshpKPpOoteXxPQSDpcfVDa+XYJ2dJwaz+Zq1SrCO8VyBJX4oa4dNVSr5nO2EC2Q==}
     engines: {node: '>=22.12'}
 
   '@mark1russell7/guidebook@0.4.0':
@@ -2461,9 +2476,9 @@ snapshots:
 
   '@mark1russell7/alerts@0.1.12':
     dependencies:
-      '@mark1russell7/algebra': 0.9.10(zod@4.6.7)
+      '@mark1russell7/algebra': 0.9.11(zod@4.6.7)
       '@mark1russell7/collections': 0.11.2(zod@4.6.7)
-      '@mark1russell7/geo': 0.5.4
+      '@mark1russell7/geo': 0.5.13
       '@mark1russell7/interval': 0.1.0
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
@@ -2474,9 +2489,9 @@ snapshots:
 
   '@mark1russell7/alerts@0.1.26':
     dependencies:
-      '@mark1russell7/algebra': 0.9.10(zod@4.6.7)
+      '@mark1russell7/algebra': 0.9.11(zod@4.6.7)
       '@mark1russell7/collections': 0.11.2(zod@4.6.7)
-      '@mark1russell7/geo': 0.5.4
+      '@mark1russell7/geo': 0.5.13
       '@mark1russell7/interval': 0.1.0
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
@@ -2494,6 +2509,13 @@ snapshots:
   '@mark1russell7/algebra@0.9.10(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
+      '@mark1russell7/rigor-statistics': 0.2.23
+    optionalDependencies:
+      zod: 4.6.7
+
+  '@mark1russell7/algebra@0.9.11(zod@4.6.7)':
+    dependencies:
+      '@mark1russell7/quantity': 0.4.8(zod@4.6.7)
       '@mark1russell7/rigor-statistics': 0.2.23
     optionalDependencies:
       zod: 4.6.7
@@ -2546,7 +2568,7 @@ snapshots:
 
   '@mark1russell7/files@0.0.5': {}
 
-  '@mark1russell7/geo@0.5.4':
+  '@mark1russell7/geo@0.5.13':
     dependencies:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/predicates': 0.1.5

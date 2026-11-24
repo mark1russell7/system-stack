@@ -69,7 +69,7 @@ export const NWS_ALARMS_SOURCE: Source = {
  * - `alert.watch`: 24 hours each day for each household. The sources give a standby mode that turns on at an alert, and warnings at night.
  *   Thus a receiver stays on at all hours to get a warning. One receiver for each home is a choice of this model.
  * - `light.see`: no read, for each household. The kit lists of official sources give a flashlight and extra batteries, but no hours of use.
- *   The count of lights of each person is a fact of the plan or the device.
+ *   The count of lights of each person is a fact of the plan or the device. `lightNeed` gives a read from the point and the awake window.
  * - `warmth.shelter`: no read. The heat of a home changes with the weather, the building and the persons. It is space heat only.
  */
 export const DAILY_NEEDS: readonly DailyNeed[] = [

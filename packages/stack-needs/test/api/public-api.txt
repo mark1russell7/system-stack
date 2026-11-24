@@ -89,6 +89,10 @@ JoinCode: build/index.d.ts#JoinCode
 JoinFinding: build/index.d.ts#JoinFinding
 JoinReferences: build/index.d.ts#JoinReferences
 LIGHT_NEED: build/index.d.ts#LIGHT_NEED
+LightDay: build/index.d.ts#LightDay
+LightHours: build/index.d.ts#LightHours
+LightHoursInput: build/index.d.ts#LightHoursInput
+MAX_LIGHT_DAYS: build/index.d.ts#MAX_LIGHT_DAYS
 MILK_LATER: build/index.d.ts#MILK_LATER
 MixConverter: build/index.d.ts#MixConverter
 MixFragment: build/index.d.ts#MixFragment
@@ -108,6 +112,8 @@ Person: build/index.d.ts#Person
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
 STORED_WATER: build/index.d.ts#STORED_WATER
+SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
+SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
 StoveShare: build/index.d.ts#StoveShare
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
@@ -132,6 +138,8 @@ formulaMixWater: build/index.d.ts#formulaMixWater
 hasNeedsError: build/index.d.ts#hasNeedsError
 householdFragment: build/index.d.ts#householdFragment
 isActivityLevel: build/index.d.ts#isActivityLevel
+lightHours: build/index.d.ts#lightHours
+lightNeed: build/index.d.ts#lightNeed
 
 ## Declarations
 
@@ -667,6 +675,32 @@ export interface JoinReferences {
 ### build/index.d.ts#LIGHT_NEED
 export declare const LIGHT_NEED = "light.see";
 
+### build/index.d.ts#LightDay
+export interface LightDay {
+  readonly date: CivilDate;
+  readonly awakeHours: number;
+  readonly darkHours: number;
+}
+
+### build/index.d.ts#LightHours
+export interface LightHours {
+  readonly days: readonly LightDay[];
+  readonly most: number;
+  readonly mean: number;
+}
+
+### build/index.d.ts#LightHoursInput
+export interface LightHoursInput {
+  readonly point: LatLon;
+  readonly awake: TimeWindow;
+  readonly from: CivilDate;
+  readonly days: number;
+  readonly altitudeDeg?: number | undefined;
+}
+
+### build/index.d.ts#MAX_LIGHT_DAYS
+export declare const MAX_LIGHT_DAYS = 1096;
+
 ### build/index.d.ts#MILK_LATER
 export declare const MILK_LATER: CitedMilk;
 
@@ -768,6 +802,12 @@ export interface ReferencePart {
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
 
+### build/index.d.ts#SUNRISE_EQUATION_SOURCE
+export declare const SUNRISE_EQUATION_SOURCE: Source;
+
+### build/index.d.ts#SUN_POSITION_SOURCE
+export declare const SUN_POSITION_SOURCE: Source;
+
 ### build/index.d.ts#StoveShare
 export interface StoveShare {
   readonly value: number;
@@ -846,3 +886,9 @@ export declare function householdFragment(input: HouseholdFragmentInput): Househ
 
 ### build/index.d.ts#isActivityLevel
 export declare function isActivityLevel(level: unknown): level is ActivityLevel;
+
+### build/index.d.ts#lightHours
+export declare function lightHours(input: LightHoursInput): LightHours;
+
+### build/index.d.ts#lightNeed
+export declare function lightNeed(hours: LightHours): DailyNeed;
