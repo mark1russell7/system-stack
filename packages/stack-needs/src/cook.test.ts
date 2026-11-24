@@ -3,7 +3,7 @@ import { SUPPLY_CATALOG, type StoveFacts, type SupplyCatalog, type SupplyProduct
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
+import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_DENSITY_MIN, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
 import { householdFragment } from "./household.ts";
 import { FOOD_NEED, STORED_WATER, WATER_NEED } from "./uses.ts";
 
@@ -227,6 +227,67 @@ describe("the cook fragment", () => {
     expect(() => cookFragment({ ...input, units: { "test.absent": 1 } })).toThrow(/no product "test.absent"/);
   });
 
+  describe("the boil fuel from a boil yield of the stove", () => {
+    /** A made-up yield: the test boils `litres` of water from 20 °C with 100 g of fuel. */
+    const yieldOf = (litres: number, more: object = {}) => ({ amount: litres, unit: "L", per: { amount: 100, unit: "g" }, fact, start: { celsius: 20, fact }, ...more });
+    const yieldStove = (litres: number, more: object = {}): StoveFacts => ({ ...massStove, boil: yieldOf(litres, more) as never });
+    const { share: _share, ...noShare } = input;
+    /** The boil fuel of one pot from a yield: the heat of the pot over the heat of 1 kg of fuel in the test, with the least density of water. */
+    const yieldBoil = (litres: number): number => HEAT / ((litres * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * 80) / 0.1);
+
+    it("gives the fuel with no share and no fuel energy, and the boil time from the mass rate", () => {
+      for (const fuel of ["fuel.test", "fuel.bare"]) {
+        const line = lineOf(cookFragment({ ...noShare, stove: { ...yieldStove(10), fuel } }).lines, "test.grain-1kg");
+        expect(line.fuel.read && line.fuel.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
+        expect(line.minutes.read && line.minutes.value).toBeCloseTo(yieldBoil(10) / 0.01 + 20, 9);
+      }
+      // The specific heat cancels: the boil fuel is the test fuel times the pot mass and rise over the test water mass and rise.
+      expect(yieldBoil(10)).toBeCloseTo((0.1 * 1.5 * 80) / (10 * WATER_DENSITY_MIN.value * 80), 12);
+    });
+
+    it("takes the most boil fuel of the share and the yield", () => {
+      // The share gives HEAT / 250 x 0.01 = 0.0201 kg. A yield of 10 L gives 0.0156 kg, and a yield of 2 L gives 0.0782 kg.
+      expect(yieldBoil(10)).toBeLessThan((HEAT / 250) * 0.01);
+      expect(yieldBoil(2)).toBeGreaterThan((HEAT / 250) * 0.01);
+      const both = (litres: number): CookLine => lineOf(cookFragment({ ...input, stove: yieldStove(litres) }).lines, "test.grain-1kg");
+      const ten = both(10);
+      const two = both(2);
+      expect(ten.fuel.read && ten.fuel.value).toBeCloseTo(FUEL, 12);
+      expect(two.fuel.read && two.fuel.value).toBeCloseTo(yieldBoil(2) + 20 * 0.01, 12);
+    });
+
+    it("gives no boil fuel from a most yield, a yield of an unknown bound or a yield with no cited start", () => {
+      const fuelOf = (stove: StoveFacts, withShare = false): CookLine["fuel"] => lineOf(cookFragment({ ...(withShare ? input : noShare), stove }).lines, "test.grain-1kg").fuel;
+      const most = fuelOf(yieldStove(10, { bound: "most" }));
+      expect(most.read).toBe(false);
+      if (!most.read) expect(most.why).toMatch(/most yield gives too little fuel/);
+      const unknown = fuelOf(yieldStove(10, { bound: "exact" }));
+      expect(unknown.read).toBe(false);
+      if (!unknown.read) expect(unknown.why.includes("too little fuel")).toBe(false);
+      const noStart = fuelOf(yieldStove(10, { start: undefined }));
+      expect(noStart.read).toBe(false);
+      if (!noStart.read) expect(noStart.why).toMatch(/no cited start/);
+      const badUnit = fuelOf(yieldStove(10, { unit: "kg" }));
+      expect(badUnit.read).toBe(false);
+      // A least yield gives the most fuel, so it has a read.
+      const least = fuelOf(yieldStove(10, { bound: "least" }));
+      expect(least.read && least.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
+      // A share keeps its read beside a yield with no read.
+      const shared = fuelOf(yieldStove(10, { bound: "most" }), true);
+      expect(shared.read && shared.value).toBeCloseTo(FUEL, 12);
+      // A yield does not make up for a stove rate with a bound: the cook part has no rate.
+      const boundRate = fuelOf({ ...yieldStove(10), rate: { ...massStove.rate!, bound: "least" as never } });
+      expect(boundRate.read).toBe(false);
+    });
+
+    it("gives no fuel for the canister stove of the catalog: its yield is the calm test of the maker", () => {
+      const line = cookFragment({ catalog: SUPPLY_CATALOG, units: { "food.rice-white-1kg": 1 }, stove: "heat.stove-canister-1-burner", batch: { value: 0.5, unit: "kg" } }).lines[0];
+      expect(line?.water.read).toBe(true);
+      expect(line?.fuel.read).toBe(false);
+      if (line !== undefined && !line.fuel.read) expect(line.fuel.why).toMatch(/bound most/);
+    });
+  });
+
   it("refuses a bad batch, share or start", () => {
     expect(() => cookFragment({ ...input, batch: { value: 0, unit: "kg" } })).toThrow(RangeError);
     expect(() => cookFragment({ ...input, batch: { value: 1, unit: "L" } })).toThrow(RangeError);
@@ -241,6 +302,8 @@ describe("the cited constants", () => {
     expect(checkSources([NIST_SI_GUIDE_SOURCE, USGS_WATER_DENSITY_SOURCE], { require: ["by", "terms"], https: true, at: "2026-11-24" })).toEqual([]);
     expect(WATER_SPECIFIC_HEAT.source).toBe(NIST_SI_GUIDE_SOURCE);
     expect(WATER_DENSITY_MAX.source).toBe(USGS_WATER_DENSITY_SOURCE);
+    expect(WATER_DENSITY_MIN.source).toBe(USGS_WATER_DENSITY_SOURCE);
+    expect(WATER_DENSITY_MIN.value).toBeLessThan(WATER_DENSITY_MAX.value);
   });
 });
 
