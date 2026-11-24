@@ -4,7 +4,7 @@ import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type Cas
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
 import { cookFragment } from "./cook.ts";
-import { FDC_SR_LEGACY_SOURCE, FORMULA_MIX, FORMULA_WATER, WIC_INFANT_SOURCE } from "./data.ts";
+import { CFR_107_10_SOURCE, FDC_SR_LEGACY_SOURCE, FORMULA_MIX, FORMULA_WATER, STORE_BRAND_INFANT_SOURCE, STORE_BRAND_LABEL, WIC_INFANT_SOURCE } from "./data.ts";
 import { householdFragment } from "./household.ts";
 import { formulaMixCheck, formulaMixFragment, formulaMixWater } from "./mix.ts";
 import { BOTTLED_WATER, FORMULA_NEED, FORMULA_POWDER, FORMULA_READY, STORED_WATER, WATER_NEED } from "./uses.ts";
@@ -28,8 +28,10 @@ const TAP = "water.container-1gal";
 const GALLON = 3.785411784;
 
 const catalog = withPowder();
-/** The water of 1 kg of powder: 5240 / 630 - 1 kg, at 1 kg/L. */
-const WATER = 5240 / 630 - 1;
+/** The water of 1 kg of powder by the label rule: 1.34 g/kcal × 5240 kcal, minus the 20 g of water of the powder, at 1 kg/L. */
+const WATER = (1.34 * 5240 - 20) / 1000;
+/** The facts of the mix rule with no label: the mass balance. */
+const BALANCE = { ...FORMULA_MIX, label: undefined };
 
 describe("the mix rule of infant formula powder", () => {
   it("finds the powder of 1 kg in the reference catalog, with 5240 kcal and no direct draw", () => {
@@ -47,27 +49,55 @@ describe("the mix rule of infant formula powder", () => {
     expect(checkSources([FORMULA_MIX.source, FORMULA_MIX.waterSource], { require: ["by", "terms", "sha256"], https: true, at: "2026-11-24" })).toEqual([]);
   });
 
-  it("gives 7.3175 kg of water for each kg of powder, thus 1.39646 g for each kcal", () => {
-    expect(formulaMixWater(5240)).toBeCloseTo(7.31746, 5);
-    expect((formulaMixWater(5240) * 1000) / 5240).toBeCloseTo(1.39646, 5);
+  it("cites the label water of the store-brand powder and the rule that puts it on each label", () => {
+    expect(FORMULA_MIX.label).toBe(STORE_BRAND_LABEL);
+    expect(STORE_BRAND_LABEL.water).toBe(134);
+    expect(STORE_BRAND_LABEL.source).toBe(STORE_BRAND_INFANT_SOURCE);
+    expect(STORE_BRAND_LABEL.locator).toContain("Water g 134");
+    expect(STORE_BRAND_LABEL.rule).toBe(CFR_107_10_SOURCE);
+    expect(STORE_BRAND_LABEL.ruleLocator).toMatch(/^107\.10\(a\)/u);
+    expect(STORE_BRAND_INFANT_SOURCE.license).toBe("all-rights-reserved");
+    expect(CFR_107_10_SOURCE.license).toBe("us-public-domain");
+    expect(checkSources([STORE_BRAND_INFANT_SOURCE, CFR_107_10_SOURCE], { require: ["by", "terms", "sha256"], https: true, at: "2026-11-24" })).toEqual([]);
+  });
+
+  it("gives 7.0016 kg of water for each kg of powder by the label rule, thus 1.33618 g for each kcal", () => {
+    expect(formulaMixWater(5240)).toBeCloseTo(7.0016, 9);
+    expect((formulaMixWater(5240) * 1000) / 5240).toBeCloseTo(1.33618, 5);
+    // The prepared formula of 1 kg of powder holds 1.34 g of water for each of its 5240 kcal: the mix water and the 20 g of the powder.
+    expect(formulaMixWater(5240) * 1000 + 20).toBeCloseTo(1.34 * 5240, 9);
+  });
+
+  it("gives 7.3175 kg of water for each kg of powder by the mass balance with no label, 4.5% more than the label rule", () => {
+    expect(formulaMixWater(5240, BALANCE)).toBeCloseTo(7.31746, 5);
     // 100 g of prepared formula: 63 kcal from 100 x 63 / 524 g of powder.
-    expect((100 - (100 * 63) / 524) / 63).toBeCloseTo((formulaMixWater(5240) * 1000) / 5240, 12);
+    expect((100 - (100 * 63) / 524) / 63).toBeCloseTo((formulaMixWater(5240, BALANCE) * 1000) / 5240, 12);
+    expect(formulaMixWater(5240, BALANCE) / formulaMixWater(5240) - 1).toBeCloseTo(0.04511, 5);
   });
 
   it("refuses a powder energy that is not above the energy of the ready-to-feed item", () => {
     expect(() => formulaMixWater(630)).toThrow(RangeError);
     expect(() => formulaMixWater(Number.NaN)).toThrow(RangeError);
     expect(() => formulaMixWater(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    // TEST VALUES: a label water too small for the water of the powder.
+    expect(() => formulaMixWater(5240, { ...FORMULA_MIX, label: { ...STORE_BRAND_LABEL, water: 0.3 } })).toThrow(/positive finite water/u);
   });
 
-  it("predicts the water of the ready-to-feed item with the water of the powder, 0.13% from the cited value", () => {
+  it("predicts the water of the ready-to-feed item by the label rule, 0.39% below the cited value", () => {
     const check = formulaMixCheck();
-    expect(check.powder).toBeCloseTo((100 * 63) / 524, 9);
-    expect(check.added).toBeCloseTo(87.977, 3);
-    expect(check.predicted).toBeCloseTo(87.977 + 0.24, 2);
+    expect(check.powder).toBeCloseTo(100 / (1 + WATER), 9);
+    expect(check.added).toBeCloseTo(87.5025, 4);
+    expect(check.predicted).toBeCloseTo(87.7524, 4);
     expect(check.cited).toBe(88.1);
-    expect(check.relative).toBeGreaterThan(0);
-    expect(check.relative).toBeLessThan(0.0014);
+    expect(check.relative).toBeLessThan(0);
+    expect(check.relative).toBeGreaterThan(-0.004);
+    expect(check.relative).toBeCloseTo(-0.003945, 6);
+  });
+
+  it("predicts the water of the ready-to-feed item by the mass balance, 0.13% above the cited value", () => {
+    const check = formulaMixCheck(BALANCE);
+    expect(check.powder).toBeCloseTo((100 * 63) / 524, 9);
+    expect(check.predicted).toBeCloseTo(87.977 + 0.24, 2);
     expect(check.relative).toBeCloseTo(0.001335, 5);
   });
 });
@@ -219,7 +249,7 @@ describe("the days of formula from powder on the endurance query", () => {
   });
 
   it("the water limits the days when it is the scarcest", () => {
-    // 5 L of water mix 5 / 7.3175 kg of powder, which gives 3580.5 kcal.
+    // 5 L of water mix 5 / 7.0016 kg of powder, which gives 3742.0 kcal.
     expect(formulaDays(2, water(5))).toBeCloseTo(((5 / WATER) * 5240) / 566, 6);
   });
 
