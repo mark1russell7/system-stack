@@ -79,7 +79,7 @@ The claims of the cases of 0.1.0 come from the hazard pages of FEMA (Ready.gov) 
 
 The law of the grid cut of a power outage comes from EAGLE-I of Oak Ridge National Laboratory (CC BY 4.0, DOI `10.6084/m9.figshare.24237376`). It has one curve for each state, the District of Columbia, Puerto Rico and the US Virgin Islands. The curves are a derived work.
 
-This law is for all causes. The grid cut of each storm case has a law of its own, from the outages that start in a storm event of the case. The law has a source of its own. Its regions are the states with 30 such outages or more. Each other cut has no law.
+This law is for all causes. The grid cut of each storm case has a law of its own, from the outages that start in a storm event of the case. The law has a source of its own. Its regions are the states with 30 such outages or more. The grid cut of a physical attack has the law of the OE-417 summaries. Each other cut has no law.
 
 ## The catastrophic cases
 
@@ -160,7 +160,7 @@ The law reads only the events with more than 0 customers. The question of a home
 - One of the open events is the attack in Moore County, North Carolina, in December 2022, with 45,000 customers.
 - The summary of 2023 prints 32 events two times, the second time with no start. The set and the counts read each such event one time.
 - The times are local times. An event across a change of the clock can be one hour off.
-- No case of the list uses this law yet. A case of a physical attack on the grid waits for its code in the alert taxonomy.
+- The case `infra.power.physical-attack` uses this law on its grid cut. Its other cuts are the cuts of a power outage, with no law.
 
 The open events change the tail of the law:
 

@@ -56,11 +56,12 @@ describe("the gate of the reference data", () => {
     expect(hasHazardError(faults)).toBe(false);
   });
 
-  it("gives one warning for each cut with no law: each cut but the grid cuts of a power outage and of the storm cases", () => {
+  it("gives one warning for each cut with no law: each cut but the grid cuts of a power outage, of a physical attack and of the storm cases", () => {
     const cuts = HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => ({ hazard: hazard.case, cut })));
     const laws = cuts.filter(({ cut }) => cut.duration.read);
     expect(laws.map(({ hazard, cut }) => `${hazard} ${cut.part}`)).toEqual([
       "infra.power.outage power.grid",
+      "infra.power.physical-attack power.grid",
       "met.winter.storm power.grid",
       "met.heat.extreme power.grid",
       "met.tropical.hurricane power.grid",

@@ -1,5 +1,5 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
-import { OE417_SOURCE } from "./oe417.ts";
+import { OE417_ATTACK_LAW, OE417_SOURCE } from "./oe417.ts";
 import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type License, type NoLaw, type Source } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
@@ -212,6 +212,23 @@ export const HAZARD_LIST: HazardList = {
           title: "No power from the grid",
           claims: [defined("The case is a stop of the power from the grid."), told("ready.power-outages", "The page tells that the electrical power goes out.")],
           duration: EAGLEI_GRID_LAW,
+        },
+        ...outageEffects(NO_LAW),
+      ],
+    },
+    {
+      case: "infra.power.physical-attack",
+      title: "Physical attack on the power grid",
+      examined: ["ready.power-outages", "doe.oe-417"],
+      cuts: [
+        {
+          part: "power.grid",
+          title: "No power from the grid",
+          claims: [
+            defined("The case is a stop of the power from the grid by a physical attack on a substation or a power line."),
+            told("doe.oe-417", "The summaries list events of vandalism, sabotage, theft and physical attacks that stopped the power of customers."),
+          ],
+          duration: OE417_ATTACK_LAW,
         },
         ...outageEffects(NO_LAW),
       ],
