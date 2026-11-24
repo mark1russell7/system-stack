@@ -84,11 +84,17 @@ The days are then an upper limit for the whole household.
 
 ### An infant
 
-The infant table gives the need of an infant below 12 months. The fragment adds that need to the one draw of food energy.
+The infant table gives the need of an infant below 12 months (`INFANT_MONTHS`). Each person record below 12 months must have the field `feeding`. It has no default, because each way gives a different draw.
 
-This has a limit. The fragment cannot tell formula from other food. Thus, when the buy list does not hold the formula of those days, the days are too high for the infant. The field `table` of each line lets a planner find the lines of the infant table.
+| `feeding` | The draw of food energy |
+| --- | --- |
+| `food` | The draw holds the need of the infant, from the infant table. |
+| `breast-milk` | The draw does not hold the need of the infant. The milk comes from the food of the mother, so the stage of lactation of the mother holds that energy. A person of the household must have a stage of lactation, or the function gives a `RangeError`. The result lists the infant in `breastMilk`. |
+| `formula` | The fragment has no draw of formula. Thus the infant gives no layer, as a person with no row. The result lists the infant in `formula`. With `noRow: "leave-out"`, the draw has no need of the infant, and `leftOut` lists the infant. |
 
-The milk of a mother comes from the food of the mother. Thus, for an infant that drinks only that milk, give the mother the stage `lactation-1`. Then leave the infant out of the persons. If the persons hold the infant too, the draw counts that energy two times. The result is then more food than the household needs, which is on the safe side. After 6 months, an infant eats food and drinks milk. The stage `lactation-2` of the mother and the need of the infant then count a part of the energy two times.
+The line of each infant in `need` has a read in each case, so `need` gives the energy of the whole household.
+
+A stage of lactation is a change with `milk: true`: `lactation-1` and `lactation-2` of the guidelines. After 6 months, an infant eats food and drinks milk. With `feeding: "food"` and the stage `lactation-2` of the mother, the draw counts a part of that energy two times. The result is then more food than the household needs, which is on the safe side.
 
 ### The resources of the buy list and the join
 

@@ -23,8 +23,8 @@ const input: HouseholdFragmentInput = { persons: adults, activity: "sedentary", 
 const foodCut: CaseCuts = { case: "test.food-cut", title: "A test stop of the food shops", cuts: [{ part: "food.retail", title: "No food shops", source: "test" }] };
 const at = "2026-11-22";
 
-/** A made-up infant of 6 months. The guidelines have no row below 12 months. The infant table gives 604 kcal/d. */
-const infant: Person = { sex: "female", ageMonths: 6, count: 1 };
+/** A made-up infant of 6 months that eats the food of the household. The guidelines have no row below 12 months. The infant table gives 604 kcal/d. */
+const infant: Person = { sex: "female", ageMonths: 6, count: 1, feeding: "food" };
 
 /** This function gives the fragment of a call, and fails the test when the call gives no layer. */
 function fragmentOf(of: HouseholdFragmentInput): HouseholdFragmentRead {
@@ -134,6 +134,47 @@ describe("the household fragment", () => {
     expect(result.needRead).toBe(true);
     expect(result.leftOut).toEqual([infant]);
     expect(result.layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
+  });
+
+  it("refuses an infant with no feeding, and a feeding that is not a way", () => {
+    expect(() => householdFragment({ ...input, persons: [...adults, { sex: "female", ageMonths: 6, count: 1 }] })).toThrow(/no feeding/);
+    const bad = { sex: "female", ageMonths: 6, count: 1, feeding: "milk" } as unknown as Person;
+    expect(() => householdFragment({ ...input, persons: [...adults, bad] })).toThrow(/not a way/);
+    // A record with count 0 needs no feeding.
+    expect(fragmentOf({ ...input, persons: [...adults, { sex: "female", ageMonths: 6, count: 0 }] }).layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
+  });
+
+  it("puts the energy of an infant on breast milk in the stage of lactation of the mother, not in the draw", () => {
+    const mother: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "lactation-1" };
+    const baby: Person = { sex: "male", ageMonths: 3, count: 1, feeding: "breast-milk" };
+    const result = fragmentOf({ ...input, persons: [adults[0] as Person, mother, baby] });
+    expect(result.layer.draws[0]).toMatchObject({ perDay: DAILY + 330, users: 2 });
+    expect(result.breastMilk).toEqual([baby]);
+    expect(result.leftOut).toEqual([]);
+    expect(result.need.lines[2]).toMatchObject({ read: true, table: NASEM_INFANT_CALORIES.id });
+    expect(result.need.need.value).toBeGreaterThan(DAILY + 330);
+    expect(DGA_CALORIES.changes?.filter((change) => change.milk === true).map((change) => change.stage)).toEqual(["lactation-1", "lactation-2"]);
+  });
+
+  it("refuses an infant on breast milk when no person has a stage of lactation", () => {
+    const baby: Person = { sex: "male", ageMonths: 3, count: 1, feeding: "breast-milk" };
+    expect(() => householdFragment({ ...input, persons: [...adults, baby] })).toThrow(/stage of lactation/);
+    const pregnant: Person = { sex: "female", ageMonths: 33 * 12, count: 1, stage: "pregnancy-2" };
+    expect(() => householdFragment({ ...input, persons: [adults[0] as Person, pregnant, baby] })).toThrow(/stage of lactation/);
+  });
+
+  it("gives no layer for an infant on formula, and leaves the infant out with the option", () => {
+    const baby: Person = { sex: "female", ageMonths: 4, count: 1, feeding: "formula" };
+    const result = householdFragment({ ...input, persons: [...adults, baby] });
+    expect(result.layer).toBeUndefined();
+    if (result.layer === undefined) {
+      expect(result.formula).toEqual([baby]);
+      expect(result.noRow).toEqual([]);
+      expect(result.why).toMatch(/formula/);
+    }
+    const left = fragmentOf({ ...input, persons: [...adults, baby], noRow: "leave-out" });
+    expect(left.leftOut).toEqual([baby]);
+    expect(left.layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
   });
 
   it("gives no layer for a draw of 0 kcal", () => {

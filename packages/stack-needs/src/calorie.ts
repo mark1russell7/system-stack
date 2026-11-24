@@ -50,6 +50,8 @@ export interface CalorieChange {
   readonly change: Quantity;
   /** The condition of the source for the change, for example a healthy weight before the pregnancy. */
   readonly condition?: string | undefined;
+  /** True when the persons of the stage make the milk of an infant: a stage of lactation. */
+  readonly milk?: true | undefined;
 }
 
 /** A table of estimated calorie needs from one source. */
@@ -72,6 +74,18 @@ export interface CalorieTable {
  */
 export type CalorieTables = CalorieTable | readonly CalorieTable[];
 
+/**
+ * The ways to feed an infant.
+ *
+ * - `breast-milk`: only the milk of a person of the household.
+ * - `formula`: infant formula.
+ * - `food`: the food of the household, also with milk.
+ */
+export const INFANT_FEEDINGS: readonly ["breast-milk", "formula", "food"] = ["breast-milk", "formula", "food"];
+
+/** A way to feed an infant. */
+export type InfantFeeding = (typeof INFANT_FEEDINGS)[number];
+
 /** A group of persons of the same sex and age, and their count. */
 export interface Person {
   readonly sex: CalorieSex;
@@ -82,6 +96,11 @@ export interface Person {
   readonly level?: ActivityLevel | undefined;
   /** The stage of the persons, for example `pregnancy-2`: the stage of a change of the table. Without it, no change applies. */
   readonly stage?: string | undefined;
+  /**
+   * The way to feed the persons. The household fragment must have it for each record below `INFANT_MONTHS`.
+   * `calorieNeed` does not read it, because the energy need is the same.
+   */
+  readonly feeding?: InfantFeeding | undefined;
 }
 
 /** The need of one person record for the days, or no read when the table has no row for the age. */
