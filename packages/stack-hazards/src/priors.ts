@@ -262,7 +262,8 @@ export interface HazardPrior extends Prior {
 }
 
 /**
- * This function gives the yearly prior of each case of a list at the region of the user, as the records `Prior` of the core with the field `region`.
+ * This function gives the yearly prior of each case of a list at the region of the user.
+ * Each prior is a record `Prior` of the core with the field `region`.
  * For each case, the first region of the option with a table of the case in its scheme gives the prior. A region that the table observes with no event of the case has a prior of 0.
  * A case with no table for a region of the option has no prior. That is no read, not a prior of 0.
  * The place of a prior is the option `place`. With no option, it is the scheme and the code of its region, for example `us-county-fips:37183`.

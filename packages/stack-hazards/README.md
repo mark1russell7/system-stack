@@ -200,7 +200,7 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
 
   Before 0.6.4, the table of the states kept its raw rates. Then 35 priors of states were 0, for example 29 states in the case `met.tropical.hurricane`. A region that the table does not observe has no prior: that is no read.
 - The place of each prior is the option `place`, for example `hazardPriors(list, { region, place: "home" })`. With no option, the place is the region of the table, for example `us-state-fips:01` after the fall back from a county. `yearShortfall` of stack-endurance finds a prior by its place, so give the place that it reads.
-- Each prior also has the field `region`: the scheme and the code of the region of the table that gives its rate, also with the option `place`. A page can thus tell "the rate of your state, not of your county" with one call.
+- Each prior also has the field `region`: the scheme and the code of the region of the table that gives its rate. The option `place` does not change it. A page can thus tell "the rate of your state, not of your county" with one call.
 - The gate refuses two tables with the same scheme, case and region (`priorTableOverlaps`). `hazardPriors` takes the first table, so the second table gives no prior there.
 - `EAGLEI_COUNTY_POOLING` of the entry `county-priors` has the law of each state in each case, and a holdout. The holdout puts each event of a county in one of two halves, each with the chance 1/2 (seed 20261124). The rates come from one half, and the other half scores them. Each score is the mean of 5 such splits.
 
