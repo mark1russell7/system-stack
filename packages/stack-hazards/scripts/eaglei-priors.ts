@@ -44,7 +44,8 @@ const DEFAULT_SHARE = 0.01;
 /** This function tells that the storm cases overlap, so a sum of their priors counts an outage more than one time. */
 const overlapText = (overlap: CaseOverlap | undefined): string =>
   "An outage in the storm events of two cases counts in each case. Thus a sum of the priors of the storm cases counts it two times or more" +
-  (overlap === undefined ? ". " : `: ${String(overlap.multiple)} of the ${String(overlap.events)} outages in a storm case are in two cases or more. `) +
+  ". " +
+  (overlap === undefined ? "" : `In the fit, ${String(overlap.multiple)} of the ${String(overlap.events)} outages in a storm case are in two cases or more. `) +
   `The case ${OUTAGE_CASE} and one storm case do not overlap. `;
 
 const common = (share: number): string =>

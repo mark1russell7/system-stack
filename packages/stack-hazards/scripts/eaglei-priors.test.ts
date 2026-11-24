@@ -57,7 +57,7 @@ describe("eaglePriors", () => {
     const base = record().priors;
     if (base === undefined) throw new Error("The record has no priors.");
     const counted = eaglePriors(record({ priors: { ...base, overlap: { events: 5, multiple: 2 } } }));
-    expect(counted.county.method).toContain("counts it two times or more: 2 of the 5 outages in a storm case are in two cases or more.");
+    expect(counted.county.method).toContain("counts it two times or more. In the fit, 2 of the 5 outages in a storm case are in two cases or more. The case");
     expect(counted.state.method).toContain("2 of the 5 outages");
     // The overlap changes the method only, not the rates.
     expect(counted.county.rates).toEqual(plain.county.rates);
