@@ -126,5 +126,30 @@ describe("priorModules", () => {
     expect(Object.keys(pooling.holdout.cases)).toEqual(["infra.power.outage", "met.tornado"]);
     // The silent county 99003 is not observed, so its customers are not in the nation.
     expect(tables.nation).toBe(3000);
+    // A record with no counts of each year has no holdout over time.
+    expect(pooling.time).toBeUndefined();
+    expect(statePooling.time).toBeUndefined();
+  });
+
+  it("gives the holdout over time of the counties and of the states when the record has the counts of each year", () => {
+    const base = record().priors;
+    if (base === undefined) throw new Error("The record has no priors.");
+    const yearly = { observed: { "99001": [2020, 2021, 2022], "99003": [2020, 2021, 2022] }, counts: { [OUTAGE_CASE]: { "2020": { "99001": 2 }, "2021": { "99001": 3 }, "2022": { "99001": 4 } }, "met.tornado": { "2022": { "99001": 1 } } } };
+    const laws = record({ priors: { ...base, yearly } });
+    const tables = eaglePriors(laws);
+    // The silent county 99003 is not observed, so only 99001 is in the holdout. The fit part has 2020 and 2021.
+    expect(tables.pooling.time).toMatchObject({ fit: [2020, 2021], score: [2022, 2022], areas: 1 });
+    expect(tables.statePooling.time).toMatchObject({ fit: [2020, 2021], score: [2022, 2022], areas: 1 });
+    // The raw rate of 99001 is 5 / 2 a year, so its squared error in 2022 is (4 - 2.5)^2.
+    expect(tables.pooling.time?.cases[OUTAGE_CASE]?.squared.raw).toBeCloseTo(2.25, 12);
+    // The tornado has no event in the fit part, so the raw rate loses 99001.
+    expect(tables.pooling.time?.cases["met.tornado"]).toMatchObject({ raw: Number.NEGATIVE_INFINITY, lost: 1 });
+    const out: Record<string, unknown> = {};
+    for (const text of Object.values(priorModules(tables, laws, "https://example.org/runs/1 attempt 1"))) {
+      new Function("out", text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: \w+)? =/gu, "out.$1 ="))(out);
+    }
+    const pooling = out["EAGLEI_COUNTY_POOLING"] as CountyPooling;
+    expect(pooling.time?.cases[OUTAGE_CASE]?.squared.raw).toBe(2.3);
+    expect((out["EAGLEI_STATE_POOLING"] as StatePooling).time?.areas).toBe(1);
   });
 });
