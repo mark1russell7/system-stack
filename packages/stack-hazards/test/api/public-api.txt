@@ -91,6 +91,7 @@ ReachScore: build/hazard.chunk.d.ts#ReachScore
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
+STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
 SilentAreas: build/index.d.ts#SilentAreas
 StormArea: build/index.d.ts#StormArea
@@ -612,6 +613,9 @@ export interface RegionCurve {
 
 ### build/index.d.ts#STORM_CLASSES
 export declare const STORM_CLASSES: Readonly<Record<string, readonly string[]>>;
+
+### build/index.d.ts#STORM_STATE_CODES
+export declare const STORM_STATE_CODES: Readonly<Record<string, string>>;
 
 ### build/index.d.ts#SilentAreas
 export interface SilentAreas {
