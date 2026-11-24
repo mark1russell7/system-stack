@@ -153,15 +153,25 @@ The fit job also reads the details files of NOAA Storm Events and the zone-count
 
 ## The yearly priors from outage records
 
-`HAZARD_LIST` has two tables of yearly priors from EAGLE-I: one for each county (`us-county-fips`) and one for each state (`us-state-fips`). `hazardPriors(list, { region })` gives the prior of each case for the first region of the option with a table of the case.
+`HAZARD_LIST` has the table of the yearly priors of each state (`us-state-fips`) from EAGLE-I. The table of each county (`us-county-fips`) is large, so it has its own entry. Add it to the list when the user gives a county:
+
+```ts
+const { EAGLEI_COUNTY_PRIORS } = await import("@mark1russell7/stack-hazards/county-priors");
+const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.priors ?? [])] };
+```
+
+`hazardPriors(list, { region })` gives the prior of each case for the first region of the option with a table of the case.
 
 - `perYear` is the count of the events of the case in one year in the region. `reach` is the mean share of the customers of the region that an event puts out of power.
 - The case `infra.power.outage` counts the outages in no storm case. Each storm case counts the outages that start in a storm event of the case.
-- An event starts at 1% of the customers of a county, so a smaller outage is not counted. Thus each rate is a lower bound.
+- An event starts at 1% of the customers of a county, so a smaller outage is not counted. That makes a rate too low.
+- One outage that crosses the line of 1% more than one time counts more than one time. A year with no count of a county is not one of its years. Each of these makes a rate too high. So a rate is not a bound in either direction.
+- A region with more than 12 events at one customer in one year (`perYear * reach`) in a case is not in its table. Its prior is no read. The limit is one a month, and the utilities report one or two a year at a customer. 31 counties and the states 72 and 78 are not in the tables.
 - A region that the table observes with no event of a case has a prior of 0. A region that the table does not observe has no prior: that is no read.
+- A county prior of 0 comes before the prior of its state. Many counties have 0 for a rare case, for example a hurricane, and many tornado rates come from one event. A pooled rate of a county and its state is a next step.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the module `src/eaglei-priors.ts` from them. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
 ## The law of a physical attack
 

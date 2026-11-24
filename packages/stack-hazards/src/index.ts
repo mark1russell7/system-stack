@@ -8,3 +8,4 @@ export * from "./law.ts";
 export * from "./storms.ts";
 export * from "./oe417.ts";
 export * from "./priors.ts";
+export { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";

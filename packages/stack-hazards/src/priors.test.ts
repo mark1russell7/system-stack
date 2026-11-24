@@ -3,7 +3,8 @@ import { checkHazards } from "./check.ts";
 import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
 import type { OutageEvent } from "./outages.ts";
 import { HAZARD_LIST } from "./data.ts";
-import { EAGLEI_COUNTY_PRIORS, EAGLEI_STATE_PRIORS } from "./eaglei-priors.ts";
+import { EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
+import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { areaCounts, coverageTally, hazardPriors, observedRegions, regionRates, type Observation } from "./priors.ts";
 
 const DAY = 86_400;
@@ -11,17 +12,33 @@ const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, se
 const state = (area: string): string => area.slice(0, 2);
 
 describe("the priors of the reference list", () => {
-  it("has the tables of EAGLE-I for each county and each state, and the gate passes", () => {
-    expect(HAZARD_LIST.priors).toEqual([EAGLEI_COUNTY_PRIORS, EAGLEI_STATE_PRIORS]);
+  // The list with the table of the counties of the entry county-priors, in front of the table of the states.
+  const withCounties: HazardList = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.priors ?? [])] };
+
+  it("has the table of the states, and the table of the counties is in its own entry. The gate passes with the two", () => {
+    expect(HAZARD_LIST.priors).toEqual([EAGLEI_STATE_PRIORS]);
     expect([EAGLEI_COUNTY_PRIORS.scheme, EAGLEI_STATE_PRIORS.scheme]).toEqual(["us-county-fips", "us-state-fips"]);
     expect(EAGLEI_COUNTY_PRIORS.codes.length).toBeGreaterThan(3000);
     expect(EAGLEI_STATE_PRIORS.codes.length).toBeGreaterThanOrEqual(50);
-    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-prior")).toEqual([]);
+    expect(checkHazards(withCounties).filter((fault) => fault.code === "hazards-prior")).toEqual([]);
+  });
+
+  it("holds the events at one customer in one year of the tables: a median in a band, no region above the limit and no more left-out regions", () => {
+    for (const [table, most] of [[EAGLEI_COUNTY_PRIORS, 31], [EAGLEI_STATE_PRIORS, 2]] as const) {
+      const products = Object.values(table.rates["infra.power.outage"] ?? {}).map(([perYear, reach]) => perYear * reach).sort((a, b) => a - b);
+      const median = products[Math.floor(products.length / 2)]!;
+      // The utilities report one or two interruptions a year at a customer. The counts here start at 1% of a county.
+      expect(median).toBeGreaterThan(0.3);
+      expect(median).toBeLessThan(3);
+      for (const entry of Object.values(table.rates)) for (const [perYear, reach] of Object.values(entry)) expect(perYear * reach).toBeLessThanOrEqual(12);
+      const left = Number(/no read: (\d+) regions/u.exec(table.method)?.[1]);
+      expect(left).toBeLessThanOrEqual(most);
+    }
   });
 
   it("gives a prior of each case of the tables for a county, and the prior of the state for a county that no table has", () => {
     const cases = Object.keys(EAGLEI_COUNTY_PRIORS.rates).sort();
-    const county = hazardPriors(HAZARD_LIST, { region: [{ scheme: "us-county-fips", code: "01001" }, { scheme: "us-state-fips", code: "01" }] });
+    const county = hazardPriors(withCounties, { region: [{ scheme: "us-county-fips", code: "01001" }, { scheme: "us-state-fips", code: "01" }] });
     expect(county.map((prior) => prior.case).sort()).toEqual(cases);
     for (const prior of county) {
       expect(prior.perYear).toBeGreaterThanOrEqual(0);
@@ -31,7 +48,7 @@ describe("the priors of the reference list", () => {
     }
     expect(county.find((prior) => prior.case === "infra.power.outage")?.place).toBe("us-county-fips:01001");
     // A code that is not a county falls back to the table of the state.
-    const state = hazardPriors(HAZARD_LIST, { region: [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] });
+    const state = hazardPriors(withCounties, { region: [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] });
     expect(new Set(state.map((prior) => prior.place))).toEqual(new Set(["us-state-fips:01"]));
     expect(hazardPriors(HAZARD_LIST, {})).toEqual([]);
   });

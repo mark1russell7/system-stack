@@ -10,30 +10,31 @@ AreaCount: build/index.d.ts#AreaCount
 BasisOptions: build/index.d.ts#BasisOptions
 CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
 CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
-CLAIM_BASES: build/index.d.ts#CLAIM_BASES
+CLAIM_BASES: build/hazard.chunk.d.ts#CLAIM_BASES
 CauseOptions: build/index.d.ts#CauseOptions
 CauseTally: build/index.d.ts#CauseTally
-Claim: build/index.d.ts#Claim
-ClaimBasis: build/index.d.ts#ClaimBasis
+Claim: build/hazard.chunk.d.ts#Claim
+ClaimBasis: build/hazard.chunk.d.ts#ClaimBasis
 CoverageTally: build/index.d.ts#CoverageTally
-DurationLaw: build/index.d.ts#DurationLaw
+DurationLaw: build/hazard.chunk.d.ts#DurationLaw
+EAGLEI_STATE_PRIORS: build/index.d.ts#EAGLEI_STATE_PRIORS
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
-Fit: build/index.d.ts#Fit
-HAZARDS_SCHEMA: build/index.d.ts#HAZARDS_SCHEMA
+Fit: build/hazard.chunk.d.ts#Fit
+HAZARDS_SCHEMA: build/hazard.chunk.d.ts#HAZARDS_SCHEMA
 HAZARD_CODES: build/index.d.ts#HAZARD_CODES
 HAZARD_LIST: build/index.d.ts#HAZARD_LIST
 HAZARD_SOURCES: build/index.d.ts#HAZARD_SOURCES
-Hazard: build/index.d.ts#Hazard
+Hazard: build/hazard.chunk.d.ts#Hazard
 HazardCaseOptions: build/index.d.ts#HazardCaseOptions
 HazardCode: build/index.d.ts#HazardCode
-HazardCut: build/index.d.ts#HazardCut
+HazardCut: build/hazard.chunk.d.ts#HazardCut
 HazardFault: build/index.d.ts#HazardFault
-HazardList: build/index.d.ts#HazardList
+HazardList: build/hazard.chunk.d.ts#HazardList
 HazardRegion: build/index.d.ts#HazardRegion
-IsoDate: build/index.d.ts#IsoDate
+IsoDate: build/hazard.chunk.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
-License: build/index.d.ts#License
+License: build/hazard.chunk.d.ts#License
 NO_COLLAPSE_LAW: build/index.d.ts#NO_COLLAPSE_LAW
 NO_CYBER_LAW: build/index.d.ts#NO_CYBER_LAW
 NO_EVENT_LAW: build/index.d.ts#NO_EVENT_LAW
@@ -42,7 +43,7 @@ NO_GEOMAGNETIC_LAW: build/index.d.ts#NO_GEOMAGNETIC_LAW
 NO_LAW: build/index.d.ts#NO_LAW
 NO_STORM_LAW: build/index.d.ts#NO_STORM_LAW
 NO_TOLD_LAW: build/index.d.ts#NO_TOLD_LAW
-NoLaw: build/index.d.ts#NoLaw
+NoLaw: build/hazard.chunk.d.ts#NoLaw
 OE417_ATTACK_EVENTS: build/index.d.ts#OE417_ATTACK_EVENTS
 OE417_ATTACK_LAW: build/index.d.ts#OE417_ATTACK_LAW
 OE417_ATTACK_TERMS: build/index.d.ts#OE417_ATTACK_TERMS
@@ -63,12 +64,12 @@ OutageOptions: build/index.d.ts#OutageOptions
 OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
-PriorTable: build/index.d.ts#PriorTable
+PriorTable: build/hazard.chunk.d.ts#PriorTable
 RegionCurve: build/index.d.ts#RegionCurve
-Regions: build/index.d.ts#Regions
+Regions: build/hazard.chunk.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
-SUPPLY_PARTS: build/index.d.ts#SUPPLY_PARTS
-Source: build/index.d.ts#Source
+SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
+Source: build/hazard.chunk.d.ts#Source
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
@@ -100,7 +101,121 @@ supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
 zoneCounties: build/index.d.ts#zoneCounties
 
+## ./county-priors (build/eaglei-county-priors.d.ts): names
+
+EAGLEI_COUNTY_PRIORS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
+
 ## Declarations
+
+### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
+export declare const EAGLEI_COUNTY_PRIORS: PriorTable;
+
+### build/hazard.chunk.d.ts#CLAIM_BASES
+declare const CLAIM_BASES: readonly ["told", "assessed"];
+
+### build/hazard.chunk.d.ts#Claim
+type Claim = {
+  readonly source: string;
+  readonly basis: ClaimBasis;
+  readonly definition?: never;
+  readonly says: string;
+} | {
+  readonly definition: true;
+  readonly source?: never;
+  readonly basis?: never;
+  readonly says: string;
+};
+
+### build/hazard.chunk.d.ts#ClaimBasis
+type ClaimBasis = (typeof CLAIM_BASES)[number];
+
+### build/hazard.chunk.d.ts#DurationLaw
+interface DurationLaw {
+  readonly read: true;
+  readonly source: string;
+  readonly fit: Fit;
+  readonly scheme: string;
+  readonly curves: Readonly<Record<string, Survival>>;
+}
+
+### build/hazard.chunk.d.ts#Fit
+interface Fit {
+  readonly family: string;
+  readonly method: string;
+  readonly count: number;
+}
+
+### build/hazard.chunk.d.ts#HAZARDS_SCHEMA
+declare const HAZARDS_SCHEMA = "hazards/1";
+
+### build/hazard.chunk.d.ts#Hazard
+interface Hazard {
+  readonly case: string;
+  readonly title: string;
+  readonly cuts: readonly HazardCut[];
+  readonly examined: readonly string[];
+}
+
+### build/hazard.chunk.d.ts#HazardCut
+interface HazardCut {
+  readonly part: string;
+  readonly title: string;
+  readonly claims: readonly Claim[];
+  readonly duration: DurationLaw | NoLaw;
+}
+
+### build/hazard.chunk.d.ts#HazardList
+interface HazardList {
+  readonly schema: typeof HAZARDS_SCHEMA;
+  readonly sources: Readonly<Record<string, Source>>;
+  readonly hazards: readonly Hazard[];
+  readonly priors?: readonly PriorTable[] | undefined;
+}
+
+### build/hazard.chunk.d.ts#IsoDate
+type IsoDate = string;
+
+### build/hazard.chunk.d.ts#License
+interface License {
+  readonly name: string;
+  readonly url: string;
+}
+
+### build/hazard.chunk.d.ts#NoLaw
+interface NoLaw {
+  readonly read: false;
+  readonly reason: string;
+}
+
+### build/hazard.chunk.d.ts#PriorTable
+interface PriorTable {
+  readonly source: string;
+  readonly asOf: IsoDate;
+  readonly scheme: string;
+  readonly method: string;
+  readonly codes: readonly string[];
+  readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+}
+
+### build/hazard.chunk.d.ts#Regions
+interface Regions {
+  readonly scheme: string;
+  readonly codes: readonly string[];
+}
+
+### build/hazard.chunk.d.ts#SUPPLY_PARTS
+declare const SUPPLY_PARTS: readonly Part[];
+
+### build/hazard.chunk.d.ts#Source
+interface Source {
+  readonly name: string;
+  readonly url: string;
+  readonly publisher: string;
+  readonly license: License;
+  readonly updated?: IsoDate | undefined;
+  readonly read: IsoDate;
+  readonly regions?: Regions | undefined;
+}
 
 ### build/index.d.ts#AreaCount
 export interface AreaCount {
@@ -119,9 +234,6 @@ export declare const CAUSE_AFTER = 10800;
 ### build/index.d.ts#CAUSE_BEFORE
 export declare const CAUSE_BEFORE = 3600;
 
-### build/index.d.ts#CLAIM_BASES
-export declare const CLAIM_BASES: readonly ["told", "assessed"];
-
 ### build/index.d.ts#CauseOptions
 export interface CauseOptions {
   readonly before?: number | undefined;
@@ -136,52 +248,20 @@ export interface CauseTally {
   readonly other: Readonly<Record<string, number>>;
 }
 
-### build/index.d.ts#Claim
-export type Claim = {
-  readonly source: string;
-  readonly basis: ClaimBasis;
-  readonly definition?: never;
-  readonly says: string;
-} | {
-  readonly definition: true;
-  readonly source?: never;
-  readonly basis?: never;
-  readonly says: string;
-};
-
-### build/index.d.ts#ClaimBasis
-export type ClaimBasis = (typeof CLAIM_BASES)[number];
-
 ### build/index.d.ts#CoverageTally
 export interface CoverageTally {
   add(count: OutageCount): void;
   years(): Map<string, number>;
 }
 
-### build/index.d.ts#DurationLaw
-export interface DurationLaw {
-  readonly read: true;
-  readonly source: string;
-  readonly fit: Fit;
-  readonly scheme: string;
-  readonly curves: Readonly<Record<string, Survival>>;
-}
+### build/index.d.ts#EAGLEI_STATE_PRIORS
+export declare const EAGLEI_STATE_PRIORS: PriorTable;
 
 ### build/index.d.ts#EAGLE_INTERVAL
 export declare const EAGLE_INTERVAL = 900;
 
 ### build/index.d.ts#EAGLE_SCHEME
 export declare const EAGLE_SCHEME = "us-state-fips";
-
-### build/index.d.ts#Fit
-export interface Fit {
-  readonly family: string;
-  readonly method: string;
-  readonly count: number;
-}
-
-### build/index.d.ts#HAZARDS_SCHEMA
-export declare const HAZARDS_SCHEMA = "hazards/1";
 
 ### build/index.d.ts#HAZARD_CODES
 export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-no-law"];
@@ -192,14 +272,6 @@ export declare const HAZARD_LIST: HazardList;
 ### build/index.d.ts#HAZARD_SOURCES
 export declare const HAZARD_SOURCES: Readonly<Record<string, Source>>;
 
-### build/index.d.ts#Hazard
-export interface Hazard {
-  readonly case: string;
-  readonly title: string;
-  readonly cuts: readonly HazardCut[];
-  readonly examined: readonly string[];
-}
-
 ### build/index.d.ts#HazardCaseOptions
 export interface HazardCaseOptions extends BasisOptions {
   readonly region?: HazardRegion | readonly HazardRegion[] | undefined;
@@ -209,25 +281,9 @@ export interface HazardCaseOptions extends BasisOptions {
 ### build/index.d.ts#HazardCode
 export type HazardCode = (typeof HAZARD_CODES)[number];
 
-### build/index.d.ts#HazardCut
-export interface HazardCut {
-  readonly part: string;
-  readonly title: string;
-  readonly claims: readonly Claim[];
-  readonly duration: DurationLaw | NoLaw;
-}
-
 ### build/index.d.ts#HazardFault
 export interface HazardFault extends Fault {
   readonly code: HazardCode;
-}
-
-### build/index.d.ts#HazardList
-export interface HazardList {
-  readonly schema: typeof HAZARDS_SCHEMA;
-  readonly sources: Readonly<Record<string, Source>>;
-  readonly hazards: readonly Hazard[];
-  readonly priors?: readonly PriorTable[] | undefined;
 }
 
 ### build/index.d.ts#HazardRegion
@@ -236,17 +292,8 @@ export interface HazardRegion {
   readonly code: string;
 }
 
-### build/index.d.ts#IsoDate
-export type IsoDate = string;
-
 ### build/index.d.ts#LAW_DAYS
 export declare const LAW_DAYS: readonly number[];
-
-### build/index.d.ts#License
-export interface License {
-  readonly name: string;
-  readonly url: string;
-}
 
 ### build/index.d.ts#NO_COLLAPSE_LAW
 export declare const NO_COLLAPSE_LAW: NoLaw;
@@ -271,12 +318,6 @@ export declare const NO_STORM_LAW: NoLaw;
 
 ### build/index.d.ts#NO_TOLD_LAW
 export declare const NO_TOLD_LAW: NoLaw;
-
-### build/index.d.ts#NoLaw
-export interface NoLaw {
-  readonly read: false;
-  readonly reason: string;
-}
 
 ### build/index.d.ts#OE417_ATTACK_EVENTS
 export declare const OE417_ATTACK_EVENTS: readonly Oe417Event[];
@@ -390,16 +431,6 @@ export interface OutageTally {
   readonly truncated: number;
 }
 
-### build/index.d.ts#PriorTable
-export interface PriorTable {
-  readonly source: string;
-  readonly asOf: IsoDate;
-  readonly scheme: string;
-  readonly method: string;
-  readonly codes: readonly string[];
-  readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
-}
-
 ### build/index.d.ts#RegionCurve
 export interface RegionCurve {
   readonly curve: Survival;
@@ -409,28 +440,8 @@ export interface RegionCurve {
   readonly median: number | undefined;
 }
 
-### build/index.d.ts#Regions
-export interface Regions {
-  readonly scheme: string;
-  readonly codes: readonly string[];
-}
-
 ### build/index.d.ts#STORM_CLASSES
 export declare const STORM_CLASSES: Readonly<Record<string, readonly string[]>>;
-
-### build/index.d.ts#SUPPLY_PARTS
-export declare const SUPPLY_PARTS: readonly Part[];
-
-### build/index.d.ts#Source
-export interface Source {
-  readonly name: string;
-  readonly url: string;
-  readonly publisher: string;
-  readonly license: License;
-  readonly updated?: IsoDate | undefined;
-  readonly read: IsoDate;
-  readonly regions?: Regions | undefined;
-}
 
 ### build/index.d.ts#StormArea
 export type StormArea = "C" | "Z" | "M";

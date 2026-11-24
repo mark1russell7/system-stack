@@ -28,6 +28,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./county-priors": "./src/eaglei-county-priors.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -68,6 +69,11 @@
         "types": "./build/index.d.ts",
         "import": "./build/index.js",
         "default": "./build/index.js"
+      },
+      "./county-priors": {
+        "types": "./build/eaglei-county-priors.d.ts",
+        "import": "./build/eaglei-county-priors.js",
+        "default": "./build/eaglei-county-priors.js"
       },
       "./package.json": "./package.json"
     }
