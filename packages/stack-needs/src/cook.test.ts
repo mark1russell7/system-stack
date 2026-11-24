@@ -295,11 +295,46 @@ describe("the cook fragment", () => {
       expect(fuelAt(95) - 20 * 0.01).toBeCloseTo(yieldBoil(10) * (80 / 75), 12);
     });
 
-    it("gives no fuel for the canister stove of the catalog: its yield is the calm test of the maker", () => {
+    it("multiplies the boil fuel of the yield by the adverse factor, and keeps the cook part", () => {
+      const fuelOf = (stove: StoveFacts): CookLine["fuel"] => lineOf(cookFragment({ ...noShare, stove }).lines, "test.grain-1kg").fuel;
+      const adverse = (factor: number, bound?: string): object => ({ adverse: { factor, fact, ...(bound === undefined ? {} : { bound }) } });
+      const withFactor = (more: object, factor: object): StoveFacts => ({ ...yieldStove(10, more), ...factor }) as StoveFacts;
+      // A most factor gives the most boil fuel, also from a most yield. The cook part stays 20 min x 0.01 kg/min.
+      for (const more of [{ bound: "most" }, { bound: "least" }, {}]) {
+        const fuel = fuelOf(withFactor(more, adverse(2, "most")));
+        expect(fuel.read && fuel.value).toBeCloseTo(2 * yieldBoil(10) + 20 * 0.01, 12);
+      }
+      // A factor with no bound is the value. It takes a yield with no bound, and not a most yield.
+      const value = fuelOf(withFactor({}, adverse(2)));
+      expect(value.read && value.value).toBeCloseTo(2 * yieldBoil(10) + 20 * 0.01, 12);
+      const mostYield = fuelOf(withFactor({ bound: "most" }, adverse(2)));
+      expect(mostYield.read).toBe(false);
+      if (!mostYield.read) expect(mostYield.why).toMatch(/most yield with a most adverse factor/);
+      // A least factor gives too little fuel. A factor below 1 or not finite is a bad value of a catalog of a caller.
+      const least = fuelOf(withFactor({}, adverse(2, "least")));
+      expect(least.read).toBe(false);
+      if (!least.read) expect(least.why).toMatch(/least factor gives too little fuel/);
+      for (const bad of [0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const fuel = fuelOf(withFactor({}, adverse(bad, "most")));
+        expect(fuel.read).toBe(false);
+        if (!fuel.read) expect(fuel.why).toMatch(/finite number of 1 or more/);
+      }
+      // A factor of 1 gives the calm fuel.
+      const one = fuelOf(withFactor({}, adverse(1, "most")));
+      expect(one.read && one.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
+    });
+
+    it("gives the canister stove of the catalog the most fuel: its calm yield times its most adverse factor of 4", () => {
       const line = cookFragment({ catalog: SUPPLY_CATALOG, units: { "food.rice-white-1kg": 1 }, stove: "heat.stove-canister-1-burner", batch: { value: 0.5, unit: "kg" } }).lines[0];
-      expect(line?.water.read).toBe(true);
-      expect(line?.fuel.read).toBe(false);
-      if (line !== undefined && !line.fuel.read) expect(line.fuel.why).toMatch(/bound most/);
+      if (line === undefined || !line.water.read || !line.fuel.read || !line.minutes.read) throw new Error("The canister line has no read.");
+      // The pot of 0.5 kg starts at 0 °C. The test boils 16 L from 21 °C to 100 °C with 227 g of fuel.
+      const heat = (line.water.value * 0.5 * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100;
+      const calmPerKg = (16 * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * 79) / 0.227;
+      const boil = heat / (calmPerKg / 4);
+      const perMin = 0.227 / 60;
+      // The rice cooks for 18 min at most after the boil, at the full rate of 227 g each hour.
+      expect(line.fuel.value).toBeCloseTo(boil + 18 * perMin, 12);
+      expect(line.minutes.value).toBeCloseTo(boil / perMin + 18, 9);
     });
   });
 

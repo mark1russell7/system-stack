@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, soakWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, soakWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -227,11 +227,26 @@ function citedCelsius(value: unknown): number | undefined {
  * A warmer start or a colder end gives less heat. Thus each one needs its citation, and a yield with no cited start or end gives a no read.
  * An end of `BOIL_CELSIUS` is not a default: at a high place the test water boils at less, and that default gives too little fuel.
  * A yield with the bound `most` is a best case, so it gives too little fuel and a no read. A yield with the bound `least` or no bound gives a read.
+ *
+ * The adverse factor of the stove multiplies the boil fuel: cold, snow melt and wind take more fuel than the calm test.
+ * The factor is relative to the cited calm yield. Thus the heat of 1 kg of fuel is the calm heat over the factor.
+ * - A factor with the bound `most` gives the most boil fuel, an upper limit. It also takes a yield with the bound `most`.
+ * - A factor with no bound is the value. It takes a yield with the bound `least` or no bound, as the calm case does.
+ * - A factor with the bound `least` gives too little fuel, so it gives a no read. So does a factor that is not a finite number of 1 or more.
  */
-function yieldHeat(boil: StoveYield): { readonly perKg: number } | { readonly why: string } {
+function yieldHeat(boil: StoveYield, adverse: StoveFactor | undefined): { readonly perKg: number } | { readonly why: string } {
+  const factorBound: unknown = adverse !== undefined && "bound" in adverse ? adverse.bound : undefined;
+  const factor: unknown = adverse?.factor;
+  if (adverse !== undefined) {
+    if (typeof factor !== "number" || !Number.isFinite(factor) || !(factor >= 1))
+      return { why: `The adverse factor of the stove is ${String(factor)}. It must be a finite number of 1 or more.` };
+    if (factorBound !== undefined && factorBound !== "most")
+      return { why: `The adverse factor of the stove has the bound ${String(factorBound)}. Only a factor with the bound most or no bound gives the boil fuel.${factorBound === "least" ? " A least factor gives too little fuel." : ""}` };
+  }
   const bound: unknown = "bound" in boil ? boil.bound : undefined;
-  if (bound !== undefined && bound !== "least")
-    return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
+  const upper = adverse !== undefined && factorBound === "most";
+  if (bound !== undefined && bound !== "least" && !(bound === "most" && upper))
+    return { why: `The boil yield of the stove has the bound ${String(bound)}. Only a yield with the bound least or no bound gives the fuel, or a most yield with a most adverse factor.${bound === "most" ? " A most yield gives too little fuel for the boil." : ""}` };
   const startC = citedCelsius(boil.start);
   if (startC === undefined) return { why: "The boil yield of the stove has no cited start temperature. A colder start of the test gives too little fuel." };
   // The end of the test, the field `end` of market. The check of the value stays, because a catalog of a caller can have a bad value.
@@ -244,7 +259,8 @@ function yieldHeat(boil: StoveYield): { readonly perKg: number } | { readonly wh
   const fuelKg = inUnit(boil.per.amount, boil.per.unit, "kg");
   if (litres === undefined || fuelKg === undefined || !(litres > 0) || !(fuelKg > 0))
     return { why: `The boil yield of the stove is ${String(boil.amount)} ${boil.unit} for each ${String(boil.per.amount)} ${boil.per.unit}, which is not a volume above 0 for a mass above 0.` };
-  return { perKg: (litres * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * (endC - startC)) / fuelKg };
+  const calm = (litres * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * (endC - startC)) / fuelKg;
+  return { perKg: typeof factor === "number" ? calm / factor : calm };
 }
 
 /** This function gives the fuel rate of a stove in `kJ/min` or `kg/min`. It gives `undefined` for a rate that is not an energy or a mass in a time. */
@@ -334,7 +350,7 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
     else potPerMin = rate.perMin * fuelEnergy.perKg * share.value;
   }
   // The heat of 1 kg of fuel into the pot, from the boil yield of the stove. It needs no share and no energy of the fuel.
-  const fromYield = stove.boil === undefined ? { why: "The stove has no cited boil yield." } : yieldHeat(stove.boil);
+  const fromYield = stove.boil === undefined ? { why: "The stove has no cited boil yield." } : yieldHeat(stove.boil, stove.adverse);
   if ("why" in fromYield) boilWhy.push(fromYield.why);
   if (potPerMin === undefined && "why" in fromYield) why.push(`The fuel of the boil is a no read. ${boilWhy.join(" ")}`);
 
@@ -404,6 +420,9 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   The boil fuel is the heat of the pot over the heat of 1 kg of fuel in the test.
  *   The test water takes `WATER_DENSITY_MIN`, and the rise goes from the cited start to the cited end of the test. The boil time is then the boil fuel over the mass rate.
  *   A yield with the bound `most`, or with no cited start or end, gives a no read. When the share and the yield both have a read, the line takes the most boil fuel.
+ * - The adverse factor of the stove (`adverse` of market) multiplies the boil fuel of the yield, for cold, snow melt and wind. The cook part stays the rate times the cook time.
+ *   A factor with the bound `most` gives the most boil fuel, also from a yield with the bound `most`. A factor with no bound is the value.
+ *   A factor with the bound `least` gives a no read of the yield.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
  *   The model does not give that time, so there the fuel is not an upper limit.
  * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
