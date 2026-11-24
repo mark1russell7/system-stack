@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-needs",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "The need rates of draws as reference data: the daily food energy of each person by age, sex and activity, from the Dietary Guidelines for Americans, with its source. An add-on of system-stack.",
   "license": "MIT",
   "repository": {

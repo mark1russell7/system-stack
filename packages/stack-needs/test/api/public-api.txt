@@ -303,6 +303,7 @@ export interface CookLine {
   readonly resource: string;
   readonly energy: CookRead;
   readonly water: CookRead;
+  readonly soak: CookRead;
   readonly heat: CookRead;
   readonly minutes: CookRead;
   readonly fuel: CookRead;

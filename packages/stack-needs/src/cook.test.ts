@@ -1,5 +1,5 @@
 import { checkSources } from "@mark1russell7/guidebook";
-import { SUPPLY_CATALOG, type StoveFacts, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { SUPPLY_CATALOG, type CitedRate, type StoveFacts, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
@@ -303,6 +303,30 @@ describe("the cook fragment", () => {
     });
   });
 
+  it("adds the soak water to the water take of a pot, with no heat and no fuel", () => {
+    const withSoak = (soak: CitedRate, more: { readonly bulk?: CitedRate } = {}): CookFragmentInput => ({
+      ...input,
+      catalog: { ...catalog, products: catalog.products.map((product) => (product.id === grain.id ? { ...grain, cook: { ...grain.cook, soak, ...more } } : product)) },
+    });
+    // A made-up soak of 3 L for each kg. One pot of 0.5 kg takes 1 L of cook water and 1.5 L of soak water.
+    const result = cookFragment(withSoak({ amount: 3, unit: "L", per: { amount: 1, unit: "kg" }, fact }));
+    const line = lineOf(result.lines, "test.grain-1kg");
+    expect(line.soak).toEqual({ read: true, value: 3, unit: "L/kg" });
+    expect(line.heat.read && line.heat.value).toBeCloseTo(HEAT, 9);
+    expect(line.fuel.read && line.fuel.value).toBeCloseTo(FUEL, 9);
+    expect(result.layer.converters[0]?.takes.find((take) => take.resource === STORED_WATER)?.amount).toBeCloseTo(2.5, 12);
+    // A soak for each volume of dry food with no bulk mass gives no L/kg, so the resource has no converter.
+    const perVolume = cookFragment(withSoak({ amount: 3, unit: "L", per: { amount: 1, unit: "L" }, fact }));
+    const noSoak = lineOf(perVolume.lines, "test.grain-1kg").soak;
+    expect(noSoak.read).toBe(false);
+    if (!noSoak.read) expect(noSoak.why).toMatch(/bulk mass/);
+    expect(perVolume.layer.converters).toEqual([]);
+    expect(perVolume.noReads.map((item) => item.resource)).toEqual(["food.test-grain"]);
+    // With a bulk mass of 0.75 kg/L, the soak is 4 L for each kg.
+    const bulk = cookFragment(withSoak({ amount: 3, unit: "L", per: { amount: 1, unit: "L" }, fact }, { bulk: { amount: 0.75, unit: "kg", per: { amount: 1, unit: "L" }, fact } }));
+    expect(lineOf(bulk.lines, "test.grain-1kg").soak).toEqual({ read: true, value: 4, unit: "L/kg" });
+  });
+
   it("refuses a bad batch, share or start", () => {
     expect(() => cookFragment({ ...input, batch: { value: 0, unit: "kg" } })).toThrow(RangeError);
     expect(() => cookFragment({ ...input, batch: { value: 1, unit: "L" } })).toThrow(RangeError);
@@ -341,6 +365,13 @@ describe("the cook fragment with the catalog of market", () => {
     const beans = lineOf(result.lines, "food.beans-dry-1kg");
     expect(pasta.water.read && pasta.water.value).toBeCloseTo(16.0232, 4);
     expect(beans.water.read && beans.water.value).toBeCloseTo(3.6511, 4);
+    // The beans soak in 1.75 qt of water for each lb, which the cook discards. Rice and pasta cite no soak.
+    expect(beans.soak.read && beans.soak.value).toBeCloseTo(3.6511, 4);
+    expect(rice.soak).toEqual({ read: true, value: 0, unit: "L/kg" });
+    expect(pasta.soak).toEqual({ read: true, value: 0, unit: "L/kg" });
+    const legume = result.layer.converters.find((converter) => converter.id === "cook:food.legume-dry");
+    const legumeWater = legume?.takes.find((take) => take.resource === "water.stored")?.amount;
+    expect(legumeWater).toBeCloseTo((3.6511 + 3.6511) * 0.5, 3);
     for (const line of [pasta, beans]) {
       const pot = (line.water.read ? line.water.value : 0) * 0.5;
       expect(line.heat.read && line.heat.value).toBeCloseTo((pot * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100, 6);

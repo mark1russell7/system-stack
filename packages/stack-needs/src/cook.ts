@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, soakWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -151,6 +151,11 @@ export interface CookLine {
   readonly energy: CookRead;
   /** The cook water, in `L/kg` of dry food, from `cookWater` of market. */
   readonly water: CookRead;
+  /**
+   * The soak water, in `L/kg` of dry food, from `soakWater` of market. The cook discards it, so it gets no heat and no fuel.
+   * A product with no cited soak has 0. A cited soak that does not convert to `L/kg` is a no read.
+   */
+  readonly soak: CookRead;
   /** The heat to boil the cook water of one pot, in `kJ`. */
   readonly heat: CookRead;
   /** The time of the stove for one pot: the boil time and the high end of the cook time, in `min`. */
@@ -288,6 +293,14 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
 
   const litres = cookWater(product);
   const water = litres === undefined ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`) : read(valueIn(litres, "L/kg"), "L/kg");
+  // The soak water. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
+  const soakLitres = product.cook?.soak === undefined ? undefined : soakWater(product);
+  const soak =
+    product.cook?.soak === undefined
+      ? read(0, "L/kg")
+      : soakLitres === undefined
+        ? noRead(`The soak water of the product ${product.id} does not convert to L/kg. A rate for each volume needs a bulk mass.`)
+        : read(valueIn(soakLitres, "L/kg"), "L/kg");
 
   // The heat to boil one pot: the mass of the water and the dry food times the specific heat of water times the rise to the boil.
   const heat = water.read ? read((water.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ") : noRead(`The heat to boil is a no read: ${water.why}`);
@@ -337,7 +350,7 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
 
   if (why.length > 0 || !heat.read || cookMin === undefined || fuelPerMin === undefined || !(fuelPerMin > 0)) {
     const text = why.join(" ");
-    return { product: product.id, resource, energy, water, heat, minutes: noRead(text), fuel: noRead(text) };
+    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text) };
   }
   // The boil fuel in kg: from the share, the boil time at the full rate; from the yield, the heat over the heat of 1 kg of fuel.
   const boilFuels = [
@@ -347,11 +360,11 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   // The checks above give a share above 0 or a yield with a read. The guard keeps a line with no boil fuel from a value of -Infinity.
   if (boilFuels.length === 0) {
     const text = `The fuel of the boil is a no read. ${boilWhy.join(" ")}`;
-    return { product: product.id, resource, energy, water, heat, minutes: noRead(text), fuel: noRead(text) };
+    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text) };
   }
   const boilFuel = Math.max(...boilFuels);
   const minutes = boilFuel / fuelPerMin + cookMin;
-  return { product: product.id, resource, energy, water, heat, minutes: read(minutes, "min"), fuel: read(boilFuel + cookMin * fuelPerMin, "kg") };
+  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel: read(boilFuel + cookMin * fuelPerMin, "kg") };
 }
 
 /** This function gives the stove facts of the input: the facts of the caller, or the facts of a product of the catalog. */
@@ -403,7 +416,9 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * the most water, the most fuel and the least food energy. When a line of the resource has no read, the resource has no converter.
  * A store of the resource from a different fragment gets the converter of this list.
  *
- * Market gives the soak water of a dry food with `soakWater`. This function does not take it. Thus the water of a food with a soak, for example dry beans, is a lower limit.
+ * The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water.
+ * Thus the soak adds to the water take, and it adds no heat and no fuel. A product with no cited soak takes no soak water.
+ * A soak rate that does not convert to `L/kg` gives a no read.
  * A product that gives more than one food has no energy for each food, so its energy is a no read.
  *
  * The cook water is `water.stored`, the store of the drinking water. A drinking draw at a higher level of the same store takes
@@ -464,7 +479,7 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   const noReads: CookNoRead[] = [];
   for (const resource of [...new Set(lines.map((line) => line.resource))]) {
     const own = lines.filter((line) => line.resource === resource);
-    const why = own.flatMap((line) => [line.energy, line.water, line.fuel].flatMap((value) => (value.read ? [] : [`${line.product}: ${value.why}`])));
+    const why = own.flatMap((line) => [line.energy, line.water, line.soak, line.fuel].flatMap((value) => (value.read ? [] : [`${line.product}: ${value.why}`])));
     if (why.length > 0) {
       noReads.push({ resource, why: [...new Set(why)].join(" ") });
       continue;
@@ -479,7 +494,8 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
       ...(input.device === undefined ? {} : { device: input.device }),
       takes: [
         { resource, amount: batchKg * dryPerKg },
-        { resource: STORED_WATER, amount: most((line) => line.water) * batchKg * waterPerL },
+        // The cook water and the soak water of one pot. The worst line is the one with the most of the two together.
+        { resource: STORED_WATER, amount: Math.max(...own.map((line) => valueOf(line.water) + valueOf(line.soak))) * batchKg * waterPerL },
         { resource: stove.fuel, amount: most((line) => line.fuel) * fuelUnitPerKg },
       ],
       gives: { need: FOOD_NEED, amount: least((line) => line.energy) * batchKg },
