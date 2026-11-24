@@ -381,8 +381,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0
       '@mark1russell7/market':
-        specifier: ^0.8.9
-        version: 0.8.10
+        specifier: ^0.8.11
+        version: 0.8.11
       '@mark1russell7/quantity':
         specifier: ^0.4.4
         version: 0.4.5(zod@4.6.7)
@@ -937,8 +937,8 @@ packages:
     resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/market@0.8.10':
-    resolution: {integrity: sha512-W4YK7k8JIbjaI52EMVr+DSyE4KFnP5It2o9XHz1Gxlc45mY3pEB5un6/AEgLO3p/2wuppeXHK+w3sZ75kmaZYg==}
+  '@mark1russell7/market@0.8.11':
+    resolution: {integrity: sha512-QABS/tNKbykOb75FKr3XwAEVxBqSIUEtoDjwWDLKLWywOenPRPhwUjhV9ImcPQ5yBuvZ9IWsH4OvOu+L371XAg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/optional@1.5.0':
@@ -2555,7 +2555,7 @@ snapshots:
 
   '@mark1russell7/interval@0.1.0': {}
 
-  '@mark1russell7/market@0.8.10':
+  '@mark1russell7/market@0.8.11':
     dependencies:
       '@mark1russell7/guidebook': 0.4.0
       '@mark1russell7/optional': 1.5.0

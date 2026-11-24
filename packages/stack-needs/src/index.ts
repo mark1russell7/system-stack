@@ -6,3 +6,4 @@ export * from "./uses.ts";
 export * from "./cook.ts";
 export * from "./mix.ts";
 export * from "./daily.ts";
+export * from "./device.ts";
