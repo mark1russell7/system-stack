@@ -86,6 +86,7 @@ describe("the counts of the priors", () => {
     for (const time of [at(2020), at(2020, 200), at(2021), at(2023)]) tally.add({ area: "01001", out: 5, time });
     tally.add({ area: "01003", out: undefined, time: at(2022) });
     expect(Object.fromEntries(tally.years())).toEqual({ "01001": 3, "01003": 1 });
+    expect(Object.fromEntries(tally.calendar())).toEqual({ "01001": [2020, 2021, 2023], "01003": [2022] });
   });
 
   it("counts the events and the peak shares of each area with customers, with a share of at most 1", () => {

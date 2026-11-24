@@ -22,6 +22,8 @@ export interface CoverageTally {
   add(count: OutageCount): void;
   /** This function gives the count of the calendar years (UTC) with one count or more of each area. */
   years(): Map<string, number>;
+  /** This function gives the calendar years (UTC) with one count or more of each area, in their order. A holdout over time splits them. */
+  calendar(): Map<string, number[]>;
 }
 
 /**
@@ -38,6 +40,7 @@ export function coverageTally(): CoverageTally {
       seen.set(count.area, years);
     },
     years: () => new Map([...seen].map(([area, years]) => [area, years.size])),
+    calendar: () => new Map([...seen].map(([area, years]) => [area, [...years].sort((a, b) => a - b)])),
   };
 }
 

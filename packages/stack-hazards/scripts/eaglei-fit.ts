@@ -210,6 +210,39 @@ export interface EaglePriors {
   readonly counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>;
   /** The overlap of the storm cases. A record of a fit before it does not have it. */
   readonly overlap?: CaseOverlap | undefined;
+  /** The counts of each year, for the holdout over time. A record of a fit before them does not have them. */
+  readonly yearly?: YearlyCounts | undefined;
+}
+
+/** The counts of each calendar year (UTC). The sum over the years of a county gives its years and its events in `EaglePriors`. */
+export interface YearlyCounts {
+  /** The calendar years in which the files list each county, in their order. */
+  readonly observed: Readonly<Record<string, readonly number[]>>;
+  /** The events of each case, by the code of the case, the year of their start and the county. A county with no event in a year is not in that year. */
+  readonly counts: Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, number>>>>>>;
+}
+
+/**
+ * This function gives the events of each county with customers in each calendar year (UTC) of their start. The function is pure.
+ * As in `areaCounts`, a county with no customers has no count.
+ */
+export function yearCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, Record<string, number>> {
+  const years = new Map<number, Map<string, number>>();
+  for (const event of events) {
+    const total = customers.get(event.area);
+    if (total === undefined || !(total > 0)) continue;
+    const year = new Date(event.start * 1000).getUTCFullYear();
+    const areas = years.get(year) ?? new Map<string, number>();
+    areas.set(event.area, (areas.get(event.area) ?? 0) + 1);
+    years.set(year, areas);
+  }
+  const byCode = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+  return Object.fromEntries(
+    [...years.keys()].sort((a, b) => a - b).map((year) => {
+      const areas = years.get(year) ?? new Map<string, number>();
+      return [String(year), Object.fromEntries([...areas.keys()].sort(byCode).map((area) => [area, areas.get(area) ?? 0]))];
+    }),
+  );
 }
 
 /** The outages in a storm case, and the outages in two storm cases or more. Each of these counts in each of its cases. */
@@ -431,10 +464,16 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const { events, tally } = main;
   const causes = options.storms === undefined ? undefined : await causeLaws(context, events, files.years, options.storms);
   const inCase = new Set([...(causes?.lists.values() ?? [])].flat());
-  const counts: Record<string, Readonly<Record<string, AreaCount>>> = { [OUTAGE_CASE]: areaCounts(events.filter((event) => !inCase.has(event)), customers) };
-  for (const [name, list] of causes?.lists ?? []) counts[name] = areaCounts(list, customers);
+  const outages = events.filter((event) => !inCase.has(event));
+  const counts: Record<string, Readonly<Record<string, AreaCount>>> = { [OUTAGE_CASE]: areaCounts(outages, customers) };
+  const yearly: Record<string, Readonly<Record<string, Readonly<Record<string, number>>>>> = { [OUTAGE_CASE]: yearCounts(outages, customers) };
+  for (const [name, list] of causes?.lists ?? []) {
+    counts[name] = areaCounts(list, customers);
+    yearly[name] = yearCounts(list, customers);
+  }
   const overlap = causes === undefined ? undefined : caseOverlap(causes.lists.values());
-  const priors: EaglePriors = { observation: { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) }, counts, overlap };
+  const observation = { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) };
+  const priors: EaglePriors = { observation, counts, overlap, yearly: { observed: Object.fromEntries(coverage.calendar()), counts: yearly } };
   const sweep =
     options.sweep === undefined
       ? undefined
