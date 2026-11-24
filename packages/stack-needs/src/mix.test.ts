@@ -9,32 +9,17 @@ import { householdFragment } from "./household.ts";
 import { formulaMixCheck, formulaMixFragment, formulaMixWater } from "./mix.ts";
 import { FORMULA_NEED, FORMULA_POWDER, FORMULA_READY, STORED_WATER, WATER_NEED } from "./uses.ts";
 
-// The powder records of this file copy the records of market 0.8.6: the resource, the fact and the product of 1 kg.
-// When stack-needs takes market 0.8.6, the tests use SUPPLY_CATALOG with no copy.
-
 const POWDER_ID = "food.infant-formula-powder-1kg";
-const powder: SupplyProduct = {
-  id: POWDER_ID,
-  title: "Infant formula, powder, 1 kg",
-  kind: "food",
-  gives: [{ resource: FORMULA_POWDER, amount: { read: true, amount: 1, unit: "kg", size: true } }],
-  size: { read: true, amount: 1, unit: "kg", definition: "The catalog item is defined as 1 kg of infant formula powder, in one or more containers." },
-  energy: { read: true, amount: 5240, unit: "kcal", scaled: { rate: { amount: 524, unit: "kcal", per: { amount: 100, unit: "g" }, fact: "fdc.infant-formula-powder" }, of: { amount: 1, unit: "kg", size: true } } },
-  shelf: { read: false, why: "The catalog has no cited shelf life of infant formula. The use-by date on the container applies." },
-  average: { read: false, why: "The known series of average prices have no series of infant formula yet." },
-};
+/** The powder product of 1 kg of the reference catalog. The tests copy it to make test products. */
+const powder: SupplyProduct = (() => {
+  const found = SUPPLY_CATALOG.products.find((product) => product.id === POWDER_ID);
+  if (found === undefined) throw new Error(`The reference catalog has no product ${POWDER_ID}.`);
+  return found;
+})();
 
-/** This function gives the reference catalog with the powder records, and with more products. */
+/** This function gives the reference catalog with more products. */
 function withPowder(...more: SupplyProduct[]): SupplyCatalog {
-  const has = SUPPLY_CATALOG.resources.some((resource) => resource.code === FORMULA_POWDER);
-  return {
-    ...SUPPLY_CATALOG,
-    facts: SUPPLY_CATALOG.facts.some((fact) => fact.id === "fdc.infant-formula-powder")
-      ? SUPPLY_CATALOG.facts
-      : [...SUPPLY_CATALOG.facts, { id: "fdc.infant-formula-powder", use: "fact", text: "The item 173554 (infant formula, store brand, powder) gives 524 kcal in 100 g.", source: "fdc.sr-legacy", locator: "FDC ID 173554" }],
-    resources: has ? SUPPLY_CATALOG.resources : [...SUPPLY_CATALOG.resources, { code: FORMULA_POWDER, unit: "kg", title: "Infant formula, powder, to mix with safe water and no fuel", kind: "food" }],
-    products: [...SUPPLY_CATALOG.products.filter((product) => product.id !== POWDER_ID), powder, ...more],
-  };
+  return { ...SUPPLY_CATALOG, products: [...SUPPLY_CATALOG.products, ...more] };
 }
 
 const catalog = withPowder();
@@ -42,6 +27,11 @@ const catalog = withPowder();
 const WATER = 5240 / 630 - 1;
 
 describe("the mix rule of infant formula powder", () => {
+  it("finds the powder of 1 kg in the reference catalog, with 5240 kcal and no direct draw", () => {
+    expect(powder.gives).toEqual([{ resource: FORMULA_POWDER, amount: { read: true, amount: 1, unit: "kg", size: true } }]);
+    expect(powder.energy).toMatchObject({ read: true, amount: 5240, unit: "kcal" });
+  });
+
   it("cites the FDC items and the WIC guide", () => {
     expect(FORMULA_MIX).toMatchObject({ powderKcal: 524, powderWater: 2, readyKcal: 63, readyWater: 88.1 });
     expect(FORMULA_MIX.source).toBe(FDC_SR_LEGACY_SOURCE);

@@ -208,6 +208,23 @@ export interface EaglePriors {
   readonly observation: Observation;
   /** The counts of each case in each county with customers, by the code of the case. */
   readonly counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>;
+  /** The overlap of the storm cases. A record of a fit before it does not have it. */
+  readonly overlap?: CaseOverlap | undefined;
+}
+
+/** The outages in a storm case, and the outages in two storm cases or more. Each of these counts in each of its cases. */
+export interface CaseOverlap {
+  readonly events: number;
+  readonly multiple: number;
+}
+
+/** This function gives the overlap of the lists of the storm cases. The function is pure. */
+export function caseOverlap(lists: Iterable<readonly OutageEvent[]>): CaseOverlap {
+  const seen = new Map<OutageEvent, number>();
+  for (const list of lists) for (const event of new Set(list)) seen.set(event, (seen.get(event) ?? 0) + 1);
+  let multiple = 0;
+  for (const times of seen.values()) if (times > 1) multiple += 1;
+  return { events: seen.size, multiple };
 }
 
 /** The output of a fit: the source, the options, the counts and the curve of each state. */
@@ -416,7 +433,8 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const inCase = new Set([...(causes?.lists.values() ?? [])].flat());
   const counts: Record<string, Readonly<Record<string, AreaCount>>> = { [OUTAGE_CASE]: areaCounts(events.filter((event) => !inCase.has(event)), customers) };
   for (const [name, list] of causes?.lists ?? []) counts[name] = areaCounts(list, customers);
-  const priors: EaglePriors = { observation: { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) }, counts };
+  const overlap = causes === undefined ? undefined : caseOverlap(causes.lists.values());
+  const priors: EaglePriors = { observation: { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) }, counts, overlap };
   const sweep =
     options.sweep === undefined
       ? undefined

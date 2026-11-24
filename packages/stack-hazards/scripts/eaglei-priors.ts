@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import type { CountyPooling, PoolHoldout, PoolLaw, PriorTable, StatePooling } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
 import { observedRegions, pooledRates, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
-import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type EagleLaws } from "./eaglei-fit.ts";
+import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type CaseOverlap, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { poolHoldout, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
 
@@ -40,6 +40,13 @@ type RatesOf = (name: string, counts: Readonly<Record<string, AreaCount>>, obser
 
 /** The share of the customers of a county that starts an event, when the fit has no option `share`: the default of `outageReader`. */
 const DEFAULT_SHARE = 0.01;
+
+/** This function tells that the storm cases overlap, so a sum of their priors counts an outage more than one time. */
+const overlapText = (overlap: CaseOverlap | undefined): string =>
+  "An outage in the storm events of two cases counts in each case. Thus a sum of the priors of the storm cases counts it two times or more" +
+  ". " +
+  (overlap === undefined ? "" : `In the fit, ${String(overlap.multiple)} of the ${String(overlap.events)} outages in a storm case are in two cases or more. `) +
+  `The case ${OUTAGE_CASE} and one storm case do not overlap. `;
 
 const common = (share: number): string =>
   `An event is a run of the 15-minute counts of a county at or above ${String(share * 100)}% of its customers. A smaller outage is not counted, and that makes a rate too low. ` +
@@ -83,7 +90,7 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
       source: EAGLEI_SOURCE_ID,
       asOf: laws.source.modified.slice(0, 10),
       scheme,
-      method: `${method} ${common(laws.options.share ?? DEFAULT_SHARE)} ${raise}${silentText}${limit}`,
+      method: `${method} ${common(laws.options.share ?? DEFAULT_SHARE)} ${overlapText(priors.overlap)}${raise}${silentText}${limit}`,
       codes: codes.filter((code) => !over.has(code)),
       rates: Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
     };
