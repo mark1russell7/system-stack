@@ -426,6 +426,7 @@ export interface HouseholdFragmentInput {
   readonly prefix?: string | undefined;
   readonly noRow?: NoRowAction | undefined;
   readonly cold?: boolean | undefined;
+  readonly formulaLater?: "whole" | undefined;
 }
 
 ### build/index.d.ts#HouseholdFragmentNoRead

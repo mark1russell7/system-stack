@@ -95,6 +95,11 @@ export interface HouseholdFragmentInput {
    * Then an opened container of formula serves one feed, and the rest is waste.
    */
   readonly cold?: boolean | undefined;
+  /**
+   * The rule for an infant on formula from `FORMULA_DRAW_MONTHS`. Without it, the infant is a person with no row.
+   * With `whole`, the formula draw holds the whole need of the row: the upper limit of formula. The food draw holds none of it.
+   */
+  readonly formulaLater?: "whole" | undefined;
 }
 
 /** The waste of the opened containers of one product of the buy list with no cold storage. */
@@ -262,6 +267,7 @@ function openedStores(
  *
  * - The draw of food energy has the rate of the need of its persons for one day, and its users are the persons.
  * - The draw of formula has the infants on formula below `FORMULA_DRAW_MONTHS`, with the whole need of their rows.
+ *   With `formulaLater: "whole"`, it also has the older infants on formula, with the whole need of their rows.
  * - The fragment has each draw with one or more users. The draw of food energy is first.
  * - Each gift of the buy list with a read is one store, with the `id` `<prefix>:<product>:<resource>`. A gift with no read has no store.
  * - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives 1 kcal for each kcal.
@@ -285,7 +291,7 @@ function openedStores(
  *   When the infants are more, the function gives no layer: the change of a stage is the milk of one infant.
  * - `formula`: below `FORMULA_DRAW_MONTHS`, the whole need of the infant is in the draw of formula, because the infant has milk only.
  *   From `FORMULA_DRAW_MONTHS`, no cited source gives the part of formula, so the infant gives no layer, as a person with no row.
- *   The option `leave-out` also applies. The feeding is only for an infant below `INFANT_MONTHS`.
+ *   The option `leave-out` also applies. The option `formulaLater: "whole"` puts the whole need in the formula draw: the upper limit. The feeding is only for an infant below `INFANT_MONTHS`.
  *
  * The function is pure.
  *
@@ -335,7 +341,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
       }
     } else if (person.feeding === "formula") {
       formula.push(person);
-      if (line.read && person.ageMonths < FORMULA_DRAW_MONTHS) {
+      if (line.read && (person.ageMonths < FORMULA_DRAW_MONTHS || input.formulaLater === "whole")) {
         formulaUsers += person.count;
         formulaPerDay += line.need.value;
         formulaLeast = Math.min(formulaLeast, line.need.value / person.count);

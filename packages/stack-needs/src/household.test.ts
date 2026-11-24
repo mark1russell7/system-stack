@@ -296,6 +296,20 @@ describe("the household fragment", () => {
     expect(householdFragment({ ...input, catalog, cold: true }).layer).toBeDefined();
   });
 
+  it("puts the whole need of an infant on formula from 6 months in the formula draw with formulaLater: whole", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months.
+    const girl: Person = { sex: "female", ageMonths: 7, count: 1, feeding: "formula" };
+    const without = householdFragment({ ...input, persons: [...adults, girl] });
+    expect(without.layer).toBeUndefined();
+    const whole = fragmentOf({ ...input, persons: [...adults, girl], formulaLater: "whole" });
+    expect(whole.layer.draws).toEqual([
+      { need: FOOD_NEED, level: "critical", perDay: DAILY, users: 2, supply: "food.retail" },
+      { need: FORMULA_NEED, level: "critical", perDay: 604, users: 1, supply: "food.retail" },
+    ]);
+    expect(whole.leftOut).toEqual([]);
+    expect(whole.formula).toEqual([girl]);
+  });
+
   it("gives only the draw of formula for a household of infants on formula", () => {
     const babies: Person = { sex: "female", ageMonths: 0, count: 2, feeding: "formula" };
     const { layer } = fragmentOf({ ...input, persons: [babies] });
