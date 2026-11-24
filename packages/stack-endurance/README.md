@@ -28,11 +28,12 @@ Each function is a plain function with no clock, no network and no file. The uni
 - A take of a resource uses its stock first, then the converters that make it, through each chain. Thus a direct use of the battery can use the fuel of the generator.
 - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
 - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
-- The take order is a rule, not the best share. The days are the days of this order. `takes` gives the amount of each resource that a draw takes.
+- The take order is a rule, not the best share. The days are the days of this order. A draw with a shared device is different (refer to the limit `perDay` below). `takes` gives the amount of each resource that a draw takes.
 - `jointDays` gives the best share for a set of draws. Refer to the section on the joint days.
 - A store gives nothing on its due date and after it. A store or a converter whose part stops gives nothing.
 - A converter can have a limit `perDay`, the most runs of one device in a day, and a count `devices` (default 1). Over `T` days, the converters of one device use `devices` times `T` days of the device or less. One run uses `1 / perDay` of a day of the device. A maker and its taker on one device share these days.
 - The higher draws use the days of a device first. Each higher draw keeps back its part of each day for all the days of a lower draw. This is the safe side.
+- A draw can reach two converters of one device, each with a limit `perDay` more than 0. Then the draw does not use the take order. A linear program with exact rationals gives the best share of its stocks and of the device-days. The days of the draw are the largest `T` of this share. The take order gave the device-days to the first converter of the list, also when a faster converter gave more.
 - `capped` names the converters whose limit stops a draw while their inputs have more. After `days`, the shortfall counts each day as a full shortfall.
 
 With a base stack, a cut also stops each part that cannot work without the cut part. Thus a pump that needs the grid stops with the grid.

@@ -2,6 +2,7 @@ import { STACK_SCHEMA, type Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { caseStopped, drawDemand, enduranceOf, giftNeed, storeAmounts } from "./endurance.ts";
+import { jointDays } from "./joint.ts";
 import type { CaseCuts, Converter, EnduranceLayer, Gift } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 
@@ -487,6 +488,81 @@ describe("a converter with a limit for each day", () => {
         expect(one?.takes["pb"] ?? 0).toBeLessThanOrEqual(5000 * (1 + 1e-9));
       }),
     );
+  });
+});
+
+describe("two limited converters of one device", () => {
+  const GRID_CUT: CaseCuts = { case: "c", title: "Cut", cuts: [{ part: "grid", title: "Grid", duration: [[0, 1], [1, 0]], source: "s" }] };
+  /**
+   * The food takes 3000 kcal each day: 5000 kcal of peanut butter, then the pots of one stove. One pot gives 1000 kcal.
+   * The stove cooks `slow` pots of oats or `fast` pots of rice in a day. The oats come first in the list.
+   */
+  function stoveLayer(oats: number, slow: number, fast: number, rice = 100): EnduranceLayer {
+    return {
+      schema: SAMPLE_ENDURANCE.schema,
+      levels: ["critical"],
+      resources: [{ code: "oats", unit: "kg" }, { code: "rice", unit: "kg" }, { code: "pb", unit: "kcal" }],
+      stores: [{ id: "tin", resource: "oats", amount: oats }, { id: "sack", resource: "rice", amount: rice }, { id: "jar", resource: "pb", amount: 5000 }],
+      draws: [{ need: "food", level: "critical", perDay: 3000, supply: "grid" }],
+      direct: [{ resource: "pb", need: "food", amount: 1 }],
+      converters: [
+        { id: "oats", device: "stove", perDay: slow, takes: [{ resource: "oats", amount: 1 }], gives: { need: "food", amount: 1000 } },
+        { id: "rice", device: "stove", perDay: fast, takes: [{ resource: "rice", amount: 1 }], gives: { need: "food", amount: 1000 } },
+      ],
+    };
+  }
+
+  it("gives the device-days to the faster converter, not to the first converter of the list", () => {
+    // The take order gave the stove to the oats first: 1 pot a day, so 5000 / (3000 - 1000) = 2.5 days.
+    // The best share cooks only rice: 2 pots a day, so 5000 / (3000 - 2000) = 5 days.
+    const result = enduranceOf(stoveLayer(10, 1, 2), GRID_CUT, { at: AT }).needs["food"];
+    expect(result?.days).toBe(5);
+    expect(result?.binding).toEqual(["pb"]);
+    expect(result?.takes).toEqual({ pb: 5000, rice: 10 });
+    expect(result?.capped).toEqual(["oats", "rice"]);
+    // With 1 kg of oats, the take order gave 4 days. The best share also gives 5 days.
+    expect(enduranceOf(stoveLayer(1, 1, 2), GRID_CUT, { at: AT }).needs["food"]?.days).toBe(5);
+  });
+
+  it("gives the days of the best share for one draw, and never fewer days with more stock or a larger limit", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 20, noNaN: true }),
+        fc.double({ min: 0.1, max: 5, noNaN: true }),
+        fc.double({ min: 0.1, max: 5, noNaN: true }),
+        fc.double({ min: 0, max: 40, noNaN: true }),
+        (oats, slow, fast, rice) => {
+          const days = (layer: EnduranceLayer): number => enduranceOf(layer, GRID_CUT, { at: AT }).needs["food"]?.days ?? Number.NaN;
+          const base = days(stoveLayer(oats, slow, fast, rice));
+          expect(base).toBeCloseTo(jointDays(stoveLayer(oats, slow, fast, rice), GRID_CUT, { at: AT }, ["food"]).days, 9);
+          expect(days(stoveLayer(oats + 1, slow, fast, rice))).toBeGreaterThanOrEqual(base * (1 - 1e-12));
+          expect(days(stoveLayer(oats, slow, fast, rice + 1))).toBeGreaterThanOrEqual(base * (1 - 1e-12));
+          expect(days(stoveLayer(oats, slow, fast * 2, rice))).toBeGreaterThanOrEqual(base * (1 - 1e-12));
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+
+  it("keeps back the device-days of a higher draw for a lower draw with a shared stove", () => {
+    // The child (critical) takes 1 pot of milk a day for 10 days, so the food gets 1 day of the stove each day, not 2.
+    // The rice cooks 2 pots in that day, more than the oats: 5000 / (3000 - 2000) = 5 days with a stove of 2 devices.
+    const layer = stoveLayer(10, 1, 2);
+    const family: EnduranceLayer = {
+      ...layer,
+      levels: ["critical", "normal"],
+      resources: [...layer.resources, { code: "milk", unit: "kg" }],
+      stores: [...layer.stores, { id: "can", resource: "milk", amount: 10 }],
+      draws: [{ need: "child", level: "critical", perDay: 1000, supply: "grid" }, { need: "food", level: "normal", perDay: 3000, supply: "grid" }],
+      converters: [
+        ...(layer.converters ?? []).map((converter) => ({ ...converter, devices: 2 })),
+        { id: "milk", device: "stove", devices: 2, perDay: 1, takes: [{ resource: "milk", amount: 1 }], gives: { need: "child", amount: 1000 } },
+      ],
+    };
+    const result = enduranceOf(family, GRID_CUT, { at: AT });
+    expect(result.needs["child"]?.days).toBeCloseTo(10, 9);
+    expect(result.needs["food"]?.days).toBe(5);
+    expect(result.needs["food"]?.takes).toEqual({ pb: 5000, rice: 10 });
   });
 });
 

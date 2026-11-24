@@ -13,3 +13,11 @@ export function inputsOf(converter: Converter): Map<string, number> {
 export function canRun(converter: Converter, stoppedParts: ReadonlySet<string>): boolean {
   return converter.gives.amount > 0 && inputsOf(converter).size > 0 && (converter.device === undefined || !stoppedParts.has(converter.device));
 }
+
+/**
+ * This function gives the key of the device-days that a converter uses. The converters of one device share one key.
+ * A converter with no device has a key of its own.
+ */
+export function deviceKey(converter: Converter): string {
+  return converter.device === undefined ? `converter:${converter.id}` : `device:${converter.device}`;
+}
