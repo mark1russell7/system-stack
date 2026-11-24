@@ -1,6 +1,6 @@
 // This module is made by `scripts/eaglei-priors.ts` from the artifact `eaglei-laws` of the workflow `hazards-fit`. Do not change it by hand.
-// The run of the fit: https://github.com/mark1russell7/system-stack/actions/runs/45337335620 attempt 3.
-// The dataset: EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.6084/m9.figshare.24237376.v4, read 2026-11-24T08:15:12.399Z.
+// The run of the fit: https://github.com/mark1russell7/system-stack/actions/runs/45373350386 attempt 1.
+// The dataset: EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.6084/m9.figshare.24237376.v4, read 2026-11-24T10:34:10.204Z.
 // The options of the fit: share 0.01, interval 900 s.
 // The rates are a derived work of the EAGLE-I dataset (CC BY 4.0) and of the storm events of NOAA (public domain).
 import type { PriorTable } from "./hazard.ts";
