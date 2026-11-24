@@ -13,6 +13,9 @@ import type { EaglePriors } from "./eaglei-fit.ts";
 /** The seed of the holdout of the committed modules. */
 export const POOL_HOLDOUT_SEED = 20261124;
 
+/** The number of splits of each case in the holdout of the committed modules. The mean of some splits makes the margins less noisy. */
+export const POOL_HOLDOUT_ROUNDS = 5;
+
 /** This function splits the events of each county into two halves, each event with the chance 1/2. The share of an event goes with it in proportion. */
 export function thinCounts(counts: Readonly<Record<string, AreaCount>>, draw: () => boolean): readonly [Record<string, AreaCount>, Record<string, AreaCount>] {
   const fit: Record<string, AreaCount> = {};
@@ -49,6 +52,7 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
   }
   const sums = { raw: 0, pooled: 0, state: 0 };
   const squared = { raw: 0, pooled: 0, state: 0 };
+  const seen = { raw: 0, pooled: 0, state: 0, areas: 0 };
   let lost = 0;
   for (const area of areas) {
     const years = observation.years[area] ?? 0;
@@ -60,20 +64,43 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
     for (const method of ["raw", "pooled", "state"] as const) {
       sums[method] += logLikelihood(count, years, rate[method]);
       squared[method] += (count - rate[method] * years) ** 2;
+      if (rate.raw > 0) seen[method] += logLikelihood(count, years, rate[method]);
     }
+    if (rate.raw > 0) seen.areas += 1;
     if (rate.raw === 0 && count > 0) lost += 1;
   }
-  return { ...sums, lost, squared };
+  return { ...sums, lost, squared, seen };
 }
 
-/** This function gives the holdout of each case of the counts of a fit, with one stream of draws for each case. */
-export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEED): PoolHoldout {
+/** The mean of some scores. */
+function meanScore(scores: readonly PoolScore[]): PoolScore {
+  const mean = (read: (score: PoolScore) => number): number => scores.reduce((sum, score) => sum + read(score), 0) / scores.length;
+  return {
+    raw: mean((score) => score.raw),
+    pooled: mean((score) => score.pooled),
+    state: mean((score) => score.state),
+    lost: mean((score) => score.lost),
+    squared: { raw: mean((score) => score.squared.raw), pooled: mean((score) => score.squared.pooled), state: mean((score) => score.squared.state) },
+    seen: { raw: mean((score) => score.seen.raw), pooled: mean((score) => score.seen.pooled), state: mean((score) => score.seen.state), areas: mean((score) => score.seen.areas) },
+  };
+}
+
+/**
+ * This function gives the holdout of each case of the counts of a fit: the mean scores of some splits.
+ * Each case has its own stream of draws, so a new case does not change the scores of the other cases.
+ */
+export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEED, rounds: number = POOL_HOLDOUT_ROUNDS): PoolHoldout {
+  if (!Number.isSafeInteger(rounds) || rounds < 1) throw new RangeError(`poolHoldout: rounds is a whole number from 1, not ${rounds}.`);
   const draws = random(seed);
   const cases: Record<string, PoolScore> = {};
   for (const name of Object.keys(priors.counts).sort()) {
     const stream = draws.fork(name);
-    const [fit, score] = thinCounts(priors.counts[name] ?? {}, () => stream.chance(0.5));
-    cases[name] = poolScore(fit, score, priors.observation);
+    const scores: PoolScore[] = [];
+    for (let round = 0; round < rounds; round++) {
+      const [fit, score] = thinCounts(priors.counts[name] ?? {}, () => stream.chance(0.5));
+      scores.push(poolScore(fit, score, priors.observation));
+    }
+    cases[name] = meanScore(scores);
   }
-  return { seed, cases };
+  return { seed, rounds, cases };
 }

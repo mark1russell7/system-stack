@@ -1,7 +1,7 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
 import type { AreaCount, Observation } from "../src/priors.ts";
-import { poolHoldout, poolScore, POOL_HOLDOUT_SEED, thinCounts } from "./eaglei-pooling.ts";
+import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, thinCounts } from "./eaglei-pooling.ts";
 
 // Made-up counties of the made-up states 98 and 99.
 const observation: Observation = { years: { "99001": 5, "99002": 5, "99003": 1, "98001": 5, "98002": 5 }, customers: { "99001": 10, "99002": 10, "99003": 10, "98001": 10, "98002": 10 } };
@@ -30,6 +30,10 @@ describe("poolScore", () => {
     expect(result.lost).toBe(1);
     expect(Number.isFinite(result.pooled)).toBe(true);
     expect(Number.isFinite(result.state)).toBe(true);
+    // The finite scores keep only the county with events in the fit half.
+    expect(result.seen.areas).toBe(1);
+    expect(Number.isFinite(result.seen.raw)).toBe(true);
+    expect(result.seen.raw).toBeLessThan(0);
   });
 
   it("gives the state with no event the same rate in the pooled and the state methods, so the two scores of its counties are equal", () => {
@@ -47,10 +51,15 @@ describe("poolHoldout", () => {
   it("scores each case with its own stream of draws from the seed, and gives the same record for the same seed", () => {
     const priors = { observation, counts: { "case.a": { "99001": { events: 30, share: 3 }, "99003": { events: 1, share: 0.5 } }, "case.b": { "98001": { events: 4, share: 1 } } } };
     const holdout = poolHoldout(priors);
-    expect(holdout.seed).toBe(POOL_HOLDOUT_SEED);
+    expect(holdout).toMatchObject({ seed: POOL_HOLDOUT_SEED, rounds: POOL_HOLDOUT_ROUNDS });
     expect(Object.keys(holdout.cases)).toEqual(["case.a", "case.b"]);
     expect(poolHoldout(priors)).toEqual(holdout);
     // A new case does not change the draws of the other cases.
     expect(poolHoldout({ ...priors, counts: { ...priors.counts, "case.c": {} } }).cases["case.a"]).toEqual(holdout.cases["case.a"]);
+    // With one round, the score is the score of the first split of the stream of the case.
+    const stream = random(POOL_HOLDOUT_SEED).fork("case.a");
+    const [fit, score] = thinCounts(priors.counts["case.a"], () => stream.chance(0.5));
+    expect(poolHoldout(priors, POOL_HOLDOUT_SEED, 1)).toMatchObject({ rounds: 1, cases: { "case.a": poolScore(fit, score, observation) } });
+    expect(() => poolHoldout(priors, POOL_HOLDOUT_SEED, 0)).toThrow(/rounds/u);
   });
 });

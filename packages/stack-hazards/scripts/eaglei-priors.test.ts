@@ -99,7 +99,7 @@ describe("priorModules", () => {
     const pooling = out["EAGLEI_COUNTY_POOLING"] as unknown as CountyPooling;
     expect(pooling.laws["met.tornado"]?.["99"]).toEqual({ shape: Number.POSITIVE_INFINITY, mean: 0.1667, areas: 2, events: 1, from: "group" });
     expect(pooling.laws[OUTAGE_CASE]?.["99"]).toEqual({ shape: 0.3252, mean: 1.5, areas: 2, events: 9, from: "group" });
-    expect(pooling.holdout.seed).toBe(POOL_HOLDOUT_SEED);
+    expect(pooling.holdout).toMatchObject({ seed: POOL_HOLDOUT_SEED, rounds: 5 });
     expect(Object.keys(pooling.holdout.cases)).toEqual(["infra.power.outage", "met.tornado"]);
     expect(tables.nation).toBe(4000);
   });

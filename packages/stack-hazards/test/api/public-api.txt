@@ -215,6 +215,7 @@ interface NoLaw {
 ### build/hazard.chunk.d.ts#PoolHoldout
 interface PoolHoldout {
   readonly seed: number;
+  readonly rounds: number;
   readonly cases: Readonly<Record<string, PoolScore>>;
 }
 
@@ -235,6 +236,12 @@ interface PoolScore {
     readonly raw: number;
     readonly pooled: number;
     readonly state: number;
+  };
+  readonly seen: {
+    readonly raw: number;
+    readonly pooled: number;
+    readonly state: number;
+    readonly areas: number;
   };
 }
 

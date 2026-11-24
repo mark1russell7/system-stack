@@ -159,12 +159,14 @@ describe("the pooled rates of the areas", () => {
   });
 
   it("holds the gate of the committed table: in each case, the pooled rates score above the raw rates and the state rates on the held-out events", () => {
+    expect(EAGLEI_COUNTY_POOLING.holdout.rounds).toBeGreaterThanOrEqual(5);
     const cases = Object.keys(EAGLEI_COUNTY_PRIORS.rates).sort();
     expect(Object.keys(EAGLEI_COUNTY_POOLING.holdout.cases)).toEqual(cases);
     for (const name of cases) {
       const score = EAGLEI_COUNTY_POOLING.holdout.cases[name];
       expect(score?.pooled, name).toBeGreaterThan(score?.state ?? Number.POSITIVE_INFINITY);
-      expect(score?.pooled, name).toBeGreaterThan(score?.raw ?? Number.POSITIVE_INFINITY);
+      // The raw score is -Infinity when a county with no event in the fit half has an event in the score half. Thus the finite scores of the counties with events compare pooled with raw.
+      expect(score?.seen.pooled, name).toBeGreaterThan(score?.seen.raw ?? Number.POSITIVE_INFINITY);
       expect(score?.squared.pooled, name).toBeLessThan(Math.min(score?.squared.raw ?? 0, score?.squared.state ?? 0));
       // Each state with an observed county has a law in each case.
       expect(Object.keys(EAGLEI_COUNTY_POOLING.laws[name] ?? {}).length, name).toBeGreaterThanOrEqual(50);

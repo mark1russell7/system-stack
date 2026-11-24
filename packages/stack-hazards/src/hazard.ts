@@ -191,11 +191,18 @@ export interface PoolScore {
   readonly lost: number;
   /** The sums of the squared errors of the counts of the score half: `(count - rate * years)^2`. They are finite for each method. */
   readonly squared: { readonly raw: number; readonly pooled: number; readonly state: number };
+  /**
+   * The Poisson log-likelihoods of the counties with one event or more in the fit half, and the count of these counties.
+   * Each raw rate of these counties is above 0, so each score is finite. It compares the raw rates with the other methods when `raw` is `-Infinity`.
+   */
+  readonly seen: { readonly raw: number; readonly pooled: number; readonly state: number; readonly areas: number };
 }
 
 /** The holdout of each case of a fit, with its seed. */
 export interface PoolHoldout {
   readonly seed: number;
+  /** The number of splits of each case. Each score is the mean of the scores of the splits. */
+  readonly rounds: number;
   readonly cases: Readonly<Record<string, PoolScore>>;
 }
 

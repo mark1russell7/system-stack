@@ -92,7 +92,8 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     (name) => pooled[name]?.rates ?? {},
     "perYear is the pooled rate of a county toward the counties of its state: a gamma law of the rates of the counties of the state in the case, and the mean of the rate of the county after its events in its years. " +
       "A county with few years or few events gets a rate near the mean of its state. A state with no event in a case gets its pooled rate toward the states with events. " +
-      "reach is the mean of the largest count of customers out of each event over the customers of the county. A county with no event gets the mean of the events of its state.",
+      "reach is the mean of the largest count of customers out of each event over the customers of the county. A county with no event gets the mean of the events of its state. " +
+      "In a state with no event, it gets the mean of all events of the case. A county over the limit is in the laws and in the holdout, but not in the table.",
   );
   return {
     county,
@@ -139,10 +140,17 @@ function roundedPooling(pooling: CountyPooling): CountyPooling {
   const cases = Object.fromEntries(
     Object.entries(pooling.holdout.cases).map(([name, score]) => [
       name,
-      { raw: tenth(score.raw), pooled: tenth(score.pooled), state: tenth(score.state), lost: score.lost, squared: { raw: tenth(score.squared.raw), pooled: tenth(score.squared.pooled), state: tenth(score.squared.state) } },
+      {
+        raw: tenth(score.raw),
+        pooled: tenth(score.pooled),
+        state: tenth(score.state),
+        lost: tenth(score.lost),
+        squared: { raw: tenth(score.squared.raw), pooled: tenth(score.squared.pooled), state: tenth(score.squared.state) },
+        seen: { raw: tenth(score.seen.raw), pooled: tenth(score.seen.pooled), state: tenth(score.seen.state), areas: tenth(score.seen.areas) },
+      },
     ]),
   );
-  return { laws, holdout: { seed: pooling.holdout.seed, cases } };
+  return { laws, holdout: { seed: pooling.holdout.seed, rounds: pooling.holdout.rounds, cases } };
 }
 
 /** The modules of the tables of a fit, by the name of their file in `src/`. */
