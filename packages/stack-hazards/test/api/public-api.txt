@@ -6,6 +6,7 @@
 
 ## . (build/index.d.ts): names
 
+AreaCount: build/index.d.ts#AreaCount
 BasisOptions: build/index.d.ts#BasisOptions
 CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
 CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
@@ -14,6 +15,7 @@ CauseOptions: build/index.d.ts#CauseOptions
 CauseTally: build/index.d.ts#CauseTally
 Claim: build/index.d.ts#Claim
 ClaimBasis: build/index.d.ts#ClaimBasis
+CoverageTally: build/index.d.ts#CoverageTally
 DurationLaw: build/index.d.ts#DurationLaw
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
@@ -51,6 +53,7 @@ OE417_NOT_ATTACK_TERMS: build/index.d.ts#OE417_NOT_ATTACK_TERMS
 OE417_SOURCE: build/index.d.ts#OE417_SOURCE
 OE417_SPACE_WEATHER_TERMS: build/index.d.ts#OE417_SPACE_WEATHER_TERMS
 OE417_YEARS: build/index.d.ts#OE417_YEARS
+Observation: build/index.d.ts#Observation
 Oe417Event: build/index.d.ts#Oe417Event
 Oe417File: build/index.d.ts#Oe417File
 Oe417Year: build/index.d.ts#Oe417Year
@@ -60,6 +63,7 @@ OutageOptions: build/index.d.ts#OutageOptions
 OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
+PriorTable: build/index.d.ts#PriorTable
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/index.d.ts#Regions
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
@@ -70,19 +74,26 @@ StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
 SupplyState: build/index.d.ts#SupplyState
 SurvivalOptions: build/index.d.ts#SurvivalOptions
+areaCounts: build/index.d.ts#areaCounts
 checkHazards: build/index.d.ts#checkHazards
+coverageTally: build/index.d.ts#coverageTally
 eagleCustomers: build/index.d.ts#eagleCustomers
 eagleLine: build/index.d.ts#eagleLine
 eagleRegion: build/index.d.ts#eagleRegion
 hasHazardError: build/index.d.ts#hasHazardError
 hazardCase: build/index.d.ts#hazardCase
 hazardOf: build/index.d.ts#hazardOf
+hazardPriors: build/index.d.ts#hazardPriors
+hazardRegions: build/index.d.ts#hazardRegions
+observedRegions: build/index.d.ts#observedRegions
 oe417AttackLaw: build/index.d.ts#oe417AttackLaw
 oe417Count: build/index.d.ts#oe417Count
 oe417Hours: build/index.d.ts#oe417Hours
 oe417IsAttack: build/index.d.ts#oe417IsAttack
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
+priorTableFaults: build/index.d.ts#priorTableFaults
+regionRates: build/index.d.ts#regionRates
 stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
@@ -90,6 +101,12 @@ survivalOf: build/index.d.ts#survivalOf
 zoneCounties: build/index.d.ts#zoneCounties
 
 ## Declarations
+
+### build/index.d.ts#AreaCount
+export interface AreaCount {
+  readonly events: number;
+  readonly share: number;
+}
 
 ### build/index.d.ts#BasisOptions
 export interface BasisOptions {
@@ -135,6 +152,12 @@ export type Claim = {
 ### build/index.d.ts#ClaimBasis
 export type ClaimBasis = (typeof CLAIM_BASES)[number];
 
+### build/index.d.ts#CoverageTally
+export interface CoverageTally {
+  add(count: OutageCount): void;
+  years(): Map<string, number>;
+}
+
 ### build/index.d.ts#DurationLaw
 export interface DurationLaw {
   readonly read: true;
@@ -161,7 +184,7 @@ export interface Fit {
 export declare const HAZARDS_SCHEMA = "hazards/1";
 
 ### build/index.d.ts#HAZARD_CODES
-export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-no-law"];
+export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-no-law"];
 
 ### build/index.d.ts#HAZARD_LIST
 export declare const HAZARD_LIST: HazardList;
@@ -204,6 +227,7 @@ export interface HazardList {
   readonly schema: typeof HAZARDS_SCHEMA;
   readonly sources: Readonly<Record<string, Source>>;
   readonly hazards: readonly Hazard[];
+  readonly priors?: readonly PriorTable[] | undefined;
 }
 
 ### build/index.d.ts#HazardRegion
@@ -284,6 +308,12 @@ export declare const OE417_SPACE_WEATHER_TERMS: RegExp;
 ### build/index.d.ts#OE417_YEARS
 export declare const OE417_YEARS: Readonly<Record<string, Oe417Year>>;
 
+### build/index.d.ts#Observation
+export interface Observation {
+  readonly years: Readonly<Record<string, number>>;
+  readonly customers: Readonly<Record<string, number>>;
+}
+
 ### build/index.d.ts#Oe417Event
 export interface Oe417Event {
   readonly year: number;
@@ -360,6 +390,16 @@ export interface OutageTally {
   readonly truncated: number;
 }
 
+### build/index.d.ts#PriorTable
+export interface PriorTable {
+  readonly source: string;
+  readonly asOf: IsoDate;
+  readonly scheme: string;
+  readonly method: string;
+  readonly codes: readonly string[];
+  readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+}
+
 ### build/index.d.ts#RegionCurve
 export interface RegionCurve {
   readonly curve: Survival;
@@ -425,8 +465,14 @@ export interface SurvivalOptions {
   readonly end?: number | undefined;
 }
 
+### build/index.d.ts#areaCounts
+export declare function areaCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, AreaCount>;
+
 ### build/index.d.ts#checkHazards
 export declare function checkHazards(list: HazardList, parts?: readonly Part[]): HazardFault[];
+
+### build/index.d.ts#coverageTally
+export declare function coverageTally(): CoverageTally;
 
 ### build/index.d.ts#eagleCustomers
 export declare function eagleCustomers(text: string): Map<string, number>;
@@ -446,6 +492,15 @@ export declare function hazardCase(list: HazardList, hazard: Hazard, options?: H
 ### build/index.d.ts#hazardOf
 export declare function hazardOf(list: HazardList, code: string): Hazard | undefined;
 
+### build/index.d.ts#hazardPriors
+export declare function hazardPriors(list: HazardList, options?: Pick<HazardCaseOptions, "region">): Prior[];
+
+### build/index.d.ts#hazardRegions
+export declare function hazardRegions(region: HazardCaseOptions["region"]): readonly HazardRegion[];
+
+### build/index.d.ts#observedRegions
+export declare function observedRegions(observation: Observation, region: (area: string) => string): string[];
+
 ### build/index.d.ts#oe417AttackLaw
 export declare function oe417AttackLaw(events: readonly Oe417Event[], options?: SurvivalOptions): DurationLaw;
 
@@ -463,6 +518,12 @@ export declare function outageCurves(events: readonly OutageEvent[], region: (ar
 
 ### build/index.d.ts#outageReader
 export declare function outageReader(options: OutageOptions): OutageReader;
+
+### build/index.d.ts#priorTableFaults
+export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[];
+
+### build/index.d.ts#regionRates
+export declare function regionRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, readonly [number, number]>;
 
 ### build/index.d.ts#stormCauses
 export declare function stormCauses(classes: Readonly<Record<string, readonly string[]>>, zones: ReadonlyMap<string, readonly string[]>, options?: CauseOptions): StormCauses;

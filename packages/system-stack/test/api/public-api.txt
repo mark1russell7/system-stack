@@ -30,6 +30,7 @@ Need: build/known.chunk.d.ts#Need
 Part: build/known.chunk.d.ts#Part
 PartSets: build/index.d.ts#PartSets
 PathOptions: build/index.d.ts#PathOptions
+Prior: build/index.d.ts#Prior
 type RecordTwice: @mark1russell7/coeval/layers#RecordTwice (external)
 type RecordsJoin: @mark1russell7/coeval/layers#RecordsJoin (external)
 type RecordsJoinOptions: @mark1russell7/coeval/layers#RecordsJoinOptions (external)
@@ -121,6 +122,16 @@ export type PartSets = {
 export interface PathOptions {
   readonly down?: Iterable<string> | undefined;
   readonly maxSets?: number | undefined;
+}
+
+### build/index.d.ts#Prior
+export interface Prior {
+  readonly case: string;
+  readonly place: string;
+  readonly perYear: number;
+  readonly reach: number;
+  readonly source: string;
+  readonly asOf: string;
 }
 
 ### build/index.d.ts#SAMPLE_STACK

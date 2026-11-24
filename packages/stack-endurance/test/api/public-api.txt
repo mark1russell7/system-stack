@@ -24,7 +24,7 @@ INDEPENDENT_MAX_WORK: build/index.d.ts#INDEPENDENT_MAX_WORK
 INDEPENDENT_TOLERANCE: build/index.d.ts#INDEPENDENT_TOLERANCE
 IsoDate: build/layer.chunk.d.ts#IsoDate
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
-Prior: build/layer.chunk.d.ts#Prior
+type Prior: @mark1russell7/system-stack#Prior (external)
 Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
 SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
@@ -271,7 +271,7 @@ interface EnduranceLayer {
   readonly direct?: readonly DirectUse[] | undefined;
   readonly converters?: readonly Converter[] | undefined;
   readonly cases?: readonly CaseCuts$1[] | undefined;
-  readonly priors?: readonly Prior[] | undefined;
+  readonly priors?: readonly Prior$1[] | undefined;
 }
 
 ### build/layer.chunk.d.ts#Gift
@@ -287,16 +287,6 @@ type Gift = {
 
 ### build/layer.chunk.d.ts#IsoDate
 type IsoDate = string;
-
-### build/layer.chunk.d.ts#Prior
-interface Prior {
-  readonly case: string;
-  readonly place: string;
-  readonly perYear: number;
-  readonly reach: number;
-  readonly source: string;
-  readonly asOf: IsoDate;
-}
 
 ### build/layer.chunk.d.ts#Resource
 interface Resource {
