@@ -71,8 +71,8 @@ const energyStove: StoveFacts = { fuel: "fuel.test", rate: { amount: 500, unit: 
 
 const input: CookFragmentInput = { catalog, units: { "test.grain-1kg": 10 }, stove: massStove, batch: { value: 0.5, unit: "kg" }, share, start: { celsius: 20, cite: fact } };
 
-// One pot of 0.5 kg takes 1 L of water. The heat is 1 kg x 4.186 kJ/(kg.K) x 80 K. The pot gets 0.01 x 50000 x 0.5 = 250 kJ/min.
-const HEAT = 1 * 4.186 * 80;
+// One pot of 0.5 kg takes 1 L of water. The heat is (1 kg + 0.5 kg) x 4.19002 kJ/(kg.K) x 80 K. The pot gets 0.01 x 50000 x 0.5 = 250 kJ/min.
+const HEAT = 1.5 * 4.19002 * 80;
 const MINUTES = HEAT / 250 + 20;
 const FUEL = MINUTES * 0.01;
 
@@ -126,7 +126,7 @@ describe("the cook fragment", () => {
   it("starts the water at 0 °C by default, which gives the most heat", () => {
     const { start: _start, ...cold } = input;
     const line = lineOf(cookFragment(cold).lines, "test.grain-1kg");
-    expect(line.heat.read && line.heat.value).toBeCloseTo(1 * WATER_SPECIFIC_HEAT.value * BOIL_CELSIUS, 9);
+    expect(line.heat.read && line.heat.value).toBeCloseTo(1.5 * WATER_SPECIFIC_HEAT.value * BOIL_CELSIUS, 9);
   });
 
   it("gives no fuel with no cited share, and keeps the read of the water", () => {
@@ -187,6 +187,30 @@ describe("the cook fragment", () => {
     expect(converter?.takes[2]?.amount).toBeCloseTo(Math.max(...fuels), 12);
   });
 
+  it("gives no energy to a product that gives two foods, because the catalog gives one energy for the whole product", () => {
+    const mix: SupplyProduct = {
+      ...grain,
+      id: "test.mix-1kg",
+      title: "A made-up mix of grain and noodle",
+      gives: [
+        { resource: "food.test-grain", amount: cited(0.5, "kg") },
+        { resource: "food.test-noodle", amount: cited(0.5, "kg") },
+      ],
+    };
+    const result = cookFragment({ ...input, catalog: { ...catalog, products: [...catalog.products, mix] }, units: { "test.mix-1kg": 1 } });
+    expect(result.lines).toHaveLength(2);
+    for (const line of result.lines) {
+      expect(line.energy.read).toBe(false);
+      if (!line.energy.read) expect(line.energy.why).toMatch(/gives 2 foods/);
+    }
+    expect(result.layer.converters).toEqual([]);
+    expect(result.read).toBe(false);
+  });
+
+  it("refuses an id of the buy list that the catalog does not have", () => {
+    expect(() => cookFragment({ ...input, units: { "test.absent": 1 } })).toThrow(/no product "test.absent"/);
+  });
+
   it("refuses a bad batch, share or start", () => {
     expect(() => cookFragment({ ...input, batch: { value: 0, unit: "kg" } })).toThrow(RangeError);
     expect(() => cookFragment({ ...input, batch: { value: 1, unit: "L" } })).toThrow(RangeError);
@@ -214,7 +238,7 @@ describe("the cook fragment with the catalog of market", () => {
     const rice = lineOf(result.lines, "food.rice-white-1kg");
     expect(rice.water.read && rice.water.value).toBeCloseTo(2.5577, 4);
     const water = (rice.water.read ? rice.water.value : 0) * 0.5;
-    const heat = water * WATER_DENSITY_MAX.value * WATER_SPECIFIC_HEAT.value * 100;
+    const heat = (water * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100;
     const perMin = 0.227 / 90;
     const minutes = heat / (perMin * 50327.01675450612 * 0.5) + 18;
     expect(rice.fuel.read && rice.fuel.value).toBeCloseTo(minutes * perMin, 9);
@@ -282,7 +306,7 @@ describe("the gate of cooked days on the endurance query", () => {
   });
 
   it("(b) the water limits the cooked days when it is the scarcest", () => {
-    // 10 kg of grain hold 12.5 days, 10 kg of fuel hold 29 days and 8 L of water hold 5 days.
+    // 10 kg of grain hold 12.5 days, 10 kg of fuel hold 28 days and 8 L of water hold 5 days.
     const result = cooked(10, 8, 10);
     expect(result.days).toBeCloseTo(8 / DAILY_POTS, 4);
     expect(binding(result.binding)).toEqual([STORED_WATER]);

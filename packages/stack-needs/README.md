@@ -134,12 +134,12 @@ const cook = cookFragment({
 The model of one pot:
 
 1. The cook water is `cookWater` of `@mark1russell7/market` times the dry mass. It takes `water.stored`, the resource of the drinking water.
-2. The heat to boil is the water mass times 4.186 kJ/(kg.K) times the rise to 100 °C. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat.
-3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the pot. It is a cited input with its heating value. It has no default.
+2. The heat to boil is the mass times 4.19002 kJ/(kg.K) times the rise to the boil (100 °C). The mass is the water and the dry food. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat. The dry food takes the specific heat of water, which is higher than its own. This term holds the heat above the true value.
+3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the water and the food. The heat of the pot itself is in the losses. It is a cited input with its heating value. It has no default.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
 5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
-7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default.
+7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default. Give the smallest pot that the cook makes. Each pot takes its own boil, so a batch above the real pot gives too little fuel.
 
 Each value of a line is a read or a no read with its reasons. These facts give a no read:
 
@@ -152,18 +152,21 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
 | No food energy of the product | The energy. |
+| A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
 
 A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
 
 The catalog of market gives no soak water. Thus a food that needs a soak, for example dry beans, has no soak draw. The beans of the catalog have no cited cook water, so they have no converter.
 
+The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. Thus the dry food gets the water only when the drink is safe to the end. With a small store of water, the dry food adds no days.
+
 The cited constants:
 
 | Name | Value | Source |
 | --- | --- | --- |
-| `WATER_SPECIFIC_HEAT` | 4.186 kJ/(kg.K) | The NIST Guide to the SI (SP 811). Appendix B.8 gives 4.185 80 J for the calorie (15 °C). Footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 °C. |
+| `WATER_SPECIFIC_HEAT` | 4.19002 kJ/(kg.K) | The NIST Guide to the SI (SP 811). Appendix B.8 gives 4.190 02 J for the calorie (mean), the mean from 0 °C to 100 °C. Footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 °C. |
 | `WATER_DENSITY_MAX` | 1 kg/L | The page Water Density of the USGS Water Science School. Its table gives 1.00000 g/cm3 at 4.0 °C, its largest value. Thus the water mass is an upper limit. |
-| `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is an upper limit. |
+| `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is less. But the cook time is longer there, and the model does not give it. Thus at a high place the fuel is not an upper limit. |
 
 The two sources are works of the United States federal government (the license `us-public-domain` of guidebook).
 

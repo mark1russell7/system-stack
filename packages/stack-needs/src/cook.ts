@@ -42,20 +42,23 @@ export interface CookConstant {
 }
 
 /**
- * The specific heat of liquid water: 4.186 kJ/(kg.K). The NIST Guide to the SI gives 4.185 80 J for the calorie (15 °C).
- * Its footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 °C. Thus 4.1858 J/(g.K), to 4 digits.
+ * The mean specific heat of liquid water from 0 °C to 100 °C: 4.19002 kJ/(kg.K).
+ * The NIST Guide to the SI gives 4.190 02 J for the calorie (mean). That is the mean of the calorie over this range. Its footnote 10 tells that the calorie is the energy to raise 1 g of water
+ * by 1 kelvin. For the default start (0 °C), the value is the mean of the rise. For a warmer start, the mean of the
+ * rise can be a little higher. The model also heats the dry food with this value, above the specific heat of a dry food.
+ * That term holds the heat of the pot above the true value.
  */
 export const WATER_SPECIFIC_HEAT: CookConstant = {
-  value: 4.186,
+  value: 4.19002,
   unit: "kJ/(kg.K)",
   source: NIST_SI_GUIDE_SOURCE,
-  locator: "Appendix B.8, row calorie (15 °C): 4.185 80 E+00 J. Footnotes, footnote 10: the energy to raise 1 gram of water by 1 °C.",
-  note: "The calorie (15 °C) in joules, for 1 g of water and 1 K, given to 4 digits.",
+  locator: "Appendix B.8, row calorie (mean): 4.190 02 E+00 J. Footnotes, footnote 10: the energy to raise 1 gram of water by 1 °C.",
+  note: "The calorie (mean) in joules, for 1 g of water and 1 K. The mean is over the range from 0 °C to 100 °C.",
 };
 
 /**
  * The largest density of liquid water: 1 kg/L. The USGS table gives 1.00000 g/cm3 at 4.0 °C, its largest value.
- * Thus 1 L of cook water is 1 kg or less, and the heat of the model is an upper limit.
+ * Thus 1 L of cook water is 1 kg or less.
  */
 export const WATER_DENSITY_MAX: CookConstant = {
   value: 1,
@@ -65,7 +68,11 @@ export const WATER_DENSITY_MAX: CookConstant = {
   note: "The largest density of the table, from 0 °C to 100 °C. Each other row is less.",
 };
 
-/** The temperature at the end of the heat to boil, in °C. At a high place, water boils at a lower temperature. Thus the heat is an upper limit. */
+/**
+ * The temperature at the end of the heat to boil, in °C.
+ * Water boils at a lower temperature at a high place. Then the heat is less.
+ * But the cook time is longer there, and the model does not give that time. Thus at a high place the fuel is not an upper limit.
+ */
 export const BOIL_CELSIUS = 100;
 
 /**
@@ -83,8 +90,8 @@ export interface CookStart {
 }
 
 /**
- * The stove share: the part of the heat of the fuel that goes into the pot, from more than 0 to 1, with its citation.
- * `heating` tells the heating value of the fuel energy that the share applies to.
+ * The stove share is the part of the heat of the fuel that goes into the water and the food of the pot.
+ * Its value is from more than 0 to 1, with its citation. The heat of the pot itself is in the losses. `heating` tells the heating value of the fuel energy that the share applies to.
  */
 export interface StoveShare {
   readonly value: number;
@@ -101,7 +108,10 @@ export interface CookFragmentInput {
   readonly units: Readonly<Record<string, number>>;
   /** The stove: the `id` of a product of the catalog with stove facts, or the cited stove facts of the caller. */
   readonly stove: string | StoveFacts;
-  /** The dry mass of the food of one pot, for example `{ "value": 0.5, "unit": "kg" }`. It is a plan of the caller. It has no default. */
+  /**
+   * The dry mass of the food of one pot, for example `{ "value": 0.5, "unit": "kg" }`. It is a plan of the caller. It has no default.
+   * Give the smallest pot that the cook makes. A batch above the real pot gives too little fuel, because each pot takes its own boil.
+   */
   readonly batch: Quantity;
   /** The stove share. Without it, the fuel of the boil is a no read, so each fuel is a no read. It has no default. */
   readonly share?: StoveShare | undefined;
@@ -210,11 +220,12 @@ interface StoveContext {
  * This function gives the cook line of one dry food. Each missing fact gives a no read with its reason.
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
  */
-function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, context: StoveContext): CookLine {
+function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
   const { stove, batchKg, share, startC, fuelEnergy } = context;
 
   let energy: CookRead;
-  if (product.energy === undefined) energy = noRead(`The product ${product.id} has no food energy in the catalog.`);
+  if (foodGifts > 1) energy = noRead(`The product ${product.id} gives ${String(foodGifts)} foods. The catalog gives one energy for the whole product, not the energy of each food.`);
+  else if (product.energy === undefined) energy = noRead(`The product ${product.id} has no food energy in the catalog.`);
   else if (!product.energy.read) energy = noRead(`The food energy of the product ${product.id} is a no read: ${product.energy.why}`);
   else {
     const kcal = inUnit(product.energy.amount, product.energy.unit, "kcal");
@@ -226,8 +237,8 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   const litres = cookWater(product);
   const water = litres === undefined ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`) : read(valueIn(litres, "L/kg"), "L/kg");
 
-  // The heat to boil the water of one pot: the water mass times the specific heat times the rise to the boil.
-  const heat = water.read ? read(water.value * batchKg * WATER_DENSITY_MAX.value * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ") : noRead(`The heat to boil is a no read: ${water.why}`);
+  // The heat to boil one pot: the mass of the water and the dry food times the specific heat of water times the rise to the boil.
+  const heat = water.read ? read((water.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ") : noRead(`The heat to boil is a no read: ${water.why}`);
 
   const why: string[] = [];
   if (!heat.read) why.push(heat.why);
@@ -279,6 +290,11 @@ function stoveOf(catalog: SupplyCatalog, stove: string | StoveFacts): StoveFacts
   return product.stove;
 }
 
+/** This function tells if a resource of the catalog is a food. */
+function isFood(catalog: SupplyCatalog, code: string): boolean {
+  return catalog.resources.find((item) => item.code === code)?.kind === "food";
+}
+
 /** This function tells if a resource of the catalog is a dry food: a food resource in a unit of mass. */
 function isDryFood(catalog: SupplyCatalog, code: string): boolean {
   const resource = catalog.resources.find((item) => item.code === code);
@@ -291,8 +307,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - One run of a converter is one pot of `batch`. It takes the dry food, the cook water from `water.stored` and the fuel of the stove.
  *   It gives the food energy of the pot to the need `food.energy`. Thus a dry food with no fuel or no water gives no meal.
  * - The cook water is `cookWater` of market times the dry mass. It is the resource of the drinking water.
- * - The heat to boil is the water mass times `WATER_SPECIFIC_HEAT` times the rise from the start to `BOIL_CELSIUS`.
- *   The water mass takes `WATER_DENSITY_MAX`.
+ * - The heat to boil is the mass of the water and the dry food times `WATER_SPECIFIC_HEAT` times the rise from the start to `BOIL_CELSIUS`.
+ *   The water mass takes `WATER_DENSITY_MAX`. The dry food takes the specific heat of water, which is higher than its own.
  * - The boil time is the heat divided by the stove rate times the share. The time of the stove is the boil time plus the high end of the cook time.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
@@ -303,6 +319,10 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * A store of the resource from a different fragment gets the converter of this list.
  *
  * The catalog of market gives no soak water. A food that needs a soak, for example dry beans, has a second water draw that this function does not give.
+ * A product that gives more than one food has no energy for each food, so its energy is a no read.
+ *
+ * The cook water is `water.stored`, the store of the drinking water. A drinking draw at a higher level of the same store takes
+ * its water first, by the take order of `enduranceOf`. Then the cook gets the water only when the drink is safe to the end.
  *
  * The function is pure.
  *
@@ -311,6 +331,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * @throws RangeError when the batch is not a mass above 0, or when the share is not above 0 and up to 1
  * @throws RangeError when the start is not from 0 up to less than 100 °C
  * @throws RangeError when the stove is a product with no stove facts
+ * @throws RangeError when the catalog has no product of an `id` of the buy list
  * @throws RangeError when the catalog has no resource of the fuel in a unit of mass
  * @throws RangeError when a converter has a read and the catalog has no resource `water.stored` in a unit of volume
  * @throws RangeError for the errors of `giftsOf`
@@ -341,11 +362,14 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   for (const [id, count] of Object.entries(units)) {
     if (!(count > 0)) continue;
     const product = catalog.products.find((item) => item.id === id);
-    if (product === undefined || product.kind !== "food") continue;
-    for (const gift of giftsOf(catalog, id, 1)) {
+    if (product === undefined) throw new RangeError(`The catalog has no product "${id}".`);
+    if (product.kind !== "food") continue;
+    const gifts = giftsOf(catalog, id, 1);
+    const foodGifts = gifts.filter((gift) => isFood(catalog, gift.resource)).length;
+    for (const gift of gifts) {
       if (!isDryFood(catalog, gift.resource)) continue;
       const perUnitKg = gift.read ? inUnit(gift.amount, gift.unit, "kg") : undefined;
-      lines.push(cookLine(product, gift.resource, perUnitKg, context));
+      lines.push(cookLine(product, gift.resource, perUnitKg, foodGifts, context));
     }
   }
 
