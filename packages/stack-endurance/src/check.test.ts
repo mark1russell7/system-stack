@@ -96,15 +96,37 @@ describe("checkEndurance", () => {
     const device = converter.device ?? "stove";
     const pair = (devices: number | undefined): EnduranceLayer => ({
       ...SAMPLE_ENDURANCE,
-      converters: [{ ...converter, device, perDay: 4, devices: 2 }, { ...converter, id: `${converter.id}-2`, device, devices }],
+      converters: [{ ...converter, device, perDay: 4, devices: 2 }, { ...converter, id: `${converter.id}-2`, device, perDay: 6, devices }],
     });
     expect(checkEndurance(pair(1)).map((fault) => [fault.code, fault.at])).toEqual([["endurance-devices", `${converter.id}-2`]]);
     expect(checkEndurance(pair(undefined)).map((fault) => fault.code)).toEqual(["endurance-devices"]);
     expect(checkEndurance(pair(2))).toEqual([]);
   });
 
+  it("warns on a device with a limited converter and a converter with no limit", () => {
+    const converter = SAMPLE_ENDURANCE.converters?.[0];
+    if (converter === undefined) throw new Error("The sample has no converter.");
+    const device = converter.device ?? "stove";
+    const mix = (second: number | undefined, third: number | undefined): EnduranceLayer => ({
+      ...SAMPLE_ENDURANCE,
+      converters: [
+        { ...converter, device, perDay: 4 },
+        { ...converter, id: `${converter.id}-2`, device, perDay: second },
+        { ...converter, id: `${converter.id}-3`, device, perDay: third },
+      ],
+    });
+    const faults = checkEndurance(mix(undefined, undefined));
+    expect(faults.map((fault) => [fault.level, fault.code, fault.at])).toEqual([["warning", "endurance-device-mix", `${converter.id}-2`]]);
+    expect(faults[0]?.message).toContain(`"${converter.id}-2" uses no device-days`);
+    expect(checkEndurance(mix(6, undefined)).map((fault) => fault.at)).toEqual([`${converter.id}-3`]);
+    expect(checkEndurance(mix(6, 2))).toEqual([]);
+    // A converter with no device has a limit of its own, so it makes no mix.
+    const alone: EnduranceLayer = { ...SAMPLE_ENDURANCE, converters: [{ ...converter, device, perDay: 4 }, { ...converter, id: `${converter.id}-2`, device: undefined }] };
+    expect(codes(alone)).toEqual([]);
+  });
+
   it("has a code for each fault", () => {
-    expect(ENDURANCE_CODES).toHaveLength(13);
+    expect(ENDURANCE_CODES).toHaveLength(14);
   });
 });
 
