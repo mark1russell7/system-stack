@@ -13,7 +13,8 @@ Each function is a plain function with no clock, no network and no file.
 | `HashedSource` | A source of `@mark1russell7/guidebook` (an id, a title, a URL, a license and the date of the check), with the SHA-256 hash of the file. |
 | `CalorieTable` | A table of estimated calorie needs from one source, with the place of the tables in the source. |
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
-| `Person` | A group of persons: a sex, an age in whole months, a count and, as an option, an activity level. |
+| `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
+| `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
 | `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, one draw and one direct use. It has the form of `EnduranceLayer`. |
 
 ## The rules of the data
@@ -21,9 +22,10 @@ Each function is a plain function with no clock, no network and no file.
 1. Each value comes from a table of a cited source. A value with no source is not data.
 2. An age with no row in the table gives a line with no read for that person, not an error. The total of `calorieNeed` is then a lower limit, and `read` is false.
 3. The activity level is an explicit input. The package has no default level.
-4. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
+4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. A stage that the table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw.
+5. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
 
-`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source. It also refuses a hash that is not 64 lowercase hexadecimal digits. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex also cover each month with no gap, from the first row to an open last row (`needs-gap`).
+`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source. It also refuses a hash that is not 64 lowercase hexadecimal digits. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex also cover each month with no gap, from the first row to an open last row (`needs-gap`). Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
 
 The field `sha256` is not in the source of guidebook yet. It moves there later.
 
@@ -122,7 +124,7 @@ The gate does not examine the FoodKeeper `id` of each product. That join goes to
 
 ## The sources
 
-The calorie table comes from Appendix 2 of the Dietary Guidelines for Americans, 2020-2025, 9th Edition (USDA and HHS). Table A2-1 gives the ages of 12 through 23 months, on page 139. Table A2-2 gives the ages of 2 and more, on pages 140 and 141. The table has 68 rows: 34 for each sex.
+The calorie table comes from Appendix 2 of the Dietary Guidelines for Americans, 2020-2025, 9th Edition (USDA and HHS). Table A2-1 gives the ages of 12 through 23 months, on page 139. Table A2-2 gives the ages of 2 and more, on pages 140 and 141. The table has 68 rows: 34 for each sex. Table A2-3, on page 141, gives the changes of pregnancy and lactation. They are 0, 340 and 452 kcal/d in the three trimesters. They are 330 and 400 kcal/d in the first and the second 6 months of lactation.
 
 The guidelines are a work of the United States federal government, in the public domain (the license `us-public-domain` of guidebook). The record of the source has the SHA-256 hash of the PDF of the check of 2026-11-22.
 
@@ -130,6 +132,9 @@ The guidelines are a work of the United States federal government, in the public
 - Table A2-1 gives one need for each age and sex of a toddler. The level does not change it.
 - Each row of a toddler covers the months up to the next row. The table has no row below 12 months.
 - The source gives each need for a reference height and weight. A person can need more or less.
+- The source gives the changes of Table A2-3 for women with a healthy weight before the pregnancy. Each change has this condition in its field `condition`.
+
+The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table of calorie needs. It sends the reader to the DRI calculator of the USDA, and its daily servings start from a calorie level. Thus the table stays the table of the 2020-2025 edition.
 
 ## The entries
 

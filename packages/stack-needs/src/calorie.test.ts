@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { ACTIVITY_LEVELS, CALORIE_SEXES, calorieNeed, calorieRow, type ActivityLevel, type CalorieRow, type CalorieSex, type Person } from "./calorie.ts";
+import { ACTIVITY_LEVELS, CALORIE_SEXES, calorieChange, calorieNeed, calorieRow, type ActivityLevel, type CalorieRow, type CalorieSex, type Person } from "./calorie.ts";
 import { DGA_CALORIES } from "./data.ts";
 
 const dga = DGA_CALORIES;
@@ -148,5 +148,38 @@ describe("the calorie need of a household", () => {
     expect(() => calorieNeed(dga, adults, "lazy" as never, 7)).toThrow(RangeError);
     expect(() => calorieNeed(dga, [{ sex: "male", ageMonths: years(33), count: 1, level: "lazy" as never }], "active", 7)).toThrow(RangeError);
     for (const days of [-1, Number.NaN, Number.POSITIVE_INFINITY]) expect(() => calorieNeed(dga, adults, "sedentary", days), String(days)).toThrow(RangeError);
+  });
+
+  it("adds the change of Table A2-3 to the need of the row of a woman at a stage of pregnancy or lactation", () => {
+    expect(dga.changes?.map((change) => [change.stage, change.change.value])).toEqual([
+      ["pregnancy-1", 0],
+      ["pregnancy-2", 340],
+      ["pregnancy-3", 452],
+      ["lactation-1", 330],
+      ["lactation-2", 400],
+    ]);
+    for (const change of dga.changes ?? []) {
+      expect(change.sex).toBe("female");
+      expect(change.change.unit).toBe("kcal/d");
+      expect(change.condition).toContain("healthy weight before the pregnancy");
+    }
+    // A made-up woman of 33 years: 1800 kcal/d at the level sedentary, and 452 kcal/d more in the third trimester.
+    const woman = { sex: "female", ageMonths: years(33), count: 1 } as const;
+    const third = calorieNeed(dga, [{ ...woman, stage: "pregnancy-3" }], "sedentary", 10);
+    expect(third.need).toEqual({ value: 22520, unit: "kcal" });
+    expect(third.lines[0]).toMatchObject({ read: true, row: "31-35", stage: "pregnancy-3" });
+    expect(calorieNeed(dga, [{ ...woman, stage: "pregnancy-1" }], "sedentary", 1).need.value).toBe(1800);
+    expect(calorieNeed(dga, [{ ...woman, stage: "lactation-1", count: 2 }], "active", 1).need.value).toBe(2 * (2200 + 330));
+    // A record with no stage has no stage in its line.
+    expect(calorieNeed(dga, [woman], "sedentary", 1).lines[0]).not.toHaveProperty("stage");
+  });
+
+  it("throws for a stage that the table does not have for the sex of the record, so no draw loses the persons", () => {
+    const man = { sex: "male", ageMonths: years(33), count: 1, stage: "pregnancy-2" } as const;
+    expect(calorieChange(dga, "male", "pregnancy-2")).toBeUndefined();
+    expect(calorieChange(dga, "female", "pregnancy-2")?.title).toBe("Pregnancy: 2nd trimester");
+    expect(() => calorieNeed(dga, [man], "sedentary", 1)).toThrow(/no change for the stage pregnancy-2/u);
+    expect(() => calorieNeed(dga, [{ ...man, sex: "female", stage: "pregnancy-4" }], "sedentary", 1)).toThrow(RangeError);
+    expect(() => calorieNeed({ ...dga, changes: undefined }, [{ ...man, sex: "female" }], "sedentary", 1)).toThrow(RangeError);
   });
 });
