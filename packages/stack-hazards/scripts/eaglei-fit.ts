@@ -233,11 +233,17 @@ export interface EagleLaws {
   readonly peaks?: Readonly<Record<string, CountyPeak>> | undefined;
 }
 
-/** The largest count out of a county, and the number of its counts above its customers in the file of the customers. */
+/** The largest counts out of a county, and the number of its counts above its customers in the file of the customers. */
 export interface CountyPeak {
+  /** The largest count. One bad line can give it. */
   readonly peak: number;
+  /** The largest count that `HELD_READINGS` readings or more reach: the count at that place from the top. It is 0 for a county with fewer readings. */
+  readonly held: number;
   readonly over: number;
 }
+
+/** The number of readings that a count `held` must have at or above it. */
+export const HELD_READINGS = 4;
 
 /**
  * This function gives a tally of the largest count out of each county.
@@ -245,29 +251,43 @@ export interface CountyPeak {
  * A county with no customers in the file has a peak and no count above its customers.
  */
 export function peakTally(customers: ReadonlyMap<string, number>): { add(count: OutageCount): void; peaks(): Record<string, CountyPeak> } {
-  const peaks = new Map<string, { peak: number; over: number }>();
+  // The largest counts of each county, the largest first, no more than HELD_READINGS of them.
+  const peaks = new Map<string, { top: number[]; over: number }>();
   return {
     add(count) {
       if (count.out === undefined) return;
-      const entry = peaks.get(count.area) ?? { peak: 0, over: 0 };
-      entry.peak = Math.max(entry.peak, count.out);
+      const entry = peaks.get(count.area) ?? { top: [], over: 0 };
+      const { top } = entry;
+      if (top.length < HELD_READINGS || count.out > (top[top.length - 1] ?? 0)) {
+        let index = top.length;
+        while (index > 0 && (top[index - 1] ?? 0) < count.out) index -= 1;
+        top.splice(index, 0, count.out);
+        if (top.length > HELD_READINGS) top.pop();
+      }
       const total = customers.get(count.area);
       if (total !== undefined && count.out > total) entry.over += 1;
       peaks.set(count.area, entry);
     },
-    peaks: () => Object.fromEntries([...peaks.keys()].sort().map((area) => [area, peaks.get(area) ?? { peak: 0, over: 0 }])),
+    peaks: () =>
+      Object.fromEntries(
+        [...peaks].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([area, { top, over }]) => [area, { peak: top[0] ?? 0, held: top.length < HELD_READINGS ? 0 : (top[HELD_READINGS - 1] ?? 0), over }]),
+      ),
   };
 }
 
-/** This function gives a table in Markdown of the counties with a count above their customers. The largest share is first, with no more than `most` rows. */
+/**
+ * This function gives a table in Markdown of the counties with a count above their customers, with no more than `most` rows.
+ * The order is by the count `held` over the customers, the largest first, and then by the code of the county.
+ */
 export function peaksTable(laws: EagleLaws, most = 40): string {
   const customers = laws.priors?.observation.customers ?? {};
   const rows = Object.entries(laws.peaks ?? {})
     .filter(([, entry]) => entry.over > 0)
     .map(([area, entry]) => ({ area, ...entry, customers: customers[area] ?? 0 }))
-    .sort((a, b) => b.peak / Math.max(b.customers, 1) - a.peak / Math.max(a.customers, 1) || (a.area < b.area ? -1 : 1));
-  const lines = rows.slice(0, most).map((row) => `| ${row.area} | ${String(row.customers)} | ${String(row.peak)} | ${String(row.over)} |`);
-  return [`${String(rows.length)} counties have a count above their customers.`, "", "| County | Customers | Largest count | Counts above the customers |", "| --- | --- | --- | --- |", ...lines].join("\n");
+    .sort((a, b) => b.held / Math.max(b.customers, 1) - a.held / Math.max(a.customers, 1) || (a.area < b.area ? -1 : 1));
+  const lines = rows.slice(0, most).map((row) => `| ${row.area} | ${String(row.customers)} | ${String(row.peak)} | ${String(row.held)} | ${String(row.over)} |`);
+  const head = `| County | Customers | Largest count | Count of ${String(HELD_READINGS)} readings | Counts above the customers |`;
+  return [`${String(rows.length)} counties have a count above their customers.`, "", head, "| --- | --- | --- | --- | --- |", ...lines].join("\n");
 }
 
 /** This function gives the counts of the events of one join time. */

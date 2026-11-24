@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, ranges, sweepTable, yearsOf } from "./eaglei-fit.ts";
+import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, ranges, sweepTable, yearsOf, type EagleLaws } from "./eaglei-fit.ts";
 import { RANGE_TRIES, type FitContext } from "./fetch.ts";
 import { STORM_BASE, stormFiles } from "./storm-files.ts";
 import { STORM_CLASSES } from "../src/storms.ts";
@@ -139,7 +139,26 @@ describe("peakTally", () => {
   it("gives the largest count of each county and the counts above its customers", () => {
     const tally = peakTally(new Map([["99001", 10], ["99009", 1000]]));
     for (const [area, out] of [["99001", 4], ["99001", 12], ["99001", 30], ["99009", 50], ["99003", 7], ["99009", undefined]] as const) tally.add({ area, out, time: 0 });
-    expect(tally.peaks()).toEqual({ "99001": { peak: 30, over: 2 }, "99003": { peak: 7, over: 0 }, "99009": { peak: 50, over: 0 } });
+    // A county with fewer than 4 readings has no held count.
+    expect(tally.peaks()).toEqual({ "99001": { peak: 30, held: 0, over: 2 }, "99003": { peak: 7, held: 0, over: 0 }, "99009": { peak: 50, held: 0, over: 0 } });
+    // One bad line gives the peak. The held count is the fourth largest count.
+    for (const out of [9, 11, 3, 900, 10]) tally.add({ area: "99001", out, time: 0 });
+    expect(tally.peaks()["99001"]).toEqual({ peak: 900, held: 11, over: 4 });
+  });
+
+  it("gives a table of the counties with a count above their customers, by the held count over the customers", () => {
+    const laws = {
+      priors: { observation: { years: {}, customers: { "99001": 10, "99003": 100, "99005": 1000 } }, counts: {} },
+      peaks: { "99001": { peak: 900, held: 20, over: 5 }, "99003": { peak: 400, held: 300, over: 9 }, "99005": { peak: 50, held: 40, over: 0 } },
+    } as unknown as EagleLaws;
+    const table = peaksTable(laws);
+    expect(table.split("\n").slice(0, 1)).toEqual(["2 counties have a count above their customers."]);
+    expect(table).toContain("| 99003 | 100 | 400 | 300 | 9 |\n| 99001 | 10 | 900 | 20 | 5 |");
+    expect(table).not.toContain("99005");
+    const one = peaksTable(laws, 1);
+    expect(one).toContain("2 counties have a count above their customers.");
+    expect(one).toContain("| 99003 |");
+    expect(one).not.toContain("| 99001 |");
   });
 });
 
@@ -156,7 +175,7 @@ describe("fitEagle", () => {
       observation: { years: { "99001": 2, "99009": 2 }, customers: { "99001": 1000, "99009": 100_000 } },
       counts: { "infra.power.outage": { "99001": { events: 1, share: 0.04 } } },
     });
-    expect(laws.peaks).toEqual({ "99001": { peak: 40, over: 0 }, "99009": { peak: 1, over: 0 } });
+    expect(laws.peaks).toEqual({ "99001": { peak: 40, held: 40, over: 0 }, "99009": { peak: 1, held: 1, over: 0 } });
     expect(peaksTable(laws)).toContain("0 counties have a count above their customers.");
     expect(Object.keys(laws.regions)).toEqual(["99"]);
     expect(laws.regions["99"]).toMatchObject({ count: 1, censored: 0, open: 0, median: 5400 / 86_400 });
