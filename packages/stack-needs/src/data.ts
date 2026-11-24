@@ -1,10 +1,15 @@
-import type { CalorieNeed, CalorieTable } from "./calorie.ts";
+import type { CalorieChange, CalorieNeed, CalorieTable } from "./calorie.ts";
 import type { HashedSource } from "./source.ts";
 
 // The estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025. Each value is from the tables of
 // Appendix 2 of the PDF, read on 2026-11-22. A calorie of the source is a food calorie, thus 1 kcal. The source gives
 // each need for a reference height and weight, to keep the weight of a person. A person can need more or less.
 // The rows of the toddlers are at 12, 15, 18 and 21 through 23 months. Each row here covers the months up to the next row.
+// The changes of pregnancy and lactation are from Table A2-3. The source gives them for women with a healthy weight before
+// the pregnancy.
+// The 2025-2030 edition of the guidelines (read on 2026-11-24) has no table of calorie needs. It sends the reader to the
+// DRI calculator of the USDA. Its daily servings by calorie level start at a calorie level and do not give a need. So
+// this table stays the table of the 2020-2025 edition.
 
 /** The source of the calorie table: the PDF of the Dietary Guidelines for Americans, 2020-2025, 9th Edition. It is a work of the United States federal government. */
 export const DGA_SOURCE: HashedSource = {
@@ -20,13 +25,22 @@ export const DGA_SOURCE: HashedSource = {
 const day = (value: number): { readonly value: number; readonly unit: string } => ({ value, unit: "kcal/d" });
 const levels = (sedentary: number, moderate: number, active: number): CalorieNeed => ({ levels: { sedentary: day(sedentary), "moderately-active": day(moderate), active: day(active) } });
 const each = (value: number): CalorieNeed => ({ each: day(value) });
+const HEALTHY = "For women with a healthy weight before the pregnancy. Other women ask their health care provider.";
+const change = (stage: string, title: string, value: number): CalorieChange => ({ stage, title, sex: "female", change: day(value), condition: HEALTHY });
 
-/** The table of estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025: 68 rows, 34 for each sex. */
+/** The table of estimated calorie needs of the Dietary Guidelines for Americans, 2020-2025: 68 rows, 34 for each sex, and 5 changes of pregnancy and lactation. */
 export const DGA_CALORIES: CalorieTable = {
   id: "dga.2020-2025:calorie-needs",
   title: "Dietary Guidelines for Americans, 2020-2025: Estimated Calorie Needs",
   source: DGA_SOURCE,
-  locator: "Appendix 2: Table A2-1 (ages 12 through 23 months, page 139) and Table A2-2 (ages 2 and older, pages 140 and 141)",
+  locator: "Appendix 2: Table A2-1 (ages 12 through 23 months, page 139), Table A2-2 (ages 2 and older, pages 140 and 141) and Table A2-3 (pregnancy and lactation, page 141)",
+  changes: [
+    change("pregnancy-1", "Pregnancy: 1st trimester", 0),
+    change("pregnancy-2", "Pregnancy: 2nd trimester", 340),
+    change("pregnancy-3", "Pregnancy: 3rd trimester", 452),
+    change("lactation-1", "Lactation: 1st 6 months", 330),
+    change("lactation-2", "Lactation: 2nd 6 months", 400),
+  ],
   rows: [
     { sex: "female", age: "12 months", from: 12, to: 14, need: each(800) },
     { sex: "female", age: "15 months", from: 15, to: 17, need: each(800) },
