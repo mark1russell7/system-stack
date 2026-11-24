@@ -17,13 +17,15 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - `node bench/main.ts read --in <folder> --freeze <file> --commit <sha>` freezes the limits of the records under a folder. Give `--commit` when the runs come from several commits. Each job of the file keeps its run and the commit that it timed.
 - A limit of a model is near the noise of its jobs, so a block can come from noise. When a commit changes no timed code, freeze again with the records of the whole run. Do it in a pull request. The rule then widens a limit only by a value of CI.
 - When a commit changes the timed code, a block is a finding. Find the cause before you change a limit.
+- At these margins, the gate cannot tell a slowdown of 1.5% from a change of the runners. So, on the same day, start the bench of the base commit. If the base blocks too, freeze again from that run, then read the pull request again.
 - A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
 - The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read.
 - The jobs of one CPU model in one run time one commit on one kind of runner. On the limit of their model, they make one group (`groupCases`).
 - A group blocks the run only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it. One slow machine makes one job slower, and the group stays within.
 - A group of 2 jobs or more reads against the group limit of its model (`groupTables`). It is `runLimit` of the lowest value of each run of the model in the freeze.
 - `limits.json` keeps each group limit with its runs. `limitFaults` computes each group limit again from the jobs of the file.
-- One slow machine in a run of the freeze widens the limit of one job by 2 times its excess. The group limit stays the same, because the other jobs of its run give the lowest value.
+- One slow machine in a run of the freeze widens the limit of one job by 2 times its excess. In a run of 2 jobs or more, the group limit stays the same, because the other jobs of its run give the lowest value.
+- A lone slow job in a run of the freeze widens the group limit too, because its value is the lowest value of its run. In the current freeze, lone jobs give the highest lowest value of the EPYC 7763 at each case.
 - A group of 1 job reads against the limit of one job. Its only value is its lowest value, so its limit must hold the slow machines of the freeze.
 - A job at the ceiling is a group of its own. A job with a no read is not in a group, so its value does not keep a group within.
 - Each job keeps its own outcome against the limit of one job. The report gives it in the column "Gate of the job alone". The gate of the run reads the groups.

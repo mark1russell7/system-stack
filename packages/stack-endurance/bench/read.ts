@@ -219,7 +219,8 @@ function modelRuns(jobs: FrozenLimits["jobs"], values: readonly number[]): Map<s
  * This function gives the group limit of each case on each CPU model with jobs of `MIN_RUNS` runs or more.
  *
  * - The group limit is `runLimit` of the lowest value of each run of the model. A run with 1 job of the model gives the value of that job.
- * - One slow machine in a run of the freeze does not widen the group limit. The other jobs of its run give the lowest value.
+ * - One slow machine in a run of 2 jobs or more does not widen the group limit. The other jobs of its run give the lowest value.
+ * - A lone slow job in a run of the freeze widens the group limit by 2 times its excess. Its value is the lowest value of its run.
  * - The group limit is at most the limit of one job. The lowest values are at most the values, and their spread is at most the spread of the values.
  */
 export function groupTables(jobs: FrozenLimits["jobs"], cases: Readonly<Record<string, RunLimit>>): Record<string, Record<string, GroupLimit>> {
