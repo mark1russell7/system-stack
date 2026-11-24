@@ -36,6 +36,13 @@ const FIELDS = 19;
 
 const isArea = (kind: string): kind is StormArea => kind === "C" || kind === "Z" || kind === "M";
 
+/**
+ * The codes of the territories in the field `STATE_FIPS` of Storm Events, and their FIPS codes of the Census Bureau.
+ * Storm Events gives Puerto Rico the code 99 and the Virgin Islands the code 96. EAGLE-I and the zone-county file use 72 and 78.
+ * Without this table, no row of a territory has a county or a zone, and the territory has no storm event.
+ */
+export const STORM_STATE_CODES: Readonly<Record<string, string>> = { "96": "78", "97": "60", "98": "66", "99": "72" };
+
 /** This function gives the first fields of a line of CSV. A field in quotes can have commas and doubled quotes. */
 function fieldsOf(line: string, count: number): string[] | undefined {
   const fields: string[] = [];
@@ -83,6 +90,7 @@ function instant(month: string, day: string, time: string, offset: number): numb
 /**
  * This function reads one line of a details file of Storm Events. It reads only the first 19 fields, before the narratives.
  * The file gives each time in the local standard time of the area. The field `CZ_TIMEZONE` has the offset, for example `CST-6`.
+ * The area of a territory has the FIPS code of the Census Bureau, from `STORM_STATE_CODES`.
  *
  * @returns The row, or undefined for the header, a part of a broken line or a line with a wrong field
  */
@@ -95,7 +103,8 @@ export function stormLine(line: string): StormRow | undefined {
   const begin = instant(beginMonth, beginDay, beginTime, Number(offset));
   const end = instant(endMonth, endDay, endTime, Number(offset));
   if (begin === undefined || end === undefined || end < begin) return undefined;
-  return { type, kind, area: state.padStart(2, "0") + cz.padStart(3, "0"), begin, end };
+  const code = state.padStart(2, "0");
+  return { type, kind, area: (STORM_STATE_CODES[code] ?? code) + cz.padStart(3, "0"), begin, end };
 }
 
 /**
