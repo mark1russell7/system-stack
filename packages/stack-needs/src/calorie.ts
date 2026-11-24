@@ -134,6 +134,7 @@ export function calorieChange(table: CalorieTable, sex: CalorieSex, stage: strin
  * - An age with no row in the table gives a line with no read, for example 6 months. Then the total is a lower limit.
  * - The table of the toddlers gives one need for each age and sex. Thus the level does not change the need of a toddler.
  * - A record with a stage adds the change of the stage to the need of its row, for example 340 kcal/d in the second trimester.
+ * - One stage holds for each day of the call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
  *
  * The activity level is an explicit input. This package has no default level. The planner selects it, also for the worst case of a long power cut.
  * In that case, work can make the level higher, for example the carry of water. The function is pure.
@@ -146,6 +147,7 @@ export function calorieChange(table: CalorieTable, sex: CalorieSex, stage: strin
  * @throws RangeError when a level is not a level of the table, or when a sex is not a sex of the table
  * @throws RangeError when the count of days is not a finite number of 0 or more
  * @throws RangeError when the table has no change for the stage and the sex of a record
+ * @throws RangeError when the daily need of a record, with the change of its stage, is not above 0
  */
 export function calorieNeed(table: CalorieTable, persons: readonly Person[], level: ActivityLevel, days: number): CalorieNeedTotal {
   if (!(Number.isFinite(days) && days >= 0)) throw new RangeError(`The count of days is ${String(days)}. It must be a finite number of 0 or more.`);
@@ -165,6 +167,7 @@ export function calorieNeed(table: CalorieTable, persons: readonly Person[], lev
     const row = calorieRow(table, person.sex, person.ageMonths);
     if (row === undefined) return { person, read: false, why: `The table ${table.id} has no row for a ${name}.` };
     const daily = valueIn(row.need.levels === undefined ? row.need.each : row.need.levels[own], DAILY_UNIT) + (change === undefined ? 0 : valueIn(change.change, DAILY_UNIT));
+    if (!(daily > 0)) throw new RangeError(`The daily need of the persons ${name} at the stage ${String(person.stage)} is ${String(daily)} kcal/d. It must be above 0.`);
     const line = { person, read: true as const, level: own, row: row.age, need: quantity(person.count * daily * days, ENERGY_UNIT) };
     return change === undefined ? line : { ...line, stage: change.stage };
   });

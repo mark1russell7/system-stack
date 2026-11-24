@@ -181,5 +181,8 @@ describe("the calorie need of a household", () => {
     expect(() => calorieNeed(dga, [man], "sedentary", 1)).toThrow(/no change for the stage pregnancy-2/u);
     expect(() => calorieNeed(dga, [{ ...man, sex: "female", stage: "pregnancy-4" }], "sedentary", 1)).toThrow(RangeError);
     expect(() => calorieNeed({ ...dga, changes: undefined }, [{ ...man, sex: "female" }], "sedentary", 1)).toThrow(RangeError);
+    // A change that makes the daily need 0 or less throws, so it cannot lower a total with no finding.
+    const lower = { ...dga, changes: [{ stage: "test", title: "Test", sex: "female" as const, change: { value: -5000, unit: "kcal/d" } }] };
+    expect(() => calorieNeed(lower, [{ ...man, sex: "female", stage: "test" }], "sedentary", 1)).toThrow(/must be above 0/u);
   });
 });

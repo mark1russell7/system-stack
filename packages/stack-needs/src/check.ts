@@ -12,8 +12,9 @@ import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } fr
  * - `needs-overlap`: two rows of one sex have ages in common.
  * - `needs-gap`: the rows of one sex do not cover each month with no gap, from the first row to an open last row.
  * - `needs-value`: a need is not a finite number above 0 in a unit of energy for each day.
- * - `needs-change`: a change has no stage, no title or a wrong sex. Or a different change has its stage and sex. Or
- *   its value is not a finite number in a unit of energy for each day.
+ * - `needs-change`: a change has no stage, no title or a wrong sex, or a stage with a space at an end. Or a different
+ *   change has its stage and sex. Or its value is not a finite number in a unit of energy for each day. Or its sum with
+ *   the smallest need of its sex is not above 0.
  */
 export const NEEDS_CODES: readonly ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"] = ["needs-hash", "needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
 
@@ -80,15 +81,25 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
   }
 
   // The changes: a stage, a title and a sex of the table, one change for each stage and sex, and a finite value.
+  // A change with the smallest need of its sex stays above 0. A row with a bad need has its own finding.
+  const smallest = (sex: string): number =>
+    Math.min(
+      ...table.rows
+        .filter((row) => row.sex === sex)
+        .flatMap((row) => (row.need.levels === undefined ? [row.need.each] : ACTIVITY_LEVELS.map((level) => row.need.levels?.[level])))
+        .filter((need): need is Quantity => need !== undefined && goodNeed(need))
+        .map((need) => valueIn(need, "kcal/d")),
+    );
   const seen = new Set<string>();
   (table.changes ?? []).forEach((change, index) => {
     const id = `${table.id}.changes[${String(index)}]`;
     const stage = typeof change.stage === "string" ? change.stage.trim() : "";
     const title = typeof change.title === "string" ? change.title.trim() : "";
-    if (stage === "" || title === "" || !(CALORIE_SEXES as readonly unknown[]).includes(change.sex)) add("needs-change", "change", id, `The change "${id}" has no stage, no title or a sex that is not a sex of the table.`);
+    if (stage === "" || stage !== change.stage || title === "" || !(CALORIE_SEXES as readonly unknown[]).includes(change.sex)) add("needs-change", "change", id, `The change "${id}" has no stage, no title, a stage with a space at an end or a sex that is not a sex of the table.`);
     else if (seen.has(`${change.sex} ${stage}`)) add("needs-change", "change", id, `The change "${id}" has the stage ${stage} of a ${change.sex}, and a different change has it too.`);
     seen.add(`${String(change.sex)} ${stage}`);
     if (!goodNeed(change.change, false)) add("needs-change", "change", id, `The change "${id}" has a value that is not a finite number in kcal/d.`);
+    else if (smallest(change.sex) + valueIn(change.change, "kcal/d") <= 0) add("needs-change", "change", id, `The change "${id}" makes the smallest need of a ${change.sex} 0 or less.`);
   });
   return findings;
 }

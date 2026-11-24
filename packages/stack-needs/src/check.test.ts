@@ -65,5 +65,10 @@ describe("the gate of a calorie table", () => {
     expect(codes([{ ...first, change: kcal(Number.NaN) }])).toEqual(["needs-change dga.2020-2025:calorie-needs.changes[0]"]);
     expect(codes([{ ...first, change: kcal(340, "kcal") }])).toEqual(["needs-change dga.2020-2025:calorie-needs.changes[0]"]);
     expect(codes([{ ...first, change: kcal(-100) }])).toEqual([]);
+    // The smallest need of a female is 800 kcal/d, so a change of -800 makes it 0.
+    expect(codes([{ ...first, change: kcal(-799) }])).toEqual([]);
+    expect(codes([{ ...first, change: kcal(-800) }])).toEqual(["needs-change dga.2020-2025:calorie-needs.changes[0]"]);
+    // A stage with a space at an end matches no person, so the gate refuses it.
+    expect(codes([{ ...first, stage: "pregnancy-1 " }])).toEqual(["needs-change dga.2020-2025:calorie-needs.changes[0]"]);
   });
 });
