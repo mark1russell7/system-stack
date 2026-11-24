@@ -129,6 +129,31 @@ export const DGA_CALORIES: CalorieTable = {
 // The report is all rights reserved. The values are facts with a citation, and the gate of the sources permits them.
 // The Infant Nutrition and Feeding guide of the WIC program of the USDA (read on 2026-11-24) gives no table of daily needs.
 
+/** The source of the feeds of formula: the PDF of the infant guide of the WIC program. It is a work of the United States federal government. */
+export const WIC_INFANT_SOURCE: Source = {
+  id: "wic-infant-guide-2019",
+  title: "Infant Nutrition and Feeding: A Guide for Use in the WIC and CSF Programs",
+  url: "https://wicworks.fna.usda.gov/sites/default/files/media/document/infant-feeding-guide.pdf",
+  license: "us-public-domain",
+  checked: "2026-11-24",
+  by: "USDA Food and Nutrition Service",
+  terms: "https://wicworks.fna.usda.gov/resources/infant-nutrition-and-feeding-guide",
+  sha256: "d0c043cc70dedf16920673f57cc4771692974db30761df351faec4e56db45b1d",
+};
+
+/** A count of feeds in one day, with its source and its place in the source. */
+export interface CitedFeeds {
+  readonly perDay: number;
+  readonly source: Source;
+  readonly locator: string;
+}
+
+/**
+ * The most feeds of formula in one day below 6 months: 8. Table 5.2 of the WIC guide gives 2 to 3 ounces every 3 to 4 hours.
+ * 24 hours divided by 3 hours is 8. More feeds give smaller feeds and thus more waste, so this value is the most feeds.
+ */
+export const FORMULA_FEEDS: CitedFeeds = { perDay: 8, source: WIC_INFANT_SOURCE, locator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137" };
+
 /** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
 export const NASEM_ENERGY_SOURCE: Source = {
   id: "nasem-dri-energy-2023",
