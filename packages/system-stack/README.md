@@ -283,7 +283,9 @@ A finding has the names of its fragments in `from`. The findings are in this ord
 
 The join does not examine the meaning of the stack. Thus a fragment can need a part of a different fragment. Give the joined stack to `checkStackLayers` afterward.
 
-An add-on that joins its layer is a `StackJoiner`: an add-on with the function `join`. The function gets the layer of each fragment, with the name of the fragment. Two tools do the usual work. `joinRecords` joins lists of records with a key, and a key in two or more fragments is a fault. `joinSetting` joins a setting, and two different values are a fault. This example adds a join to the add-on `examined`.
+An add-on that joins its layer is a `StackJoiner`: an add-on with the function `join`. The function gets the layer of each fragment, with the name of the fragment.
+
+Two tools do the usual work. `joinRecords` joins lists of records with a key, and a key in two or more fragments is a fault. With the option `equal`, equal records of one key join into one record, and only different records are a fault. `joinSetting` joins a setting, and two different values are a fault. This example adds a join to the add-on `examined`.
 
 ```ts
 import { joinRecords, joinStacks, type StackFragment, type StackJoiner } from "@mark1russell7/system-stack";
@@ -314,7 +316,7 @@ Each add-on package gives a `StackJoiner` in its entry `/add-on`. Thus a host gi
 
 A join of joined stacks gives the stack of one join of all the fragments. A fragment with no parts and no layers changes nothing. A layer has these two properties when the join of its add-on has them.
 
-The join of the layers is `joinLayers` of the entry `@mark1russell7/coeval/layers`. The core gives its names again: `LayerJoiner`, `LayerPiece`, `joinRecords`, `joinSetting` and the types of their results.
+The join of the layers is `joinLayers` of the entry `@mark1russell7/coeval/layers`. The core gives its names again: `LayerJoiner`, `LayerPiece`, `joinRecords`, `joinSetting`, the options of `joinRecords` (`RecordsJoinOptions`) and the types of their results.
 
 ## The read of JSON
 

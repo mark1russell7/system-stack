@@ -32,6 +32,7 @@ PartSets: build/index.d.ts#PartSets
 PathOptions: build/index.d.ts#PathOptions
 type RecordTwice: @mark1russell7/coeval/layers#RecordTwice (external)
 type RecordsJoin: @mark1russell7/coeval/layers#RecordsJoin (external)
+type RecordsJoinOptions: @mark1russell7/coeval/layers#RecordsJoinOptions (external)
 SAMPLE_STACK: build/index.d.ts#SAMPLE_STACK
 STACK_CODES: build/known.chunk.d.ts#STACK_CODES
 STACK_JOIN_CODES: build/index.d.ts#STACK_JOIN_CODES

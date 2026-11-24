@@ -95,7 +95,8 @@ In the sample, the rice needs 2 L of water for each kg. The drinking water holds
 
 - Two fragments can declare one resource code. When the two records are equal, the joined layer has one record.
 - The join compares the records with canonical JSON (RFC 8785). Thus the order of the keys has no effect.
-- When the unit or a different field is not equal, the join has a fault. The message names the two fragments and the two records.
+- When the unit or a different field is not equal, the join has a fault. The message names the fragments and the resource code.
+- The join is `joinRecords` of the core with the option `equal`.
 - One key of a store, a draw, a direct use, a converter, a case or a prior in two fragments is a fault.
 - The levels are one setting. Each fragment with levels gives the same list.
 
