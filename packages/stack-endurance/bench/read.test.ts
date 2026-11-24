@@ -1,9 +1,9 @@
-import { runLimit } from "@mark1russell7/rigor-bench";
+import { CEILING_ONLY, runLimit } from "@mark1russell7/rigor-bench";
 import type { ArmProcess, BenchEnv, FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, MIN_READ_JOBS, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, MIN_JOBS, MIN_READ_JOBS, MIN_RUNS, modelTables, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobRecord } from "./read.ts";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
 const STAMP = { commit: "0".repeat(40), date: "2026-11-22", runs: ["1"] };
@@ -55,6 +55,9 @@ describe("the frozen limits", () => {
     expect(limitFaults(file)).toEqual([]);
     expect(Object.keys(file.cases)).toEqual(IDS);
     expect(file.jobs.length).toBeGreaterThanOrEqual(MIN_JOBS);
+    // The limit of a model is not above the ceiling, and the EPYC 7763 of the runners has its own limit.
+    for (const table of Object.values(modelTables(file))) for (const limit of Object.values(table)) expect(limit.limit).toBeLessThanOrEqual(table.other.limit);
+    expect(Object.keys(modelTables(file)["m12"] ?? {})).toContain("AMD EPYC 7763 64-Core Processor");
   });
 
   it("need 5 jobs or more", () => {
@@ -102,6 +105,67 @@ describe("the gate of a job", () => {
     const gate = jobGate(jobRead({ ...record, processes: record.processes.filter((item) => item.arm !== "m8") }), frozen());
     expect(gate.cases.find((item) => item.case === "m8")?.outcome).toBe("cannot decide");
     expect(gate.gate.outcome).toBe("no read");
+  });
+});
+
+describe("the limits of each CPU model", () => {
+  // 5 jobs of 5 runs on cpu-a and 2 faster jobs on cpu-b: cpu-a gets its own limit, and cpu-b gets the ceiling. A record with no run counts as its own run.
+  const B = { ...ENV, cpu: "cpu-b" };
+  const mixed = (): FrozenLimits => freezeLimits([...JOBS, jobRecord("b-1", 0.6, () => 1, B), jobRecord("b-2", 0.62, () => 1, B)].map(jobRead), STAMP);
+
+  it("give each model with jobs of 5 runs or more the runLimit of its values, and the ceiling to the others", () => {
+    const file = mixed();
+    const table = modelTables(file)["m12"];
+    expect(Object.keys(table ?? {}).sort()).toEqual(["cpu-a", "other"]);
+    expect(table?.["cpu-a"]).toEqual(runLimit(JOBS.map((job) => jobRead(job).cases.find((item) => item.case === "m12")?.ms ?? 0)));
+    expect(table?.other).toEqual(file.cases["m12"]);
+    expect(table?.["cpu-a"]?.limit).toBeLessThan(table?.other.limit ?? 0);
+  });
+
+  it("block a value above the limit of its model, also when the value is under the ceiling", () => {
+    const file = mixed();
+    const gate = jobGate(jobRead(jobRecord("slow-a", 1.3)), file);
+    const m12 = gate.cases.find((item) => item.case === "m12");
+    expect(m12?.outcome).toBe("beyond");
+    expect(m12?.model).toBe("cpu-a");
+    expect(m12?.note).toBeUndefined();
+    expect(m12?.ms ?? 0).toBeLessThan(file.cases["m12"]?.limit ?? 0);
+  });
+
+  it("read a model with fewer than 5 jobs at the ceiling, with the words of limitOnModel", () => {
+    const file = mixed();
+    const gate = jobGate(jobRead(jobRecord("b-3", 1.3, () => 1, B)), file);
+    expect(gate.cases.map((item) => [item.outcome, item.model, item.note, item.limit])).toEqual(IDS.map((id) => ["within", "other", CEILING_ONLY, file.cases[id]?.limit]));
+    const report = readReport([jobRead(jobRecord("b-3", 1.3, () => 1, B))], [gate], file);
+    expect(report).toContain(`The jobs at the ceiling (${CEILING_ONLY}):`);
+    expect(report).toContain("- b-3 (cpu-b)");
+    expect(report).toContain("| cpu-a | 5 | 5 |");
+  });
+
+  it("match the exact CPU name: a model with few runs whose name holds the name of a table model reads at the ceiling", () => {
+    const A2 = { ...ENV, cpu: "cpu-a2" };
+    const file = freezeLimits([...JOBS, jobRecord("a2-1", 2, () => 1, A2), jobRecord("a2-2", 2.1, () => 1, A2)].map(jobRead), STAMP);
+    expect(Object.keys(modelTables(file)["m12"] ?? {}).sort()).toEqual(["cpu-a", "other"]);
+    const gate = jobGate(jobRead(jobRecord("a2-3", 2.05, () => 1, A2)), file);
+    expect(gate.cases.map((item) => [item.outcome, item.model, item.note, item.limit])).toEqual(IDS.map((id) => ["within", "other", CEILING_ONLY, file.cases[id]?.limit]));
+  });
+
+  it("count runs, not jobs: 5 jobs of one run give no limit of the model", () => {
+    const oneRun = JOBS.map((job) => ({ ...job, run: "run-1" }));
+    const file = freezeLimits(oneRun.map(jobRead), STAMP);
+    expect(MIN_RUNS).toBe(5);
+    expect(Object.keys(modelTables(file)["m12"] ?? {})).toEqual(["other"]);
+    expect(jobGate(jobRead(oneRun[0] as JobRecord), file).cases[0]?.note).toBe(CEILING_ONLY);
+  });
+
+  it("keep the run and the commit of each job, and show a job with no run or commit as a fault", () => {
+    const file = freezeLimits([{ ...(JOBS[0] as JobRecord), run: "r-9", commit: "a".repeat(40) }, ...JOBS.slice(1)].map(jobRead), STAMP);
+    expect(file.jobs[0]).toEqual({ job: "job-1", cpu: "cpu-a", run: "r-9", commit: "a".repeat(40) });
+    expect(file.jobs[1]).toEqual({ job: "job-2", cpu: "cpu-a", run: "job-2", commit: STAMP.commit });
+    expect(limitFaults({ ...file, jobs: file.jobs.map((job, index) => (index === 0 ? { ...job, run: "", commit: "abc" } : job)) })).toEqual([
+      "The job job-1 has no run.",
+      "The job job-1 has no full SHA of its commit.",
+    ]);
   });
 });
 
