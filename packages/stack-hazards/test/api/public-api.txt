@@ -52,8 +52,10 @@ OE417_ATTACK_CASE: build/index.d.ts#OE417_ATTACK_CASE
 OE417_ATTACK_EVENTS: build/index.d.ts#OE417_ATTACK_EVENTS
 OE417_ATTACK_LAW: build/index.d.ts#OE417_ATTACK_LAW
 OE417_ATTACK_TERMS: build/index.d.ts#OE417_ATTACK_TERMS
+OE417_COUNTS_FIRST: build/index.d.ts#OE417_COUNTS_FIRST
 OE417_CYBER_TERMS: build/index.d.ts#OE417_CYBER_TERMS
 OE417_FILES: build/index.d.ts#OE417_FILES
+OE417_LAST_YEAR: build/index.d.ts#OE417_LAST_YEAR
 OE417_LEAST_HOURS: build/index.d.ts#OE417_LEAST_HOURS
 OE417_NATION_PRIORS: build/index.d.ts#OE417_NATION_PRIORS
 OE417_NOT_ATTACK_TERMS: build/index.d.ts#OE417_NOT_ATTACK_TERMS
@@ -394,11 +396,17 @@ export declare const OE417_ATTACK_LAW: DurationLaw;
 ### build/index.d.ts#OE417_ATTACK_TERMS
 export declare const OE417_ATTACK_TERMS: RegExp;
 
+### build/index.d.ts#OE417_COUNTS_FIRST
+export declare const OE417_COUNTS_FIRST: number;
+
 ### build/index.d.ts#OE417_CYBER_TERMS
 export declare const OE417_CYBER_TERMS: RegExp;
 
 ### build/index.d.ts#OE417_FILES
 export declare const OE417_FILES: Readonly<Record<string, Oe417File>>;
+
+### build/index.d.ts#OE417_LAST_YEAR
+export declare const OE417_LAST_YEAR: number;
 
 ### build/index.d.ts#OE417_LEAST_HOURS
 export declare const OE417_LEAST_HOURS = .25;

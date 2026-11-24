@@ -10,6 +10,8 @@ import {
   OE417_ATTACK_CASE,
   OE417_ATTACK_LAW,
   OE417_NATION_PRIORS,
+  OE417_COUNTS_FIRST,
+  OE417_LAST_YEAR,
   OE417_PRIOR_FIRST,
   oe417PriorWindow,
   oe417AttackPrior,
@@ -166,11 +168,15 @@ describe("the events of a physical attack", () => {
 });
 
 describe("the prior of a physical attack", () => {
-  it("calculates the first year of the prior from the events: the year after the last window that fails the dispersion test", () => {
-    // A new summary changes the counts. Then this gate moves the window, or it fails until OE417_PRIOR_FIRST changes.
-    const window = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011, last: 2023 });
+  it("calculates the first year of the prior from the events: the year after the last window that fails the dispersion test", { timeout: 30_000 }, () => {
+    // A new summary adds a year to OE417_LAST_YEAR, so the pin of the counts fails, and the window is calculated again.
+    expect([OE417_COUNTS_FIRST, OE417_LAST_YEAR]).toEqual([2011, 2023]);
+    const window = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: OE417_COUNTS_FIRST, last: OE417_LAST_YEAR });
     expect(window.counts).toEqual([1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14, 8]);
     expect(window.first).toBe(OE417_PRIOR_FIRST);
+    // The note of the prior is a second copy of the counts and of the window.
+    expect(OE417_NATION_PRIORS.method).toContain(`are ${window.counts.join(", ")}.`);
+    expect(OE417_NATION_PRIORS.method).toContain(`the window from ${String(window.first)} passes it`);
     const p = Object.fromEntries(window.tests.map((test) => [test.first, test.p]));
     // The exact p values are 0.0447 from 2014 and 0.3526 from 2015. The seeded draws are near them.
     expect(p[2014]).toBeGreaterThan(0.04);

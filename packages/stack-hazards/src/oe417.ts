@@ -230,7 +230,9 @@ export const OE417_WINDOW_DRAWS = 100_000;
 export const OE417_WINDOW_SEED = "oe417-attack-window";
 
 /**
- * This function gives the first year of a prior: the longest window to the last year whose yearly counts agree with one rate.
+ * This function gives the first year of a prior: the longest window to the last year that passes the test.
+ * Each shorter window to the last year must pass too.
+ * The test of a window asks if its yearly counts agree with one rate.
  *
  * - The counts are the events of the law of each year (`oe417LawEvents`), with 0 for a year with no event.
  * - The test of each window is `dispersionTest` of `@mark1russell7/rigor-statistics`: the Pearson statistic, with seeded draws given the total.
@@ -258,25 +260,36 @@ export function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417Wi
   return { first: fails.length === 0 ? first : (fails.at(-1)?.first ?? first) + 1, counts, tests };
 }
 
+/** The last year of the summaries of `OE417_YEARS`, 2023 at this time. The prior and its window end in this year. */
+export const OE417_LAST_YEAR: number = Math.max(...Object.keys(OE417_YEARS).map(Number));
+
+/** The first year with an event of the law, 2011 at this time. The counts of the window of the prior start in this year. */
+export const OE417_COUNTS_FIRST: number = Math.min(...oe417LawEvents(OE417_ATTACK_EVENTS).map((event) => event.year));
+
+/** The yearly counts of the events of the law, from `OE417_COUNTS_FIRST` to `OE417_LAST_YEAR`. */
+const PRIOR_COUNTS = Array.from({ length: OE417_LAST_YEAR - OE417_COUNTS_FIRST + 1 }, (_, index) => oe417LawEvents(OE417_ATTACK_EVENTS).filter((event) => event.year === OE417_COUNTS_FIRST + index).length);
+
 /**
- * The first year of `OE417_NATION_PRIORS`: the longest window to 2023 whose yearly counts agree with one rate in a dispersion test at 5%.
- * A test calculates it again with `oe417PriorWindow` from the events of 2011 to 2023.
+ * The first year of `OE417_NATION_PRIORS`, from the rule of `oe417PriorWindow` at 5%.
+ * A test calculates it again from the events of `OE417_COUNTS_FIRST` to `OE417_LAST_YEAR`.
+ * A new summary changes the counts. Then the test fails until this constant agrees with the new window.
  */
 export const OE417_PRIOR_FIRST = 2015;
 
 /**
- * The yearly prior of a physical attack on the grid for the nation, from the summaries of 2015 to 2023.
- * The years 2011 to 2014 have fewer events (4 in 4 years), so one rate of 2011 to 2023 is too low for each later year.
+ * The yearly prior of a physical attack on the grid for the nation, from `OE417_PRIOR_FIRST` to `OE417_LAST_YEAR` (2015 to 2023 at this time).
+ * The earlier years have fewer events (4 in 2011 to 2014), so one rate of all the years is too low for each later year.
  */
 export const OE417_NATION_PRIORS: PriorTable = oe417AttackPrior(OE417_ATTACK_EVENTS, {
   first: OE417_PRIOR_FIRST,
-  last: 2023,
+  last: OE417_LAST_YEAR,
   customers: EAGLEI_NATION_CUSTOMERS,
   note:
     "The customers of the nation are the sum of the customers of each observed county of EAGLE-I (CC BY 4.0). " +
-    "The years are the longest window to 2023 whose yearly counts agree with one rate in a dispersion test of the counts at 5%. " +
-    "The counts of the years 2011 to 2023 are 1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14 and 8. The window from 2014 fails the test, and the window from 2015 passes it. " +
-    "The summaries of 2000 to 2010 list no such event.",
+    `The years are the longest window to ${String(OE417_LAST_YEAR)} that passes a dispersion test of the yearly counts at 5%, with each shorter window. ` +
+    `The counts of the years ${String(OE417_COUNTS_FIRST)} to ${String(OE417_LAST_YEAR)} are ${PRIOR_COUNTS.join(", ")}. ` +
+    `The window from ${String(OE417_PRIOR_FIRST - 1)} fails the test, and the window from ${String(OE417_PRIOR_FIRST)} passes it. ` +
+    `The summaries before ${String(OE417_COUNTS_FIRST)} list no such event.`,
 });
 
 export { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS };
