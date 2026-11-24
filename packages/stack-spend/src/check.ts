@@ -79,7 +79,7 @@ function inDays(days: number): string {
  * - `service-duplicate`: two records name one part.
  * - `part-no-service`: a part of a kind of `kinds` has no record.
  * - `price`: a price is less than 0 or not finite, or a `fixed` plan has no price.
- * - `amount`: the amount of a limit is less than 0 or not finite.
+ * - `amount`: the amount of a limit or of an allowance is less than 0 or not finite.
  *
  * The limits:
  * - `limit-none`: the cost of a `metered` service has no limit.
@@ -136,6 +136,7 @@ export function checkSpend(layer: SpendLayer, stack: Stack, options: SpendOption
     if (!parts.has(at)) add("service-part", at, `A cost record names "${at}", which is no part of the stack.`);
     if (service.price !== undefined && !isZeroOrMore(service.price)) add("price", at, `The price ${String(service.price)} of "${at}" is less than 0 or not finite.`);
     if (service.billing === "fixed" && service.price === undefined) add("price", at, `The service "${at}" has a fixed price, and its record gives no price.`);
+    if (service.allowance !== undefined && !isZeroOrMore(service.allowance)) add("amount", at, `The allowance ${String(service.allowance)} of "${at}" is less than 0 or not finite.`);
     const limits: readonly Limit[] = service.limits ?? [];
     for (const limit of [...limits, ...(service.wanted === undefined ? [] : [service.wanted])]) examine(limit, at, "");
     const recharges = limits.some((limit) => limit.kind === "prepaid" && limit.recharge === true);

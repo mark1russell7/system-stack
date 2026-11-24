@@ -101,6 +101,11 @@ export interface Service {
   readonly price?: number | undefined;
   /** The limits that are in force. A `metered` service must have one hard limit, or more. */
   readonly limits?: readonly Limit[] | undefined;
+  /**
+   * The allowance of the plan: the cost of the use that the plan includes in a month, in the currency of the layer.
+   * The provider takes no money for that part of the use. With no value, the plan includes no use.
+   */
+  readonly allowance?: number | undefined;
   /** A limit that is not in force: the owner must set it. The gate fails until it is in `limits`. */
   readonly wanted?: Limit | undefined;
   /** The end of the plan, for a plan that ends on a date. The fields `billing`, `price` and `limits` give the cost before the end. */

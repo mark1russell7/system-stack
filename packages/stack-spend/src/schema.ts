@@ -45,6 +45,7 @@ const service = z.strictObject({
   billing: z.enum([...BILLINGS]),
   price: z.number().optional(),
   limits: z.array(limit).readonly().optional(),
+  allowance: z.number().optional(),
   wanted: limit.optional(),
   ends: ends.optional(),
   proof: proof.optional(),
@@ -81,6 +82,7 @@ const read = z.strictObject({
   part: id,
   source: z.enum([...USE_SOURCES]),
   amount: z.number(),
+  gross: z.number().optional(),
   date: z.string(),
 });
 
