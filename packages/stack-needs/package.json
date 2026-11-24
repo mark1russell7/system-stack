@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@mark1russell7/guidebook": "^0.4.0",
-    "@mark1russell7/market": "^0.8.2",
+    "@mark1russell7/market": "^0.8.5",
     "@mark1russell7/quantity": "^0.4.4"
   },
   "devDependencies": {

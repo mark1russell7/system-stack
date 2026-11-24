@@ -179,13 +179,15 @@ describe("the cook fragment", () => {
 
   it("gives no fuel for a stove rate with a bound, because only a rate with no bound is the value", () => {
     for (const bound of ["least", "most"]) {
-      const rate = { ...massStove.rate!, bound };
+      const rate = { ...massStove.rate!, bound: bound as never };
       const stove: StoveFacts = { ...massStove, rate };
       const line = lineOf(cookFragment({ ...input, stove }).lines, "test.grain-1kg");
       expect(line.water.read).toBe(true);
       expect(line.fuel.read).toBe(false);
       expect(line.minutes.read).toBe(false);
       if (!line.fuel.read) expect(line.fuel.why).toContain(`the bound ${bound}`);
+      // Only a least rate gives too little fuel. Another bound has no known side.
+      if (!line.fuel.read) expect(line.fuel.why.includes("too little fuel")).toBe(bound === "least");
     }
     // A rate with no field bound keeps its read.
     expect(lineOf(cookFragment({ ...input, stove: massStove }).lines, "test.grain-1kg").fuel.read).toBe(true);

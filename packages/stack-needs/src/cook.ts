@@ -255,7 +255,7 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   const rate = stove.rate === undefined || bound !== undefined ? undefined : stoveRate(stove.rate);
   if (stove.rate === undefined) why.push(`The stove of ${stove.fuel} has no cited fuel rate.`);
   else if (bound !== undefined)
-    why.push(`The fuel rate of the stove has the bound ${String(bound)}. Only a rate with no bound is the value. A least rate gives too little fuel for the cook time.`);
+    why.push(`The fuel rate of the stove has the bound ${String(bound)}. Only a rate with no bound is the value.${bound === "least" ? " A least rate gives too little fuel for the cook time." : ""}`);
   else if (rate === undefined) why.push(`The fuel rate of the stove is in ${stove.rate.unit} for each ${stove.rate.per.unit}, which is not an energy or a mass in a time.`);
 
   // The heat of the stove into the pot for each minute, in kJ/min. It needs a cited share with the same heating value as the energy rate.
