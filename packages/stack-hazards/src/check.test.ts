@@ -268,13 +268,14 @@ describe("the gate of the cuts and the sources", () => {
     expect(codes({ ...base, hazards: [{ ...hazard, cuts: [{ ...cut, claims: [{ source: "unknown", basis: "told", says: "A page tells it." }] }] }] })).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, url: "ftp://data.example.net" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, terms: "the terms" }))).toEqual(["hazards-source"]);
-    // The rules of the list: an HTTPS address, a publisher and a page of the terms.
+    // The rules of the list in the source gate of the guidebook: an HTTPS address, a publisher and a page of the terms. Each fault of a field is a hazards-source.
     expect(codes(withLaw(LAW, { ...SOURCE, url: "http://data.example.net" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, by: " " }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, by: undefined as unknown as string }))).toEqual(["hazards-source"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, terms: undefined as unknown as string }))).toEqual(["hazards-license"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, terms: "" }))).toEqual(["hazards-source"]);
-    expect(codes(withLaw(LAW, { ...SOURCE, terms: "http://data.example.net/terms" }))).toEqual(["hazards-license"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: undefined as unknown as string }))).toEqual(["hazards-source"]);
+    // An empty page of the terms is a fault of the source. The count of its findings is a behavior of the gate of the guidebook.
+    expect([...new Set(codes(withLaw(LAW, { ...SOURCE, terms: "" })))]).toEqual(["hazards-source"]);
+    expect(codes(withLaw(LAW, { ...SOURCE, terms: "http://data.example.net/terms" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, title: " " }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, checked: "21.11.2026" }))).toEqual(["hazards-source"]);
     expect(codes(withLaw(LAW, { ...SOURCE, updated: "2026-11-22" }))).toEqual(["hazards-source"]);

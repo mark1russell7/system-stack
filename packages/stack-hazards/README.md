@@ -105,7 +105,7 @@ The format of the list is `hazards/2`. Each source is the source record of `@mar
 
 The gate gives the code `hazards-license` for a license that the guidebook does not know. It also gives this code for a license that does not permit a summary, because the claims are summaries in own words. The license of the source of a law or a table of priors must permit a fact. Each other fault of the source gate has the code `hazards-source`, and its message ends with the code of the guidebook.
 
-The list has three rules that the source gate of the guidebook does not have at this time. A source has an HTTPS address and a publisher (`by`), else the code is `hazards-source`. A source has an HTTPS page of its terms, else the code is `hazards-license`. A source with a fault of its license gives one finding: its laws and tables of priors give no second finding.
+The list gives three rules to the source gate of the guidebook, as its options `require: ["by", "terms"]` and `https: true`. A source has an HTTPS address, a publisher (`by`) and an HTTPS page of its terms, else the code is `hazards-source`. Before 0.4.0, a fault of the page of the terms had the code `hazards-license`. A source with a fault of its license gives one finding: its laws and tables of priors give no second finding.
 
 In the format `hazards/1`, a source had the fields `name`, `publisher`, `read` and a license with a name and a URL. The format `hazards/2` has the fields `title`, `by`, `checked`, `license` and `terms` in their place.
 
