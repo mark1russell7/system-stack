@@ -45,8 +45,22 @@ describe("eaglePriors", () => {
     expect(county.method).not.toContain("too few customers");
     // With the option raise, the method tells that the customers of some counties come from their counts.
     const raised = eaglePriors(record({ options: { share: 0.01, interval: 900, raise: true }, raised: { "99001": { file: 10, fit: 40 } }, peaks: { "99001": { peak: 50, held: 40, over: 9, days: 5 } } }));
-    expect(raised.county.method).toContain("storm events of NOAA. The file of the customers gives too few customers to some counties. For 1 counties, the customers are the count that the county reached on 4 different days. A county with no event");
+    expect(raised.county.method).toContain("one storm case do not overlap. The file of the customers gives too few customers to some counties. For 1 counties, the customers are the count that the county reached on 4 different days. A county with no event");
     expect(raised.state.method).toContain("For 1 counties");
+  });
+
+  it("tells in the method that the storm cases overlap, with the count of the fit when the record has it", () => {
+    const plain = eaglePriors(record());
+    for (const table of [plain.county, plain.state]) {
+      expect(table.method).toContain(`a sum of the priors of the storm cases counts it two times or more. The case ${OUTAGE_CASE} and one storm case do not overlap.`);
+    }
+    const base = record().priors;
+    if (base === undefined) throw new Error("The record has no priors.");
+    const counted = eaglePriors(record({ priors: { ...base, overlap: { events: 5, multiple: 2 } } }));
+    expect(counted.county.method).toContain("counts it two times or more: 2 of the 5 outages in a storm case are in two cases or more.");
+    expect(counted.state.method).toContain("2 of the 5 outages");
+    // The overlap changes the method only, not the rates.
+    expect(counted.county.rates).toEqual(plain.county.rates);
   });
 
   it("passes the gate with the cases and the source of the dataset", () => {

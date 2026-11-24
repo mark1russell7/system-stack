@@ -269,6 +269,7 @@ export interface HazardPrior extends Prior {
  * The place of a prior is the option `place`. With no option, it is the scheme and the code of its region, for example `us-county-fips:37183`.
  * After a fall back to a larger region, that default is the larger region, not the place of the user. Thus a caller that finds a prior by its place gives the option.
  * The field `region` is always the scheme and the code of the region that gives the rate, also with the option `place`.
+ * Do not add the priors of the storm cases: an outage in two storm cases counts in each case. The method of the table tells the overlap.
  * The function is pure.
  *
  * @throws RangeError when the option `place` is empty or has a space at an end
