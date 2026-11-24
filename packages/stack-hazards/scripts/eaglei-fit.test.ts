@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, ranges, sweepTable, yearsOf } from "./eaglei-fit.ts";
+import { EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, ranges, sweepTable, yearsOf } from "./eaglei-fit.ts";
 import { RANGE_TRIES, type FitContext } from "./fetch.ts";
 import { STORM_BASE, stormFiles } from "./storm-files.ts";
 import { STORM_CLASSES } from "../src/storms.ts";
@@ -135,6 +135,14 @@ describe("the parts of the fit job", () => {
   });
 });
 
+describe("peakTally", () => {
+  it("gives the largest count of each county and the counts above its customers", () => {
+    const tally = peakTally(new Map([["99001", 10], ["99009", 1000]]));
+    for (const [area, out] of [["99001", 4], ["99001", 12], ["99001", 30], ["99009", 50], ["99003", 7], ["99009", undefined]] as const) tally.add({ area, out, time: 0 });
+    expect(tally.peaks()).toEqual({ "99001": { peak: 30, over: 2 }, "99003": { peak: 7, over: 0 }, "99009": { peak: 50, over: 0 } });
+  });
+});
+
 describe("fitEagle", () => {
   it("reads each file in ranges with a redirect for each range, and gives the curve of each state", async () => {
     const { transport, asked } = fake(article());
@@ -148,6 +156,8 @@ describe("fitEagle", () => {
       observation: { years: { "99001": 2, "99009": 2 }, customers: { "99001": 1000, "99009": 100_000 } },
       counts: { "infra.power.outage": { "99001": { events: 1, share: 0.04 } } },
     });
+    expect(laws.peaks).toEqual({ "99001": { peak: 40, over: 0 }, "99009": { peak: 1, over: 0 } });
+    expect(peaksTable(laws)).toContain("0 counties have a count above their customers.");
     expect(Object.keys(laws.regions)).toEqual(["99"]);
     expect(laws.regions["99"]).toMatchObject({ count: 1, censored: 0, open: 0, median: 5400 / 86_400 });
     const hosts = asked.map((url) => new URL(url).host);
