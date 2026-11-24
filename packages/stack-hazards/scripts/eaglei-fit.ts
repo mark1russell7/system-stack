@@ -18,7 +18,7 @@ import { fetchTransport, statusLine, type Pace } from "polite-crawler/api";
 import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
-import { outageReader, type OutageEvent, type OutageRuns, type OutageTally } from "../src/outages.ts";
+import { outageReader, type OutageCount, type OutageEvent, type OutageRuns, type OutageTally } from "../src/outages.ts";
 import { areaCounts, coverageTally, regionRates, type AreaCount, type Observation } from "../src/priors.ts";
 import { CAUSE_AFTER, CAUSE_BEFORE, STORM_CLASSES, type CauseOptions } from "../src/storms.ts";
 import { TryFault, get, passing, withTries, type FitContext } from "./fetch.ts";
@@ -229,6 +229,65 @@ export interface EagleLaws {
   readonly priors?: EaglePriors | undefined;
   /** The counts of the events with each join time of the option `sweep`. */
   readonly sweep?: readonly JoinSweep[] | undefined;
+  /** The largest count of each county, and the times that its count is above its customers. A record of a fit before them does not have them. */
+  readonly peaks?: Readonly<Record<string, CountyPeak>> | undefined;
+}
+
+/** The largest counts out of a county, and the number of its counts above its customers in the file of the customers. */
+export interface CountyPeak {
+  /** The largest count. One bad line can give it. */
+  readonly peak: number;
+  /** The largest count that `HELD_READINGS` readings or more reach: the count at that place from the top. It is 0 for a county with fewer readings. */
+  readonly held: number;
+  readonly over: number;
+}
+
+/** The number of readings that a count `held` must have at or above it. */
+export const HELD_READINGS = 4;
+
+/**
+ * This function gives a tally of the largest count out of each county.
+ * A count above the customers of the county shows that the file of the customers gives too few customers for that county.
+ * A county with no customers in the file has a peak and no count above its customers.
+ */
+export function peakTally(customers: ReadonlyMap<string, number>): { add(count: OutageCount): void; peaks(): Record<string, CountyPeak> } {
+  // The largest counts of each county, the largest first, no more than HELD_READINGS of them.
+  const peaks = new Map<string, { top: number[]; over: number }>();
+  return {
+    add(count) {
+      if (count.out === undefined) return;
+      const entry = peaks.get(count.area) ?? { top: [], over: 0 };
+      const { top } = entry;
+      if (top.length < HELD_READINGS || count.out > (top[top.length - 1] ?? 0)) {
+        let index = top.length;
+        while (index > 0 && (top[index - 1] ?? 0) < count.out) index -= 1;
+        top.splice(index, 0, count.out);
+        if (top.length > HELD_READINGS) top.pop();
+      }
+      const total = customers.get(count.area);
+      if (total !== undefined && count.out > total) entry.over += 1;
+      peaks.set(count.area, entry);
+    },
+    peaks: () =>
+      Object.fromEntries(
+        [...peaks].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([area, { top, over }]) => [area, { peak: top[0] ?? 0, held: top.length < HELD_READINGS ? 0 : (top[HELD_READINGS - 1] ?? 0), over }]),
+      ),
+  };
+}
+
+/**
+ * This function gives a table in Markdown of the counties with a count above their customers, with no more than `most` rows.
+ * The order is by the count `held` over the customers, the largest first, and then by the code of the county.
+ */
+export function peaksTable(laws: EagleLaws, most = 40): string {
+  const customers = laws.priors?.observation.customers ?? {};
+  const rows = Object.entries(laws.peaks ?? {})
+    .filter(([, entry]) => entry.over > 0)
+    .map(([area, entry]) => ({ area, ...entry, customers: customers[area] ?? 0 }))
+    .sort((a, b) => b.held / Math.max(b.customers, 1) - a.held / Math.max(a.customers, 1) || (a.area < b.area ? -1 : 1));
+  const lines = rows.slice(0, most).map((row) => `| ${row.area} | ${String(row.customers)} | ${String(row.peak)} | ${String(row.held)} | ${String(row.over)} |`);
+  const head = `| County | Customers | Largest count | Count of ${String(HELD_READINGS)} readings | Counts above the customers |`;
+  return [`${String(rows.length)} counties have a count above their customers.`, "", head, "| --- | --- | --- | --- | --- |", ...lines].join("\n");
 }
 
 /** This function gives the counts of the events of one join time. */
@@ -274,6 +333,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const reader = outageReader({ customers, share: options.share, join: options.join });
   const joins = [options.join ?? 0, ...(options.sweep ?? []).filter((join) => join !== (options.join ?? 0))];
   const coverage = coverageTally();
+  const peaks = peakTally(customers);
   let lines = 0;
   let skipped = 0;
   for (const { file } of files.years) {
@@ -285,6 +345,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
       else {
         reader.add(count);
         coverage.add(count);
+        peaks.add(count);
       }
     }
   }
@@ -318,6 +379,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     causes: causes?.laws,
     priors,
     sweep,
+    peaks: peaks.peaks(),
   };
 }
 
@@ -358,7 +420,7 @@ if (import.meta.main) {
   const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), join: values.join === undefined ? undefined : Number(values.join), sweep: values.sweep ? JOIN_SWEEP : undefined, now: () => new Date(), storms: { classes: STORM_CLASSES } });
   mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, `${JSON.stringify(laws, null, 2)}\n`);
-  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}${laws.sweep === undefined ? "" : `\n${sweepTable(laws.sweep)}\n`}`;
+  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}${laws.sweep === undefined ? "" : `\n${sweepTable(laws.sweep)}\n`}\n${peaksTable(laws)}\n`;
   console.log(summary);
   const file = process.env["GITHUB_STEP_SUMMARY"];
   if (file !== undefined && file !== "") appendFileSync(file, `## The laws of EAGLE-I\n\n${summary}`);
