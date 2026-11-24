@@ -16,6 +16,7 @@ Each function is a plain function with no clock, no network and no file.
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
 | `HouseholdFragment` | A fragment of an endurance layer: the resources, the stores, the draws and their direct uses. It has the form of `EnduranceLayer`. |
+| `OpenedWaste` | The containers of one product with no cold storage: the count, the energy of one container, the feed, the energy used and the waste. |
 | `CookFragment` | A fragment of an endurance layer: the resources and one cook converter for each dry resource with a read. It has the form of `EnduranceLayer`. |
 | `CookLine` | The energy, the cook water, the heat to boil, the stove time and the fuel of one pot of one dry food, each a read or a no read. |
 
@@ -71,12 +72,26 @@ console.log(enduranceOf(food.layer, cut, { at: "2026-11-22" }).needs["food.energ
 - The fragment has each draw with one or more users. The draw `food.energy` is first.
 - Each gift of the buy list (`giftsOf`) is one store. Examples are `food.no-cook` in `kcal`, the dry foods in `kg` and `water.stored` in `L`.
 - A gift with no read has no store. It is in `noReads`, and `storesRead` is false. The draw does not change.
+- With no cold storage, an opened container of formula serves one feed. This is the default (`cold` is false), the worst case of no power. The next section tells the rule.
 - The direct uses are each use of `uses` for the need of a draw. The default `DIRECT_USES` gives `food.no-cook` to the food draw and `food.infant-formula-ready` to the formula draw, 1 kcal for each kcal.
 - The resources are the resources of the stores and of the direct uses. The resource of each direct use is in `kcal` in the catalog, or the function throws a `RangeError`.
 - The supply part of each draw is `supply`. Its default is the part of `NEED_SUPPLIES` for the need of the draw: `food.retail`.
 - The result also has the food energy of each product (`buyListEnergy`). A caller gets the energy of the dry food for its converters from it.
 
 The result has two reads. `needRead` tells if the draw has a read, and `storesRead` tells if each gift of the buy list has a read.
+
+### Opened containers with no cold storage
+
+The WIC guide of the USDA (page 106) tells this rule: with limited access to a refrigerator, use formula immediately after a ready-to-feed container is opened. The catalog of market gives the rule as the field `opened` of a product, with the size of one container.
+
+| Step | Value |
+| --- | --- |
+| Feeds in one day | 8 (`FORMULA_FEEDS`). Table 5.2 of the WIC guide (page 137) gives a feed every 3 to 4 hours. More feeds give smaller feeds, so 8 is the worst case. |
+| One feed | The smallest need of an infant of the formula draw, divided by 8 |
+| Energy that one container gives | `feed / ceil(feed / container)`. A feed that is more than a container takes more containers, and the rest of the last is waste. |
+| Store | The count of containers times the energy that one container gives. `waste` gives the rest for each product. |
+
+A product with a container of no read gives no store. It is in `noReads`, so the stores are a lower limit. The 1 kg formula of the catalog has no container size yet. The option `cold: true` gives the whole energy of each container. Only the formula draw has a cited size of one feed. Thus a product with opened containers that feeds no formula draw makes the function throw a `RangeError`.
 
 ### A person with no row
 
