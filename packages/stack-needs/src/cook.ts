@@ -31,6 +31,29 @@ export const USGS_WATER_DENSITY_SOURCE: Source = {
   terms: "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
 };
 
+/**
+ * The source of the check of the range of the specific heat: the fluid data of water in the NIST Chemistry WebBook (Standard Reference Data 69).
+ * NIST keeps the copyright of its standard reference data (15 USC 290e). Thus the model cites only facts from it, with a citation.
+ */
+export const NIST_WEBBOOK_WATER_SOURCE: Source = {
+  id: "nist-webbook-fluid-water",
+  title: "Thermophysical Properties of Fluid Systems, NIST Chemistry WebBook (SRD 69), water, isobaric data at 0.101325 MPa",
+  url: "https://webbook.nist.gov/chemistry/fluid/",
+  license: "all-rights-reserved",
+  checked: "2026-11-24",
+  by: "National Institute of Standards and Technology",
+  terms: "https://www.nist.gov/srd/public-law",
+  note: "The data of water come from the IAPWS-95 formulation. The table read is water, isobaric, 0.101325 MPa, 0 °C to 99.9 °C in steps of 10 °C.",
+};
+
+/** The check of a cited constant against a second source. */
+export interface CookCheck {
+  readonly source: Source;
+  readonly locator: string;
+  /** What the second source shows about the value. */
+  readonly note: string;
+}
+
 /** A physical constant of the cook model, with its source and the place of the value in the source. */
 export interface CookConstant {
   readonly value: number;
@@ -39,15 +62,21 @@ export interface CookConstant {
   readonly locator: string;
   /** How the value comes from the source. */
   readonly note: string;
+  /** The check of the value against a second source. */
+  readonly check?: CookCheck;
 }
 
 /**
  * The mean specific heat of liquid water from 0 °C to 100 °C: 4.19002 kJ/(kg.K).
  * The NIST Guide to the SI gives 4.190 02 J for the calorie (mean). The common definition of that calorie is the mean over this range.
- * SP 811 does not state the range. Its footnote 10 tells that the calorie is the energy to raise 1 g of water
- * by 1 kelvin. For the default start (0 °C), the value is the mean of the rise. For a warmer start, the mean of the
- * rise can be a little higher. The model also heats the dry food with this value, above the specific heat of a dry food.
- * That term holds the heat of the pot above the true value.
+ * SP 811 does not state the range. Its footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 kelvin.
+ *
+ * The check of the range comes from the enthalpy of liquid water at 0.101325 MPa in the NIST Chemistry WebBook.
+ * The mean from 0.01 °C to the boil (99.9743 °C) is 4.19104 kJ/(kg.K), 0.024% above this value.
+ * From a start of 10 °C to 30 °C, the heat of the rise is within 0.02% of the table.
+ * The specific heat of water is higher near the boil. Thus from a warmer start, the value gives less heat than the table. From 90 °C, it gives 0.48% less.
+ * The error of the stove share is much larger. For example, the adverse factor of a stove is a factor of 3 to 4.
+ * The model also heats the dry food with this value, above the specific heat of a dry food. That term holds the heat of the pot above the true value.
  */
 export const WATER_SPECIFIC_HEAT: CookConstant = {
   value: 4.19002,
@@ -55,6 +84,11 @@ export const WATER_SPECIFIC_HEAT: CookConstant = {
   source: NIST_SI_GUIDE_SOURCE,
   locator: "Appendix B.8, row calorie (mean): 4.190 02 E+00 J. Footnotes, footnote 10: the energy to raise 1 gram of water by 1 °C.",
   note: "The calorie (mean) in joules, for 1 g of water and 1 K. By its common definition, the mean is over the range from 0 °C to 100 °C. SP 811 does not state the range.",
+  check: {
+    source: NIST_WEBBOOK_WATER_SOURCE,
+    locator: "Water, isobaric data at 0.101325 MPa, column Enthalpy (kJ/kg) of the liquid: 0.103208 at 0.0100 °C, 377.106 at 90.0100 °C, 419.058 at 99.9743 °C.",
+    note: "The mean from 0.01 °C to the boil is (419.058 - 0.103208) / 99.9643 = 4.19104 kJ/(kg.K), 0.024% above the value. From 90.01 °C, the value gives 0.48% less heat than the table.",
+  },
 };
 
 /**

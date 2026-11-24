@@ -3,7 +3,7 @@ import { SUPPLY_CATALOG, type CitedRate, type StoveFacts, type SupplyCatalog, ty
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_DENSITY_MIN, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
+import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, NIST_WEBBOOK_WATER_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_DENSITY_MIN, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
 import { householdFragment } from "./household.ts";
 import { FOOD_NEED, STORED_WATER, WATER_NEED } from "./uses.ts";
 
@@ -378,6 +378,24 @@ describe("the cited constants", () => {
     expect(WATER_DENSITY_MAX.source).toBe(USGS_WATER_DENSITY_SOURCE);
     expect(WATER_DENSITY_MIN.source).toBe(USGS_WATER_DENSITY_SOURCE);
     expect(WATER_DENSITY_MIN.value).toBeLessThan(WATER_DENSITY_MAX.value);
+  });
+
+  it("check the range of the specific heat against the enthalpy table of the NIST Chemistry WebBook", () => {
+    // A source with all rights reserved permits a fact with a citation.
+    expect(checkSources([NIST_WEBBOOK_WATER_SOURCE], { require: ["by", "terms"], https: true, at: "2026-11-24" })).toEqual([]);
+    expect(WATER_SPECIFIC_HEAT.check?.source).toBe(NIST_WEBBOOK_WATER_SOURCE);
+    // The cited enthalpies of the liquid at 0.101325 MPa, in kJ/kg, and their temperatures in °C.
+    const rows: readonly (readonly [number, number])[] = [
+      [0.01, 0.103208],
+      [90.01, 377.106],
+      [99.9743, 419.058],
+    ];
+    for (const [celsius, enthalpy] of rows) expect(WATER_SPECIFIC_HEAT.check?.locator).toContain(`${String(enthalpy)} at ${celsius.toFixed(4)}`);
+    const [boilC, boilKJ] = rows[2] ?? [0, 0];
+    const share = (startC: number, startKJ: number): number => (WATER_SPECIFIC_HEAT.value * (boilC - startC)) / (boilKJ - startKJ) - 1;
+    // The mean of the full range is 0.024% above the value. From 90 °C, the value gives 0.48% less heat.
+    expect(share(0.01, 0.103208)).toBeCloseTo(-0.000244, 6);
+    expect(share(90.01, 377.106)).toBeCloseTo(-0.0048, 5);
   });
 });
 
