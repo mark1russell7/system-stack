@@ -267,7 +267,7 @@ export declare const NASEM_ENERGY_SOURCE: Source;
 export declare const NASEM_INFANT_CALORIES: CalorieTable;
 
 ### build/index.d.ts#NEEDS_CODES
-export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
+export declare const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change", "needs-id"];
 
 ### build/index.d.ts#NEED_SUPPLIES
 export declare const NEED_SUPPLIES: {

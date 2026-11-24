@@ -54,6 +54,7 @@ describe("the gate of a calorie table", () => {
     ]);
     const rows = DGA_CALORIES.rows.map((row) => (row.sex === "male" && row.to === undefined ? { ...row, to: 1199 } : row));
     expect(messages([{ ...DGA_CALORIES, rows }, NASEM_INFANT_CALORIES])).toEqual(["needs-gap chain The rows of a male end at 1199 months. The chain has no open last row."]);
+    expect(messages([...CALORIE_CHAIN, DGA_CALORIES])).toEqual([`needs-id chain The chain has the table ${DGA_CALORIES.id} two times or more.`]);
     expect(messages([])).toEqual(["needs-gap chain The chain has no table.", "needs-gap chain The tables have no row of a female.", "needs-gap chain The tables have no row of a male."]);
   });
 

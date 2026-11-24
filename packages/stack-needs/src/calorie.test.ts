@@ -221,10 +221,13 @@ describe("the infant table and the chain of tables", () => {
     expect(calorieRowOf(nasem, "male", 36)).toBeUndefined();
   });
 
-  it("gives a row for each age of 0 to 100 years, for each sex", () => {
+  it("gives a row for each age of 0 to 100 years, for each sex: the infant table below 12 months, and the guidelines from 12 months", () => {
     for (const sex of CALORIE_SEXES) {
-      const missing = Array.from({ length: years(100) + 1 }, (_, ageMonths) => ageMonths).filter((ageMonths) => calorieRowOf(CALORIE_CHAIN, sex, ageMonths) === undefined);
-      expect(missing, sex).toEqual([]);
+      // The id of the table of each month holds the seam: an earlier table that loses its first row gives no gate finding.
+      const wrong = Array.from({ length: years(100) + 1 }, (_, ageMonths) => ageMonths).filter(
+        (ageMonths) => calorieRowOf(CALORIE_CHAIN, sex, ageMonths)?.table.id !== (ageMonths < 12 ? nasem.id : dga.id),
+      );
+      expect(wrong, sex).toEqual([]);
     }
   });
 

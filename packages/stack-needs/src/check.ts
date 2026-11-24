@@ -15,8 +15,16 @@ import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable, typ
  * - `needs-change`: a change has no stage, no title or a wrong sex, or a stage with a space at an end. Or a different
  *   change has its stage and sex. Or its value is not a finite number in a unit of energy for each day. Or its sum with
  *   the smallest need of its sex is not above 0.
+ * - `needs-id`: two tables of a chain have the same `id`. Each line of a need names its table by the `id`.
  */
-export const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"] = ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change"];
+export const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "needs-value", "needs-change", "needs-id"] = [
+  "needs-row",
+  "needs-overlap",
+  "needs-gap",
+  "needs-value",
+  "needs-change",
+  "needs-id",
+];
 
 /** A code of the gate of a table of calorie needs. */
 export type NeedsCode = (typeof NEEDS_CODES)[number];
@@ -111,7 +119,12 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
  * This function gives each finding of a chain of tables. First come the findings of `checkCalorieTable` for each table,
  * in the order of the chain. Then come the findings of the cover. For each sex, the rows of all the tables cover each month from 0 to an
  * open last row (`needs-gap`, record `chain`). A row of a later table can overlap a row of an earlier table: the earlier
- * table gives the need. A list with no error tells that the gate passes. The function is pure.
+ * table gives the need. Two tables of the chain with the same `id` give `needs-id`.
+ *
+ * The limit of the first match: when an earlier table loses a row at its start, a later table can give those months.
+ * Then the gate gives no finding. A caller that needs each month from one table tests the `id` of the table of each month.
+ *
+ * A list with no error tells that the gate passes. The function is pure.
  *
  * @param tables - One table, or tables in order
  * @param options - The options of the gate of the sources, for example the date of the gate
@@ -120,10 +133,13 @@ export function checkCalorieChain(tables: CalorieTables, options?: GateOptions):
   const list = "rows" in tables ? [tables] : tables;
   const findings = list.flatMap((table) => checkCalorieTable(table, options));
   const id = list.map((table) => table.id).join(" + ");
-  const add = (message: string): void => {
-    findings.push({ level: "error", code: "needs-gap", record: "chain", id, message });
+  const add = (message: string, code: NeedsCode = "needs-gap"): void => {
+    findings.push({ level: "error", code, record: "chain", id, message });
   };
   if (list.length === 0) add("The chain has no table.");
+  list.forEach((table, index) => {
+    if (list.findIndex((other) => other.id === table.id) < index) add(`The chain has the table ${table.id} two times or more.`, "needs-id");
+  });
   for (const sex of CALORIE_SEXES) {
     const rows = list.flatMap((table) => table.rows).filter((row) => row.sex === sex && Number.isSafeInteger(row.from) && row.from >= 0);
     if (rows.length === 0) {

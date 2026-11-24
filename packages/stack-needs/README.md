@@ -27,7 +27,7 @@ Each function is a plain function with no clock, no network and no file.
 
 `checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). The source of a table must have a publisher (`by`), a page of its terms and a hash, and HTTPS addresses (the options `require` and `https` of the gate). A missing field gives `missing-field`. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex have no gap between two rows (`needs-gap`). A table can start after month 0 and end at a closed row. Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
 
-`checkCalorieChain` is the gate of tables in order. It gives the findings of `checkCalorieTable` for each table.
+`checkCalorieChain` is the gate of tables in order. It gives the findings of `checkCalorieTable` for each table. Two tables with the same `id` give `needs-id`.
 
 Then, for each sex, the rows of all the tables must cover each month from 0 to an open last row (`needs-gap`, record `chain`). Before 0.6.0, `checkCalorieTable` refused a table with a closed last row.
 
@@ -84,7 +84,9 @@ The days are then an upper limit for the whole household.
 
 ### An infant
 
-The infant table gives the need of an infant below 12 months. For an infant on formula or on food, the buy list holds that need.
+The infant table gives the need of an infant below 12 months. The fragment adds that need to the one draw of food energy.
+
+This has a limit. The fragment cannot tell formula from other food. Thus, when the buy list does not hold the formula of those days, the days are too high for the infant. The field `table` of each line lets a planner find the lines of the infant table.
 
 The milk of a mother comes from the food of the mother. Thus, for an infant that drinks only that milk, give the mother the stage `lactation-1`. Then leave the infant out of the persons. If the persons hold the infant too, the draw counts that energy two times. The result is then more food than the household needs, which is on the safe side. After 6 months, an infant eats food and drinks milk. The stage `lactation-2` of the mother and the need of the infant then count a part of the energy two times.
 
