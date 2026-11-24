@@ -184,7 +184,7 @@ describe("fitEagle", () => {
     const plain = await fitEagle(context(once.transport), { now: () => new Date("2026-11-22T00:00:00Z") });
     const twice = fake(article(undefined, files), { files });
     const laws = await fitEagle(context(twice.transport), { now: () => new Date("2026-11-22T00:00:00Z"), raise: true });
-    const outageReads = (asked: readonly string[]): number => asked.filter((url) => /eaglei_outages_/u.test(url) && url.startsWith(STORE)).length;
+    const outageReads = (asked: readonly string[]): number => asked.filter((url) => /eaglei_outages_/u.test(url) && new URL(url).host === new URL(STORE).host).length;
     expect(outageReads(twice.asked)).toBe(2 * outageReads(once.asked));
     expect(plain.raised).toBeUndefined();
     // Without the option, the 10 customers of the file give 99001 a share of 1, the cap of a share, and the priors have the 10 customers.
