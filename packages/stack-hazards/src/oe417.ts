@@ -1,4 +1,4 @@
-import { kaplanMeier } from "@mark1russell7/rigor-statistics";
+import { dispersionTest, kaplanMeier } from "@mark1russell7/rigor-statistics";
 import { EAGLEI_NATION_CUSTOMERS } from "./eaglei-state-priors.ts";
 import type { DurationLaw, HazardSource, PriorTable } from "./hazard.ts";
 import { survivalOf, type SurvivalOptions } from "./law.ts";
@@ -196,7 +196,72 @@ export function oe417AttackPrior(events: readonly Oe417Event[], options: Oe417Pr
   };
 }
 
-/** The first year of `OE417_NATION_PRIORS`: the longest window to 2023 whose yearly counts agree with one rate in a dispersion test at 5%. */
+/** The options of `oe417PriorWindow`. */
+export interface Oe417WindowOptions {
+  /** The first year of the counts, a whole number. */
+  readonly first: number;
+  /** The last year of the counts and of each window, a whole number of `first` or more. */
+  readonly last: number;
+  /** The level of the test. The default is 0.05. */
+  readonly level?: number | undefined;
+  /** The count of the seeded draws of each test. The default is `OE417_WINDOW_DRAWS`. */
+  readonly draws?: number | undefined;
+  /** The seed of the draws. The default is `OE417_WINDOW_SEED`. */
+  readonly seed?: number | string | undefined;
+}
+
+/** The window of a prior, with the test of each window. */
+export interface Oe417Window {
+  /** The first year of the window: the year after the last window that fails the test, or `first` when no window fails. */
+  readonly first: number;
+  /** The yearly counts of the events of the law, from `first` to `last` of the options. */
+  readonly counts: readonly number[];
+  /** The p value of each window to `last`, by its first year. A window with fewer than 2 years or no event has p 1. */
+  readonly tests: readonly { readonly first: number; readonly p: number }[];
+}
+
+/**
+ * The count of the draws of each test of `oe417PriorWindow`. With 10000 draws, the p value of the window from 2014 is
+ * 2.6 standard errors from 0.05. With 100000 draws, it is more than 6 standard errors from 0.05.
+ */
+export const OE417_WINDOW_DRAWS = 100_000;
+
+/** The seed of the draws of `oe417PriorWindow`. */
+export const OE417_WINDOW_SEED = "oe417-attack-window";
+
+/**
+ * This function gives the first year of a prior: the longest window to the last year whose yearly counts agree with one rate.
+ *
+ * - The counts are the events of the law of each year (`oe417LawEvents`), with 0 for a year with no event.
+ * - The test of each window is `dispersionTest` of `@mark1russell7/rigor-statistics`: the Pearson statistic, with seeded draws given the total.
+ * - The window starts in the year after the last window that fails the test at `level`.
+ *
+ * A new summary changes the counts, so it can move the window. The function is pure.
+ *
+ * @param events - The events
+ * @param options - The years of the counts, the level, the count of draws and the seed
+ * @throws RangeError when a year is not a whole number, when `last` is before `first`, or when the level is not between 0 and 1
+ */
+export function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417WindowOptions): Oe417Window {
+  const { first, last, level = 0.05, draws = OE417_WINDOW_DRAWS, seed = OE417_WINDOW_SEED } = options;
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || last < first) throw new RangeError(`oe417PriorWindow: the years ${String(first)} to ${String(last)} are not a range of whole years.`);
+  if (!(level > 0 && level < 1)) throw new RangeError(`oe417PriorWindow: the level ${String(level)} is not between 0 and 1.`);
+  const law = oe417LawEvents(events);
+  const counts = Array.from({ length: last - first + 1 }, (_, index) => law.filter((event) => event.year === first + index).length);
+  const tests = counts.map((_, index) => {
+    const window = counts.slice(index);
+    const total = window.reduce((sum, count) => sum + count, 0);
+    const p = window.length < 2 || total === 0 ? 1 : dispersionTest(window, { draws, seed }).p;
+    return { first: first + index, p };
+  });
+  const fails = tests.filter((test) => test.p < level);
+  return { first: fails.length === 0 ? first : (fails.at(-1)?.first ?? first) + 1, counts, tests };
+}
+
+/**
+ * The first year of `OE417_NATION_PRIORS`: the longest window to 2023 whose yearly counts agree with one rate in a dispersion test at 5%.
+ * A test calculates it again with `oe417PriorWindow` from the events of 2011 to 2023.
+ */
 export const OE417_PRIOR_FIRST = 2015;
 
 /**

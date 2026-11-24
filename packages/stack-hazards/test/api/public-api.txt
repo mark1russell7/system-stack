@@ -60,11 +60,15 @@ OE417_NOT_ATTACK_TERMS: build/index.d.ts#OE417_NOT_ATTACK_TERMS
 OE417_PRIOR_FIRST: build/index.d.ts#OE417_PRIOR_FIRST
 OE417_SOURCE: build/index.d.ts#OE417_SOURCE
 OE417_SPACE_WEATHER_TERMS: build/index.d.ts#OE417_SPACE_WEATHER_TERMS
+OE417_WINDOW_DRAWS: build/index.d.ts#OE417_WINDOW_DRAWS
+OE417_WINDOW_SEED: build/index.d.ts#OE417_WINDOW_SEED
 OE417_YEARS: build/index.d.ts#OE417_YEARS
 Observation: build/index.d.ts#Observation
 Oe417Event: build/index.d.ts#Oe417Event
 Oe417File: build/index.d.ts#Oe417File
 Oe417PriorOptions: build/index.d.ts#Oe417PriorOptions
+Oe417Window: build/index.d.ts#Oe417Window
+Oe417WindowOptions: build/index.d.ts#Oe417WindowOptions
 Oe417Year: build/index.d.ts#Oe417Year
 OutageCount: build/index.d.ts#OutageCount
 OutageEvent: build/index.d.ts#OutageEvent
@@ -104,6 +108,7 @@ oe417Count: build/index.d.ts#oe417Count
 oe417Hours: build/index.d.ts#oe417Hours
 oe417IsAttack: build/index.d.ts#oe417IsAttack
 oe417LawEvents: build/index.d.ts#oe417LawEvents
+oe417PriorWindow: build/index.d.ts#oe417PriorWindow
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
@@ -413,6 +418,12 @@ export declare const OE417_SOURCE: HazardSource;
 ### build/index.d.ts#OE417_SPACE_WEATHER_TERMS
 export declare const OE417_SPACE_WEATHER_TERMS: RegExp;
 
+### build/index.d.ts#OE417_WINDOW_DRAWS
+export declare const OE417_WINDOW_DRAWS = 1e5;
+
+### build/index.d.ts#OE417_WINDOW_SEED
+export declare const OE417_WINDOW_SEED = "oe417-attack-window";
+
 ### build/index.d.ts#OE417_YEARS
 export declare const OE417_YEARS: Readonly<Record<string, Oe417Year>>;
 
@@ -447,6 +458,25 @@ export interface Oe417PriorOptions {
   readonly last: number;
   readonly customers: number;
   readonly note?: string | undefined;
+}
+
+### build/index.d.ts#Oe417Window
+export interface Oe417Window {
+  readonly first: number;
+  readonly counts: readonly number[];
+  readonly tests: readonly {
+    readonly first: number;
+    readonly p: number;
+  }[];
+}
+
+### build/index.d.ts#Oe417WindowOptions
+export interface Oe417WindowOptions {
+  readonly first: number;
+  readonly last: number;
+  readonly level?: number | undefined;
+  readonly draws?: number | undefined;
+  readonly seed?: number | string | undefined;
 }
 
 ### build/index.d.ts#Oe417Year
@@ -613,6 +643,9 @@ export declare function oe417IsAttack(type: string): boolean;
 
 ### build/index.d.ts#oe417LawEvents
 export declare function oe417LawEvents(events: readonly Oe417Event[]): Oe417Event[];
+
+### build/index.d.ts#oe417PriorWindow
+export declare function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417WindowOptions): Oe417Window;
 
 ### build/index.d.ts#outageCurves
 export declare function outageCurves(events: readonly OutageEvent[], region: (area: string) => string, options?: SurvivalOptions): Readonly<Record<string, RegionCurve>>;
