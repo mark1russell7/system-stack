@@ -101,8 +101,8 @@ describe("the faults of the used amounts", () => {
 
   it("gives the faults of the reads first, then the faults of the services in their sequence", () => {
     const faults = checkUse(layer(capped("a", 10), capped("b", 10), capped("c", 10)), [read("c", "provider", 11), read("x", "count", 1), read("a", "count", 9), read("a", "provider", 9.5, "2026-11-10")], { today, readDays: 0 });
-    expect(faults.map((fault) => `${fault.code} ${fault.at}`)).toEqual(["read-part x", "use-level a", "use-count a", "use-none b", "use-over c"]);
-    expect(checkUse(layer(capped("a", 10)), [read("a", "count", 9, "2026-11-10")], { today, readDays: 0 }).map((fault) => fault.code)).toEqual(["use-level", "use-old"]);
+    expect(faults.map((fault) => `${fault.code} ${fault.at}`)).toEqual(["read-part x", "use-level a", "use-forecast a", "use-count a", "use-none b", "use-over c"]);
+    expect(checkUse(layer(capped("a", 10)), [read("a", "count", 9, "2026-11-10")], { today, readDays: 0 }).map((fault) => fault.code)).toEqual(["use-level", "use-forecast", "use-old"]);
   });
 
   it("refuses options that are not correct", () => {
@@ -136,7 +136,7 @@ describe("the gate on generated reads", () => {
         const readFaults = faults.filter((fault) => fault.code.startsWith("read-"));
         const faulty = reads.filter((item) => item.part === "x" || !Number.isFinite(item.amount) || item.amount < 0 || item.date === "2026-11-17" || item.date === "2026-02-30");
         expect(readFaults.length).toBe(faulty.length);
-        const levels = new Map(USE_CODES.map((code) => [code, ["use-level", "use-count", "use-none", "use-old"].includes(code) ? "warning" : "error"] as const));
+        const levels = new Map(USE_CODES.map((code) => [code, ["use-level", "use-forecast", "use-count", "use-none", "use-old"].includes(code) ? "warning" : "error"] as const));
         for (const fault of faults) expect(fault.level).toBe(levels.get(fault.code));
       }),
       { seed: 20261116, numRuns: 200 },

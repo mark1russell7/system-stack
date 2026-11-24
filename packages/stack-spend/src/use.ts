@@ -59,29 +59,33 @@ export const READ_AGE: Expr = app("min", each(MONTH_READS, ref("age")));
 /**
  * This function gives the tree of the reads of a layer, as a space of Vex.
  *
- * - The layer is the root, with the key `LAYER_KEY`. Its fields are `month` (the month of the check) and `levels`.
- * - A service is a child of the layer. Its fields are `billing` and `limit`: its hard limit, from `serviceStates`.
- * - A read is a child of its service. Its fields are `source`, `amount`, `month` and `age`: the days from its date to the check.
+ * - The layer is the root, with the key `LAYER_KEY`. Its fields are `month` (the month of the check), `levels`, `days` and `rateDays`.
+ *   The field `days` is the count of days of the month.
+ * - A service is a child of the layer. Its fields are `billing`, `allowance` and `limit`: its hard limit, from `serviceStates`.
+ *   A service with no allowance has the allowance 0.
+ * - A read is a child of its service. Its fields are `source`, `amount`, `month`, `age` and `day`.
+ *   The field `age` is the count of days from its date to the check. The field `day` is its day of the month of the check.
+ *   A read with a gross amount has the field `gross` too.
  *
  * A read with a fault is not in the tree, and `checkUse` tells the fault. The first record of a part is used.
  *
- * @throws RangeError when `today` is not a date `YYYY-MM-DD`, or `levels` or `readDays` is not valid
+ * @throws RangeError when `today` is not a date `YYYY-MM-DD`, or `levels`, `readDays` or `rateDays` is not valid
  */
 export function useSpace(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): Space {
   const plan = usePlan(layer, reads, options);
   const limits = new Map(serviceStates(layer).map((state) => [state.part, state.hardLimit] as const));
-  const records: Record<string, Readonly<Record<string, unknown>>> = { [LAYER_KEY]: { kind: "layer", month: plan.month, levels: [...plan.levels] } };
+  const records: Record<string, Readonly<Record<string, unknown>>> = { [LAYER_KEY]: { kind: "layer", month: plan.month, levels: [...plan.levels], days: plan.monthDays, rateDays: plan.rateDays } };
   const parents: Record<string, string | null> = { [LAYER_KEY]: null };
   for (const service of firstServices(layer)) {
     const key = serviceKey(service.part);
     const limit = limits.get(service.part);
-    records[key] = { kind: "service", billing: service.billing, ...(limit === undefined ? {} : { limit }) };
+    records[key] = { kind: "service", billing: service.billing, allowance: service.allowance ?? 0, ...(limit === undefined ? {} : { limit }) };
     parents[key] = LAYER_KEY;
   }
   reads.forEach((read, index) => {
     if (plan.codes[index] !== undefined) return;
     const key = `read:${String(index)}`;
-    records[key] = { kind: "read", source: read.source, amount: read.amount, month: monthOf(read.date), age: plan.ages[index] };
+    records[key] = { kind: "read", source: read.source, amount: read.amount, month: monthOf(read.date), age: plan.ages[index], day: plan.days[index], ...(read.gross === undefined ? {} : { gross: read.gross }) };
     parents[key] = serviceKey(read.part);
   });
   return space.tree(records, parents);

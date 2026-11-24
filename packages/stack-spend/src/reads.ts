@@ -24,12 +24,20 @@ export interface UseRead {
   readonly source: UseSource;
   /** The cost of the use from the start of the month until the read, in the currency of the layer. */
   readonly amount: number;
+  /**
+   * The gross amount: the cost of the same use before the allowance of the plan, in the currency of the layer.
+   * It is not less than `amount`. A read of a service with no allowance needs none.
+   */
+  readonly gross?: number | undefined;
   /** The date of the read, as `YYYY-MM-DD`. The month of this date is the month of the amount. */
   readonly date: string;
 }
 
 /** These are the default levels of the used share of a hard limit: 50, 80 and 100 percent. */
 export const USE_LEVELS: readonly number[] = [0.5, 0.8, 1];
+
+/** The default count of days of the rate of the use. The rate is the growth of the use in that many days, or more. */
+export const RATE_DAYS = 7;
 
 /** The options of the functions of the used amount. */
 export interface UseOptions {
@@ -39,4 +47,9 @@ export interface UseOptions {
   readonly levels?: readonly number[] | undefined;
   /** The largest age of the newest read of a service, in days. With no value, the gate examines no age. */
   readonly readDays?: number | undefined;
+  /**
+   * The smallest count of days between the two reads that give the rate of the use, 1 or more. The default is `RATE_DAYS`.
+   * A month with no read that old gives the rate from the start of the month.
+   */
+  readonly rateDays?: number | undefined;
 }

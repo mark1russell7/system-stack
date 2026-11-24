@@ -95,6 +95,7 @@ This layer is `SAMPLE_SPEND` of the package. It is for `SAMPLE_STACK` of the cor
 | `billing` | `free`, `fixed` or `metered`. |
 | `price` | The fixed price of a month. A `fixed` service must have one. |
 | `limits` | The limits that are in force. Each limit has a `kind` and an `amount` for a month. |
+| `allowance` | The cost of the use that the plan includes in a month. With no value, the plan includes no use. |
 | `wanted` | A limit that is not in force. The gate fails until the limit is in `limits`. |
 | `ends` | The end of the plan, for a plan that ends on a date. Refer to [The end of a plan](#the-end-of-a-plan). |
 | `proof` | The read of the account: its `date`, its reader in `by`, and its `source`. |
@@ -129,7 +130,7 @@ checkSpend(SAMPLE_SPEND, SAMPLE_STACK, { today: SAMPLE_TODAY }).map((fault) => `
 | `service-duplicate` | error | Two records name one part. |
 | `part-no-service` | error | A part of a kind of `kinds` has no record. |
 | `price` | error | A price is less than 0 or not finite, or a `fixed` plan has no price. |
-| `amount` | error | The amount of a limit is less than 0 or not finite. |
+| `amount` | error | The amount of a limit or of an allowance is less than 0 or not finite. |
 | `limit-none` | error | The cost of a `metered` service has no limit. |
 | `limit-alert` | error | The only limits of a `metered` service are alerts. |
 | `limit-recharge` | error | A prepaid balance gets money automatically. |
@@ -321,6 +322,7 @@ A read is live data, so it is not a record of the layer. A program makes each re
 | `part` | The `id` of the part of the service. |
 | `source` | `count` or `provider`. |
 | `amount` | The cost of the use from the start of the month until the read. |
+| `gross` | The cost of the same use before the allowance of the plan. A read can have none. |
 | `date` | The date of the read. Its month is the month of the amount. |
 
 The source tells who gives the amount:
@@ -368,6 +370,45 @@ useStates(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY });
 - A read with a fault does not count, and the gate tells the fault.
 - The option `levels` gives different levels. Each level is a share of the hard limit, above 0.
 
+### The forecast of a month
+
+A level tells the cost until a read. `useForecasts(layer, reads, { today })` tells the cost at the end of the month, if the use continues at the rate of the reads.
+
+```ts
+import { SAMPLE_READS, SAMPLE_SPEND, SAMPLE_TODAY, useForecasts } from "@mark1russell7/stack-spend";
+
+useForecasts(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY });
+// => [
+//   { part: "cloud-account", gross: 0, from: 0, to: 15, rate: 0, end: 0 },
+//   { part: "push-account" },
+//   { part: "call-account", gross: 5.2, from: 0, to: 16, rate: 0.325, end: 9.75 },
+// ]
+```
+
+| Field of a forecast | What it is |
+| --- | --- |
+| `gross` | The gross amount of the month: the cost of the use before the allowance of the plan. |
+| `from` | The day of the month from which the rate counts. The day 0 is the start of the month. |
+| `to` | The day of the newest read. The rate counts until this day. |
+| `rate` | The gross cost of the use of one day, from `from` to `to`. |
+| `end` | The cost at the end of the month at that rate. The allowance is not in it. |
+| `limitDate` | The date on which the cost reaches the hard limit at that rate. |
+
+- Two reads give the rate: the newest read, and the newest read that is 7 days older, or more.
+- The option `rateDays` gives a different count of days.
+- A month with no read that old gives the rate from the start of the month, when the use was 0.
+- A cost that stays below the hard limit until the end of the month has no `limitDate`. A cost that is at the limit has none.
+- The sample has no `limitDate`. At 0.325 USD for each day, the cost of `call-account` reaches 10 USD on day 31, and November has 30 days.
+- The forecast is a calculation, not a read. The use of the next days can be different.
+
+Some plans include an amount of use in each month. The field `allowance` of a cost record gives that amount as a cost.
+The provider shows a cost of 0 until the use is more than the allowance. Thus a rate from the costs is 0 at the start of each month.
+A read with the field `gross` gives the cost of the use before the allowance, and the rate comes from the gross amounts.
+
+- A read with no `gross` and an amount above 0 has the gross amount `amount` plus `allowance`.
+- A read with no `gross` and the amount 0 does not tell the use of a service with an allowance. It gives no gross amount.
+- The cost at the end of the month is the gross amount on that day less the allowance. It is 0 at the least.
+
 ### The gate of the used amounts
 
 `checkUse(layer, reads, { today })` gives the faults of the used amounts. An error stops the gate. A warning does not.
@@ -385,11 +426,12 @@ checkUse(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY }).map((fault) => `${
 | Code | Level | The fault |
 | --- | --- | --- |
 | `read-part` | error | A read names a part with no cost record. |
-| `read-amount` | error | The amount of a read is less than 0 or not finite. |
+| `read-amount` | error | The amount of a read is less than 0 or not finite. Or its gross amount is less than its amount or not finite. |
 | `read-date` | error | The date of a read is not a date, or it is after the date of the check. |
 | `use-billing` | error | A read shows a cost of the use of a `free` or `fixed` service. The cost record is not correct. |
 | `use-over` | error | The used amount is more than the hard limit. The limit did not hold. |
 | `use-level` | warning | The used amount reached a level of the hard limit. |
+| `use-forecast` | warning | At the rate of the reads, the cost reaches the hard limit before the month ends. |
 | `use-count` | warning | The provider shows more than the stack counted. The count does not have all the use. |
 | `use-none` | warning | A `metered` service has no read of the month, so its used amount is not known. |
 | `use-old` | warning | The newest read of a `metered` service is older than the option `readDays`. |
@@ -398,6 +440,8 @@ checkUse(SAMPLE_SPEND, SAMPLE_READS, { today: SAMPLE_TODAY }).map((fault) => `${
 - A service with no read does not pass and does not fail. The gate tells that it has no read.
 - The gate has no memory. A host that sends a message at each level keeps the last level that it sent for each service.
 - The option `readDays` gives the largest age of the newest read. With no value, the gate examines no age.
+- The warning `use-forecast` gives the date on which the cost reaches the hard limit. The service stops on that date.
+- An old read can give a date before the date of the check. Then the warning tells you to make a new read.
 
 ## The formulas
 The layer becomes a tree: the layer, then each service, then each limit in force. The plan after the end of a plan is a child of its service too, with its own limits as children.
@@ -429,6 +473,22 @@ The reads become a second tree: the layer, then each service, then each read. `u
 
 `MONTH_READS` is the axis of the reads of a service in the month of the check.
 A share reaches a level when it is the level less `LEVEL_TOLERANCE`, or more. Thus the rounding of a division does not hide a level.
+
+The programs of the forecast evaluate at a service of the same tree:
+
+| Program | What it gives |
+| --- | --- |
+| `GROSS_USED` | The gross amount of the month: the largest gross amount of the reads. |
+| `LAST_DAY` | The day of the newest read with a known gross amount, as a day of the month. |
+| `BASE_DAY` | The day from which the rate counts: the day of the newest old read, or 0. |
+| `BASE_GROSS` | The gross amount on `BASE_DAY`: the largest gross amount of the old reads, or 0. |
+| `USE_RATE` | The gross cost of the use of one day, from `BASE_DAY` to `LAST_DAY`. |
+| `MONTH_END` | The cost at the end of the month at `USE_RATE`, after the allowance. |
+| `LIMIT_DAY` | The day of the month on which the cost reaches the hard limit at `USE_RATE`. |
+| `LIMIT_IN_MONTH` | If `LIMIT_DAY` is after `LAST_DAY` and not after the last day of the month. |
+
+`READ_GROSS` evaluates at a read: it gives the gross amount of the read. `RATE_READS` is the axis of the reads of the month with a known gross amount.
+An old read is `rateDays` older than the newest read, or more.
 
 ## A stop for a project of Google Cloud
 

@@ -6,6 +6,8 @@
 
 ## . (build/index.d.ts): names
 
+BASE_DAY: build/index.d.ts#BASE_DAY
+BASE_GROSS: build/index.d.ts#BASE_GROSS
 BILLINGS: build/layer.chunk.d.ts#BILLINGS
 BOUNDED_TOTAL: build/index.d.ts#BOUNDED_TOTAL
 Billing: build/layer.chunk.d.ts#Billing
@@ -15,15 +17,20 @@ END_DAYS: build/layer.chunk.d.ts#END_DAYS
 EndDecision: build/layer.chunk.d.ts#EndDecision
 EndOptions: build/index.d.ts#EndOptions
 EndStops: build/index.d.ts#EndStops
+GROSS_USED: build/index.d.ts#GROSS_USED
 HARD_COUNT: build/index.d.ts#HARD_COUNT
 HARD_LIMIT: build/index.d.ts#HARD_LIMIT
 HARD_LIMITS: build/index.d.ts#HARD_LIMITS
 IS_HARD: build/index.d.ts#IS_HARD
+LAST_DAY: build/index.d.ts#LAST_DAY
 LAYER_KEY: build/index.d.ts#LAYER_KEY
 LEVEL_TOLERANCE: build/index.d.ts#LEVEL_TOLERANCE
+LIMIT_DAY: build/index.d.ts#LIMIT_DAY
+LIMIT_IN_MONTH: build/index.d.ts#LIMIT_IN_MONTH
 LIMIT_KINDS: build/layer.chunk.d.ts#LIMIT_KINDS
 Limit: build/layer.chunk.d.ts#Limit
 LimitKind: build/layer.chunk.d.ts#LimitKind
+MONTH_END: build/index.d.ts#MONTH_END
 MONTH_MAX: build/index.d.ts#MONTH_MAX
 MONTH_READS: build/index.d.ts#MONTH_READS
 MonthTotal: build/index.d.ts#MonthTotal
@@ -40,7 +47,10 @@ PROVIDER_USED: build/index.d.ts#PROVIDER_USED
 PlanEnd: build/layer.chunk.d.ts#PlanEnd
 PlanEndState: build/index.d.ts#PlanEndState
 Proof: build/layer.chunk.d.ts#Proof
+RATE_DAYS: build/reads.chunk.d.ts#RATE_DAYS
+RATE_READS: build/index.d.ts#RATE_READS
 READ_AGE: build/index.d.ts#READ_AGE
+READ_GROSS: build/index.d.ts#READ_GROSS
 SAMPLE_ENDS: build/index.d.ts#SAMPLE_ENDS
 SAMPLE_READS: build/index.d.ts#SAMPLE_READS
 SAMPLE_SPEND: build/index.d.ts#SAMPLE_SPEND
@@ -58,10 +68,12 @@ USE_CODES: build/index.d.ts#USE_CODES
 USE_LEVEL: build/index.d.ts#USE_LEVEL
 USE_LEVELS: build/reads.chunk.d.ts#USE_LEVELS
 USE_OVER: build/index.d.ts#USE_OVER
+USE_RATE: build/index.d.ts#USE_RATE
 USE_SHARE: build/index.d.ts#USE_SHARE
 USE_SOURCES: build/reads.chunk.d.ts#USE_SOURCES
 UseCode: build/index.d.ts#UseCode
 UseFault: build/index.d.ts#UseFault
+UseForecast: build/index.d.ts#UseForecast
 UseOptions: build/reads.chunk.d.ts#UseOptions
 UseRead: build/reads.chunk.d.ts#UseRead
 UseSource: build/reads.chunk.d.ts#UseSource
@@ -81,6 +93,7 @@ planEnds: build/index.d.ts#planEnds
 serviceKey: build/index.d.ts#serviceKey
 serviceStates: build/index.d.ts#serviceStates
 spendSpace: build/index.d.ts#spendSpace
+useForecasts: build/index.d.ts#useForecasts
 useSpace: build/index.d.ts#useSpace
 useStates: build/index.d.ts#useStates
 
@@ -280,6 +293,12 @@ export declare function stopSource(version: string): {
 ### build/gcp-stop.d.ts#tokenRequest
 export declare function tokenRequest(): StopRequest;
 
+### build/index.d.ts#BASE_DAY
+export declare const BASE_DAY: Expr;
+
+### build/index.d.ts#BASE_GROSS
+export declare const BASE_GROSS: Expr;
+
 ### build/index.d.ts#BOUNDED_TOTAL
 export declare const BOUNDED_TOTAL: Expr;
 
@@ -303,6 +322,9 @@ export interface EndStops {
   readonly stopped: readonly string[];
 }
 
+### build/index.d.ts#GROSS_USED
+export declare const GROSS_USED: Expr;
+
 ### build/index.d.ts#HARD_COUNT
 export declare const HARD_COUNT: Expr;
 
@@ -315,11 +337,23 @@ export declare const HARD_LIMITS: Axis;
 ### build/index.d.ts#IS_HARD
 export declare const IS_HARD: Expr;
 
+### build/index.d.ts#LAST_DAY
+export declare const LAST_DAY: Expr;
+
 ### build/index.d.ts#LAYER_KEY
 export declare const LAYER_KEY = "layer";
 
 ### build/index.d.ts#LEVEL_TOLERANCE
 export declare const LEVEL_TOLERANCE = 1e-9;
+
+### build/index.d.ts#LIMIT_DAY
+export declare const LIMIT_DAY: Expr;
+
+### build/index.d.ts#LIMIT_IN_MONTH
+export declare const LIMIT_IN_MONTH: Expr;
+
+### build/index.d.ts#MONTH_END
+export declare const MONTH_END: Expr;
 
 ### build/index.d.ts#MONTH_MAX
 export declare const MONTH_MAX: Expr;
@@ -375,8 +409,14 @@ export interface PlanEndState {
   readonly decided: boolean;
 }
 
+### build/index.d.ts#RATE_READS
+export declare const RATE_READS: Axis;
+
 ### build/index.d.ts#READ_AGE
 export declare const READ_AGE: Expr;
+
+### build/index.d.ts#READ_GROSS
+export declare const READ_GROSS: Expr;
 
 ### build/index.d.ts#SAMPLE_ENDS
 export declare const SAMPLE_ENDS: SpendLayer;
@@ -403,13 +443,16 @@ export interface ServiceState {
 export declare const USED: Expr;
 
 ### build/index.d.ts#USE_CODES
-export declare const USE_CODES: readonly ["read-part", "read-amount", "read-date", "use-billing", "use-over", "use-level", "use-count", "use-none", "use-old"];
+export declare const USE_CODES: readonly ["read-part", "read-amount", "read-date", "use-billing", "use-over", "use-level", "use-forecast", "use-count", "use-none", "use-old"];
 
 ### build/index.d.ts#USE_LEVEL
 export declare const USE_LEVEL: Expr;
 
 ### build/index.d.ts#USE_OVER
 export declare const USE_OVER: Expr;
+
+### build/index.d.ts#USE_RATE
+export declare const USE_RATE: Expr;
 
 ### build/index.d.ts#USE_SHARE
 export declare const USE_SHARE: Expr;
@@ -420,6 +463,17 @@ export type UseCode = (typeof USE_CODES)[number];
 ### build/index.d.ts#UseFault
 export interface UseFault extends Fault {
   readonly code: UseCode;
+}
+
+### build/index.d.ts#UseForecast
+export interface UseForecast {
+  readonly part: string;
+  readonly gross?: number | undefined;
+  readonly from?: number | undefined;
+  readonly to?: number | undefined;
+  readonly rate?: number | undefined;
+  readonly end?: number | undefined;
+  readonly limitDate?: string | undefined;
 }
 
 ### build/index.d.ts#UseState
@@ -474,6 +528,9 @@ export declare function serviceStates(layer: SpendLayer, options?: DownOptions):
 
 ### build/index.d.ts#spendSpace
 export declare function spendSpace(layer: SpendLayer, options?: DownOptions): Space;
+
+### build/index.d.ts#useForecasts
+export declare function useForecasts(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): UseForecast[];
 
 ### build/index.d.ts#useSpace
 export declare function useSpace(layer: SpendLayer, reads: readonly UseRead[], options: UseOptions): Space;
@@ -542,6 +599,7 @@ interface Service {
   readonly billing: Billing;
   readonly price?: number | undefined;
   readonly limits?: readonly Limit[] | undefined;
+  readonly allowance?: number | undefined;
   readonly wanted?: Limit | undefined;
   readonly ends?: PlanEnd | undefined;
   readonly proof?: Proof | undefined;
@@ -558,6 +616,9 @@ interface SpendLayer {
   readonly services: readonly Service[];
 }
 
+### build/reads.chunk.d.ts#RATE_DAYS
+declare const RATE_DAYS = 7;
+
 ### build/reads.chunk.d.ts#USE_LEVELS
 declare const USE_LEVELS: readonly number[];
 
@@ -569,6 +630,7 @@ interface UseOptions {
   readonly today: string;
   readonly levels?: readonly number[] | undefined;
   readonly readDays?: number | undefined;
+  readonly rateDays?: number | undefined;
 }
 
 ### build/reads.chunk.d.ts#UseRead
@@ -576,6 +638,7 @@ interface UseRead {
   readonly part: string;
   readonly source: UseSource;
   readonly amount: number;
+  readonly gross?: number | undefined;
   readonly date: string;
 }
 
