@@ -195,10 +195,11 @@ The model of one pot:
    Each choice gives the most fuel. At a high place the test water boils below 100 °C, so the end has no default.
    The boil time is then the boil fuel over the mass rate. When the share and the yield both give a boil fuel, the line takes the most.
    The adverse factor of the stove (`adverse` of market) multiplies the boil fuel of the yield. Cold, snow melt and wind take more fuel than the calm test.
-   A factor with the bound `most` gives the most boil fuel, also from a most yield. For example, the canister stove of the catalog has a most yield and a most factor of 4.
-   Its boil fuel is 4 times the calm fuel, an upper limit. A factor with no bound is the value. The cook part stays the rate times the cook time.
+   A factor with the bound `most` also takes a most yield. For example, the canister stove of the catalog has a most yield and a most factor of 4.
+   Its boil fuel is 4 times the calm fuel. This is an estimate, not a proven upper limit. The source gives 3 to 4 times as a typical range, not as a ceiling.
+   A factor with no bound is the value. The cook part stays the rate times the cook time.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
-5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
+5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit. A boil fuel from an adverse factor is an estimate (step 3), so that fuel is not a proven upper limit.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
 7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default. Give the smallest pot that the cook makes. Each pot takes its own cook time, so a batch above the real pot gives too little fuel.
 

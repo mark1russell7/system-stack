@@ -264,7 +264,8 @@ function citedCelsius(value: unknown): number | undefined {
  *
  * The adverse factor of the stove multiplies the boil fuel: cold, snow melt and wind take more fuel than the calm test.
  * The factor is relative to the cited calm yield. Thus the heat of 1 kg of fuel is the calm heat over the factor.
- * - A factor with the bound `most` gives the most boil fuel, an upper limit. It also takes a yield with the bound `most`.
+ * - A factor with the bound `most` gives the boil fuel at the top of its cited range. It also takes a yield with the bound `most`.
+ *   The fuel is an estimate, not a proven upper limit: a source can give a typical range, not a ceiling.
  * - A factor with no bound is the value. It takes a yield with the bound `least` or no bound, as the calm case does.
  * - A factor with the bound `least` gives too little fuel, so it gives a no read. So does a factor that is not a finite number of 1 or more.
  */
@@ -326,6 +327,7 @@ interface StoveContext {
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
  * Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read.
  * At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
+ * A boil fuel from an adverse factor is an estimate (`yieldHeat`), so that fuel is not a proven upper limit.
  */
 function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
   const { stove, batchKg, share, startC, fuelEnergy } = context;
@@ -455,10 +457,11 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   The test water takes `WATER_DENSITY_MIN`, and the rise goes from the cited start to the cited end of the test. The boil time is then the boil fuel over the mass rate.
  *   A yield with the bound `most`, or with no cited start or end, gives a no read. When the share and the yield both have a read, the line takes the most boil fuel.
  * - The adverse factor of the stove (`adverse` of market) multiplies the boil fuel of the yield, for cold, snow melt and wind. The cook part stays the rate times the cook time.
- *   A factor with the bound `most` gives the most boil fuel, also from a yield with the bound `most`. A factor with no bound is the value.
+ *   A factor with the bound `most` gives the boil fuel at the top of its cited range, also from a yield with the bound `most`. That fuel is an estimate.
+ *   A factor with no bound is the value.
  *   A factor with the bound `least` gives a no read of the yield.
  * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
- *   The model does not give that time, so there the fuel is not an upper limit.
+ *   The model does not give that time, so there the fuel is not an upper limit. A boil fuel from an adverse factor is an estimate.
  * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
