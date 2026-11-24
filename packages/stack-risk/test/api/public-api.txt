@@ -12,6 +12,7 @@ ChanceOptions: build/index.d.ts#ChanceOptions
 DelayPoint: build/layer.chunk.d.ts#DelayPoint
 Goal: build/layer.chunk.d.ts#Goal
 GoalState: build/index.d.ts#GoalState
+GroupChances: build/index.d.ts#GroupChances
 PartImportance: build/index.d.ts#PartImportance
 RISK_CODES: build/check.chunk.d.ts#RISK_CODES
 RISK_SCHEMA: build/layer.chunk.d.ts#RISK_SCHEMA
@@ -21,6 +22,7 @@ RiskLayer: build/layer.chunk.d.ts#RiskLayer
 RiskOptions: build/check.chunk.d.ts#RiskOptions
 SAMPLE_RISK: build/index.d.ts#SAMPLE_RISK
 SAMPLE_TODAY: build/index.d.ts#SAMPLE_TODAY
+SharedCauseFit: build/index.d.ts#SharedCauseFit
 WorksChance: build/index.d.ts#WorksChance
 chancesByPart: build/layer.chunk.d.ts#chancesByPart
 checkRisk: build/check.chunk.d.ts#checkRisk
@@ -30,6 +32,7 @@ goalStates: build/index.d.ts#goalStates
 inTimeChance: build/layer.chunk.d.ts#inTimeChance
 isChance: build/layer.chunk.d.ts#isChance
 joinRisk: build/index.d.ts#joinRisk
+sharedCauseFit: build/index.d.ts#sharedCauseFit
 worksChance: build/index.d.ts#worksChance
 
 ## ./schema (build/schema.d.ts): names
@@ -88,6 +91,12 @@ export type GoalState = {
   readonly read: false;
 };
 
+### build/index.d.ts#GroupChances
+export interface GroupChances {
+  readonly works: readonly number[];
+  readonly anyWorks: number;
+}
+
 ### build/index.d.ts#PartImportance
 export interface PartImportance {
   readonly part: string;
@@ -99,6 +108,12 @@ export declare const SAMPLE_RISK: RiskLayer;
 
 ### build/index.d.ts#SAMPLE_TODAY
 export declare const SAMPLE_TODAY = "2026-11-16";
+
+### build/index.d.ts#SharedCauseFit
+export interface SharedCauseFit {
+  readonly shared: number;
+  readonly own: readonly number[];
+}
 
 ### build/index.d.ts#WorksChance
 export type WorksChance = {
@@ -115,6 +130,9 @@ export declare function goalStates(layer: RiskLayer, stack: Stack, options?: Pat
 
 ### build/index.d.ts#joinRisk
 export declare function joinRisk(pieces: readonly LayerPiece<RiskLayer>[]): LayerParse<RiskLayer>;
+
+### build/index.d.ts#sharedCauseFit
+export declare function sharedCauseFit(group: GroupChances): SharedCauseFit;
 
 ### build/index.d.ts#worksChance
 export declare function worksChance(layer: RiskLayer, stack: Stack, part: string, options?: ChanceOptions): WorksChance;
