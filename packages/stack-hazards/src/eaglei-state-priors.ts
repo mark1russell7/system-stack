@@ -22,5 +22,5 @@ export const EAGLEI_STATE_PRIORS: PriorTable = {
   },
 };
 
-/** The sum of the customers of the observed counties of the states of `EAGLEI_STATE_PRIORS`. A table of priors for the nation divides by it for a reach. */
-export const EAGLEI_NATION_CUSTOMERS = 154316079;
+/** The sum of the customers of each observed county of the fit, also in a state over the limit of the table. A table of priors for the nation divides by it for a reach. */
+export const EAGLEI_NATION_CUSTOMERS = 155605385;

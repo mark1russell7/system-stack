@@ -156,6 +156,8 @@ export interface Oe417PriorOptions {
   readonly last: number;
   /** The customers of the nation, for example `EAGLEI_NATION_CUSTOMERS`. */
   readonly customers: number;
+  /** A text that the method adds after its facts: the source of the customers and the reason for the years. */
+  readonly note?: string | undefined;
 }
 
 /** The case of a physical attack on the grid. */
@@ -167,11 +169,12 @@ export const OE417_ATTACK_CASE = "infra.power.physical-attack";
  * - `perYear` is the count of the events of `oe417LawEvents` from the year `first` to the year `last`, over the count of the years.
  * - `reach` is the mean of the customers of those events over the customers of the nation. Thus `perYear * reach` is the expected events at one customer in one year.
  * - A year with no event in the summaries counts as a year with no event.
+ * - The method tells only what the function calculates. The option `note` adds the source of the customers and the reason for the years.
  *
  * @throws RangeError when the years are not whole numbers in order, when the customers are not above 0, or when the years have no event
  */
 export function oe417AttackPrior(events: readonly Oe417Event[], options: Oe417PriorOptions): PriorTable {
-  const { first, last, customers } = options;
+  const { first, last, customers, note } = options;
   if (!Number.isInteger(first) || !Number.isInteger(last) || first > last) throw new RangeError(`oe417AttackPrior: the years ${String(first)} to ${String(last)} are not whole numbers in order.`);
   if (!Number.isFinite(customers) || customers <= 0) throw new RangeError(`oe417AttackPrior: the customers are ${String(customers)}. They are a finite number above 0.`);
   const kept = oe417LawEvents(events).filter((event) => event.year >= first && event.year <= last);
@@ -185,15 +188,30 @@ export function oe417AttackPrior(events: readonly Oe417Event[], options: Oe417Pr
     method:
       `perYear is the count of the events of a physical attack, vandalism, sabotage or theft with customers in the OE-417 annual summaries of ${String(first)} to ${String(last)}, over ${String(years)} years: ${String(kept.length)} events. ` +
       "An event is in the count when the law of its duration reads it: more than 0 customers, and a duration of 15 minutes or more or no time of the restoration. " +
-      `reach is the mean of the customers of an event over ${String(customers)} customers of the nation, the sum of the customers of the counties of the states of EAGLE-I (CC BY 4.0). ` +
-      "The summaries of 2000 to 2010 list no such event, and their counts of all events are lower. That can be a change of the form or of the reports, so the rate does not read those years. " +
-      "An event with no count of customers is not in the count, and that makes the rate too low.",
+      `reach is the mean of the customers of an event over ${String(customers)} customers of the nation. ` +
+      "An event with no count of customers is not in the count, and that makes the rate too low." +
+      (note === undefined ? "" : ` ${note}`),
     codes: ["US"],
     rates: { [OE417_ATTACK_CASE]: { US: [kept.length / years, reach] } },
   };
 }
 
-/** The yearly prior of a physical attack on the grid for the nation, from the summaries of 2011 to 2023. */
-export const OE417_NATION_PRIORS: PriorTable = oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, customers: EAGLEI_NATION_CUSTOMERS });
+/** The first year of `OE417_NATION_PRIORS`: the longest window to 2023 whose yearly counts agree with one rate in a dispersion test at 5%. */
+export const OE417_PRIOR_FIRST = 2015;
+
+/**
+ * The yearly prior of a physical attack on the grid for the nation, from the summaries of 2015 to 2023.
+ * The years 2011 to 2014 have fewer events (4 in 4 years), so one rate of 2011 to 2023 is too low for each later year.
+ */
+export const OE417_NATION_PRIORS: PriorTable = oe417AttackPrior(OE417_ATTACK_EVENTS, {
+  first: OE417_PRIOR_FIRST,
+  last: 2023,
+  customers: EAGLEI_NATION_CUSTOMERS,
+  note:
+    "The customers of the nation are the sum of the customers of each observed county of EAGLE-I (CC BY 4.0). " +
+    "The years are the longest window to 2023 whose yearly counts agree with one rate in a dispersion test of the counts at 5%. " +
+    "The counts of the years 2011 to 2023 are 1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14 and 8. The window from 2014 fails the test, and the window from 2015 passes it. " +
+    "The summaries of 2000 to 2010 list no such event.",
+});
 
 export { OE417_ATTACK_EVENTS, OE417_FILES, OE417_YEARS };

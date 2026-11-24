@@ -23,7 +23,7 @@ const DIGITS = 4;
 export interface EaglePriorTables {
   readonly county: PriorTable;
   readonly state: PriorTable;
-  /** The sum of the customers of the observed counties of the states of the table `state`: the customers of the nation for a reach. */
+  /** The sum of the customers of each observed county: the customers of the nation for a reach. The limit of the tables does not change it. */
   readonly nation: number;
 }
 
@@ -76,10 +76,8 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     eagleRegion,
     "perYear is the sum of the events of each county of a state over its years. reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year.",
   );
-  const states = new Set(state.codes);
-  const nation = observedRegions(priors.observation, (area) => area)
-    .filter((area) => states.has(eagleRegion(area)))
-    .reduce((sum, area) => sum + (priors.observation.customers[area] ?? 0), 0);
+  // Each observed county, also in a state that the limit keeps out of the table: a later fit cannot change the reach of a national prior through the limit.
+  const nation = observedRegions(priors.observation, (area) => area).reduce((sum, area) => sum + (priors.observation.customers[area] ?? 0), 0);
   return {
     county: table(COUNTY_SCHEME, (area) => area, "perYear is the events of a county over its years. reach is the mean of the largest count of customers out of each event over the customers of the county."),
     state,
@@ -130,7 +128,7 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       ...head,
       ...tableLines("EAGLEI_STATE_PRIORS", "The yearly priors of the power outage and of each storm case in each state, from the outages of the counties of the state.", tables.state),
       "",
-      "/** The sum of the customers of the observed counties of the states of `EAGLEI_STATE_PRIORS`. A table of priors for the nation divides by it for a reach. */",
+      "/** The sum of the customers of each observed county of the fit, also in a state over the limit of the table. A table of priors for the nation divides by it for a reach. */",
       `export const EAGLEI_NATION_CUSTOMERS = ${String(tables.nation)};`,
       "",
     ].join("\n"),

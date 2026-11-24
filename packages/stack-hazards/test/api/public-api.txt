@@ -56,6 +56,7 @@ OE417_FILES: build/index.d.ts#OE417_FILES
 OE417_LEAST_HOURS: build/index.d.ts#OE417_LEAST_HOURS
 OE417_NATION_PRIORS: build/index.d.ts#OE417_NATION_PRIORS
 OE417_NOT_ATTACK_TERMS: build/index.d.ts#OE417_NOT_ATTACK_TERMS
+OE417_PRIOR_FIRST: build/index.d.ts#OE417_PRIOR_FIRST
 OE417_SOURCE: build/index.d.ts#OE417_SOURCE
 OE417_SPACE_WEATHER_TERMS: build/index.d.ts#OE417_SPACE_WEATHER_TERMS
 OE417_YEARS: build/index.d.ts#OE417_YEARS
@@ -252,7 +253,7 @@ export interface CoverageTally {
 }
 
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS
-export declare const EAGLEI_NATION_CUSTOMERS = 154316079;
+export declare const EAGLEI_NATION_CUSTOMERS = 155605385;
 
 ### build/index.d.ts#EAGLEI_STATE_PRIORS
 export declare const EAGLEI_STATE_PRIORS: PriorTable;
@@ -354,6 +355,9 @@ export declare const OE417_NATION_PRIORS: PriorTable;
 ### build/index.d.ts#OE417_NOT_ATTACK_TERMS
 export declare const OE417_NOT_ATTACK_TERMS: RegExp;
 
+### build/index.d.ts#OE417_PRIOR_FIRST
+export declare const OE417_PRIOR_FIRST = 2015;
+
 ### build/index.d.ts#OE417_SOURCE
 export declare const OE417_SOURCE: HazardSource;
 
@@ -393,6 +397,7 @@ export interface Oe417PriorOptions {
   readonly first: number;
   readonly last: number;
   readonly customers: number;
+  readonly note?: string | undefined;
 }
 
 ### build/index.d.ts#Oe417Year
