@@ -3,11 +3,11 @@
  *
  * - The value of a case in a job is the median time of one call over the fresh children of its arm, in milliseconds.
  * - The limit of a case is `runLimit` of rigor-bench: the worst value of 5 jobs or more plus their spread.
- * - A CPU model with 5 jobs or more in the freeze gets its own limit. Each other model of the freeze gets the ceiling: the limit over all the jobs.
+ * - A CPU model with jobs of 5 runs or more in the freeze gets its own limit. Each other model of the freeze gets the ceiling: the limit over all the jobs.
  * - The noise cap is the `runLimit` of the A/A spreads of the same jobs (`aaLimits`). A job above it is a no read.
  * - A job on a CPU model with no frozen value is a no read. A no read is not a pass.
  */
-import { aaLimits, aaStats, CEILING_ONLY, cpuEntry, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
+import { aaLimits, aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 
@@ -19,13 +19,15 @@ export const LIMITS_SCHEMA = "stack-endurance/independent-limits/1";
 export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
 export const RULE =
-  "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with 5 jobs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling.";
+  "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling.";
 /** The case of the A/A pair: the largest case of the sum over the states, with a second arm of the same child. */
 export const AA_CASE = caseId(12);
 /** The id of the second arm of the A/A pair. */
 export const AA_ARM = `${AA_CASE}#aa`;
 /** The fewest jobs that give a frozen limit. */
 export const MIN_JOBS = 5;
+/** The fewest CI runs of one CPU model that give the model its own limit. */
+export const MIN_RUNS = 5;
 
 /** The record of one job of the bench, as `main.ts run` writes it. */
 export interface JobRecord {
@@ -56,6 +58,10 @@ export interface CaseValue {
 export interface JobRead {
   readonly job: string;
   readonly cpu: string;
+  /** The CI run of the job. A record with no run gives the id of the job. */
+  readonly run: string;
+  /** The commit that the job timed, when the record has one. */
+  readonly commit?: string;
   readonly cases: readonly CaseValue[];
   /** The A/A statistics of the pair of `AA_CASE`. A job with no A/A records has none. */
   readonly aa: CaseAaStat | undefined;
@@ -69,7 +75,7 @@ export function jobRead(record: JobRecord): JobRead {
     return arm === undefined ? [] : [{ case: arm.case, cuts, ms: arm.median, p10: arm.p10, p90: arm.p90, processes: arm.processes }];
   });
   const aa = record.aa.length === 0 ? undefined : aaStats(record.aa).find((stat) => stat.case === AA_CASE);
-  return { job: record.job, cpu: record.env.cpu, cases, aa };
+  return { job: record.job, cpu: record.env.cpu, run: record.run ?? record.job, ...(record.commit === undefined ? {} : { commit: record.commit }), cases, aa };
 }
 
 /** The file of the frozen limits, with the values, the commit and the date of each limit. */
@@ -78,14 +84,14 @@ export interface FrozenLimits {
   readonly measure: string;
   readonly rule: string;
   readonly seed: string;
-  /** The commit of the code that the jobs timed. */
+  /** The commit that names the freeze. Each job has the commit that it timed. With two commits or more, the timed code of the commits is the same. */
   readonly commit: string;
   /** The date of the freeze, `YYYY-MM-DD`. */
   readonly date: string;
   /** The CI runs of the jobs. */
   readonly runs: readonly string[];
   /** The job and the CPU model of each value, in the order of the values. */
-  readonly jobs: readonly { readonly job: string; readonly cpu: string }[];
+  readonly jobs: readonly { readonly job: string; readonly cpu: string; readonly run: string; readonly commit: string }[];
   /** The limit of each case, in milliseconds, with its values. */
   readonly cases: Readonly<Record<string, RunLimit>>;
   /** The noise cap: the limit of the A/A spread of a job, on a log scale, with its values. */
@@ -130,7 +136,7 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     commit: stamp.commit,
     date: stamp.date,
     runs: stamp.runs,
-    jobs: reads.map((read) => ({ job: read.job, cpu: read.cpu })),
+    jobs: reads.map((read) => ({ job: read.job, cpu: read.cpu, run: read.run, commit: read.commit ?? stamp.commit })),
     cases,
     noiseCap,
   };
@@ -149,37 +155,38 @@ export function limitFaults(file: FrozenLimits): string[] {
     const again = limit.values.length < MIN_JOBS ? undefined : runLimit(limit.values);
     if (again === undefined || again.limit !== limit.limit || again.worst !== limit.worst || again.spread !== limit.spread) faults.push(`The limit of ${name} is not runLimit of its values.`);
   };
+  for (const job of file.jobs) {
+    if (typeof job.run !== "string" || job.run === "") faults.push(`The job ${job.job} has no run.`);
+    if (typeof job.commit !== "string" || !/^[0-9a-f]{40}$/.test(job.commit)) faults.push(`The job ${job.job} has no full SHA of its commit.`);
+  }
   for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
   check("the noise cap", file.noiseCap);
   return faults;
 }
 
-/** The limits of one case: the limit of each CPU model with `MIN_JOBS` jobs or more, by its full name, and the ceiling `other`. */
+/** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, by its full name, and the ceiling `other`. */
 export type CaseTable = Readonly<Record<string, RunLimit>> & { readonly other: RunLimit };
 
 /**
  * This function gives the table of the limits of each case of a file of frozen limits.
  *
- * - The limit of a CPU model is `runLimit` of the values of its jobs. It needs `MIN_JOBS` jobs or more of the model.
+ * - The limit of a CPU model is `runLimit` of the values of its jobs. It needs jobs of `MIN_RUNS` different runs or more, because one run can give 5 jobs.
  * - The entry `other` is the limit of the case over all the jobs. It is the ceiling: the limit of a model is not above it.
- * - The keys go from the longest name to the shortest, because `cpuEntry` gives the first key that is a part of the name.
  * - The tables come from the jobs and the values of the file, so `limitFaults` also examines them.
  */
 export function modelTables(file: FrozenLimits): Record<string, CaseTable> {
   const tables: Record<string, CaseTable> = {};
   for (const [id, pooled] of Object.entries(file.cases)) {
-    const groups = new Map<string, number[]>();
+    const groups = new Map<string, { values: number[]; runs: Set<string> }>();
     file.jobs.forEach((job, index) => {
       const value = pooled.values[index];
       if (value === undefined) return;
-      const group = groups.get(job.cpu);
-      if (group === undefined) groups.set(job.cpu, [value]);
-      else group.push(value);
+      const group = groups.get(job.cpu) ?? { values: [], runs: new Set<string>() };
+      group.values.push(value);
+      group.runs.add(job.run);
+      groups.set(job.cpu, group);
     });
-    const models = [...groups].filter(([, values]) => values.length >= MIN_JOBS)
-      // `cpuEntry` gives the first key that is a part of the name, so a longer name comes first.
-      .sort(([first], [second]) => second.length - first.length || first.localeCompare(second))
-      .map(([cpu, values]) => [cpu, runLimit(values)] as const);
+    const models = [...groups].filter(([cpu, group]) => cpu !== "other" && group.runs.size >= MIN_RUNS).map(([cpu, group]) => [cpu, runLimit(group.values)] as const);
     tables[id] = { ...Object.fromEntries(models), other: pooled };
   }
   return tables;
@@ -211,7 +218,8 @@ export interface JobGate {
  * This function gives the gate of one job against the frozen limits.
  *
  * - A case is `within` when its value is at most its limit, and `beyond` when its value is above the limit.
- * - The limit is the entry of the CPU model in the table of the case (`cpuEntry`), or the ceiling with the note `CEILING_ONLY` (`limitOnModel`).
+ * - The limit is the entry of the exact CPU name in the table of the case, or the ceiling with the note `CEILING_ONLY` (`limitOnModel`).
+ *   A part of a name does not match: a model of the freeze with few runs can have a name that holds the name of a model of the table.
  * - Each case is `cannot decide` when the job has no A/A read, or when the A/A spread or the A/A bias is above the noise cap.
  * - Each case is `cannot decide` when the CPU model of the job has no frozen value, or when there is no file of limits.
  * - A case that the job or the file does not have is `cannot decide`. `gateOf` makes each `cannot decide` a no read.
@@ -223,13 +231,11 @@ export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGat
     const id = caseId(cuts);
     const ms = read.cases.find((item) => item.case === id)?.ms;
     const table = tables[id];
-    const entry = table === undefined ? undefined : cpuEntry(table, read.cpu);
-    const on =
-      table === undefined || entry === undefined
-        ? undefined
-        : limitOnModel({ gain: entry.value.limit, ceiling: table.other.limit, models: entry.model === "other" ? [] : [entry.model] }, entry.model);
+    const own = table !== undefined && read.cpu !== "other" && Object.hasOwn(table, read.cpu) ? table[read.cpu] : undefined;
+    const model = own === undefined ? "other" : read.cpu;
+    const on = table === undefined ? undefined : limitOnModel({ gain: (own ?? table.other).limit, ceiling: table.other.limit, models: own === undefined ? [] : [model] }, model);
     const limit = on?.limit;
-    const place = entry === undefined ? {} : { model: entry.model, ...(on?.note === undefined ? {} : { note: on.note }) };
+    const place = table === undefined ? {} : { model, ...(on?.note === undefined ? {} : { note: on.note }) };
     if (why !== undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: why };
     if (ms === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The job has no value of the case." };
     if (limit === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The file has no limit of the case." };
@@ -317,10 +323,10 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     const tables = modelTables(candidate);
     const models = Object.keys(tables[ids[0] ?? ""] ?? {}).filter((model) => model !== "other");
     if (models.length > 0) {
-      lines.push("", `The candidate limits of each CPU model with ${String(MIN_JOBS)} jobs or more:`, "", `| CPU | Jobs | ${ids.map((id) => `${id} (ms)`).join(" | ")} |`, `| --- | --- | ${ids.map(() => "---").join(" | ")} |`);
+      lines.push("", `The candidate limits of each CPU model with jobs of ${String(MIN_RUNS)} runs or more:`, "", `| CPU | Runs | Jobs | ${ids.map((id) => `${id} (ms)`).join(" | ")} |`, `| --- | --- | --- | ${ids.map(() => "---").join(" | ")} |`);
       for (const model of models) {
-        const jobs = candidate.jobs.filter((job) => job.cpu === model).length;
-        lines.push(`| ${model} | ${String(jobs)} | ${ids.map((id) => String(tables[id]?.[model]?.limit ?? "-")).join(" | ")} |`);
+        const jobs = candidate.jobs.filter((job) => job.cpu === model);
+        lines.push(`| ${model} | ${String(new Set(jobs.map((job) => job.run)).size)} | ${String(jobs.length)} | ${ids.map((id) => String(tables[id]?.[model]?.limit ?? "-")).join(" | ")} |`);
       }
     }
     lines.push("", `The candidate noise cap is ${String(candidate.noiseCap.limit)}, on a log scale.`);

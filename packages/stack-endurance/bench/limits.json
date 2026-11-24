@@ -1,7 +1,7 @@
 {
   "schema": "stack-endurance/independent-limits/1",
   "measure": "the median time of one call of independentStop over the fresh children of one job, in milliseconds",
-  "rule": "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with 5 jobs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling.",
+  "rule": "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling.",
   "seed": "stack-endurance/independent-stop/1",
   "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0",
   "date": "2026-11-24",
@@ -20,243 +20,363 @@
   "jobs": [
     {
       "job": "45011598445-1",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45011598445-2",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45011598445-3",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45011598445-4",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45011598445-5",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45011598445-6",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45011598445",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-1",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-2",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-3",
-      "cpu": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz"
+      "cpu": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-5",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012161360-6",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45012161360",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-1",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-3",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-5",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45012805466-6",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45012805466",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-1",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-3",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-5",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013373802-6",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45013373802",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-1",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-3",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-5",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45013843804-6",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45013843804",
+      "commit": "16240a721fbe32d261065a185b74c4f32bb698b3"
     },
     {
       "job": "45387566643-1",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45387566643-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45387566643-3",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45387566643-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45387566643-5",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45387566643-6",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45387566643",
+      "commit": "afda44cda6b218a5e7d2363f099d342ae85c87a0"
     },
     {
       "job": "45432973675-1",
-      "cpu": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz"
+      "cpu": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45432973675-2",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45432973675-3",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45432973675-4",
-      "cpu": "Intel(R) Xeon(R) 6973P-C"
+      "cpu": "Intel(R) Xeon(R) 6973P-C",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45432973675-5",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45432973675-6",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45432973675",
+      "commit": "7a436d8c1c903055d0b234e7d74c8121dce1ca2a"
     },
     {
       "job": "45434349391-1",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45434349391-2",
-      "cpu": "AMD EPYC 9V45 96-Core Processor"
+      "cpu": "AMD EPYC 9V45 96-Core Processor",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45434349391-3",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45434349391-4",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45434349391-5",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45434349391-6",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45434349391",
+      "commit": "7e63c0239aee5fe8421f34cc28e8b85633993f3c"
     },
     {
       "job": "45436194812-1",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45436194812-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45436194812-3",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45436194812-4",
-      "cpu": "Intel(R) Xeon(R) 6975P-C"
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45436194812-5",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45436194812-6",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45436194812",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-1",
-      "cpu": "AMD EPYC 9V74 80-Core Processor"
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-2",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-3",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-4",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-5",
-      "cpu": "AMD EPYC 7763 64-Core Processor"
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     },
     {
       "job": "45437394852-6",
-      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C"
+      "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+      "run": "45437394852",
+      "commit": "26a0ea7f3cb84e2980792fd2ec61d2eb08f13010"
     }
   ],
   "cases": {
