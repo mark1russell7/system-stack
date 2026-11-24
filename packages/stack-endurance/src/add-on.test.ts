@@ -92,7 +92,7 @@ describe("joinEndurance", () => {
     ]);
     expect(joined).toEqual({
       ok: false,
-      errors: ['The fragment "list" has the resource {"code":"water.stored","unit":"L"}, and the fragment "tank" has {"code":"water.stored","unit":"gal"}.'],
+      errors: ['The fragments "list", "tank" each have the resource "water.stored", and the records are not equal.'],
     });
   });
 

@@ -5,7 +5,7 @@ import { STACK_SCHEMA, type Stack } from "./stack.ts";
 // The join of the stack documents of some owners into one stack.
 // The core joins its own records, the parts. Each add-on joins its own layer, through the layer contract.
 
-export { joinRecords, joinSetting, type LayerJoiner, type LayerPiece, type RecordsJoin, type RecordTwice, type SettingJoin } from "@mark1russell7/coeval/layers";
+export { joinRecords, joinSetting, type LayerJoiner, type LayerPiece, type RecordsJoin, type RecordsJoinOptions, type RecordTwice, type SettingJoin } from "@mark1russell7/coeval/layers";
 
 /** A fragment of a stack: the stack document of one file or of one owner. */
 export interface StackFragment {
