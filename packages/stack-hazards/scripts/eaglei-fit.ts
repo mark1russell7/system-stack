@@ -155,6 +155,11 @@ export interface FitOptions {
   readonly sweep?: readonly number[] | undefined;
   /** The time of the read. */
   readonly now: () => Date;
+  /**
+   * When this option is true, the fit reads the outage files two times. The first read gives the count `held` of each county.
+   * The second read uses the larger of the customers of the file and that count as the customers of the county. The default is false.
+   */
+  readonly raise?: boolean | undefined;
   /** The event types of each case and the margins in time. With this option, the fit also gives the curves of each case. */
   readonly storms?: { readonly classes: Readonly<Record<string, readonly string[]>>; readonly options?: CauseOptions | undefined } | undefined;
 }
@@ -217,7 +222,7 @@ export interface EagleLaws {
     readonly files: readonly Omit<DatasetFile, "url">[];
   };
   readonly read: string;
-  readonly options: { readonly share: number | undefined; readonly interval: number; readonly join?: number | undefined };
+  readonly options: { readonly share: number | undefined; readonly interval: number; readonly join?: number | undefined; readonly raise?: boolean | undefined };
   readonly scheme: typeof EAGLE_SCHEME;
   readonly lines: number;
   readonly skipped: number;
@@ -231,6 +236,33 @@ export interface EagleLaws {
   readonly sweep?: readonly JoinSweep[] | undefined;
   /** The largest count of each county, and the times that its count is above its customers. A record of a fit before them does not have them. */
   readonly peaks?: Readonly<Record<string, CountyPeak>> | undefined;
+  /** The counties whose customers the option `raise` changed: the customers of the file and the customers of the fit. A record of a fit before them does not have them. */
+  readonly raised?: Readonly<Record<string, CustomerRaise>> | undefined;
+}
+
+/** The customers of a county in the file of the customers, and the customers that the fit uses in place of them. */
+export interface CustomerRaise {
+  readonly file: number;
+  readonly fit: number;
+}
+
+/**
+ * This function gives the customers of each county for a fit with the option `raise`.
+ * They are the larger of the customers of the file and the count `held`.
+ * A count of 4 readings is a lower bound of the customers of a county, because each count out counts customers.
+ * A county that is not in the file stays out of it, as in a fit without the option.
+ */
+export function raiseCustomers(file: ReadonlyMap<string, number>, peaks: Readonly<Record<string, CountyPeak>>): { customers: Map<string, number>; raised: Record<string, CustomerRaise> } {
+  const customers = new Map(file);
+  const raised: Record<string, CustomerRaise> = {};
+  for (const [area, total] of [...file].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    const held = peaks[area]?.held ?? 0;
+    if (held > total) {
+      customers.set(area, held);
+      raised[area] = { file: total, fit: held };
+    }
+  }
+  return { customers, raised };
 }
 
 /** The largest counts out of a county, and the number of its counts above its customers in the file of the customers. */
@@ -281,13 +313,15 @@ export function peakTally(customers: ReadonlyMap<string, number>): { add(count: 
  */
 export function peaksTable(laws: EagleLaws, most = 40): string {
   const customers = laws.priors?.observation.customers ?? {};
+  // With the option raise, the customers of the priors are the customers of the fit. The table compares each count with the customers of the file.
   const rows = Object.entries(laws.peaks ?? {})
     .filter(([, entry]) => entry.over > 0)
-    .map(([area, entry]) => ({ area, ...entry, customers: customers[area] ?? 0 }))
+    .map(([area, entry]) => ({ area, ...entry, customers: laws.raised?.[area]?.file ?? customers[area] ?? 0 }))
     .sort((a, b) => b.held / Math.max(b.customers, 1) - a.held / Math.max(a.customers, 1) || (a.area < b.area ? -1 : 1));
   const lines = rows.slice(0, most).map((row) => `| ${row.area} | ${String(row.customers)} | ${String(row.peak)} | ${String(row.held)} | ${String(row.over)} |`);
   const head = `| County | Customers | Largest count | Count of ${String(HELD_READINGS)} readings | Counts above the customers |`;
-  return [`${String(rows.length)} counties have a count above their customers.`, "", head, "| --- | --- | --- | --- | --- |", ...lines].join("\n");
+  const raised = laws.raised === undefined ? "" : ` The fit uses the count of ${String(HELD_READINGS)} readings as the customers of ${String(Object.keys(laws.raised).length)} counties.`;
+  return [`${String(rows.length)} counties have a count above their customers.${raised}`, "", head, "| --- | --- | --- | --- | --- |", ...lines].join("\n");
 }
 
 /** This function gives the counts of the events of one join time. */
@@ -329,11 +363,25 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const files = eagleFiles(JSON.parse(record.body), options.years);
   const parts: Uint8Array[] = [];
   for await (const bytes of fileChunks(context, files.customers)) parts.push(bytes);
-  const customers = eagleCustomers(Buffer.concat(parts).toString("utf8"));
+  const fileCustomers = eagleCustomers(Buffer.concat(parts).toString("utf8"));
+  // The peaks compare each count with the customers of the file, also with the option raise.
+  const peaks = peakTally(fileCustomers);
+  let customers: ReadonlyMap<string, number> = fileCustomers;
+  let raised: Record<string, CustomerRaise> | undefined;
+  if (options.raise === true) {
+    for (const { file } of files.years) {
+      context.log(`${file.name}: the first read, for the count of 4 readings of each county`);
+      for await (const line of linesOf(fileChunks(context, file))) {
+        const count = eagleLine(line);
+        if (count !== undefined) peaks.add(count);
+      }
+    }
+    ({ customers, raised } = raiseCustomers(fileCustomers, peaks.peaks()));
+    context.log(`${String(Object.keys(raised).length)} counties have more customers than the file gives.`);
+  }
   const reader = outageReader({ customers, share: options.share, join: options.join });
   const joins = [options.join ?? 0, ...(options.sweep ?? []).filter((join) => join !== (options.join ?? 0))];
   const coverage = coverageTally();
-  const peaks = peakTally(customers);
   let lines = 0;
   let skipped = 0;
   for (const { file } of files.years) {
@@ -345,7 +393,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
       else {
         reader.add(count);
         coverage.add(count);
-        peaks.add(count);
+        if (options.raise !== true) peaks.add(count);
       }
     }
   }
@@ -369,7 +417,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     schema: LAWS_SCHEMA,
     source: { article: EAGLE_ARTICLE, version, modified, license, doi, files: [files.customers, ...files.years.map((entry) => entry.file)].map(({ url: _, ...file }) => file) },
     read: options.now().toISOString(),
-    options: { share: options.share, interval: EAGLE_INTERVAL, join: options.join },
+    options: { share: options.share, interval: EAGLE_INTERVAL, join: options.join, raise: options.raise },
     scheme: EAGLE_SCHEME,
     lines,
     skipped,
@@ -380,6 +428,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     priors,
     sweep,
     peaks: peaks.peaks(),
+    raised,
   };
 }
 
@@ -414,10 +463,10 @@ export function yearsOf(text: string): (year: number) => boolean {
 }
 
 if (import.meta.main) {
-  const { values } = parseArgs({ options: { years: { type: "string", default: "2014-2030" }, out: { type: "string", default: "out/eaglei-laws.json" }, share: { type: "string" }, join: { type: "string" }, sweep: { type: "boolean", default: false } } });
+  const { values } = parseArgs({ options: { years: { type: "string", default: "2014-2030" }, out: { type: "string", default: "out/eaglei-laws.json" }, share: { type: "string" }, join: { type: "string" }, sweep: { type: "boolean", default: false }, raise: { type: "boolean", default: false } } });
   const pace: Pace = { scheduler: new HostScheduler(realClock, 1), now: realClock.now };
   const context: FitContext = { pace, transport: fetchTransport({ userAgent: USER_AGENT, timeoutMs: 600_000 }), chunkBytes: CHUNK_BYTES, log: (line) => console.log(line) };
-  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), join: values.join === undefined ? undefined : Number(values.join), sweep: values.sweep ? JOIN_SWEEP : undefined, now: () => new Date(), storms: { classes: STORM_CLASSES } });
+  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), join: values.join === undefined ? undefined : Number(values.join), sweep: values.sweep ? JOIN_SWEEP : undefined, raise: values.raise, now: () => new Date(), storms: { classes: STORM_CLASSES } });
   mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, `${JSON.stringify(laws, null, 2)}\n`);
   const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}${laws.sweep === undefined ? "" : `\n${sweepTable(laws.sweep)}\n`}\n${peaksTable(laws)}\n`;
