@@ -171,7 +171,7 @@ A dry resource with a no read in a line has no converter. It is in `noReads`, an
 
 The catalog of market gives no soak water. Thus a food that needs a soak, for example dry beans, has no soak draw. The beans of the catalog have no cited cook water, so they have no converter.
 
-The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
+The cook water and the drinking water are one store, `water.stored`. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water. `jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.
 
 The cited constants:
 
