@@ -164,7 +164,7 @@ export function limitFaults(file: FrozenLimits): string[] {
   return faults;
 }
 
-/** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, by its full name, and the ceiling `other`. */
+/** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, and the ceiling `other`. The key of a model is its full name. */
 export type CaseTable = Readonly<Record<string, RunLimit>> & { readonly other: RunLimit };
 
 /**
@@ -219,7 +219,7 @@ export interface JobGate {
  *
  * - A case is `within` when its value is at most its limit, and `beyond` when its value is above the limit.
  * - The limit is the entry of the exact CPU name in the table of the case, or the ceiling with the note `CEILING_ONLY` (`limitOnModel`).
- *   A part of a name does not match: a model of the freeze with few runs can have a name that holds the name of a model of the table.
+ *   A part of a name does not match. A model of the freeze with few runs can have a name that holds the name of a table model.
  * - Each case is `cannot decide` when the job has no A/A read, or when the A/A spread or the A/A bias is above the noise cap.
  * - Each case is `cannot decide` when the CPU model of the job has no frozen value, or when there is no file of limits.
  * - A case that the job or the file does not have is `cannot decide`. `gateOf` makes each `cannot decide` a no read.

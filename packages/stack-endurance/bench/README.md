@@ -14,7 +14,7 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - The limits of the first day blocked 1 of 19 jobs of the second day on a model with its own limit. The job was above on 2 cases, by 0.07% and 0.26%. The limits of the second day blocked no job of the first day.
 - The jobs on the 9V45 have two levels at 12 cuts: 31 ms, and 34 to 35 ms. The jobs on the 8573C have two levels too. The record of a job has no field that tells the two machine kinds apart, so the limit of a model holds its two levels.
 - `node bench/main.ts read --in <folder> --freeze <file> --commit <sha>` freezes the limits of the records under a folder. Give `--commit` when the runs come from several commits. Each job of the file keeps its run and the commit that it timed.
-- A limit of a model is near the noise of its jobs, so a block can come from noise. When a commit changes no timed code, put the records of the whole run into a new freeze in a pull request. The rule then widens a limit only by a value of CI.
+- A limit of a model is near the noise of its jobs, so a block can come from noise. When a commit changes no timed code, freeze again with the records of the whole run. Do it in a pull request. The rule then widens a limit only by a value of CI.
 - When a commit changes the timed code, a block is a finding. Find the cause before you change a limit.
 - A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
 - The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read. A job above its limit blocks the run.
