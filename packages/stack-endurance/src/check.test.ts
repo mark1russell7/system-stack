@@ -79,8 +79,32 @@ describe("checkEndurance", () => {
     expect(hasEnduranceError(faults)).toBe(false);
   });
 
+  it("refuses a limit for each day that is not 0 or more, and a count of devices that is not a whole number of 1 or more", () => {
+    const converter = SAMPLE_ENDURANCE.converters?.[0];
+    if (converter === undefined) throw new Error("The sample has no converter.");
+    for (const bad of [{ perDay: -1 }, { perDay: Number.NaN }, { perDay: Infinity }, { devices: 0 }, { devices: 1.5 }, { devices: -2 }]) {
+      const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, converters: [{ ...converter, ...bad }] };
+      expect(codes(layer)).toEqual(["endurance-range"]);
+    }
+    const good: EnduranceLayer = { ...SAMPLE_ENDURANCE, converters: [{ ...converter, perDay: 0, devices: 3 }] };
+    expect(codes(good)).toEqual([]);
+  });
+
+  it("refuses two counts of devices for one device", () => {
+    const converter = SAMPLE_ENDURANCE.converters?.[0];
+    if (converter === undefined) throw new Error("The sample has no converter.");
+    const device = converter.device ?? "stove";
+    const pair = (devices: number | undefined): EnduranceLayer => ({
+      ...SAMPLE_ENDURANCE,
+      converters: [{ ...converter, device, perDay: 4, devices: 2 }, { ...converter, id: `${converter.id}-2`, device, devices }],
+    });
+    expect(checkEndurance(pair(1)).map((fault) => [fault.code, fault.at])).toEqual([["endurance-devices", `${converter.id}-2`]]);
+    expect(checkEndurance(pair(undefined)).map((fault) => fault.code)).toEqual(["endurance-devices"]);
+    expect(checkEndurance(pair(2))).toEqual([]);
+  });
+
   it("has a code for each fault", () => {
-    expect(ENDURANCE_CODES).toHaveLength(12);
+    expect(ENDURANCE_CODES).toHaveLength(13);
   });
 });
 

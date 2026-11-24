@@ -259,6 +259,26 @@ The report is all rights reserved (the license `all-rights-reserved` of guideboo
 
 The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table of calorie needs. It sends the reader to the DRI calculator of the USDA, and its daily servings start from a calorie level. Thus the table stays the table of the 2020-2025 edition.
 
+## The daily needs of the kit
+
+`DAILY_NEEDS` gives the needs of the kit items: light, the watch of an alert receiver and warmth. Each need has a cited daily rate, or a no read with its reason. A no read is not 0, and the list keeps it.
+
+| Code | Unit | Users | Daily rate |
+| --- | --- | --- | --- |
+| `alert.watch` | `h` | household | 24 `h/d` |
+| `light.see` | `h` | household | no read |
+| `warmth.shelter` | `kWh` | household | no read |
+
+- `alert.watch` comes from two pages of the National Weather Service (read on 2026-11-24). Many receivers have a muted standby mode that turns on when a warning comes. Warnings also come at night. Thus a receiver stays on and listens at all hours, so 24 hours each day. One receiver for each home is a choice of this model, not of the pages. The pages are in the public domain (the license `us-public-domain`).
+- `light.see` is a no read. The kit lists of Ready.gov give a flashlight and extra batteries, but no hours of use each day. The hours of dark are the same for all the persons of a home, so the users are the household. The count of lights of each person is a fact of the plan or the device.
+- `warmth.shelter` is a no read. The heat that a home needs changes with the weather, the building and the persons. It is space heat only. The blankets and the sleeping bags of each person are gear, not this need.
+- A user gives each no read as input data.
+- The rate of a device is a fact of the device, not of the need. An example is the watts of a radio in standby.
+
+`checkDailyNeeds` is the gate of the list. It gives the findings of `checkSources` of `@mark1russell7/guidebook`. Each source must have a publisher (`by`), a page of its terms and HTTPS addresses. `resultOf` of guidebook tells if the gate passes.
+
+The gate refuses an empty code and two needs with one code (`daily-need-id`). It refuses a unit that `@mark1russell7/quantity` does not read (`daily-need-unit`). It also refuses a bad read or a no read with no reason (`daily-need-rate`). A bad read has no source. Or its amount is not a finite number of 0 or more in the unit of the need for each day.
+
 ## The entries
 
 | Entry | What it has |
