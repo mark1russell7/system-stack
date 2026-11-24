@@ -154,6 +154,44 @@ export interface CitedFeeds {
  */
 export const FORMULA_FEEDS: CitedFeeds = { perDay: 8, source: WIC_INFANT_SOURCE, locator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137" };
 
+/** The source of the energy of one fluid ounce of ready-to-feed formula: the SR Legacy file of FoodData Central. */
+export const FDC_SR_LEGACY_SOURCE: Source = {
+  id: "fdc-sr-legacy-2018-04",
+  title: "FoodData Central, SR Legacy (April 2018)",
+  url: "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+  license: "cc0",
+  checked: "2026-11-24",
+  by: "USDA Agricultural Research Service",
+  terms: "https://fdc.nal.usda.gov/download-datasets",
+  sha256: "b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0",
+};
+
+/** The energy of the least formula of one infant for one day, from a cited volume and a cited energy of one fluid ounce. */
+export interface CitedFormulaLeast {
+  /** The energy, in `kcal`: `ounces` times `kcalPerOunce`. */
+  readonly perDay: number;
+  readonly ounces: number;
+  readonly ouncesSource: Source;
+  readonly ouncesLocator: string;
+  readonly kcalPerOunce: number;
+  readonly kcalSource: Source;
+  readonly kcalLocator: string;
+}
+
+/**
+ * The least formula of one infant from 6 months: 24 fl oz a day. Table 5.2 of the WIC guide gives 24 to 32 ounces at 6 to 8 months,
+ * and 24 ounces at 8 to 12 months. The FDC item 172319 gives 63 kcal in 100 g and 30.4 g in 1 fl oz, thus 19.152 kcal in 1 fl oz.
+ */
+export const FORMULA_LATER_LEAST: CitedFormulaLeast = {
+  perDay: 24 * 19.152,
+  ounces: 24,
+  ouncesSource: WIC_INFANT_SOURCE,
+  ouncesLocator: "Table 5.2, Guidelines for Feeding Healthy Infants, Birth to 12 Months Old, page 137",
+  kcalPerOunce: 19.152,
+  kcalSource: FDC_SR_LEGACY_SOURCE,
+  kcalLocator: "FDC ID 172319: 63 kcal in 100 g (food_nutrient.csv), and 30.4 g in 1 fl oz (food_portion.csv)",
+};
+
 /** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
 export const NASEM_ENERGY_SOURCE: Source = {
   id: "nasem-dri-energy-2023",

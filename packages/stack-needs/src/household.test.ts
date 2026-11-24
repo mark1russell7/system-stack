@@ -2,7 +2,7 @@ import { SUPPLY_CATALOG, type SupplyCatalog, type SupplyProduct } from "@mark1ru
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { DGA_CALORIES, FORMULA_FEEDS, MILK_LATER, NASEM_INFANT_CALORIES } from "./data.ts";
+import { DGA_CALORIES, FORMULA_FEEDS, FORMULA_LATER_LEAST, MILK_LATER, NASEM_INFANT_CALORIES } from "./data.ts";
 import { FORMULA_DRAW_MONTHS, householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
 import { FOOD_NEED, FORMULA_NEED, FORMULA_READY, NO_COOK } from "./uses.ts";
 
@@ -308,6 +308,22 @@ describe("the household fragment", () => {
     ]);
     expect(whole.leftOut).toEqual([]);
     expect(whole.formula).toEqual([girl]);
+  });
+
+  it("puts the least formula of an infant from 6 months in the formula draw and the rest in the food draw with formulaLater: least", () => {
+    // The infant table gives 604 kcal/d for the girls of 6 to 8 months. The least formula is 24 fl oz at 19.152 kcal/fl oz.
+    const girls: Person = { sex: "female", ageMonths: 7, count: 2, feeding: "formula" };
+    const least = fragmentOf({ ...input, persons: [...adults, girls], formulaLater: "least" });
+    expect(FORMULA_LATER_LEAST.perDay).toBeCloseTo(459.648, 9);
+    expect(least.layer.draws).toEqual([
+      { need: FOOD_NEED, level: "critical", perDay: expect.closeTo(DAILY + 2 * (604 - 459.648), 9), users: 4, supply: "food.retail" },
+      { need: FORMULA_NEED, level: "critical", perDay: expect.closeTo(2 * 459.648, 9), users: 2, supply: "food.retail" },
+    ]);
+    expect(least.leftOut).toEqual([]);
+    // The low and the high give the same total energy. Only the split between the draws differs.
+    const whole = fragmentOf({ ...input, persons: [...adults, girls], formulaLater: "whole" });
+    const total = (layer: EnduranceLayer): number => layer.draws.reduce((sum, draw) => sum + draw.perDay, 0);
+    expect(total(least.layer)).toBeCloseTo(total(whole.layer), 9);
   });
 
   it("gives only the draw of formula for a household of infants on formula", () => {

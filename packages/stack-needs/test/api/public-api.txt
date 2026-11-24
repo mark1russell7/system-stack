@@ -24,6 +24,7 @@ CalorieSex: build/index.d.ts#CalorieSex
 CalorieTable: build/index.d.ts#CalorieTable
 CalorieTables: build/index.d.ts#CalorieTables
 CitedFeeds: build/index.d.ts#CitedFeeds
+CitedFormulaLeast: build/index.d.ts#CitedFormulaLeast
 CitedMilk: build/index.d.ts#CitedMilk
 CookConstant: build/index.d.ts#CookConstant
 CookFragment: build/index.d.ts#CookFragment
@@ -44,9 +45,11 @@ DailyNeedFinding: build/index.d.ts#DailyNeedFinding
 DailyNeedUsers: build/index.d.ts#DailyNeedUsers
 DailyRateNoRead: build/index.d.ts#DailyRateNoRead
 DailyRateRead: build/index.d.ts#DailyRateRead
+FDC_SR_LEGACY_SOURCE: build/index.d.ts#FDC_SR_LEGACY_SOURCE
 FOOD_NEED: build/index.d.ts#FOOD_NEED
 FORMULA_DRAW_MONTHS: build/index.d.ts#FORMULA_DRAW_MONTHS
 FORMULA_FEEDS: build/index.d.ts#FORMULA_FEEDS
+FORMULA_LATER_LEAST: build/index.d.ts#FORMULA_LATER_LEAST
 FORMULA_NEED: build/index.d.ts#FORMULA_NEED
 FORMULA_READY: build/index.d.ts#FORMULA_READY
 FragmentConverter: build/index.d.ts#FragmentConverter
@@ -209,6 +212,17 @@ export interface CitedFeeds {
   readonly locator: string;
 }
 
+### build/index.d.ts#CitedFormulaLeast
+export interface CitedFormulaLeast {
+  readonly perDay: number;
+  readonly ounces: number;
+  readonly ouncesSource: Source;
+  readonly ouncesLocator: string;
+  readonly kcalPerOunce: number;
+  readonly kcalSource: Source;
+  readonly kcalLocator: string;
+}
+
 ### build/index.d.ts#CitedMilk
 export interface CitedMilk {
   readonly perDay: number;
@@ -337,6 +351,9 @@ export interface DailyRateRead {
   readonly note: string;
 }
 
+### build/index.d.ts#FDC_SR_LEGACY_SOURCE
+export declare const FDC_SR_LEGACY_SOURCE: Source;
+
 ### build/index.d.ts#FOOD_NEED
 export declare const FOOD_NEED = "food.energy";
 
@@ -345,6 +362,9 @@ export declare const FORMULA_DRAW_MONTHS = 6;
 
 ### build/index.d.ts#FORMULA_FEEDS
 export declare const FORMULA_FEEDS: CitedFeeds;
+
+### build/index.d.ts#FORMULA_LATER_LEAST
+export declare const FORMULA_LATER_LEAST: CitedFormulaLeast;
 
 ### build/index.d.ts#FORMULA_NEED
 export declare const FORMULA_NEED = "food.infant-formula";
@@ -426,7 +446,7 @@ export interface HouseholdFragmentInput {
   readonly prefix?: string | undefined;
   readonly noRow?: NoRowAction | undefined;
   readonly cold?: boolean | undefined;
-  readonly formulaLater?: "whole" | undefined;
+  readonly formulaLater?: "whole" | "least" | undefined;
 }
 
 ### build/index.d.ts#HouseholdFragmentNoRead
