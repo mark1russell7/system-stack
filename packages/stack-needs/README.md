@@ -1,6 +1,6 @@
 # @mark1russell7/stack-needs
 
-The need rates of draws as reference data. Each rate has its source and its license. The first table is the food energy that each person needs each day.
+The need rates of draws as reference data. Each rate has its source and its license. The first tables are the food energy that each person needs each day.
 
 It is an add-on of [`@mark1russell7/system-stack`](../system-stack/README.md). It makes a fragment of an endurance layer, and [`@mark1russell7/stack-endurance`](../stack-endurance/README.md) calculates with it. The data names no person and no place. The persons of a household are input data.
 
@@ -11,6 +11,7 @@ Each function is a plain function with no clock, no network and no file.
 | Record | What it tells |
 | --- | --- |
 | `CalorieTable` | A table of estimated calorie needs from one source, with the place of the tables in the source. |
+| `CalorieTables` | One table, or tables in order. For each person, the first table with a row for the age gives the need. |
 | `CalorieRow` | A sex, a range of ages in months, and the need of each activity level, or one need for all levels. |
 | `CalorieChange` | A stage (for example `pregnancy-2`), a sex, and the change of the daily need at that stage, with the condition of the source. |
 | `Person` | A group of persons: a sex, an age in whole months, a count and, as options, an activity level and a stage. |
@@ -19,12 +20,16 @@ Each function is a plain function with no clock, no network and no file.
 ## The rules of the data
 
 1. Each value comes from a table of a cited source. A value with no source is not data.
-2. An age with no row in the table gives a line with no read for that person, not an error. The total of `calorieNeed` is then a lower limit, and `read` is false.
+2. An age with no row in the tables gives a line with no read for that person, not an error. The total of `calorieNeed` is then a lower limit, and `read` is false.
 3. The activity level is an explicit input. The package has no default level.
-4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. A stage that the table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw. One stage holds for each day of a call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
+4. A stage of pregnancy or lactation is an input of a person record. `calorieNeed` adds the change of the stage to the need of the row. The change comes from the table of the row. A stage that this table does not have for the sex of the record is an error, not a no read. Thus the option `leave-out` cannot remove a pregnant person from a draw. One stage holds for each day of a call. For a period that crosses stages, the planner selects the stage, for example the stage with the largest change.
 5. The package has no cooking converter. No cited source gives the water and the fuel to cook 1 kg of dry food.
 
-`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). The source of a table must have a publisher (`by`), a page of its terms and a hash, and HTTPS addresses (the options `require` and `https` of the gate). A missing field gives `missing-field`. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex also cover each month with no gap, from the first row to an open last row (`needs-gap`). Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
+`checkCalorieTable` is the gate of a table. It gives the findings of `checkSources` of `@mark1russell7/guidebook` for the source, also for a hash that is not 64 lowercase hexadecimal digits (`bad-sha256`). The source of a table must have a publisher (`by`), a page of its terms and a hash, and HTTPS addresses (the options `require` and `https` of the gate). A missing field gives `missing-field`. For the rows, it refuses two rows of one sex with ages in common, and a need that is not above 0 in `kcal/d`. The rows of each sex have no gap between two rows (`needs-gap`). A table can start after month 0 and end at a closed row. Each change has a stage, a title, a sex of the table and a finite value in `kcal/d`. Each stage and sex has one change at most (`needs-change`).
+
+`checkCalorieChain` is the gate of tables in order. It gives the findings of `checkCalorieTable` for each table.
+
+Then, for each sex, the rows of all the tables must cover each month from 0 to an open last row (`needs-gap`, record `chain`). Before 0.6.0, `checkCalorieTable` refused a table with a closed last row.
 
 The source of a table is the `Source` of `@mark1russell7/guidebook`, with its field `sha256`. Before 0.3.0, the package had its own type `HashedSource` and the code `needs-hash`.
 
@@ -71,9 +76,17 @@ The result has two reads. `needRead` tells if the draw has a read, and `storesRe
 
 ### A person with no row
 
-The table has no row below 12 months. By default, a person with no row gives no layer. The result has `layer: undefined`, the persons with no row and the reason. A low rate gives too many days, and the draw has no field for a no read. A draw of 0 kcal also gives no layer: a household with no person, or each count 0.
+The default tables are `CALORIE_CHAIN`: the guidelines, then the infant table. They give a row for each age. A table of the option `table` can have no row for an age. By default, a person with no row gives no layer. The result has `layer: undefined`, the persons with no row and the reason. A low rate gives too many days, and the draw has no field for a no read. A draw of 0 kcal also gives no layer: a household with no person, or each count 0.
 
-The option `noRow: "leave-out"` leaves those persons out of the draw. The users are then the persons with a row, and `leftOut` lists the other persons. The draw then has no need of those persons. For an infant, that need is breast milk or formula, not the buy list. The days are then an upper limit for the whole household.
+The option `noRow: "leave-out"` leaves those persons out of the draw. The users are then the persons with a row, and `leftOut` lists the other persons. The draw then has no need of those persons.
+
+The days are then an upper limit for the whole household.
+
+### An infant
+
+The infant table gives the need of an infant below 12 months. For an infant on formula or on food, the buy list holds that need.
+
+The milk of a mother comes from the food of the mother. Thus, for an infant that drinks only that milk, give the mother the stage `lactation-1`. Then leave the infant out of the persons. If the persons hold the infant too, the draw counts that energy two times. The result is then more food than the household needs, which is on the safe side. After 6 months, an infant eats food and drinks milk. The stage `lactation-2` of the mother and the need of the infant then count a part of the energy two times.
 
 ### The resources of the buy list and the join
 
@@ -133,10 +146,19 @@ The guidelines are a work of the United States federal government, in the public
 - The source gives each need for a reference height and weight. A person can need more or less.
 - The source gives the changes of Table A2-3 for women with a healthy weight before the pregnancy. Each change has this condition in its field `condition`.
 
+The infant table comes from the report Dietary Reference Intakes for Energy (2023) of the National Academies of Sciences, Engineering, and Medicine (DOI 10.17226/26818). Table 7-5 gives the boys of 0 to 35 months, on page 160. Table 7-6 gives the girls of 0 to 35 months, on page 161. The table has 24 rows: one row for each group of 3 months and each sex.
+
+The report gives each need for the median length and weight of the age group in the United States.
+
+The report is all rights reserved (the license `all-rights-reserved` of guidebook). The table cites its values as facts and copies no text, and the gate of the sources permits this use. The record of the source has the SHA-256 hash of the PDF of the check of 2026-11-24. The Infant Nutrition and Feeding guide of the WIC program of the USDA gives no table of daily needs (read on 2026-11-24).
+
+- The rows of 12 to 35 months are also in the table. In `CALORIE_CHAIN`, the guidelines come first, so they give the need of those ages.
+- A table with the report first gives the needs of the report up to 35 months.
+
 The 2025-2030 edition of the guidelines was read on 2026-11-24. It has no table of calorie needs. It sends the reader to the DRI calculator of the USDA, and its daily servings start from a calorie level. Thus the table stays the table of the 2020-2025 edition.
 
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-needs` | The records, the calorie table, the gate, `calorieNeed`, `householdFragment`, the uses, the supply parts and `checkJoins`. |
+| `@mark1russell7/stack-needs` | The records, the calorie tables and `CALORIE_CHAIN`, the gates, `calorieNeed`, `householdFragment`, the uses, the supply parts and `checkJoins`. |

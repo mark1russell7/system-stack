@@ -2,6 +2,7 @@ import { SUPPLY_CATALOG } from "@mark1russell7/market/supplies";
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
+import { DGA_CALORIES, NASEM_INFANT_CALORIES } from "./data.ts";
 import { householdFragment, type HouseholdFragmentInput, type HouseholdFragmentRead } from "./household.ts";
 import { FOOD_NEED, NO_COOK } from "./uses.ts";
 
@@ -22,7 +23,7 @@ const input: HouseholdFragmentInput = { persons: adults, activity: "sedentary", 
 const foodCut: CaseCuts = { case: "test.food-cut", title: "A test stop of the food shops", cuts: [{ part: "food.retail", title: "No food shops", source: "test" }] };
 const at = "2026-11-22";
 
-/** A made-up infant of 6 months. The table has no row below 12 months. */
+/** A made-up infant of 6 months. The guidelines have no row below 12 months. The infant table gives 604 kcal/d. */
 const infant: Person = { sex: "female", ageMonths: 6, count: 1 };
 
 /** This function gives the fragment of a call, and fails the test when the call gives no layer. */
@@ -105,15 +106,22 @@ describe("the household fragment", () => {
     expect(result.layer.resources.find((resource) => resource.code === "water.stored")?.unit).toBe("L");
   });
 
-  it("gives no layer for a household of only an infant", () => {
-    const result = householdFragment({ ...input, persons: [infant] });
+  it("gives an infant the need of the infant table by default", () => {
+    const result = fragmentOf({ ...input, persons: [...adults, infant] });
+    expect(result.leftOut).toEqual([]);
+    expect(result.layer.draws[0]).toMatchObject({ perDay: DAILY + 604, users: 3 });
+    expect(result.need.lines[2]).toMatchObject({ read: true, table: NASEM_INFANT_CALORIES.id, row: "6-8" });
+  });
+
+  it("gives no layer for a household of only an infant with a table that has no row for the infant", () => {
+    const result = householdFragment({ ...input, table: DGA_CALORIES, persons: [infant] });
     expect(result.layer).toBeUndefined();
     expect(result.needRead).toBe(false);
     if (result.layer === undefined) expect(result.noRow).toEqual([infant]);
   });
 
-  it("gives no layer for two adults and an infant by default", () => {
-    const result = householdFragment({ ...input, persons: [...adults, infant] });
+  it("gives no layer for two adults and an infant with no row, with no option", () => {
+    const result = householdFragment({ ...input, table: DGA_CALORIES, persons: [...adults, infant] });
     expect(result.layer).toBeUndefined();
     if (result.layer === undefined) {
       expect(result.noRow).toEqual([infant]);
@@ -122,7 +130,7 @@ describe("the household fragment", () => {
   });
 
   it("leaves the infant out of the draw with the option, and lists the infant", () => {
-    const result = fragmentOf({ ...input, persons: [...adults, infant], noRow: "leave-out" });
+    const result = fragmentOf({ ...input, table: DGA_CALORIES, persons: [...adults, infant], noRow: "leave-out" });
     expect(result.needRead).toBe(true);
     expect(result.leftOut).toEqual([infant]);
     expect(result.layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
@@ -134,7 +142,7 @@ describe("the household fragment", () => {
       expect(result.layer, JSON.stringify(persons)).toBeUndefined();
       expect(result.needRead).toBe(false);
     }
-    expect(householdFragment({ ...input, persons: [infant], noRow: "leave-out" }).layer).toBeUndefined();
+    expect(householdFragment({ ...input, table: DGA_CALORIES, persons: [infant], noRow: "leave-out" }).layer).toBeUndefined();
   });
 
   it("keeps a gift with no read out of the stores, and the food draw stays exact", () => {

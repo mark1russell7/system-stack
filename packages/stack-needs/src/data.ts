@@ -114,5 +114,70 @@ export const DGA_CALORIES: CalorieTable = {
   ],
 };
 
+// The Estimated Energy Requirements of the report Dietary Reference Intakes for Energy (2023) of the National Academies,
+// for the ages of 0 to 35 months. Each value is from Table 7-5 (boys, page 160) and Table 7-6 (girls, page 161) of the
+// PDF, read on 2026-11-24. The report gives each need for the median length and weight of the age group in the United
+// States (NHANES 2015-2018). The age groups are 3 months wide. The report predicts each group at one age, for example
+// 1 month for the group Birth-2.
+// The report is all rights reserved. The values are facts with a citation, and the gate of the sources permits them.
+// The Infant Nutrition and Feeding guide of the WIC program of the USDA (read on 2026-11-24) gives no table of daily needs.
+
+/** The source of the infant table: the PDF of the report Dietary Reference Intakes for Energy (2023) of the National Academies. */
+export const NASEM_ENERGY_SOURCE: Source = {
+  id: "nasem-dri-energy-2023",
+  title: "Dietary Reference Intakes for Energy (2023)",
+  url: "https://nap.nationalacademies.org/26818",
+  license: "all-rights-reserved",
+  checked: "2026-11-24",
+  by: "National Academies of Sciences, Engineering, and Medicine",
+  terms: "https://nap.nationalacademies.org/26818",
+  note: "DOI 10.17226/26818. The terms are on the first page of the PDF. The table cites its values as facts and copies no text.",
+  sha256: "e6a7d9c9104053d4925c621b659b06de4c8dd6c64ed4534e6f5bc5cf0dd41b27",
+};
+
+/**
+ * The table of the Estimated Energy Requirements of the ages of 0 to 35 months, from the report Dietary Reference Intakes
+ * for Energy (2023): 24 rows, 12 for each sex. Each row gives one need for each age group and sex. The last row ends at
+ * 35 months, so the table is for a chain of tables, for example `CALORIE_CHAIN`.
+ */
+export const NASEM_INFANT_CALORIES: CalorieTable = {
+  id: "nasem.2023:eer-0-35-months",
+  title: "Dietary Reference Intakes for Energy (2023): Estimated Energy Requirements of the ages of 0 to 35 months",
+  source: NASEM_ENERGY_SOURCE,
+  locator: "Chapter 7: Table 7-5 (boys of 0 to 35 months, page 160) and Table 7-6 (girls of 0 to 35 months, page 161)",
+  rows: [
+    { sex: "female", age: "Birth-2", from: 0, to: 2, need: each(531) },
+    { sex: "female", age: "3-5", from: 3, to: 5, need: each(546) },
+    { sex: "female", age: "6-8", from: 6, to: 8, need: each(604) },
+    { sex: "female", age: "9-11", from: 9, to: 11, need: each(689) },
+    { sex: "female", age: "12-14", from: 12, to: 14, need: each(780) },
+    { sex: "female", age: "15-17", from: 15, to: 17, need: each(817) },
+    { sex: "female", age: "18-20", from: 18, to: 20, need: each(881) },
+    { sex: "female", age: "21-23", from: 21, to: 23, need: each(956) },
+    { sex: "female", age: "24-26", from: 24, to: 26, need: each(1011) },
+    { sex: "female", age: "27-29", from: 27, to: 29, need: each(1051) },
+    { sex: "female", age: "30-32", from: 30, to: 32, need: each(1122) },
+    { sex: "female", age: "33-35", from: 33, to: 35, need: each(1192) },
+    { sex: "male", age: "Birth-2", from: 0, to: 2, need: each(566) },
+    { sex: "male", age: "3-5", from: 3, to: 5, need: each(589) },
+    { sex: "male", age: "6-8", from: 6, to: 8, need: each(675) },
+    { sex: "male", age: "9-11", from: 9, to: 11, need: each(745) },
+    { sex: "male", age: "12-14", from: 12, to: 14, need: each(821) },
+    { sex: "male", age: "15-17", from: 15, to: 17, need: each(881) },
+    { sex: "male", age: "18-20", from: 18, to: 20, need: each(952) },
+    { sex: "male", age: "21-23", from: 21, to: 23, need: each(1027) },
+    { sex: "male", age: "24-26", from: 24, to: 26, need: each(1058) },
+    { sex: "male", age: "27-29", from: 27, to: 29, need: each(1136) },
+    { sex: "male", age: "30-32", from: 30, to: 32, need: each(1183) },
+    { sex: "male", age: "33-35", from: 33, to: 35, need: each(1213) },
+  ],
+};
+
 /** The tables of estimated calorie needs, one record for each source. */
-export const CALORIE_TABLES: readonly CalorieTable[] = [DGA_CALORIES];
+export const CALORIE_TABLES: readonly CalorieTable[] = [DGA_CALORIES, NASEM_INFANT_CALORIES];
+
+/**
+ * The default tables of `householdFragment`, in order: the guidelines first, then the infant table. The guidelines give
+ * each age from 12 months. The infant table gives the ages below 12 months. Together they give a row for each age.
+ */
+export const CALORIE_CHAIN: readonly CalorieTable[] = [DGA_CALORIES, NASEM_INFANT_CALORIES];

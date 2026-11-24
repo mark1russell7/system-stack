@@ -1,6 +1,6 @@
 import { checkSources, type Finding, type FindingCode, type GateOptions, type SourceField } from "@mark1russell7/guidebook";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
-import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } from "./calorie.ts";
+import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable, type CalorieTables } from "./calorie.ts";
 
 // The gate of a table of calorie needs: the gate of the sources of guidebook, and the rows.
 
@@ -9,7 +9,8 @@ import { ACTIVITY_LEVELS, CALORIE_SEXES, type CalorieRow, type CalorieTable } fr
  *
  * - `needs-row`: a row has no age or a wrong sex. Or its range of months is not a range of whole numbers of 0 or more.
  * - `needs-overlap`: two rows of one sex have ages in common.
- * - `needs-gap`: the rows of one sex do not cover each month with no gap, from the first row to an open last row.
+ * - `needs-gap`: the rows of one sex in a table have a gap between two rows. Or the rows of one sex in a chain of tables
+ *   do not cover each month from 0 to an open last row.
  * - `needs-value`: a need is not a finite number above 0 in a unit of energy for each day.
  * - `needs-change`: a change has no stage, no title or a wrong sex, or a stage with a space at an end. Or a different
  *   change has its stage and sex. Or its value is not a finite number in a unit of energy for each day. Or its sum with
@@ -21,7 +22,7 @@ export const NEEDS_CODES: readonly ["needs-row", "needs-overlap", "needs-gap", "
 export type NeedsCode = (typeof NEEDS_CODES)[number];
 
 /** A finding of the gate of a table of calorie needs: a finding of the gate of the sources, or a finding of a row. */
-export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | "row" | "change">;
+export type NeedsFinding = Finding<NeedsCode | FindingCode, "source" | "unit" | "row" | "change" | "chain">;
 
 /** This function tells if a need is a finite number in a unit of energy for each day, and above 0 when `positive` is true. */
 function goodNeed(need: Quantity, positive = true): boolean {
@@ -71,7 +72,8 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
     }
   });
 
-  // The rows of each sex, in the order of their first month, cover each month with no gap to an open last row. A row with a bad range has its own finding.
+  // The rows of each sex, in the order of their first month, have no gap. A row with a bad range has its own finding.
+  // A table can start after month 0 and end at a closed row: the gate of a chain checks the cover of all months.
   for (const sex of CALORIE_SEXES) {
     const rows = table.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.sex === sex && range(row));
     rows.sort((a, b) => a.row.from - b.row.from);
@@ -79,8 +81,6 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
       const before = rows[at]?.row.to;
       if (before !== undefined && row.from > before + 1) add("needs-gap", "row", idOf(index), `The table has no row of a ${sex} for the months ${String(before + 1)} to ${String(row.from - 1)}.`);
     });
-    const last = rows.at(-1);
-    if (last !== undefined && last.row.to !== undefined) add("needs-gap", "row", idOf(last.index), `The last row of a ${sex} ends at ${String(last.row.to)} months. It is not an open row.`);
   }
 
   // The changes: a stage, a title and a sex of the table, one change for each stage and sex, and a finite value.
@@ -104,6 +104,41 @@ export function checkCalorieTable(table: CalorieTable, options?: GateOptions): N
     if (!goodNeed(change.change, false)) add("needs-change", "change", id, `The change "${id}" has a value that is not a finite number in kcal/d.`);
     else if (smallest(change.sex) + valueIn(change.change, "kcal/d") <= 0) add("needs-change", "change", id, `The change "${id}" makes the smallest need of a ${change.sex} 0 or less.`);
   });
+  return findings;
+}
+
+/**
+ * This function gives each finding of a chain of tables. First come the findings of `checkCalorieTable` for each table,
+ * in the order of the chain. Then come the findings of the cover. For each sex, the rows of all the tables cover each month from 0 to an
+ * open last row (`needs-gap`, record `chain`). A row of a later table can overlap a row of an earlier table: the earlier
+ * table gives the need. A list with no error tells that the gate passes. The function is pure.
+ *
+ * @param tables - One table, or tables in order
+ * @param options - The options of the gate of the sources, for example the date of the gate
+ */
+export function checkCalorieChain(tables: CalorieTables, options?: GateOptions): NeedsFinding[] {
+  const list = "rows" in tables ? [tables] : tables;
+  const findings = list.flatMap((table) => checkCalorieTable(table, options));
+  const id = list.map((table) => table.id).join(" + ");
+  const add = (message: string): void => {
+    findings.push({ level: "error", code: "needs-gap", record: "chain", id, message });
+  };
+  if (list.length === 0) add("The chain has no table.");
+  for (const sex of CALORIE_SEXES) {
+    const rows = list.flatMap((table) => table.rows).filter((row) => row.sex === sex && Number.isSafeInteger(row.from) && row.from >= 0);
+    if (rows.length === 0) {
+      add(`The tables have no row of a ${sex}.`);
+      continue;
+    }
+    rows.sort((a, b) => a.from - b.from);
+    // The first month with no row so far. It is Infinity after an open row.
+    let next = 0;
+    for (const row of rows) {
+      if (row.from > next) add(`The tables have no row of a ${sex} for the months ${String(next)} to ${String(row.from - 1)}.`);
+      next = Math.max(next, row.to === undefined ? Infinity : row.to + 1);
+    }
+    if (next !== Infinity) add(`The rows of a ${sex} end at ${String(next - 1)} months. The chain has no open last row.`);
+  }
   return findings;
 }
 

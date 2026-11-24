@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { ACTIVITY_LEVELS, CALORIE_SEXES, calorieChange, calorieNeed, calorieRow, type ActivityLevel, type CalorieRow, type CalorieSex, type Person } from "./calorie.ts";
-import { DGA_CALORIES } from "./data.ts";
+import { ACTIVITY_LEVELS, CALORIE_SEXES, calorieChange, calorieNeed, calorieRow, calorieRowOf, type ActivityLevel, type CalorieRow, type CalorieSex, type Person } from "./calorie.ts";
+import { CALORIE_CHAIN, DGA_CALORIES, NASEM_INFANT_CALORIES } from "./data.ts";
 
 const dga = DGA_CALORIES;
 const years = (months: number): number => months * 12;
@@ -184,5 +184,56 @@ describe("the calorie need of a household", () => {
     // A change that makes the daily need 0 or less throws, so it cannot lower a total with no finding.
     const lower = { ...dga, changes: [{ stage: "test", title: "Test", sex: "female" as const, change: { value: -5000, unit: "kcal/d" } }] };
     expect(() => calorieNeed(lower, [{ ...man, sex: "female", stage: "test" }], "sedentary", 1)).toThrow(/must be above 0/u);
+  });
+});
+
+describe("the infant table and the chain of tables", () => {
+  const nasem = NASEM_INFANT_CALORIES;
+  const each = (sex: CalorieSex): number[] => nasem.rows.filter((row) => row.sex === sex).map((row) => rowNeed(row, "sedentary"));
+
+  it("has the 24 rows of Tables 7-5 and 7-6: 12 groups of 3 months for each sex, from 0 to 35 months", () => {
+    expect(nasem.rows).toHaveLength(24);
+    for (const sex of CALORIE_SEXES) {
+      const rows = nasem.rows.filter((row) => row.sex === sex);
+      expect(rows.map((row) => [row.from, row.to])).toEqual(Array.from({ length: 12 }, (_, index) => [3 * index, 3 * index + 2]));
+      for (const row of rows) expect(row.need.each?.unit).toBe("kcal/d");
+    }
+    expect(each("male")).toEqual([566, 589, 675, 745, 821, 881, 952, 1027, 1058, 1136, 1183, 1213]);
+    expect(each("female")).toEqual([531, 546, 604, 689, 780, 817, 881, 956, 1011, 1051, 1122, 1192]);
+  });
+
+  it("gives an infant the need of the infant table, and a toddler the need of the guidelines, which come first", () => {
+    const persons: Person[] = [
+      { sex: "female", ageMonths: 0, count: 1 },
+      { sex: "male", ageMonths: 10, count: 2 },
+      { sex: "male", ageMonths: 12, count: 1 },
+    ];
+    const total = calorieNeed(CALORIE_CHAIN, persons, "active", 1);
+    expect(total.read).toBe(true);
+    expect(total.lines.map((line) => (line.read ? [line.table, line.row, line.need.value] : []))).toEqual([
+      [nasem.id, "Birth-2", 531],
+      [nasem.id, "9-11", 2 * 745],
+      [dga.id, "12 months", 800],
+    ]);
+    // In the other order, the infant table gives the need of 12 months.
+    expect(calorieNeed([nasem, dga], [{ sex: "male", ageMonths: 12, count: 1 }], "active", 1).need.value).toBe(821);
+    expect(calorieRowOf([nasem, dga], "male", years(33))?.table.id).toBe(dga.id);
+    expect(calorieRowOf(nasem, "male", 36)).toBeUndefined();
+  });
+
+  it("gives a row for each age of 0 to 100 years, for each sex", () => {
+    for (const sex of CALORIE_SEXES) {
+      const missing = Array.from({ length: years(100) + 1 }, (_, ageMonths) => ageMonths).filter((ageMonths) => calorieRowOf(CALORIE_CHAIN, sex, ageMonths) === undefined);
+      expect(missing, sex).toEqual([]);
+    }
+  });
+
+  it("takes the change of a stage from the table of the row, and refuses an empty list of tables", () => {
+    const woman = { sex: "female", ageMonths: years(33), count: 1, stage: "lactation-1" } as const;
+    expect(calorieNeed(CALORIE_CHAIN, [woman], "sedentary", 1).need.value).toBe(1800 + 330);
+    // The infant table has no changes, so a stage of a person of its rows is an error.
+    expect(() => calorieNeed(CALORIE_CHAIN, [{ ...woman, ageMonths: 6 }], "sedentary", 1)).toThrow(/of the row of the persons female of 6 months has no change/u);
+    expect(() => calorieNeed(nasem, [{ ...woman, ageMonths: 6 }], "sedentary", 1)).toThrow(/have no change for the stage/u);
+    expect(() => calorieNeed([], [woman], "sedentary", 1)).toThrow(/list of tables is empty/u);
   });
 });

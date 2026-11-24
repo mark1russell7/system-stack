@@ -1,6 +1,6 @@
 import { buyListEnergy, giftsOf, type BuyListEnergy, type SupplyCatalog } from "@mark1russell7/market/supplies";
-import { calorieNeed, type ActivityLevel, type CalorieNeedTotal, type CalorieTable, type Person } from "./calorie.ts";
-import { DGA_CALORIES } from "./data.ts";
+import { calorieNeed, type ActivityLevel, type CalorieNeedTotal, type CalorieTables, type Person } from "./calorie.ts";
+import { CALORIE_CHAIN } from "./data.ts";
 import { DIRECT_USES, FOOD_NEED, NEED_SUPPLIES, type FragmentDirectUse } from "./uses.ts";
 
 // The join of a household and a buy list into a fragment of an endurance layer: one draw of food energy and the stores of the list.
@@ -64,8 +64,8 @@ export interface HouseholdFragmentInput {
   readonly level: string;
   /** The levels of the fragment. The default is no levels: a different fragment of the stack gives them. */
   readonly levels?: readonly string[] | undefined;
-  /** The table of calorie needs. The default is `DGA_CALORIES`. */
-  readonly table?: CalorieTable | undefined;
+  /** The table of calorie needs, or tables in order. The default is `CALORIE_CHAIN`, which gives a row for each age. */
+  readonly table?: CalorieTables | undefined;
   /** The start of the `id` of each store. The default is `buy`. */
   readonly prefix?: string | undefined;
   /**
@@ -157,7 +157,7 @@ function buyListStores(
  * - The supply part of the draw is `supply`. Its default is the part of `NEED_SUPPLIES` for `food.energy`.
  * - The fragment has no converter. A caller adds converters for the dry food, with the water and the fuel of each run.
  *
- * A person with no row in the table gives no layer, because a low rate gives too many days.
+ * A person with no row in the tables gives no layer, because a low rate gives too many days. The default tables give a row for each age.
  * The option `noRow: "leave-out"` leaves those persons out of the draw. A draw of 0 kcal gives no layer.
  * The function is pure.
  *
@@ -172,7 +172,7 @@ export function householdFragment(input: HouseholdFragmentInput): HouseholdFragm
   if (input.persons.every((person) => person.count === 0)) {
     return { ...parts, layer: undefined, need: undefined, needRead: false, noRow: [], why: "The household has no person, so the draw is 0 kcal." };
   }
-  const need = calorieNeed(input.table ?? DGA_CALORIES, input.persons, input.activity, 1);
+  const need = calorieNeed(input.table ?? CALORIE_CHAIN, input.persons, input.activity, 1);
   const noRow: Person[] = [];
   let users = 0;
   for (const line of need.lines) {
