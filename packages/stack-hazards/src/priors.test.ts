@@ -1,3 +1,4 @@
+import { SAMPLE_ENDURANCE, yearShortfall } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "./check.ts";
 import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
@@ -51,6 +52,25 @@ describe("the priors of the reference list", () => {
     const state = hazardPriors(withCounties, { region: [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] });
     expect(new Set(state.map((prior) => prior.place))).toEqual(new Set(["us-state-fips:01"]));
     expect(hazardPriors(HAZARD_LIST, {})).toEqual([]);
+  });
+
+  it("gives each prior the place of the option, so yearShortfall finds the prior of the state after the fall back", () => {
+    const region = [{ scheme: "us-county-fips", code: "00000" }, { scheme: "us-state-fips", code: "01" }] as const;
+    const home = hazardPriors(withCounties, { region, place: "home" });
+    const plain = hazardPriors(withCounties, { region });
+    expect(home).toEqual(plain.map((prior) => ({ ...prior, place: "home" })));
+    // The cuts of the sample storm, as the outage case of the list. With the default place, the place of the user finds no prior.
+    const [storm] = SAMPLE_ENDURANCE.cases ?? [];
+    if (storm === undefined) throw new Error("The sample layer has no case.");
+    const cases = [{ ...storm, case: "infra.power.outage" }];
+    const at = { at: "2026-12-01" };
+    expect(yearShortfall({ ...SAMPLE_ENDURANCE, cases, priors: plain }, "home", at).cases).toEqual([]);
+    const year = yearShortfall({ ...SAMPLE_ENDURANCE, cases, priors: home }, "home", at);
+    const outage = home.find((prior) => prior.case === "infra.power.outage");
+    expect(outage?.perYear).toBeGreaterThan(0);
+    expect(year.cases.map((item) => [item.case, item.rate])).toEqual([["infra.power.outage", (outage?.perYear ?? 0) * (outage?.reach ?? 0)]]);
+    expect(() => hazardPriors(withCounties, { region, place: "" })).toThrow(RangeError);
+    expect(() => hazardPriors(withCounties, { region, place: " home" })).toThrow(RangeError);
   });
 });
 
