@@ -375,8 +375,8 @@ importers:
         specifier: ^0.3.0
         version: 0.3.0
       '@mark1russell7/market':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.7.0
+        version: 0.7.0
       '@mark1russell7/quantity':
         specifier: ^0.4.4
         version: 0.4.5(zod@4.6.7)
@@ -918,10 +918,6 @@ packages:
     resolution: {integrity: sha512-HHlt/0QqP5yOswCNOmPxDnduEN//I6KUJpcC0z3RG/Xi1Q6v/+4d1CkzWUWtV8glKP5R6MvJfGpVfc98m+6XXQ==}
     engines: {node: '>=22.12'}
 
-  '@mark1russell7/guidebook@0.1.1':
-    resolution: {integrity: sha512-DTENTIjb1CiMoONeBqmvbWO9MeFxGAF8bPjfSFg7AMf8dcdTiIMAKtFcr4aPMf8DS/bml+3UzwtmPQqbDVSRpQ==}
-    engines: {node: '>=22.12'}
-
   '@mark1russell7/guidebook@0.3.0':
     resolution: {integrity: sha512-D8BA5Xznbn4K0SYMHZVQG8MLcW+GumjbWRBTNEf7H82nZ1YcUz1Jyer4cyxtWWjctvFsLjAw75zqLz6C0Z6moQ==}
     engines: {node: '>=22.12'}
@@ -930,8 +926,8 @@ packages:
     resolution: {integrity: sha512-gxOyU9JQ4ikiomiisbOmNPwwKuOtWqQ6hPWcJANOWvIipjwQu2aYOvCeLokYpMEoCEhJHoY5FxzBGpn/mbgx+A==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/market@0.3.1':
-    resolution: {integrity: sha512-/fvYO6Ju/JHqtff7PjxQp8Zs0HCqL7sQmtBInNlTRfD8an7nv7/mUbr96uYBPHwctgps+MsU29NX8bxZB3gyjA==}
+  '@mark1russell7/market@0.7.0':
+    resolution: {integrity: sha512-w60lRiWCnpI6kwuzMyQNwdteR9bQcAeWJZUDYcM6IN1CrcIz3XJ06yBApP9GneJ2LPQ6UJnF1QWubWEis1AZdw==}
     engines: {node: '>=22'}
 
   '@mark1russell7/optional@1.5.0':
@@ -2525,15 +2521,14 @@ snapshots:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/predicates': 0.1.5
 
-  '@mark1russell7/guidebook@0.1.1': {}
-
   '@mark1russell7/guidebook@0.3.0': {}
 
   '@mark1russell7/interval@0.1.0': {}
 
-  '@mark1russell7/market@0.3.1':
+  '@mark1russell7/market@0.7.0':
     dependencies:
-      '@mark1russell7/guidebook': 0.1.1
+      '@mark1russell7/guidebook': 0.3.0
+      '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.5(zod@4.6.7)
       '@mark1russell7/strategy-search': 0.1.2
       '@mark1russell7/strategy-space': 0.1.1
