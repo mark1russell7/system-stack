@@ -220,7 +220,10 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `OE417_ATTACK_LAW` | The law of the 70 events with customers: 62 ends of 15 minutes or more and 8 open events. |
 | `oe417LawEvents(events)` | It gives the events that the law reads. The prior counts the same events. |
 | `oe417AttackPrior(events, { first, last, customers, note })` | It gives the table of the prior of a physical attack for the nation, from the events of the years `first` to `last`. The method tells only what it calculates, and then the text `note`. |
-| `OE417_PRIOR_FIRST` | 2015, the first year of the prior. |
+| `oe417PriorWindow(events, { first, last, level, draws, seed })` | It gives the first year of a prior: the year after the last window to `last` that fails the dispersion test. It also gives the yearly counts and the p value of each window. |
+| `OE417_WINDOW_DRAWS`, `OE417_WINDOW_SEED` | The 100000 seeded draws of each test, and their seed. |
+| `OE417_LAST_YEAR`, `OE417_COUNTS_FIRST` | The last year of the summaries (2023), and the first year with an event of the law (2011). |
+| `OE417_PRIOR_FIRST` | 2015, the first year of the prior. A test calculates it again with `oe417PriorWindow`. |
 | `OE417_NATION_PRIORS` | The prior of 2015 to 2023: 66 events in 9 years, with the customers `EAGLEI_NATION_CUSTOMERS`. |
 
 The law reads only the events with more than 0 customers. The question of a home is how long its power is off.
@@ -244,10 +247,14 @@ The prior of a physical attack is one rate for the nation:
 The years of the prior come from a rule:
 
 - The counts of the years 2011 to 2023 are 1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14 and 8. The summaries of 2000 to 2010 list no such event.
-- The rule: the years are the longest window to the last year whose yearly counts agree with one rate. The test is a dispersion test of the counts at 5%.
-- The window from 2014 fails the test (chi-square 17.3 with 9 degrees of freedom, p 0.04). The window from 2015 passes it (9.0 with 8, p 0.34).
+- The rule: the years are the longest window to the last year that passes the test, with each shorter window to the last year. The test asks if the yearly counts agree with one rate. It is `dispersionTest` of `@mark1russell7/rigor-statistics` at 5%: the Pearson statistic, with seeded draws given the total.
+- The window from 2014 fails the test (the exact p is 0.0447). The window from 2015 passes it (the exact p is 0.3526).
 - With 2011 to 2023, the rate is 5.4 events in one year, below each year from 2016 but one. The mean of years that do not agree with one rate is not the rate of the next year.
-- A test pins the yearly counts. A new summary changes them, and then the window is calculated again.
+- A gate calculates the window from the events with `oe417PriorWindow`. A new summary changes the counts. Then the gate moves the window, or it fails until `OE417_PRIOR_FIRST` changes.
+
+The choice is close, but its effect is small. With one more event in 2014, the exact p is 0.086, and the window starts in 2014. With one fewer, the p is 0.020. The rate then changes from 7.33 to 7.1 events in one year, by 3%.
+
+`OE417_LAST_YEAR` is the last year of `OE417_YEARS`, and `OE417_COUNTS_FIRST` is the first year with an event of the law. The prior and the gate use both.
 
 The product rests on few events:
 

@@ -10,7 +10,10 @@ import {
   OE417_ATTACK_CASE,
   OE417_ATTACK_LAW,
   OE417_NATION_PRIORS,
+  OE417_COUNTS_FIRST,
+  OE417_LAST_YEAR,
   OE417_PRIOR_FIRST,
+  oe417PriorWindow,
   oe417AttackPrior,
   oe417LawEvents,
   OE417_CYBER_TERMS,
@@ -165,15 +168,42 @@ describe("the events of a physical attack", () => {
 });
 
 describe("the prior of a physical attack", () => {
+  it("calculates the first year of the prior from the events: the year after the last window that fails the dispersion test", { timeout: 30_000 }, () => {
+    // A new summary adds a year to OE417_LAST_YEAR, so the pin of the counts fails, and the window is calculated again.
+    expect([OE417_COUNTS_FIRST, OE417_LAST_YEAR]).toEqual([2011, 2023]);
+    const window = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: OE417_COUNTS_FIRST, last: OE417_LAST_YEAR });
+    expect(window.counts).toEqual([1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14, 8]);
+    expect(window.first).toBe(OE417_PRIOR_FIRST);
+    // The note of the prior is a second copy of the counts and of the window.
+    expect(OE417_NATION_PRIORS.method).toContain(`are ${window.counts.join(", ")}.`);
+    expect(OE417_NATION_PRIORS.method).toContain(`the window from ${String(window.first)} passes it`);
+    const p = Object.fromEntries(window.tests.map((test) => [test.first, test.p]));
+    // The exact p values are 0.0447 from 2014 and 0.3526 from 2015. The seeded draws are near them.
+    expect(p[2014]).toBeGreaterThan(0.04);
+    expect(p[2014]).toBeLessThan(0.05);
+    expect(p[2015]).toBeGreaterThan(0.3);
+    expect(p[2023]).toBe(1);
+    expect(window.tests.filter((test) => test.first >= 2015).every((test) => test.p >= 0.05)).toBe(true);
+  });
+
+  it("gives the first year when no window fails, and refuses bad years or a bad level", () => {
+    const window = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2016, last: 2021, draws: 2000 });
+    expect(window.first).toBe(2016);
+    expect(window.counts).toEqual([6, 6, 5, 8, 8, 7]);
+    // Years with no event give p 1.
+    expect(oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2000, last: 2010 })).toMatchObject({ first: 2000, counts: Array.from({ length: 11 }, () => 0) });
+    // A higher level fails the window from 2015 too.
+    expect(oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, level: 0.5, draws: 2000 }).first).toBeGreaterThan(2015);
+    expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2023, last: 2011 })).toThrow(RangeError);
+    expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011.5, last: 2023 })).toThrow(RangeError);
+    expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, level: 1 })).toThrow(RangeError);
+  });
+
   it("counts the events of the law in 2015 to 2023 over the customers of the nation", () => {
     const events = oe417LawEvents(OE417_ATTACK_EVENTS);
     // The law reads 70 events: 62 ends of 15 minutes or more and 8 open events.
     expect(events).toHaveLength(70);
     expect(OE417_ATTACK_LAW.read && OE417_ATTACK_LAW.fit.count).toBe(70);
-    // The yearly counts of 2011 to 2023. The window of the prior is the longest window to 2023 that a dispersion test at 5% does not refuse.
-    // A new summary changes these counts. Then calculate the window again. A dispersion test of rigor-statistics can make this a gate.
-    const counts = Array.from({ length: 13 }, (_, i) => events.filter((event) => event.year === 2011 + i).length);
-    expect(counts).toEqual([1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14, 8]);
     expect(OE417_PRIOR_FIRST).toBe(2015);
     const kept = events.filter((event) => event.year >= OE417_PRIOR_FIRST);
     expect(kept).toHaveLength(66);
