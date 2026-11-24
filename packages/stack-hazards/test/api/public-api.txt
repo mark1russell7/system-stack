@@ -413,6 +413,7 @@ export interface OutageOptions {
   readonly share?: number | undefined;
   readonly least?: number | undefined;
   readonly interval?: number | undefined;
+  readonly join?: number | undefined;
 }
 
 ### build/index.d.ts#OutageReader
@@ -435,6 +436,7 @@ export interface OutageTally {
   readonly unknown: number;
   readonly missing: number;
   readonly truncated: number;
+  readonly joined: number;
 }
 
 ### build/index.d.ts#RegionCurve

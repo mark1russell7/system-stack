@@ -17,8 +17,8 @@ import { fetchTransport, statusLine, type Pace } from "polite-crawler/api";
 import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
-import { outageReader, type OutageEvent, type OutageTally } from "../src/outages.ts";
-import { areaCounts, coverageTally, type AreaCount, type Observation } from "../src/priors.ts";
+import { outageReader, type OutageEvent, type OutageRuns, type OutageTally } from "../src/outages.ts";
+import { areaCounts, coverageTally, regionRates, type AreaCount, type Observation } from "../src/priors.ts";
 import { CAUSE_AFTER, CAUSE_BEFORE, STORM_CLASSES, type CauseOptions } from "../src/storms.ts";
 import { TryFault, get, passing, withTries, type FitContext } from "./fetch.ts";
 import { readStorms, type StormRecord } from "./storm-files.ts";
@@ -148,6 +148,10 @@ export interface FitOptions {
   readonly years?: ((year: number) => boolean) | undefined;
   /** The share of the customers of a county that starts an event. The default is that of `outageReader`. */
   readonly share?: number | undefined;
+  /** The join time of `outageReader` in seconds. The default is 0: each run is an event. */
+  readonly join?: number | undefined;
+  /** More join times. For each, the fit also reads the events and gives their counts, but no curve. */
+  readonly sweep?: readonly number[] | undefined;
   /** The time of the read. */
   readonly now: () => Date;
   /** The event types of each case and the margins in time. With this option, the fit also gives the curves of each case. */
@@ -159,6 +163,34 @@ export interface CauseLaws {
   readonly storms: StormRecord;
   readonly options: { readonly before: number; readonly after: number };
   readonly cases: Readonly<Record<string, { readonly types: readonly string[]; readonly events: number; readonly regions: Readonly<Record<string, RegionCurve>> }>>;
+}
+
+/**
+ * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
+ * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
+ * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
+ * of an event many times. A true rate can also be above the limit, for example in Puerto Rico. Such a region is not
+ * in the table, so its prior is no read. The measures are not the same. EIA counts each interruption of more than 5
+ * minutes at a customer. The table counts the events of a county at 1% or more of its customers. So the comparison
+ * holds only for the order of the number.
+ */
+export const PRIOR_LIMIT = 12;
+
+/** The join times of the sweep of the workflow, in seconds: none, 1 hour, 4 hours, 12 hours and 24 hours. */
+export const JOIN_SWEEP: readonly number[] = [0, 3600, 4 * 3600, 12 * 3600, 24 * 3600];
+
+/** The events of the fit with one join time of the option `sweep`. The counts are over all events, in no case. */
+export interface JoinSweep {
+  readonly join: number;
+  readonly events: number;
+  readonly joined: number;
+  readonly truncated: number;
+  /** The median over the observed counties of the events at one customer in one year (perYear * reach). */
+  readonly median: number;
+  /** The largest of these rates, and its county. */
+  readonly most: { readonly area: string; readonly rate: number } | undefined;
+  /** The counties with a rate above `PRIOR_LIMIT`. */
+  readonly over: number;
 }
 
 /** The code of the case of a power outage. Its prior counts the events in no storm case, so that a storm outage counts in one case only. */
@@ -184,7 +216,7 @@ export interface EagleLaws {
     readonly files: readonly Omit<DatasetFile, "url">[];
   };
   readonly read: string;
-  readonly options: { readonly share: number | undefined; readonly interval: number };
+  readonly options: { readonly share: number | undefined; readonly interval: number; readonly join?: number | undefined };
   readonly scheme: typeof EAGLE_SCHEME;
   readonly lines: number;
   readonly skipped: number;
@@ -194,6 +226,18 @@ export interface EagleLaws {
   readonly causes?: CauseLaws | undefined;
   /** The counts of the yearly priors. A record of a fit before them does not have them. */
   readonly priors?: EaglePriors | undefined;
+  /** The counts of the events with each join time of the option `sweep`. */
+  readonly sweep?: readonly JoinSweep[] | undefined;
+}
+
+/** This function gives the counts of the events of one join time. */
+export function joinSweep(join: number, runs: OutageRuns, observation: Observation, customers: ReadonlyMap<string, number>): JoinSweep {
+  const rates = Object.entries(regionRates(areaCounts(runs.events, customers), observation, (area) => area)).map(([area, [perYear, reach]]) => ({ area, rate: perYear * reach }));
+  const sorted = rates.map((item) => item.rate).sort((a, b) => a - b);
+  const middle = sorted.length / 2;
+  const median = sorted.length === 0 ? 0 : sorted.length % 2 === 1 ? (sorted[Math.floor(middle)] ?? 0) : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+  const most = rates.reduce<JoinSweep["most"]>((best, item) => (best === undefined || item.rate > best.rate ? item : best), undefined);
+  return { join, events: runs.events.length, joined: runs.tally.joined, truncated: runs.tally.truncated, median, most, over: rates.filter((item) => item.rate > PRIOR_LIMIT).length };
 }
 
 /** This function reads the storm events of the years of the outage files and of the year before them. It gives the curves of each case. */
@@ -226,7 +270,9 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
   const parts: Uint8Array[] = [];
   for await (const bytes of fileChunks(context, files.customers)) parts.push(bytes);
   const customers = eagleCustomers(Buffer.concat(parts).toString("utf8"));
-  const reader = outageReader({ customers, share: options.share });
+  const reader = outageReader({ customers, share: options.share, join: options.join });
+  const sweepJoins = (options.sweep ?? []).filter((join) => join !== (options.join ?? 0));
+  const sweepReaders = sweepJoins.map((join) => outageReader({ customers, share: options.share, join }));
   const coverage = coverageTally();
   let lines = 0;
   let skipped = 0;
@@ -238,22 +284,30 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
       if (count === undefined) skipped += 1;
       else {
         reader.add(count);
+        for (const other of sweepReaders) other.add(count);
         coverage.add(count);
       }
     }
   }
-  const { events, tally } = reader.finish();
+  const main = reader.finish();
+  const { events, tally } = main;
   const causes = options.storms === undefined ? undefined : await causeLaws(context, events, files.years, options.storms);
   const inCase = new Set([...(causes?.lists.values() ?? [])].flat());
   const counts: Record<string, Readonly<Record<string, AreaCount>>> = { [OUTAGE_CASE]: areaCounts(events.filter((event) => !inCase.has(event)), customers) };
   for (const [name, list] of causes?.lists ?? []) counts[name] = areaCounts(list, customers);
   const priors: EaglePriors = { observation: { years: Object.fromEntries(coverage.years()), customers: Object.fromEntries(customers) }, counts };
+  const sweep =
+    options.sweep === undefined
+      ? undefined
+      : [{ join: options.join ?? 0, runs: main }, ...sweepJoins.map((join, index) => ({ join, runs: sweepReaders[index]?.finish() ?? main }))]
+          .sort((a, b) => a.join - b.join)
+          .map(({ join, runs }) => joinSweep(join, runs, priors.observation, customers));
   const { version, modified, license, doi } = files;
   return {
     schema: LAWS_SCHEMA,
     source: { article: EAGLE_ARTICLE, version, modified, license, doi, files: [files.customers, ...files.years.map((entry) => entry.file)].map(({ url: _, ...file }) => file) },
     read: options.now().toISOString(),
-    options: { share: options.share, interval: EAGLE_INTERVAL },
+    options: { share: options.share, interval: EAGLE_INTERVAL, join: options.join },
     scheme: EAGLE_SCHEME,
     lines,
     skipped,
@@ -262,6 +316,7 @@ export async function fitEagle(context: FitContext, options: FitOptions): Promis
     regions: outageCurves(events, eagleRegion),
     causes: causes?.laws,
     priors,
+    sweep,
   };
 }
 
@@ -280,6 +335,12 @@ export function causesTable(causes: CauseLaws): string {
   return ["| Case | Events | States |", "| --- | --- | --- |", ...rows, "", counts].join("\n");
 }
 
+/** This function gives a table in Markdown of the sweep of join times: the events, the joined runs and the rates of the counties. */
+export function sweepTable(sweep: readonly JoinSweep[]): string {
+  const rows = sweep.map((row) => `| ${String(row.join / 3600)} | ${String(row.events)} | ${String(row.joined)} | ${String(row.truncated)} | ${row.median.toFixed(3)} | ${row.most === undefined ? "none" : `${row.most.area} ${row.most.rate.toFixed(1)}`} | ${String(row.over)} |`);
+  return ["| Join (hours) | Events | Joined runs | Runs with no start | Median rate | Largest rate | Counties over the limit |", "| --- | --- | --- | --- | --- | --- | --- |", ...rows].join("\n");
+}
+
 /** This function reads the years of the option `--years`: one year, or a range, for example `2014-2025`. */
 export function yearsOf(text: string): (year: number) => boolean {
   const match = /^(\d{4})(?:-(\d{4}))?$/.exec(text.trim());
@@ -290,13 +351,13 @@ export function yearsOf(text: string): (year: number) => boolean {
 }
 
 if (import.meta.main) {
-  const { values } = parseArgs({ options: { years: { type: "string", default: "2014-2030" }, out: { type: "string", default: "out/eaglei-laws.json" }, share: { type: "string" } } });
+  const { values } = parseArgs({ options: { years: { type: "string", default: "2014-2030" }, out: { type: "string", default: "out/eaglei-laws.json" }, share: { type: "string" }, join: { type: "string" }, sweep: { type: "boolean", default: false } } });
   const pace: Pace = { scheduler: new HostScheduler(realClock, 1), now: realClock.now };
   const context: FitContext = { pace, transport: fetchTransport({ userAgent: USER_AGENT, timeoutMs: 600_000 }), chunkBytes: CHUNK_BYTES, log: (line) => console.log(line) };
-  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), now: () => new Date(), storms: { classes: STORM_CLASSES } });
+  const laws = await fitEagle(context, { years: yearsOf(values.years), share: values.share === undefined ? undefined : Number(values.share), join: values.join === undefined ? undefined : Number(values.join), sweep: values.sweep ? JOIN_SWEEP : undefined, now: () => new Date(), storms: { classes: STORM_CLASSES } });
   mkdirSync(dirname(values.out), { recursive: true });
   writeFileSync(values.out, `${JSON.stringify(laws, null, 2)}\n`);
-  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}`;
+  const summary = `${String(laws.lines)} lines, ${String(laws.events)} events, ${String(laws.tally.truncated)} runs with no start, ${String(laws.tally.unknown)} counts of unknown counties.\n\n${lawsTable(laws)}\n${laws.causes === undefined ? "" : `\n${causesTable(laws.causes)}\n`}${laws.sweep === undefined ? "" : `\n${sweepTable(laws.sweep)}\n`}`;
   console.log(summary);
   const file = process.env["GITHUB_STEP_SUMMARY"];
   if (file !== undefined && file !== "") appendFileSync(file, `## The laws of EAGLE-I\n\n${summary}`);

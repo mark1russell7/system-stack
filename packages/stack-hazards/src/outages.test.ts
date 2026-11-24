@@ -34,7 +34,7 @@ describe("outageReader", () => {
       ]),
     );
     expect(events).toEqual([{ area: "A", start: at(2), seconds: 4 * 900, peak: 80, censored: false }]);
-    expect(tally).toEqual({ counts: 15, times: 11, repeats: 0, unknown: 0, missing: 0, truncated: 0 });
+    expect(tally).toEqual({ counts: 15, times: 11, repeats: 0, unknown: 0, missing: 0, truncated: 0, joined: 0 });
   });
 
   it("censors a run at a line with no count, and does not give a run at the next time of the area", () => {
@@ -46,7 +46,7 @@ describe("outageReader", () => {
       { area: "A", start: at(2), seconds: 3 * 900, peak: 50, censored: true },
       { area: "A", start: at(9), seconds: 2 * 900, peak: 50, censored: false },
     ]);
-    expect(tally).toEqual({ counts: 21, times: 13, repeats: 0, unknown: 0, missing: 1, truncated: 1 });
+    expect(tally).toEqual({ counts: 21, times: 13, repeats: 0, unknown: 0, missing: 1, truncated: 1, joined: 0 });
     expect(read([...list].sort((left, right) => left.time - right.time)).events).toEqual(events);
     // A time of the collection with no line of "A" after the line with no count gives a known start again.
     const later = read([...counts(steps(0, 10), []), a(2, 50), a(3, 50), a(4, undefined), a(6, 50), a(7, 50)]);
@@ -157,5 +157,28 @@ describe("outageReader", () => {
     expect(() => reader.add({ area: "A", out: Number.NaN, time: 0 })).toThrow(RangeError);
     reader.finish();
     expect(() => reader.add({ area: "A", out: 1, time: 0 })).toThrow(Error);
+  });
+
+  it("joins the near runs of an area into one event with the option join, but not across a gap, a stop or a run with no known start", () => {
+    // Three runs of "A": steps 2-3, steps 5-6 and steps 10-11. A count under the threshold is between them.
+    const a = [[2, 50], [3, 50], [4, 5], [5, 90], [6, 90], [7, 5], [10, 40], [11, 40], [12, 5]] as const;
+    const third = { area: "A", start: at(10), seconds: 2 * 900, peak: 40, censored: false };
+    expect(read(counts(steps(0, 20), a)).events).toHaveLength(3);
+    // A join time of two intervals joins the first two runs. The third run starts four intervals after the second run.
+    const near = read(counts(steps(0, 20), a), { ...OPTIONS, join: 2 * 900 });
+    expect(near.events).toEqual([{ area: "A", start: at(2), seconds: 5 * 900, peak: 90, censored: false }, third]);
+    expect(near.tally.joined).toBe(1);
+    expect(read(counts(steps(0, 20), a), { ...OPTIONS, join: 4 * 900 }).events).toEqual([{ area: "A", start: at(2), seconds: 10 * 900, peak: 90, censored: false }]);
+    // The collection has no time at step 4, so the first run has no observed end and the second run has no known start.
+    // The third run joins the second run, so the event of the two runs has no known start either.
+    const gap = read(counts(steps(0, 20).filter((step) => step !== 4), a.filter(([step]) => step !== 4)), { ...OPTIONS, join: 4 * 900 });
+    expect(gap.events).toEqual([{ area: "A", start: at(2), seconds: 2 * 900, peak: 50, censored: true }]);
+    expect(gap.tally).toMatchObject({ truncated: 1, joined: 1 });
+    // A line with no count at step 4 stops the first run. The second run has no known start.
+    const stopped = read([...counts(steps(0, 20), a.filter(([step]) => step !== 4)), { area: "A", out: undefined, time: at(4) }].sort((x, y) => x.time - y.time), { ...OPTIONS, join: 2 * 900 });
+    expect(stopped.events).toEqual([{ area: "A", start: at(2), seconds: 2 * 900, peak: 50, censored: true }, third]);
+    expect(stopped.tally).toMatchObject({ truncated: 1, joined: 0 });
+    expect(() => outageReader({ ...OPTIONS, join: -1 })).toThrow(RangeError);
+    expect(() => outageReader({ ...OPTIONS, join: Number.NaN })).toThrow(RangeError);
   });
 });

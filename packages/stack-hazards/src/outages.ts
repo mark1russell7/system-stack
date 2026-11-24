@@ -38,6 +38,14 @@ export interface OutageOptions {
   readonly least?: number | undefined;
   /** The interval of the collection in seconds. The default is 900, 15 minutes. A step of more than 1.5 intervals is a gap. */
   readonly interval?: number | undefined;
+  /**
+   * The join time in seconds. It is the longest step from the end of a run to the start of the next run of its area in one event.
+   * The default is 0: each run is an event.
+   * One outage that moves across the threshold gives many short runs. With a join time, those runs are one event.
+   * Two runs are not one event when the first run has no observed end or the second run has no known start.
+   * A gap of the collection between them also keeps them apart.
+   */
+  readonly join?: number | undefined;
 }
 
 /** The counts of a read. */
@@ -54,6 +62,8 @@ export interface OutageTally {
   readonly missing: number;
   /** The runs that start at the start of the data, after a gap or after a line with no count. Their start is not known, so they are not events. */
   readonly truncated: number;
+  /** The runs that the option `join` adds to the run before them. They are not events of their own. */
+  readonly joined: number;
 }
 
 /** The result of a read: the events, from the earliest start, and the tally. */
@@ -109,6 +119,10 @@ function lowerBound(sorted: Float64Array, value: number): number {
  * - The end of a run is observed when the collection has a time within 1.5 intervals after the run. Else the event is censored.
  * - The start of a run is known when the collection has a time within 1.5 intervals before the run. Else the run is truncated.
  * - A line with no count stops the observation of its area. An open run is censored. A run at the next time of the area is truncated.
+ * - With the option `join`, a run that starts within the join time after the end of the run before it is part of that run.
+ *   It is not part of it when the run before it was stopped or when it has no known start.
+ *   A gap of the collection between the two runs also keeps them apart.
+ *   The event then has the start of the first run, the end of the last run and the largest peak.
  *
  * @param options - The customers of each area and the threshold
  * @returns The reader
@@ -120,6 +134,8 @@ export function outageReader(options: OutageOptions): OutageReader {
   if (!(share >= 0 && share <= 1)) throw new RangeError("outageReader: the share is not from 0 to 1.");
   if (!(Number.isFinite(least) && least >= 1)) throw new RangeError("outageReader: the lowest threshold is not a finite number of 1 or more.");
   if (!(Number.isFinite(interval) && interval > 0)) throw new RangeError("outageReader: the interval is not a finite number of more than 0.");
+  const join = options.join ?? 0;
+  if (!(Number.isFinite(join) && join >= 0)) throw new RangeError("outageReader: the join time is not a finite number of 0 or more.");
   const gap = 1.5 * interval;
   const areas = new Map<string, AreaState>();
   const times = new Set<number>();
@@ -186,9 +202,33 @@ export function outageReader(options: OutageOptions): OutageReader {
       finished = true;
       for (const state of areas.values()) if (state.run !== undefined) runs.push(state.run);
       const sorted = Float64Array.from(times).sort();
+      // The collection has no gap from one time to a later time.
+      const covered = (from: number, to: number): boolean => {
+        for (let index = lowerBound(sorted, from); index + 1 < sorted.length && (sorted[index] ?? to) < to; index += 1) {
+          if ((sorted[index + 1] ?? 0) - (sorted[index] ?? 0) > gap) return false;
+        }
+        return true;
+      };
+      // The runs of each area end in the order of their times, so the run before a run of an area is the last run of the area in `joinedRuns`.
+      const joinedRuns: Run[] = [];
+      const lastOf = new Map<string, Run>();
+      let joined = 0;
+      for (const run of runs) {
+        const before = lastOf.get(run.area);
+        if (join > 0 && before !== undefined && !before.stopped && !run.blind && run.start - before.last <= join && covered(before.last, run.start)) {
+          before.last = run.last;
+          before.peak = Math.max(before.peak, run.peak);
+          before.stopped = run.stopped;
+          joined += 1;
+          continue;
+        }
+        const copy = { ...run };
+        joinedRuns.push(copy);
+        lastOf.set(run.area, copy);
+      }
       const events: OutageEvent[] = [];
       let truncated = 0;
-      for (const run of runs) {
+      for (const run of joinedRuns) {
         const first = lowerBound(sorted, run.start);
         const before = sorted[first - 1];
         if (run.blind || before === undefined || run.start - before > gap) {
@@ -200,7 +240,7 @@ export function outageReader(options: OutageOptions): OutageReader {
         events.push({ area: run.area, start: run.start, seconds: run.last - run.start + interval, peak: run.peak, censored });
       }
       events.sort((a, b) => a.start - b.start || (a.area < b.area ? -1 : a.area > b.area ? 1 : 0));
-      return { events, tally: { counts, times: sorted.length, repeats, unknown, missing, truncated } };
+      return { events, tally: { counts, times: sorted.length, repeats, unknown, missing, truncated, joined } };
     },
   };
 }
