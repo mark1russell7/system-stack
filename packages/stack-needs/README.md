@@ -186,7 +186,8 @@ The model of one pot:
 2. The heat to boil is the mass times 4.19002 kJ/(kg.K) times the rise to the boil (100 °C). The mass is the water and the dry food. The rise starts at the start temperature. This temperature is an input with its citation. The default is 0 °C, which gives the most heat. The dry food takes the specific heat of water, which is higher than its own. This term holds the heat above the true value.
 3. The boil time is the heat divided by the stove rate times the stove share. The share is the part of the stove heat that goes into the water and the food. The heat of the pot itself is in the losses. It is a cited input with its heating value. It has no default.
    A boil yield of the stove (`boil` of market) also gives the boil fuel, with no share and no fuel energy. The boil fuel is then the heat of the pot over the heat that 1 kg of fuel put into the test water.
-   The test water takes `WATER_DENSITY_MIN` (0.95865 kg/L at 100 °C, from the USGS table) and the cited start of the test. Each choice gives the most fuel.
+   The test water takes `WATER_DENSITY_MIN` (0.95865 kg/L at 100 °C, from the USGS table). The rise goes from the cited start to the cited end of the test.
+   Each choice gives the most fuel. At a high place the test water boils below 100 °C, so the end has no default.
    The boil time is then the boil fuel over the mass rate. When the share and the yield both give a boil fuel, the line takes the most.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
 5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
@@ -202,7 +203,7 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | No cited stove rate, or a rate that is not an energy or a mass in a time | The stove time and the fuel. |
 | A stove rate with a bound, for example `bound: "least"` of market | The stove time and the fuel. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel. |
 | No cited stove share, and no boil yield with a read | The stove time and the fuel. The water and the heat keep their reads. |
-| A boil yield with the bound `most`, or with no cited start | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
+| A boil yield with the bound `most`, or with no cited start or end temperature | No boil fuel from the yield. A most yield, for example the calm test of a maker, gives too little fuel for the boil. |
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
 | No food energy of the product | The energy. |

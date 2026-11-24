@@ -93,6 +93,7 @@ StoveShare: build/index.d.ts#StoveShare
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
+WATER_DENSITY_MIN: build/index.d.ts#WATER_DENSITY_MIN
 WATER_NEED: build/index.d.ts#WATER_NEED
 WATER_SPECIFIC_HEAT: build/index.d.ts#WATER_SPECIFIC_HEAT
 WIC_INFANT_SOURCE: build/index.d.ts#WIC_INFANT_SOURCE
@@ -598,6 +599,9 @@ export declare const WARMTH_NEED = "warmth.shelter";
 
 ### build/index.d.ts#WATER_DENSITY_MAX
 export declare const WATER_DENSITY_MAX: CookConstant;
+
+### build/index.d.ts#WATER_DENSITY_MIN
+export declare const WATER_DENSITY_MIN: CookConstant;
 
 ### build/index.d.ts#WATER_NEED
 export declare const WATER_NEED = "hydration.drink";

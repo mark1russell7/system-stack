@@ -228,8 +228,8 @@ describe("the cook fragment", () => {
   });
 
   describe("the boil fuel from a boil yield of the stove", () => {
-    /** A made-up yield: the test boils `litres` of water from 20 °C with 100 g of fuel. */
-    const yieldOf = (litres: number, more: object = {}) => ({ amount: litres, unit: "L", per: { amount: 100, unit: "g" }, fact, start: { celsius: 20, fact }, ...more });
+    /** A made-up yield: the test boils `litres` of water from 20 °C to 100 °C with 100 g of fuel. */
+    const yieldOf = (litres: number, more: object = {}) => ({ amount: litres, unit: "L", per: { amount: 100, unit: "g" }, fact, start: { celsius: 20, fact }, end: { celsius: 100, fact }, ...more });
     const yieldStove = (litres: number, more: object = {}): StoveFacts => ({ ...massStove, boil: yieldOf(litres, more) as never });
     const { share: _share, ...noShare } = input;
     /** The boil fuel of one pot from a yield: the heat of the pot over the heat of 1 kg of fuel in the test, with the least density of water. */
@@ -269,6 +269,11 @@ describe("the cook fragment", () => {
       if (!noStart.read) expect(noStart.why).toMatch(/no cited start/);
       const badUnit = fuelOf(yieldStove(10, { unit: "kg" }));
       expect(badUnit.read).toBe(false);
+      const noEnd = fuelOf(yieldStove(10, { end: undefined }));
+      expect(noEnd.read).toBe(false);
+      if (!noEnd.read) expect(noEnd.why).toMatch(/no cited end/);
+      for (const end of [{ celsius: 20, fact }, { celsius: 101, fact }, { celsius: 95 }])
+        expect(fuelOf(yieldStove(10, { end })).read).toBe(false);
       // A least yield gives the most fuel, so it has a read.
       const least = fuelOf(yieldStove(10, { bound: "least" }));
       expect(least.read && least.value).toBeCloseTo(yieldBoil(10) + 20 * 0.01, 12);
@@ -278,6 +283,16 @@ describe("the cook fragment", () => {
       // A yield does not make up for a stove rate with a bound: the cook part has no rate.
       const boundRate = fuelOf({ ...yieldStove(10), rate: { ...massStove.rate!, bound: "least" as never } });
       expect(boundRate.read).toBe(false);
+    });
+
+    it("gives more fuel for a yield tested at a high place, where the test water boils below 100 °C", () => {
+      const fuelAt = (endC: number): number => {
+        const line = lineOf(cookFragment({ ...noShare, stove: yieldStove(10, { end: { celsius: endC, fact } }) }).lines, "test.grain-1kg");
+        return line.fuel.read ? line.fuel.value : Number.NaN;
+      };
+      expect(fuelAt(95)).toBeGreaterThan(fuelAt(100));
+      // The boil fuel grows by the ratio of the rises: 80 K at the sea over 75 K at the high place.
+      expect(fuelAt(95) - 20 * 0.01).toBeCloseTo(yieldBoil(10) * (80 / 75), 12);
     });
 
     it("gives no fuel for the canister stove of the catalog: its yield is the calm test of the maker", () => {
