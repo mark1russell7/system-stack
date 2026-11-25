@@ -225,6 +225,13 @@ export interface CookFragmentInput {
   readonly soak?: SoakMethod | undefined;
   /** The `id` of the stove in the stack. The converters stop when the stove stops. */
   readonly device?: string | undefined;
+  /**
+   * The stove time of one day: the most time that the stove burns in a day, for example `{ "value": 240, "unit": "min" }`. Since 0.10.9.
+   * It is a plan of the caller, for example from the hours of the cook and the air of the room. It has no default.
+   * With it, each converter has the limit `perDay` of stack-endurance: the whole pots of this time at the most stove time of one pot.
+   * It needs `device`, so that the converters of the dry foods share the day of the stove.
+   */
+  readonly stoveDay?: Quantity | undefined;
   /** The start of the `id` of each converter. The default is `cook`. */
   readonly prefix?: string | undefined;
 }
@@ -292,6 +299,8 @@ export interface FragmentConverter {
   readonly device?: string | undefined;
   readonly takes: readonly { readonly resource: string; readonly amount: number }[];
   readonly gives: { readonly need: string; readonly amount: number };
+  /** The most pots of one day of the stove, from the input `stoveDay`. A converter has it only with a stove day. Since 0.10.9. */
+  readonly perDay?: number | undefined;
 }
 
 /** The cook fragment of an endurance layer: the resources and one converter for each dry resource with a read. It has no store and no draw. */
@@ -692,6 +701,9 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store.
  * Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
  *
+ * With the input `stoveDay`, each converter has the limit `perDay`: the whole pots of the stove day at the most stove time of one pot.
+ * A dry food with no read of the stove time, or with a stove time that is not a most, then has no converter.
+ *
  * The function is pure.
  *
  * @param input - The catalog and the buy list, the stove, the dry mass of one pot, the share and the start temperature
@@ -700,6 +712,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * @throws RangeError when the start is not from 0 up to less than 100 °C
  * @throws RangeError when the soak method is not `cold`, `quick` or `none`
  * @throws RangeError when the elevation is not a finite number of metres
+ * @throws RangeError when the stove day is not a time above 0, or when it has no device
  * @throws RangeError when the stove is a product with no stove facts
  * @throws RangeError when the catalog has no product of an `id` of the buy list
  * @throws RangeError when the catalog has no resource of the fuel in a unit of mass
@@ -718,6 +731,10 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   if (method !== "cold" && method !== "quick" && method !== "none") throw new RangeError(`The soak method is ${String(method)}. It must be cold, quick or none.`);
   const elevationM = input.elevation?.meters;
   if (elevationM !== undefined && !Number.isFinite(elevationM)) throw new RangeError(`The elevation is ${String(elevationM)} m. It must be a finite number of metres.`);
+  const stoveDayMin = input.stoveDay === undefined ? undefined : inUnit(input.stoveDay.value, input.stoveDay.unit, "min");
+  if (input.stoveDay !== undefined && (stoveDayMin === undefined || !(stoveDayMin > 0)))
+    throw new RangeError(`The stove day ${String(input.stoveDay.value)} ${input.stoveDay.unit} is not a time above 0.`);
+  if (input.stoveDay !== undefined && input.device === undefined) throw new RangeError("A stove day needs the device of the stove. Then the converters of the dry foods share its day.");
   const stove = stoveOf(catalog, input.stove);
   const fuel = catalog.resources.find((resource) => resource.code === stove.fuel);
   const fuelUnitPerKg = fuel === undefined ? undefined : inUnit(1, "kg", fuel.unit);
@@ -755,6 +772,12 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   for (const resource of [...new Set(lines.map((line) => line.resource))]) {
     const own = lines.filter((line) => line.resource === resource);
     const why = own.flatMap((line) => [line.energy, line.water, line.soak, line.fuel].flatMap((value) => (value.read ? [] : [`${line.product}: ${value.why}`])));
+    // A limit of the pots of a day needs a most stove time of each pot. A converter with no limit can cook more pots than the stove day gives.
+    if (stoveDayMin !== undefined)
+      for (const line of own) {
+        if (!line.minutes.read) why.push(`${line.product}: ${line.minutes.why} The stove day needs the stove time of each pot.`);
+        else if (line.minutes.bound !== undefined && line.minutes.bound !== "most") why.push(`${line.product}: The stove time has the bound ${line.minutes.bound}. The stove day needs a most stove time.`);
+      }
     if (why.length > 0) {
       noReads.push({ resource, why: [...new Set(why)].join(" ") });
       continue;
@@ -774,6 +797,8 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
         { resource: stove.fuel, amount: most((line) => line.fuel) * fuelUnitPerKg },
       ],
       gives: { need: FOOD_NEED, amount: least((line) => line.energy) * batchKg },
+      // The whole pots of the stove day at the most stove time. A part of a pot is not a pot, so the limit rounds down.
+      ...(stoveDayMin === undefined ? {} : { perDay: Math.floor(stoveDayMin / most((line) => line.minutes)) }),
     });
   }
 

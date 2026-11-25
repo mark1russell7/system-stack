@@ -203,6 +203,35 @@ describe("the cook fragment", () => {
     expect(plain.minutes.read && "bound" in plain.minutes).toBe(false);
   });
 
+  it("gives each converter the whole pots of the stove day at the most stove time of one pot", () => {
+    const day: CookFragmentInput = { ...input, device: "stove-1", stoveDay: { value: 240, unit: "min" } };
+    const result = cookFragment(day);
+    const converter = result.layer.converters[0];
+    expect(converter?.perDay).toBe(Math.floor(240 / MINUTES));
+    expect(converter?.takes).toEqual(cookFragment({ ...input, device: "stove-1" }).layer.converters[0]?.takes);
+    expect(hasEnduranceError(checkEndurance(result.layer))).toBe(false);
+    // Without a stove day, a converter has no limit.
+    expect(cookFragment(input).layer.converters[0]).not.toHaveProperty("perDay");
+    // A stove day shorter than one pot gives a limit of 0. The stove then cooks no pot.
+    expect(cookFragment({ ...day, stoveDay: { value: MINUTES / 2, unit: "min" } }).layer.converters[0]?.perDay).toBe(0);
+  });
+
+  it("gives no converter with a stove day when the stove time of a pot has no read", () => {
+    // A most rate gives the fuel as a most, and too little stove time.
+    const stove: StoveFacts = { ...massStove, rate: { ...massStove.rate!, bound: "most" as never } };
+    const result = cookFragment({ ...input, stove, device: "stove-1", stoveDay: { value: 240, unit: "min" } });
+    expect(result.layer.converters).toEqual([]);
+    expect(result.noReads[0]?.why).toContain("The stove day needs the stove time of each pot.");
+    // Without a stove day, the same stove gives its converter.
+    expect(cookFragment({ ...input, stove }).layer.converters).toHaveLength(1);
+  });
+
+  it("refuses a stove day that is not a time above 0, and a stove day with no device", () => {
+    expect(() => cookFragment({ ...input, device: "stove-1", stoveDay: { value: 0, unit: "min" } })).toThrow(RangeError);
+    expect(() => cookFragment({ ...input, device: "stove-1", stoveDay: { value: 240, unit: "kg" } })).toThrow(RangeError);
+    expect(() => cookFragment({ ...input, stoveDay: { value: 240, unit: "min" } })).toThrow("needs the device of the stove");
+  });
+
   it("takes the worst case of two foods of one resource: the most water, the most fuel and the least energy", () => {
     const result = cookFragment({ ...input, units: { "test.grain-1kg": 1, "test.coarse-1kg": 1 } });
     const fuels = result.lines.map((line) => (line.fuel.read ? line.fuel.value : Number.NaN));
