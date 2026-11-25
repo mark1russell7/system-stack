@@ -185,13 +185,15 @@ const assessed = (source: string, says: string): Claim => ({ source, basis: "ass
 const defined = (says: string): Claim => ({ definition: true, says });
 
 /**
- * The time from the end of a stop of the grid to the end of the boil order of the water main, as a rule minimum. Since 0.6.9.
+ * The time from the end of a stop of the grid to the end of the boil order of the water main. Since 0.6.9.
+ * It is a rule minimum.
  * The rules give the samples that end the order, and the method table gives the time of the incubation. It is not a measured time.
  */
 export const WATER_RECOVERY: CitedSpan = {
   low: 24,
   high: 48,
   unit: "hours",
+  basis: "minimum",
   says:
     "A rule minimum, not a measured time. The low end is one round of samples with 24 hours of incubation, in Texas. The high end is two sets of samples at least 24 hours apart, with 24 hours of incubation, in Illinois. A real recovery can be longer.",
   claims: [

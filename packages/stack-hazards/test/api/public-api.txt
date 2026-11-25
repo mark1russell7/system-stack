@@ -100,11 +100,13 @@ PriorTable: build/hazard.chunk.d.ts#PriorTable
 ReachScore: build/hazard.chunk.d.ts#ReachScore
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
+SPAN_BASES: build/hazard.chunk.d.ts#SPAN_BASES
 SPAN_UNITS: build/hazard.chunk.d.ts#SPAN_UNITS
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
 SilentAreas: build/index.d.ts#SilentAreas
+SpanBasis: build/hazard.chunk.d.ts#SpanBasis
 SpanUnit: build/hazard.chunk.d.ts#SpanUnit
 StatePooling: build/hazard.chunk.d.ts#StatePooling
 StormArea: build/index.d.ts#StormArea
@@ -175,6 +177,7 @@ interface CitedSpan {
   readonly low: number;
   readonly high: number;
   readonly unit: SpanUnit;
+  readonly basis: SpanBasis;
   readonly says: string;
   readonly claims: readonly Claim[];
 }
@@ -344,11 +347,17 @@ interface Regions {
   readonly codes: readonly string[];
 }
 
+### build/hazard.chunk.d.ts#SPAN_BASES
+declare const SPAN_BASES: readonly ["range", "minimum"];
+
 ### build/hazard.chunk.d.ts#SPAN_UNITS
 declare const SPAN_UNITS: readonly ["hours", "days"];
 
 ### build/hazard.chunk.d.ts#SUPPLY_PARTS
 declare const SUPPLY_PARTS: readonly Part[];
+
+### build/hazard.chunk.d.ts#SpanBasis
+type SpanBasis = (typeof SPAN_BASES)[number];
 
 ### build/hazard.chunk.d.ts#SpanUnit
 type SpanUnit = (typeof SPAN_UNITS)[number];

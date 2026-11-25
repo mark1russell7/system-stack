@@ -114,6 +114,16 @@ export const SPAN_UNITS: readonly ["hours", "days"] = ["hours", "days"];
 /** The unit of a cited span. Since 0.6.9. */
 export type SpanUnit = (typeof SPAN_UNITS)[number];
 
+/** The bases of a cited span, in a fixed order. Since 0.6.9. */
+export const SPAN_BASES: readonly ["range", "minimum"] = ["range", "minimum"];
+
+/**
+ * The basis of a cited span. Since 0.6.9.
+ * - `range`: the sources give the range of the value.
+ * - `minimum`: the sources give a least value, for example a rule minimum. The real value is at least the low end.
+ */
+export type SpanBasis = (typeof SPAN_BASES)[number];
+
 /**
  * A cited span of a time: a low end and a high end in a unit, with the claims of its sources. Since 0.6.9.
  * The text `says` tells how the span comes from the claims, in own words. It is not a quote.
@@ -125,6 +135,8 @@ export interface CitedSpan {
   /** The high end, not less than the low end. */
   readonly high: number;
   readonly unit: SpanUnit;
+  /** The basis: `range` when the sources give the range of the value, `minimum` when they give a least value. */
+  readonly basis: SpanBasis;
   readonly says: string;
   /** The claims of the sources of the span. A span has one claim or more. */
   readonly claims: readonly Claim[];

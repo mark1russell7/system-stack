@@ -181,14 +181,20 @@ function cutCurve(context: CurveContext, cut: HazardCut, seen: ReadonlySet<strin
 
 /**
  * This function gives a term of a dependent cut. A missing onset is 0, an upper bound. A missing recovery is 0, a lower bound.
- * A cited onset takes the low end of its span, and a cited recovery takes the high end. Each one is an upper bound, for its span.
+ *
+ * A span of the basis `range` gives the low end of an onset and the high end of a recovery. Each one is an upper bound, for its span.
+ * A span of the basis `minimum` gives its low end, because the real value is at least that value.
+ * A longer onset gives a shorter cut, so a minimum onset is an upper bound. A minimum recovery is a lower bound.
  */
 function followTerm(name: "onset" | "recovery", span: CitedSpan | undefined): FollowTerm {
   if (span === undefined) {
     return name === "onset" ? { days: 0, cited: false, side: "upper", says: "onset not cited: 0, an upper bound" } : { days: 0, cited: false, side: "lower", says: "recovery not cited: 0, a lower bound" };
   }
-  const [end, value]: readonly [string, number] = name === "onset" ? ["low", span.low] : ["high", span.high];
-  return { days: span.unit === "hours" ? value / 24 : value, cited: true, side: "upper", says: `${name} cited: the ${end} end, ${String(value)} ${span.unit}, an upper bound` };
+  const minimum = span.basis === "minimum";
+  const [end, value]: readonly [string, number] = name === "onset" || minimum ? ["low", span.low] : ["high", span.high];
+  const side: TermSide = minimum && name === "recovery" ? "lower" : "upper";
+  const says = `${name} cited as ${minimum ? "a rule minimum" : "a range"}: the ${end} end, ${String(value)} ${span.unit}, ${side === "upper" ? "an upper bound" : "a lower bound"}`;
+  return { days: span.unit === "hours" ? value / 24 : value, cited: true, side, says };
 }
 
 /** This function gives the URLs of the claims of a span. */

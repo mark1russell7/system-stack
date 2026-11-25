@@ -277,7 +277,7 @@ describe("a hazard case with cuts that follow another cut", () => {
     [3, 0],
   ];
   const terms = { license: "public-domain", terms: "https://data.example.net/terms", by: "An agency", checked: "2026-11-24" } as const;
-  const span = (low: number, high: number, unit: CitedSpan["unit"], source: string): CitedSpan => ({ low, high, unit, says: "A made-up span.", claims: [{ source, basis: "told", says: "A rule tells it." }] });
+  const span = (low: number, high: number, unit: CitedSpan["unit"], source: string, basis: CitedSpan["basis"] = "range"): CitedSpan => ({ low, high, unit, basis, says: "A made-up span.", claims: [{ source, basis: "told", says: "A rule tells it." }] });
   const noLaw = { read: false, reason: "none" } as const;
   const defined = [{ definition: true, says: "The case stops it." }] as const;
   const follow = (part: string, follows: HazardCut["follows"], claims: HazardCut["claims"] = defined): HazardCut => ({ part, title: part, claims, duration: noLaw, follows });
@@ -305,6 +305,9 @@ describe("a hazard case with cuts that follow another cut", () => {
           follow("road.local", { part: "power.grid", onset: span(0.5, 1, "days", "table"), recovery: span(1, 2, "days", "rule") }),
           // A chain: the shops follow the phone cut, which follows the grid cut.
           follow("food.retail", { part: "phone.network", recovery: span(12, 24, "hours", "table") }),
+          // A minimum onset is an upper bound, and a minimum recovery is a lower bound.
+          follow("heat.main", { part: "power.grid", onset: span(12, 24, "hours", "table", "minimum"), recovery: span(1, 2, "days", "rule") }),
+          follow("air.main", { part: "power.grid", recovery: span(24, 48, "hours", "rule", "minimum") }),
           follow("gas.main", { part: "sewer.main" }),
         ],
       },
@@ -322,6 +325,8 @@ describe("a hazard case with cuts that follow another cut", () => {
       ["water.main", followCurve(curve, 0, 2), "https://data.example.net/outages https://data.example.net/rule"],
       ["road.local", followCurve(curve, 0.5, 2), "https://data.example.net/outages https://data.example.net/table https://data.example.net/rule"],
       ["food.retail", followCurve(curve, 0, 1), "https://data.example.net/outages https://data.example.net/table"],
+      ["heat.main", followCurve(curve, 0.5, 2), "https://data.example.net/outages https://data.example.net/table https://data.example.net/rule"],
+      ["air.main", followCurve(curve, 0, 1), "https://data.example.net/outages https://data.example.net/rule"],
       ["gas.main", undefined, "definition"],
     ]);
   });
@@ -339,11 +344,15 @@ describe("a hazard case with cuts that follow another cut", () => {
     expect(read("water.main")).toEqual({
       part: "power.grid",
       onset: { days: 0, cited: false, side: "upper", says: "onset not cited: 0, an upper bound" },
-      recovery: { days: 2, cited: true, side: "upper", says: "recovery cited: the high end, 48 hours, an upper bound" },
+      recovery: { days: 2, cited: true, side: "upper", says: "recovery cited as a range: the high end, 48 hours, an upper bound" },
       bound: "upper",
     });
-    expect(read("road.local")?.onset).toEqual({ days: 0.5, cited: true, side: "upper", says: "onset cited: the low end, 0.5 days, an upper bound" });
+    expect(read("road.local")?.onset).toEqual({ days: 0.5, cited: true, side: "upper", says: "onset cited as a range: the low end, 0.5 days, an upper bound" });
     expect(read("road.local")?.bound).toBe("upper");
+    expect(read("heat.main")?.onset).toEqual({ days: 0.5, cited: true, side: "upper", says: "onset cited as a rule minimum: the low end, 12 hours, an upper bound" });
+    expect(read("heat.main")?.bound).toBe("upper");
+    expect(read("air.main")?.recovery).toEqual({ days: 1, cited: true, side: "lower", says: "recovery cited as a rule minimum: the low end, 24 hours, a lower bound" });
+    expect(read("air.main")?.bound).toBe("none");
     // The cause of the shops is the phone cut, which is not a bound. So the shops claim no bound.
     expect(read("food.retail")?.bound).toBe("none");
     expect(read("gas.main")).toBeUndefined();
@@ -353,7 +362,7 @@ describe("a hazard case with cuts that follow another cut", () => {
     for (const options of [{}, { region: { scheme: "test-region", code: "B" } }]) {
       const cuts = hazardCase(list, hazard, options).cuts;
       expect(cuts.every((cut) => cut.duration === undefined && !("follows" in cut))).toBe(true);
-      expect(cuts.map((cut) => cut.source)).toEqual(["definition", "definition", "definition", "definition", "definition", "definition"]);
+      expect(cuts.map((cut) => cut.source)).toEqual(["definition", "definition", "definition", "definition", "definition", "definition", "definition", "definition"]);
     }
   });
 
@@ -371,13 +380,14 @@ describe("a hazard case with cuts that follow another cut", () => {
     expect([drop?.duration, drop?.source]).toEqual([undefined, "https://data.example.net/rule"]);
   });
 
-  it("gives the water main of a power outage the curve of the state, shifted up by 48 hours, with the sources of the rules", () => {
+  it("gives the water main of a power outage the curve of the state, shifted up by the rule minimum of 24 hours, a lower bound, with the sources of the rules", () => {
     const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
     const cuts = hazardCase(HAZARD_LIST, outage, { region: { scheme: "us-state-fips", code: "48" } }).cuts;
     const water = cuts.find((cut) => cut.part === "water.main");
-    expect(water?.duration).toEqual(followCurve(EAGLEI_GRID_LAW.curves["48"]!, 0, 2));
+    expect(water?.duration).toEqual(followCurve(EAGLEI_GRID_LAW.curves["48"]!, 0, 1));
     expect(water?.source.split(" ")).toEqual([EAGLEI_SOURCE_URL, ...WATER_RECOVERY.claims.map((claim) => HAZARD_SOURCES[claim.source ?? ""]?.url)]);
-    expect([water?.follows?.onset.says, water?.follows?.recovery.says, water?.follows?.bound]).toEqual(["onset not cited: 0, an upper bound", "recovery cited: the high end, 48 hours, an upper bound", "upper"]);
+    expect([water?.follows?.onset.says, water?.follows?.recovery.says, water?.follows?.bound]).toEqual(["onset not cited: 0, an upper bound", "recovery cited as a rule minimum: the low end, 24 hours, a lower bound", "none"]);
+    expect(water?.follows?.recovery.side).toBe("lower");
     for (const part of ["phone.network", "road.local", "food.retail", "fuel.retail", "cash.retail"]) {
       const cut = cuts.find((item) => item.part === part);
       expect(cut?.duration, part).toEqual(EAGLEI_GRID_LAW.curves["48"]);
@@ -387,7 +397,7 @@ describe("a hazard case with cuts that follow another cut", () => {
 
   it("gives the cuts of a physical attack the law of the nation, and the cuts of a long collapse no curve", () => {
     const attack = hazardCase(HAZARD_LIST, hazardOf(HAZARD_LIST, "infra.power.physical-attack")!, { region: { scheme: "us-nation", code: "US" } }).cuts;
-    expect(attack.find((cut) => cut.part === "water.main")?.duration).toEqual(followCurve(OE417_ATTACK_LAW.curves["US"]!, 0, 2));
+    expect(attack.find((cut) => cut.part === "water.main")?.duration).toEqual(followCurve(OE417_ATTACK_LAW.curves["US"]!, 0, 1));
     const collapse = hazardCase(HAZARD_LIST, hazardOf(HAZARD_LIST, "infra.power.grid-collapse")!, { region: [{ scheme: "us-state-fips", code: "48" }, { scheme: "us-nation", code: "US" }] }).cuts;
     expect(collapse.every((cut) => cut.duration === undefined && cut.follows === undefined)).toBe(true);
   });

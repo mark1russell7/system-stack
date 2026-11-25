@@ -17,7 +17,7 @@ Each function is a plain function with no clock, no network and no file.
 | `DurationLaw` | A survival curve of the duration for each region of its source, with its fit. |
 | `NoLaw` | No law is read yet. The cut has no curve, so its draws are no read. |
 | `Follows` | The cause of a dependent cut: the cut of another part in the same case, with an onset and a recovery. Since 0.6.9. |
-| `CitedSpan` | A cited span of a time: a low end, a high end, a unit of `SPAN_UNITS`, a text and the claims of its sources. Since 0.6.9. |
+| `CitedSpan` | A cited span of a time: its two ends, a unit of `SPAN_UNITS`, a basis of `SPAN_BASES`, a text and the claims of its sources. Since 0.6.9. |
 | `Hazard` | A case: its code, its name, its cuts and the sources that the dataset examined for it. |
 
 ## The rules of the data
@@ -29,7 +29,9 @@ Each function is a plain function with no clock, no network and no file.
 5. A regional law covers each region of its source, not only one chosen region. The region of the user is input data.
 6. The fits come from `@mark1russell7/rigor-statistics`. The fetches of a source go through `polite-crawler`.
 
-`checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. With the option `at`, the gate also examines the check date of each source. A check after `at` is an error. A check older than `maxAgeDays` (365 by default) is a warning. The gate refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law. Since 0.6.9, a cut that follows a cause with a law gets no warning.
+`checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. With the option `at`, the gate also examines the check date of each source. A check after `at` is an error. A check older than `maxAgeDays` (365 by default) is a warning.
+
+The gate refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law. Since 0.6.9, a cut that follows a cause with a law gets no warning.
 
 The gate refuses a claim of a source with no basis or with a basis that is not in `CLAIM_BASES`. It also refuses a claim of the definition with a basis. Each of these faults has the code `hazards-source`.
 
@@ -77,7 +79,9 @@ The dependent cut occurs only when the cause lasts longer than the onset. Then i
 
 - The cause curve is shifted down by the onset and then up by the recovery.
 - The law has a mass at 0: the chance that the cause ends at or before the onset. A curve of the core has no step, so the curve falls linearly from [0, 1] to its next point. That part is above the law, thus an upper bound. With an onset of 0, the curve is exact.
-- A cited onset takes the low end of its span, and a cited recovery takes the high end. Each one is an upper bound, for its span.
+- A span has a basis. With `range`, the sources give the range of the value. With `minimum`, they give a least value, for example a rule minimum.
+- A `range` onset takes its low end, and a `range` recovery takes its high end. Each one is an upper bound, for its span.
+- A `minimum` term takes its low end, because the real value is at least that value. A longer onset gives a shorter cut, so a minimum onset is an upper bound. A minimum recovery is a lower bound.
 - A missing onset is 0, which can only make the cut longer: an upper bound. A missing recovery is 0, which can only make the cut shorter: a lower bound.
 
 `hazardCase` finds the cause by its reference part, before the option `parts`. When the cause has a curve for the region of the user, the dependent cut gets the shifted curve and the field `follows` (`FollowRead`):
@@ -90,13 +94,13 @@ The dependent cut occurs only when the cause lasts longer than the onset. Then i
 
 The source of the cut is the source of the cause curve, and then the sources of the claims of its terms. A cause with no curve gives the dependent cut no `duration` and no field `follows`, as before 0.6.9. A chain of cuts is permitted.
 
-The gate gives the code `hazards-follows` for a cause that is not a cut of the case, a chain that comes back to the cut, and a cut with `follows` and a law of its own. It gives the same code for a span with wrong ends, a unit that is not in `SPAN_UNITS`, no text, no claim, or a claim of the definition.
+The gate gives `hazards-follows` for a cause that is not a cut of the case, or a chain that comes back to the cut. It gives the same code for a cut with `follows` and a law of its own. It gives the same code for a span with wrong ends, no text, no claim, or a claim of the definition. It also gives it for a unit that is not in `SPAN_UNITS` or a basis that is not in `SPAN_BASES`.
 
-In a power outage, a physical attack and a long collapse of the grid, each cut of a stop of the grid follows the grid cut. No public source gives the time of the storage of water or of the backup fuel, so no cut has an onset.
+Three cases have a stop of the grid: a power outage, a physical attack and a long collapse of the grid. In each case, the other cuts of the stop follow the grid cut. No public source gives the time of the storage of water or of the backup fuel, so no cut has an onset.
 
 | Cut | Onset | Recovery | Bound |
 | --- | --- | --- | --- |
-| `water.main` | Not cited: 0, an upper bound | `WATER_RECOVERY`: 24 to 48 hours, the high end, an upper bound | `upper` |
+| `water.main` | Not cited: 0, an upper bound | `WATER_RECOVERY`: a rule minimum of 24 to 48 hours, the low end, a lower bound | `none` |
 | `phone.network`, `road.local`, `food.retail`, `fuel.retail`, `cash.retail` | Not cited: 0, an upper bound | Not cited: 0, a lower bound | `none` |
 
 `WATER_RECOVERY` is a rule minimum, not a measured time. It is the time of the samples that end the boil order after a loss of pressure:
@@ -106,15 +110,17 @@ In a power outage, a physical attack and a long collapse of the grid, each cut o
 - EPA 815-B-24-008 (January 2024): the results of the Colisure method can be read after an incubation of 24 hours.
 - Thus the low end is 24 hours: one round with its incubation. The high end is 48 hours: two sets 24 hours apart, with the incubation of the second set.
 
-A real recovery can be longer than the rule minimum. So the bound `upper` of the water main holds only for the cited span. The text of a state rule has no copyright: the government edicts doctrine (Georgia v. Public.Resource.Org, 2020). Thus the license of each state rule is `public-domain`, not `us-public-domain`, which is only for a federal work.
+The real recovery is at least the rule minimum of its state, and it can be longer. So the span is not a range of the real value, and its basis is `minimum`. The water main gets the cause curve plus 24 hours. That curve is a lower bound, so its bound is `none`.
+
+The text of a state rule has no copyright: the government edicts doctrine (Georgia v. Public.Resource.Org, 2020). Thus the license of each state rule is `public-domain`, not `us-public-domain`, which is only for a federal work.
 
 ```ts
 const outage = hazardOf(HAZARD_LIST, "infra.power.outage");
 if (outage !== undefined) {
   const cuts = hazardCase(HAZARD_LIST, outage, { region: { scheme: "us-state-fips", code: "48" } }).cuts;
   const water = cuts.find((cut) => cut.part === "water.main");
-  console.log(water?.follows?.recovery.says); // "recovery cited: the high end, 48 hours, an upper bound"
-  console.log(water?.follows?.bound); // "upper"
+  console.log(water?.follows?.recovery.says); // "recovery cited as a rule minimum: the low end, 24 hours, a lower bound"
+  console.log(water?.follows?.bound); // "none"
 }
 ```
 

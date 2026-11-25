@@ -224,7 +224,7 @@ describe("the cuts that follow the stop of the grid", () => {
   });
 
   it("gives the water main a recovery of 24 to 48 hours from the rules, with a license for each source", () => {
-    expect([WATER_RECOVERY.low, WATER_RECOVERY.high, WATER_RECOVERY.unit]).toEqual([24, 48, "hours"]);
+    expect([WATER_RECOVERY.low, WATER_RECOVERY.high, WATER_RECOVERY.unit, WATER_RECOVERY.basis]).toEqual([24, 48, "hours", "minimum"]);
     expect(WATER_RECOVERY.says).toContain("A rule minimum, not a measured time.");
     for (const sentence of WATER_RECOVERY.says.split(/(?<=\.) /u)) expect(sentence.split(" ").length, sentence).toBeLessThanOrEqual(25);
     const licenses = WATER_RECOVERY.claims.map((claim) => [claim.source, claim.basis, HAZARD_SOURCES[claim.source ?? ""]?.license]);
@@ -240,7 +240,7 @@ describe("the cuts that follow the stop of the grid", () => {
 });
 
 describe("the gate of a cut that follows another cut", () => {
-  const span: CitedSpan = { low: 24, high: 48, unit: "hours", says: "A rule minimum.", claims: [{ source: "outages", basis: "told", says: "A rule tells it." }] };
+  const span: CitedSpan = { low: 24, high: 48, unit: "hours", basis: "minimum", says: "A rule minimum.", claims: [{ source: "outages", basis: "told", says: "A rule tells it." }] };
   const water = (follows: HazardCut["follows"], extra: Partial<HazardCut> = {}): HazardCut => ({
     part: "water.main",
     title: "No water",
@@ -279,12 +279,15 @@ describe("the gate of a cut that follows another cut", () => {
     expect(checkHazards(list(water({ part: "gas.main" })))[0]).toMatchObject({ level: "error", at: "infra.power.outage.water.main" });
   });
 
-  it("refuses a span with wrong ends, a wrong unit, no text, no claim or a claim of the definition", () => {
+  it("refuses a span with wrong ends, a wrong unit, a wrong basis, no text, no claim or a claim of the definition", () => {
     const bad = (onset: unknown): string[] => codes(list(water({ part: "power.grid", onset: onset as CitedSpan })));
     expect(bad({ ...span, low: 50 })).toEqual(["hazards-follows"]);
     expect(bad({ ...span, low: -1 })).toEqual(["hazards-follows"]);
     expect(bad({ ...span, high: Number.NaN })).toEqual(["hazards-follows"]);
     expect(bad({ ...span, unit: "weeks" })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, basis: "most" })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, basis: undefined })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, basis: "range" })).toEqual([]);
     expect(bad({ ...span, says: " " })).toEqual(["hazards-follows"]);
     expect(bad({ ...span, claims: [] })).toEqual(["hazards-follows"]);
     expect(bad({ ...span, claims: [{ definition: true, says: "The case says it." }] })).toEqual(["hazards-follows"]);

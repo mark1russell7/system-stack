@@ -1,6 +1,6 @@
 import { checkSources, LICENSES, permits, type FindingCode, type GateOptions, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
-import { CLAIM_BASES, SPAN_UNITS, SUPPLY_PARTS, type CitedSpan, type Claim, type DurationLaw, type Hazard, type HazardCut, type HazardList, type HazardSource } from "./hazard.ts";
+import { CLAIM_BASES, SPAN_BASES, SPAN_UNITS, SUPPLY_PARTS, type CitedSpan, type Claim, type DurationLaw, type Hazard, type HazardCut, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
@@ -32,7 +32,9 @@ import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
  *   Or two tables have the same scheme, case and region.
  * - `hazards-follows`: a cut has `follows` and a law of its own. Since 0.6.9.
  *   Or it follows a part that is not a cut of the case, or a chain of `follows` comes back to the cut.
- *   Or a span of its onset or of its recovery has an end that is not a number of 0 or more, a low end above the high end, or a unit that is not in `SPAN_UNITS`.
+ *   Or an end of a span of its onset or recovery is not finite or is below 0.
+ *   Or the low end of the span is above the high end.
+ *   Or the span has a unit that is not in `SPAN_UNITS`, or a basis that is not in `SPAN_BASES`.
  *   Or the span has no text, no claim, or a claim of the definition.
  *   A claim of a span with no source in the table, or with no basis, is a `hazards-source`.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
@@ -200,6 +202,7 @@ function spanFaults(span: CitedSpan): string[] {
   const { low, high } = span;
   if (!(Number.isFinite(low) && Number.isFinite(high) && low >= 0 && low <= high)) faults.push("has ends that are not two numbers of 0 or more, with the low end not above the high end");
   if (!(SPAN_UNITS as readonly unknown[]).includes(span.unit)) faults.push(`has the unit "${String(span.unit)}", which is not one of ${SPAN_UNITS.join(", ")}`);
+  if (!(SPAN_BASES as readonly unknown[]).includes(span.basis)) faults.push(`has the basis "${String(span.basis)}", which is not one of ${SPAN_BASES.join(", ")}`);
   if (typeof span.says !== "string" || span.says.trim() === "") faults.push("has no text");
   if (span.claims.length === 0) faults.push("has no claim");
   if (span.claims.some((claim) => claim.definition === true)) faults.push("has a claim of the definition. Each claim of a span names a source");
