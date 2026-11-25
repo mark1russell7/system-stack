@@ -60,37 +60,38 @@ jobs:
 
   # The stamp of the timed code: the bundle of bench/child.ts after a tree shake, with the lock closure of each package that it imports.
   # A run of another event times. A change of the bench or its workflow times. Each failure of a step times, so a failure can skip no bench.
+  # The job always runs, and it gives the output match of the gate: "Bench OK" names it as the job of changes, so a skip of the bench is a pass only when match is false.
   timed:
     needs: changes
-    if: needs.changes.outputs.match == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       match: ${{ steps.decide.outputs.match }}
     env:
       EVENT: ${{ github.event_name }}
+      CHANGES: ${{ needs.changes.outputs.match }}
       BASE: ${{ github.event.pull_request.base.sha }}
       HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - id: checkout
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
         continue-on-error: true
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
         continue-on-error: true
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
           cache: pnpm
       - id: install
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
         continue-on-error: true
         run: pnpm install --frozen-lockfile
       - id: decide
@@ -104,6 +105,11 @@ jobs:
             echo "match=true" >> "$GITHUB_OUTPUT"
             exit 0
           }
+          if [ "$CHANGES" = false ]; then
+            echo "The job changes found no file of the gate. So the bench does not run."
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           [ "$EVENT" = pull_request ] || times "The event is $EVENT, not a pull request."
           [ "$INSTALL" = success ] || times "The install of the head gave $INSTALL."
           base=$(git merge-base "$BASE" "$HEAD") || times "The merge base of $BASE and $HEAD is not known."
@@ -210,3 +216,4 @@ jobs:
       - uses: mark1russell7/template/.github/actions/gate-summary@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
         with:
           needs: ${{ toJSON(needs) }}
+          changes: timed
