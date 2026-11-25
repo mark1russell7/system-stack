@@ -47,8 +47,8 @@ export function weakestBound(bounds: Iterable<CutBound>): CutBound {
   let lower = false;
   for (const bound of bounds) {
     if (bound === "none") return "none";
-    if (bound === "upper") upper = true;
     if (bound === "lower") lower = true;
+    if (bound === "upper") upper = true;
   }
   if (upper && lower) return "none";
   return upper ? "upper" : lower ? "lower" : "law";
