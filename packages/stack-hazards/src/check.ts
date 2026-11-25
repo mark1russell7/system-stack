@@ -1,6 +1,6 @@
 import { checkSources, LICENSES, permits, type FindingCode, type GateOptions, type Use } from "@mark1russell7/guidebook";
 import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
-import { CLAIM_BASES, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
+import { CLAIM_BASES, SPAN_UNITS, SUPPLY_PARTS, type CitedSpan, type Claim, type DurationLaw, type Hazard, type HazardCut, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
 
 // The gate of a list of hazard cases: each cut has a claim, each claim and each law has a source with a license.
@@ -30,7 +30,13 @@ import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
  *   Or its scheme is empty, or a region is two times in its codes.
  *   Or it has a rate that is not a pair of a count of 0 or more and a share from 0 to 1.
  *   Or two tables have the same scheme, case and region.
+ * - `hazards-follows`: a cut has `follows` and a law of its own. Since 0.6.9.
+ *   Or it follows a part that is not a cut of the case, or a chain of `follows` comes back to the cut.
+ *   Or a span of its onset or of its recovery has an end that is not a number of 0 or more, a low end above the high end, or a unit that is not in `SPAN_UNITS`.
+ *   Or the span has no text, no claim, or a claim of the definition.
+ *   A claim of a span with no source in the table, or with no basis, is a `hazards-source`.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
+ *   Since 0.6.9, a cut that follows a cause with a law gets no warning, because `hazardCase` gives it a curve.
  */
 export const HAZARD_CODES: readonly [
   "hazards-twice",
@@ -42,8 +48,9 @@ export const HAZARD_CODES: readonly [
   "hazards-fit",
   "hazards-curve",
   "hazards-prior",
+  "hazards-follows",
   "hazards-no-law",
-] = ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-no-law"];
+] = ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-follows", "hazards-no-law"];
 
 /** A code of the gate of a list of hazard cases. */
 export type HazardCode = (typeof HAZARD_CODES)[number];
@@ -108,12 +115,24 @@ export function checkHazards(list: HazardList, parts: readonly Part[] = SUPPLY_P
         const fault = basisFault(claim);
         if (fault !== undefined) add("error", "hazards-source", at, `A claim of the cut "${at}" ${fault}.`);
       }
+      if (item.follows !== undefined) {
+        for (const message of followFaults(hazard, item)) add("error", "hazards-follows", at, `The cut "${at}" ${message}.`);
+        for (const [name, span] of [["onset", item.follows.onset], ["recovery", item.follows.recovery]] as const) {
+          if (span === undefined) continue;
+          for (const message of spanFaults(span)) add("error", "hazards-follows", at, `The ${name} of the cut "${at}" ${message}.`);
+          for (const claim of span.claims) {
+            if (claim.source !== undefined) sourceAt(at, claim.source);
+            const fault = basisFault(claim);
+            if (fault !== undefined) add("error", "hazards-source", at, `A claim of the ${name} of the cut "${at}" ${fault}.`);
+          }
+        }
+      }
       if (item.duration.read) {
         for (const [code, message] of lawFaults(item.duration, list.sources)) {
           if (code !== "hazards-license" || !badLicense.has(item.duration.source)) add("error", code, at, `The law of the cut "${at}": ${message}`);
         }
       }
-      else add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
+      else if (!followsLaw(hazard, item)) add("warning", "hazards-no-law", at, `The cut "${at}" has no law of its duration, so the draws that it can stop are no read.`);
     }
   }
   for (const [index, table] of (list.priors ?? []).entries()) {
@@ -137,6 +156,54 @@ function basisFault(claim: Claim): string | undefined {
   if (claim.definition === true) return basis === undefined ? undefined : "is the definition of the case, and has a basis of a source";
   if (basis === undefined) return `names the source "${claim.source}" with no basis`;
   return (CLAIM_BASES as readonly unknown[]).includes(basis) ? undefined : `has the basis "${String(basis)}", which is not one of ${CLAIM_BASES.join(", ")}`;
+}
+
+/** This function gives the faults of the field `follows` of a cut, each as the end of a sentence. */
+function followFaults(hazard: Hazard, cut: HazardCut): string[] {
+  const follows = cut.follows;
+  if (follows === undefined) return [];
+  const faults: string[] = [];
+  if (cut.duration.read) faults.push(`has a law of its own and follows the part "${follows.part}". A cut has one of the two`);
+  if (!hazard.cuts.some((item) => item.part === follows.part)) faults.push(`follows the part "${follows.part}", which is not a cut of the case`);
+  else if (followsCycle(hazard, cut)) faults.push(`follows a chain of cuts that comes back to it`);
+  return faults;
+}
+
+/** This function tells if the chain of `follows` from a cut comes back to the cut. A cycle that does not hold the cut gives `false`: each cut of that cycle gives the fault. */
+function followsCycle(hazard: Hazard, cut: HazardCut): boolean {
+  const seen = new Set([cut.part]);
+  let next = cut.follows?.part;
+  while (next !== undefined) {
+    if (seen.has(next)) return next === cut.part;
+    seen.add(next);
+    const part = next;
+    next = hazard.cuts.find((item) => item.part === part)?.follows?.part;
+  }
+  return false;
+}
+
+/** This function tells if the chain of `follows` from a cut with no law gets to a cut with a law. Then `hazardCase` can give the cut a curve. */
+function followsLaw(hazard: Hazard, cut: HazardCut): boolean {
+  const seen = new Set<string>();
+  let item: HazardCut | undefined = cut;
+  while (item !== undefined && !item.duration.read && item.follows !== undefined && !seen.has(item.part)) {
+    seen.add(item.part);
+    const part: string = item.follows.part;
+    item = hazard.cuts.find((other) => other.part === part);
+  }
+  return item !== undefined && item.duration.read;
+}
+
+/** This function gives the faults of a cited span, each as the end of a sentence. */
+function spanFaults(span: CitedSpan): string[] {
+  const faults: string[] = [];
+  const { low, high } = span;
+  if (!(Number.isFinite(low) && Number.isFinite(high) && low >= 0 && low <= high)) faults.push("has ends that are not two numbers of 0 or more, with the low end not above the high end");
+  if (!(SPAN_UNITS as readonly unknown[]).includes(span.unit)) faults.push(`has the unit "${String(span.unit)}", which is not one of ${SPAN_UNITS.join(", ")}`);
+  if (typeof span.says !== "string" || span.says.trim() === "") faults.push("has no text");
+  if (span.claims.length === 0) faults.push("has no claim");
+  if (span.claims.some((claim) => claim.definition === true)) faults.push("has a claim of the definition. Each claim of a span names a source");
+  return faults;
 }
 
 /**

@@ -1,10 +1,10 @@
 import { unknownKinds } from "@mark1russell7/alerts";
 import { describe, expect, it } from "vitest";
 import { checkHazards, hasHazardError } from "./check.ts";
-import { HAZARD_LIST, HAZARD_SOURCES, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_EVENT_LAW, NO_FOLLOW_LAW, NO_GEOMAGNETIC_LAW, NO_LAW } from "./data.ts";
+import { HAZARD_LIST, HAZARD_SOURCES, NO_COLLAPSE_LAW, NO_CYBER_LAW, NO_EVENT_LAW, NO_FOLLOW_LAW, NO_GEOMAGNETIC_LAW, NO_LAW, WATER_RECOVERY } from "./data.ts";
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE } from "./eaglei-law.ts";
 import { STORM_CLASSES } from "./storms.ts";
-import { CLAIM_BASES, HAZARDS_SCHEMA, SUPPLY_PARTS, type Claim, type DurationLaw, type HazardList, type HazardSource } from "./hazard.ts";
+import { CLAIM_BASES, HAZARDS_SCHEMA, SUPPLY_PARTS, type CitedSpan, type Claim, type DurationLaw, type HazardCut, type HazardList, type HazardSource } from "./hazard.ts";
 import { supplyState } from "./case.ts";
 
 /** The catastrophic cases, in the order of the list. */
@@ -58,7 +58,7 @@ describe("the gate of the reference data", () => {
     expect(hasHazardError(faults)).toBe(false);
   });
 
-  it("gives one warning for each cut with no law: each cut but the grid cuts of a power outage, of a physical attack and of the storm cases", () => {
+  it("gives one warning for each cut with no law and no cause with a law: each cut but the grid cuts with a law and the cuts that follow them", () => {
     const cuts = HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => ({ hazard: hazard.case, cut })));
     const laws = cuts.filter(({ cut }) => cut.duration.read);
     expect(laws.map(({ hazard, cut }) => `${hazard} ${cut.part}`)).toEqual([
@@ -72,7 +72,10 @@ describe("the gate of the reference data", () => {
     ]);
     const noLaw = cuts.filter(({ hazard, cut }) => !cut.duration.read && !CATASTROPHIC.includes(hazard));
     expect(noLaw.every(({ cut }) => cut.duration === NO_LAW)).toBe(true);
-    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-no-law")).toHaveLength(cuts.length - laws.length);
+    // The six cuts of a stop of the grid follow the grid cut. In a power outage and a physical attack, that cut has a law.
+    const followers = cuts.filter(({ hazard, cut }) => cut.follows !== undefined && ["infra.power.outage", "infra.power.physical-attack"].includes(hazard));
+    expect(followers).toHaveLength(12);
+    expect(checkHazards(HAZARD_LIST).filter((fault) => fault.code === "hazards-no-law")).toHaveLength(cuts.length - laws.length - followers.length);
   });
 
   it("has a law of its own on the grid cut of each storm case, with a curve for each region of its source", () => {
@@ -103,7 +106,10 @@ describe("the gate of the reference data", () => {
     const used = new Set(
       HAZARD_LIST.hazards.flatMap((hazard) => [
         ...hazard.examined,
-        ...hazard.cuts.flatMap((cut) => [...cut.claims.flatMap((claim) => (claim.source === undefined ? [] : [claim.source])), ...(cut.duration.read ? [cut.duration.source] : [])]),
+        ...hazard.cuts.flatMap((cut) => [
+          ...[...cut.claims, ...(cut.follows?.onset?.claims ?? []), ...(cut.follows?.recovery?.claims ?? [])].flatMap((claim) => (claim.source === undefined ? [] : [claim.source])),
+          ...(cut.duration.read ? [cut.duration.source] : []),
+        ]),
       ]),
     );
     expect(HAZARD_LIST.hazards.flatMap((hazard) => hazard.cuts.map((cut) => cut.part)).filter((part) => !parts.has(part))).toEqual([]);
@@ -200,6 +206,95 @@ describe("the gate of the reference data", () => {
     for (const hazard of HAZARD_LIST.hazards) {
       for (const cut of hazard.cuts) for (const claim of cut.claims) if (claim.source !== undefined) expect(hazard.examined).toContain(claim.source);
     }
+  });
+});
+
+describe("the cuts that follow the stop of the grid", () => {
+  it("gives each cut of a stop of the grid the grid cut as its cause, and a cited recovery only to the water main", () => {
+    for (const code of ["infra.power.outage", "infra.power.physical-attack", "infra.power.grid-collapse"]) {
+      const cuts = HAZARD_LIST.hazards.find((hazard) => hazard.case === code)?.cuts ?? [];
+      const follows = Object.fromEntries(cuts.flatMap((cut) => (cut.follows === undefined ? [] : [[cut.part, cut.follows]])));
+      expect(Object.keys(follows), code).toEqual(["phone.network", "water.main", "road.local", "food.retail", "fuel.retail", "cash.retail"]);
+      for (const [part, item] of Object.entries(follows)) {
+        expect(item.part, part).toBe("power.grid");
+        expect(item.onset, part).toBeUndefined();
+        expect(item.recovery, part).toBe(part === "water.main" ? WATER_RECOVERY : undefined);
+      }
+    }
+  });
+
+  it("gives the water main a recovery of 24 to 48 hours from the rules, with a license for each source", () => {
+    expect([WATER_RECOVERY.low, WATER_RECOVERY.high, WATER_RECOVERY.unit]).toEqual([24, 48, "hours"]);
+    expect(WATER_RECOVERY.says).toContain("A rule minimum, not a measured time.");
+    for (const sentence of WATER_RECOVERY.says.split(/(?<=\.) /u)) expect(sentence.split(" ").length, sentence).toBeLessThanOrEqual(25);
+    const licenses = WATER_RECOVERY.claims.map((claim) => [claim.source, claim.basis, HAZARD_SOURCES[claim.source ?? ""]?.license]);
+    expect(licenses).toEqual([
+      ["tx.30-tac-290.46", "told", "public-domain"],
+      ["il.35-602.310", "told", "public-domain"],
+      ["il.35-604.135", "told", "public-domain"],
+      ["epa.rtcr-methods", "told", "us-public-domain"],
+    ]);
+    // The text of a state rule is not a federal work, so its license is not us-public-domain.
+    for (const id of ["tx.30-tac-290.46", "il.35-602.310", "il.35-604.135"]) expect(HAZARD_SOURCES[id]?.terms, id).toContain("supremecourt.gov");
+  });
+});
+
+describe("the gate of a cut that follows another cut", () => {
+  const span: CitedSpan = { low: 24, high: 48, unit: "hours", says: "A rule minimum.", claims: [{ source: "outages", basis: "told", says: "A rule tells it." }] };
+  const water = (follows: HazardCut["follows"], extra: Partial<HazardCut> = {}): HazardCut => ({
+    part: "water.main",
+    title: "No water",
+    claims: [{ definition: true, says: "The case stops the water." }],
+    duration: { read: false, reason: "It follows the grid." },
+    follows,
+    ...extra,
+  });
+  const list = (...cuts: HazardCut[]): HazardList => {
+    const base = withLaw(LAW);
+    const hazard = base.hazards[0]!;
+    return { ...base, hazards: [{ ...hazard, cuts: [...hazard.cuts, ...cuts] }] };
+  };
+
+  it("passes a cut that follows the grid cut, with no warning of no law", () => {
+    expect(checkHazards(list(water({ part: "power.grid" })))).toEqual([]);
+    expect(checkHazards(list(water({ part: "power.grid", onset: span, recovery: span })))).toEqual([]);
+    // A chain to a cut with a law also gets a curve, so it gets no warning.
+    const road = { ...water({ part: "water.main" }), part: "road.local" };
+    expect(checkHazards(list(water({ part: "power.grid" }), road))).toEqual([]);
+  });
+
+  it("gives the warning of no law when the cause has no law", () => {
+    const base = list(water({ part: "power.grid" }));
+    const hazard = base.hazards[0]!;
+    const noLaw = { ...base, hazards: [{ ...hazard, cuts: hazard.cuts.map((cut) => (cut.part === "power.grid" ? { ...cut, duration: { read: false, reason: "none" } as const } : cut)) }] };
+    expect(codes(noLaw)).toEqual(["hazards-no-law", "hazards-no-law"]);
+  });
+
+  it("refuses a cause that is not a cut of the case, a cycle, and a cut with a law of its own", () => {
+    expect(codes(list(water({ part: "gas.main" })))).toEqual(["hazards-follows", "hazards-no-law"]);
+    expect(codes(list(water({ part: "water.main" })))).toEqual(["hazards-follows", "hazards-no-law"]);
+    const road = { ...water({ part: "water.main" }), part: "road.local" };
+    expect(codes(list(water({ part: "road.local" }), road))).toEqual(["hazards-follows", "hazards-no-law", "hazards-follows", "hazards-no-law"]);
+    expect(codes(list(water({ part: "power.grid" }, { duration: LAW })))).toEqual(["hazards-follows"]);
+    expect(checkHazards(list(water({ part: "gas.main" })))[0]).toMatchObject({ level: "error", at: "infra.power.outage.water.main" });
+  });
+
+  it("refuses a span with wrong ends, a wrong unit, no text, no claim or a claim of the definition", () => {
+    const bad = (onset: unknown): string[] => codes(list(water({ part: "power.grid", onset: onset as CitedSpan })));
+    expect(bad({ ...span, low: 50 })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, low: -1 })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, high: Number.NaN })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, unit: "weeks" })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, says: " " })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, claims: [] })).toEqual(["hazards-follows"]);
+    expect(bad({ ...span, claims: [{ definition: true, says: "The case says it." }] })).toEqual(["hazards-follows"]);
+    expect(checkHazards(list(water({ part: "power.grid", recovery: { ...span, unit: "weeks" as "hours" } })))[0]?.message).toContain("The recovery of the cut");
+  });
+
+  it("refuses a claim of a span with no source in the table or with no basis", () => {
+    const withClaim = (claim: unknown): string[] => codes(list(water({ part: "power.grid", recovery: { ...span, claims: [claim as Claim] } })));
+    expect(withClaim({ source: "unknown", basis: "told", says: "A rule tells it." })).toEqual(["hazards-source"]);
+    expect(withClaim({ source: "outages", says: "A rule tells it." })).toEqual(["hazards-source"]);
   });
 });
 

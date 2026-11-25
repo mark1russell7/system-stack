@@ -1,7 +1,7 @@
 import { EAGLEI_CAUSE_LAWS, EAGLEI_CAUSE_SOURCES, EAGLEI_GRID_LAW, EAGLEI_SOURCE, STORM_EVENTS_SOURCE, ZONE_COUNTY_SOURCE } from "./eaglei-law.ts";
 import { EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_ATTACK_LAW, OE417_NATION_PRIORS, OE417_SOURCE } from "./oe417.ts";
-import { HAZARDS_SCHEMA, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type HazardSource, type NoLaw } from "./hazard.ts";
+import { HAZARDS_SCHEMA, type CitedSpan, type Claim, type IsoDate, type DurationLaw, type HazardCut, type HazardList, type HazardSource, type NoLaw } from "./hazard.ts";
 
 // The reference data: the hazard cases, the cuts that public pages name, and the table of the sources.
 // Each claim is in own words. The dataset holds no quote. A cut that no source names is not in the list: it is no read.
@@ -30,6 +30,16 @@ const doe = (id: string, title: string, path: string, updated: IsoDate): HazardS
 const cisa = (id: string, title: string, path: string): HazardSource => federal(id, { title, url: `https://www.cisa.gov/${path}`, by: "CISA", checked: READ_CASES });
 const nws = (id: string, title: string, path: string): HazardSource =>
   federal(id, { title, url: `https://www.weather.gov/safety/${path}`, by: "National Weather Service", checked: READ }, NWS_TERMS);
+
+/**
+ * The text of a law has no copyright: the government edicts doctrine, Georgia v. Public.Resource.Org (2020).
+ * Thus the text of a state rule has the license `public-domain`, not `us-public-domain`, which is only for a federal work.
+ */
+const EDICTS_TERMS = "https://www.supremecourt.gov/opinions/19pdf/18-1150_7m58.pdf";
+const READ_RULES = "2026-11-24";
+
+/** This function gives the record of the text of a state rule. */
+const stateRule = (id: string, title: string, url: string, by: string): HazardSource => ({ id, title, url, by, license: "public-domain", terms: EDICTS_TERMS, checked: READ_RULES });
 
 /** This function gives the table of the sources by id, from a list of sources. */
 const byId = (sources: readonly HazardSource[]): Readonly<Record<string, HazardSource>> => Object.fromEntries(sources.map((source) => [source.id, source]));
@@ -106,6 +116,21 @@ export const HAZARD_SOURCES: Readonly<Record<string, HazardSource>> = byId([
   nws("nws.flood", "Flood safety", "flood"),
   nws("nws.wildfire", "Wildfire safety", "wildfire"),
   nws("nws.heat", "Heat safety", "heat"),
+  stateRule("il.35-602.310", "35 Ill. Adm. Code 602.310", "https://www.ilga.gov/commission/jcar/admincode/035/035006020C03100R.html", "Illinois General Assembly, Joint Committee on Administrative Rules"),
+  stateRule("il.35-604.135", "35 Ill. Adm. Code 604.135", "https://www.ilga.gov/commission/jcar/admincode/035/035006040A01350R.html", "Illinois General Assembly, Joint Committee on Administrative Rules"),
+  stateRule(
+    "tx.30-tac-290.46",
+    "30 Tex. Admin. Code 290.46, Minimum acceptable operating practices for public drinking water systems",
+    "https://www.law.cornell.edu/regulations/texas/30-Tex-Admin-Code-SS-290-46",
+    "Texas Commission on Environmental Quality (the copy of Cornell LII)",
+  ),
+  federal("epa.rtcr-methods", {
+    title: "Methods of the Revised Total Coliform Rule (EPA 815-B-24-008)",
+    url: "https://www.epa.gov/system/files/documents/2024-02/rtcr-methods-table.pdf",
+    by: "U.S. Environmental Protection Agency",
+    note: "The table has the date January 2024.",
+    checked: READ_RULES,
+  }),
   OE417_SOURCE,
   EAGLEI_SOURCE,
   STORM_EVENTS_SOURCE,
@@ -160,16 +185,40 @@ const assessed = (source: string, says: string): Claim => ({ source, basis: "ass
 const defined = (says: string): Claim => ({ definition: true, says });
 
 /**
+ * The time from the end of a stop of the grid to the end of the boil order of the water main, as a rule minimum. Since 0.6.9.
+ * The rules give the samples that end the order, and the method table gives the time of the incubation. It is not a measured time.
+ */
+export const WATER_RECOVERY: CitedSpan = {
+  low: 24,
+  high: 48,
+  unit: "hours",
+  says:
+    "A rule minimum, not a measured time. The low end is one round of samples with 24 hours of incubation, in Texas. The high end is two sets of samples at least 24 hours apart, with 24 hours of incubation, in Illinois. A real recovery can be longer.",
+  claims: [
+    told("tx.30-tac-290.46", "The rule tells that a boil water notice ends only after special samples are negative for coliform organisms."),
+    told("il.35-602.310", "The rule tells that two sets of samples at least 24 hours apart, with no coliform bacteria and a chlorine residual, verify the disinfection."),
+    told("il.35-604.135", "The rule tells that a drop of the pressure below 20 psi gives a boil order. Its other path takes samples at once and approximately 12 hours later."),
+    told("epa.rtcr-methods", "The table tells that the results of the Colisure method can be read after an incubation of 24 hours."),
+  ],
+};
+
+/** The cause of each cut that a stop of the grid causes. No public source gives the time of the storage of water or of the backup fuel, so no cut has an onset. */
+const GRID = "power.grid";
+
+/**
  * This function gives the cuts that a stop of the grid causes, from the page on power outages. A power outage, a physical attack on the grid and a long collapse of the grid share them.
  * A long collapse has a different reason for no law.
+ *
+ * Since 0.6.9, each cut follows the grid cut of its case, so `hazardCase` gives it the curve of the grid cut.
+ * Only the water main has a cited recovery: the boil order after the stop. Each other cut has no onset and no recovery.
  */
 const outageEffects = (duration: NoLaw): HazardCut[] => [
-  { part: "phone.network", title: "No telephone service", claims: [told("ready.power-outages", "The page tells that a power outage can stop communications.")], duration },
-  { part: "water.main", title: "No water from the main", claims: [told("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration },
-  { part: "road.local", title: "No transport", claims: [told("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration },
-  { part: "food.retail", title: "The food shops are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration },
-  { part: "fuel.retail", title: "The fuel stations are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration },
-  { part: "cash.retail", title: "No banks and no cash machines", claims: [told("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration },
+  { part: "phone.network", title: "No telephone service", claims: [told("ready.power-outages", "The page tells that a power outage can stop communications.")], duration, follows: { part: GRID } },
+  { part: "water.main", title: "No water from the main", claims: [told("ready.power-outages", "The page tells that a power outage can stop the water supply.")], duration, follows: { part: GRID, recovery: WATER_RECOVERY } },
+  { part: "road.local", title: "No transport", claims: [told("ready.power-outages", "The page tells that a power outage can stop transportation.")], duration, follows: { part: GRID } },
+  { part: "food.retail", title: "The food shops are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the grocery stores.")], duration, follows: { part: GRID } },
+  { part: "fuel.retail", title: "The fuel stations are closed", claims: [told("ready.power-outages", "The page tells that a power outage can close the gas stations.")], duration, follows: { part: GRID } },
+  { part: "cash.retail", title: "No banks and no cash machines", claims: [told("ready.power-outages", "The page tells that a power outage can close the banks and the ATMs.")], duration, follows: { part: GRID } },
 ];
 
 /**
