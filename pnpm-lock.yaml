@@ -334,6 +334,9 @@ importers:
 
   packages/stack-hazards:
     dependencies:
+      '@mark1russell7/geo':
+        specifier: ^0.5.13
+        version: 0.5.13
       '@mark1russell7/guidebook':
         specifier: ^0.4.0
         version: 0.4.0
