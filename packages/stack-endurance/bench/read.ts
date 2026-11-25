@@ -4,26 +4,31 @@
  * - The value of a case in a job is the median time of one call over the fresh children of its arm, in milliseconds.
  * - The limit of a case is `runLimit` of rigor-bench: the worst value of 5 jobs or more plus their spread.
  * - A CPU model with jobs of 5 runs or more in the freeze gets its own limit. Each other model of the freeze gets the ceiling: the limit over all the jobs.
- * - The noise cap is the `runLimit` of the A/A spreads of the same jobs (`aaLimits`). A job above it is a no read.
+ * - The noise cap is the worst A/A spread of the jobs plus the high side of their spread (`noiseCapOf`). A job above it is a no read.
+ *   A CPU model with its own limit has its own noise cap. Each other model reads against the pooled noise cap (`noiseCapTable`).
  * - A job on a CPU model with no frozen value is a no read. A no read is not a pass.
  * - The gate reads the jobs of one CPU model in one run as one group. A group is beyond only when its lowest value is above the limit (`groupCases`).
  * - A group of 2 jobs or more on a model with its own limit reads against the group limit of the model (`groupTables`).
  *   The group limit is `runLimit` of the lowest value of each run of the model.
  *   A group of 1 job reads against the limit of one job.
  */
-import { aaLimits, aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
+import { aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
+import { median } from "@mark1russell7/rigor-statistics";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 
 /** The schema of the record of one job. */
 export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
 /** The schema of the file of the frozen limits. */
-export const LIMITS_SCHEMA = "stack-endurance/independent-limits/2";
+export const LIMITS_SCHEMA = "stack-endurance/independent-limits/3";
 /** The measure of each value and each limit. */
 export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
 export const RULE =
   "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling. The group limit of a model is runLimit of the lowest value of each run of the model. A group of 2 jobs or more reads against it. A group of 1 job reads against the limit of one job.";
+/** The rule of each noise cap. */
+export const NOISE_RULE =
+  "The worst A/A spread of the jobs plus the high side of their spread (worst - median), on a log scale. Each CPU model with jobs of 5 runs or more has its own noise cap from the A/A spreads of its jobs. The other models get the pooled noise cap of all the jobs.";
 /** The case of the A/A pair: the largest case of the sum over the states, with a second arm of the same child. */
 export const AA_CASE = caseId(12);
 /** The id of the second arm of the A/A pair. */
@@ -98,14 +103,59 @@ export interface FrozenLimits {
   readonly jobs: readonly { readonly job: string; readonly cpu: string; readonly run: string; readonly commit: string }[];
   /** The limit of each case, in milliseconds, with its values. */
   readonly cases: Readonly<Record<string, RunLimit>>;
-  /** The noise cap: the limit of the A/A spread of a job, on a log scale, with its values. */
-  readonly noiseCap: RunLimit;
+  /** The rule of each noise cap. */
+  readonly noiseRule: string;
+  /** The noise cap of each CPU model with jobs of `MIN_RUNS` runs or more, and the pooled noise cap `other` (`noiseCapTable`). `limitFaults` computes each one again. */
+  readonly noiseCaps: NoiseCapTable;
   /** The group limit of each case for each CPU model with jobs of `MIN_RUNS` runs or more (`groupTables`). `limitFaults` computes each one again from the jobs. */
   readonly groups: Readonly<Record<string, Readonly<Record<string, GroupLimit>>>>;
 }
 
 /** The group limit of one case on one CPU model: `runLimit` of the lowest value of each run, with the run of each value. */
 export type GroupLimit = RunLimit & { readonly runs: readonly string[] };
+
+/** A noise cap: the limit of the A/A spread of a job, on a log scale, with its values (`noiseCapOf`). */
+export interface NoiseCap {
+  readonly limit: number;
+  /** The largest A/A spread of the jobs. */
+  readonly worst: number;
+  /** The median A/A spread of the jobs. */
+  readonly median: number;
+  /** The high side of the spread of the values: worst - median. */
+  readonly high: number;
+  /** The A/A spread of each job. */
+  readonly values: readonly number[];
+}
+
+/** The noise caps of a freeze: the cap of each CPU model with jobs of `MIN_RUNS` runs or more, and the pooled cap `other`. The key of a model is its full name. */
+export type NoiseCapTable = Readonly<Record<string, NoiseCap>> & { readonly other: NoiseCap };
+
+/**
+ * This function gives the noise cap of the A/A spreads of 5 jobs or more. It is the worst spread plus the high side (worst - median).
+ *
+ * - It is `runLimit` of the spreads, with each spread under the median at the median. Thus the spreads under the median do not set the cap.
+ * - `runLimit` of the raw spreads adds the low side too. With it, a job with less noise makes the cap larger.
+ * - A job with less noise in place of a job under the median does not change the cap. A lower worst spread makes the cap smaller.
+ *
+ * @throws RangeError when there are fewer than 5 spreads, or when a spread is not finite
+ */
+export function noiseCapOf(values: readonly number[]): NoiseCap {
+  if (values.length < MIN_JOBS) throw new RangeError(`A noise cap needs ${String(MIN_JOBS)} A/A spreads or more, not ${String(values.length)}.`);
+  const center = median(values);
+  const { limit, worst, spread } = runLimit(values.map((value) => Math.max(value, center)));
+  return { limit, worst, median: center, high: spread, values: [...values] };
+}
+
+/**
+ * This function gives the noise caps of the jobs of a freeze from the A/A spread of each job, in the order of the jobs.
+ *
+ * - Each CPU model with jobs of `MIN_RUNS` runs or more has the noise cap of the spreads of its jobs. These are the models of `modelTables`.
+ * - The entry `other` is the pooled noise cap of all the jobs. Each other model reads against it.
+ */
+export function noiseCapTable(jobs: FrozenLimits["jobs"], spreads: readonly number[]): NoiseCapTable {
+  const models = [...modelRuns(jobs, spreads)].map(([cpu, runs]) => [cpu, noiseCapOf([...runs.values()].flat())] as const);
+  return { ...Object.fromEntries(models), other: noiseCapOf(spreads) };
+}
 
 /** The stamp of a freeze. */
 export interface FreezeStamp {
@@ -131,12 +181,10 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     });
     cases[id] = runLimit(values);
   }
-  const aa = reads.map((read) => {
+  const spreads = reads.map((read) => {
     if (read.aa === undefined) throw new RangeError(`The job ${read.job} has no A/A read.`);
-    return { job: read.job, cases: [read.aa] };
+    return read.aa.spread;
   });
-  // Each job stays: a freeze keeps the worst job, and a noisy job widens the cap only in this file, which a review reads.
-  const noiseCap = aaLimits(aa, { cut: Infinity }).fallback.noiseCap;
   const jobs = reads.map((read) => ({ job: read.job, cpu: read.cpu, run: read.run, commit: read.commit ?? stamp.commit }));
   return {
     schema: LIMITS_SCHEMA,
@@ -148,7 +196,9 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     runs: stamp.runs,
     jobs,
     cases,
-    noiseCap,
+    noiseRule: NOISE_RULE,
+    // Each job stays: a freeze keeps the worst job, and a noisy job widens a cap only in this file, which a review reads.
+    noiseCaps: noiseCapTable(jobs, spreads),
     groups: groupTables(jobs, cases),
   };
 }
@@ -171,7 +221,7 @@ export function limitFaults(file: FrozenLimits): string[] {
     if (typeof job.commit !== "string" || !/^[0-9a-f]{40}$/.test(job.commit)) faults.push(`The job ${job.job} has no full SHA of its commit.`);
   }
   for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
-  check("the noise cap", file.noiseCap);
+  faults.push(...noiseCapFaults(file));
   // Each group limit must be the limit that the jobs and the values of the file give. Thus a review of the jobs is also a review of the group limits.
   const again = groupTables(file.jobs, file.cases);
   const stored: FrozenLimits["groups"] = typeof file.groups === "object" && file.groups !== null ? file.groups : {};
@@ -181,6 +231,18 @@ export function limitFaults(file: FrozenLimits): string[] {
     }
   }
   return faults;
+}
+
+/** This function gives the faults of the noise caps of a file. It computes each cap again from the jobs and the A/A spreads of the pooled cap. */
+function noiseCapFaults(file: FrozenLimits): string[] {
+  if (file.noiseRule !== NOISE_RULE) return ["The rule of the noise caps is not NOISE_RULE."];
+  const stored: Readonly<Record<string, NoiseCap>> = typeof file.noiseCaps === "object" && file.noiseCaps !== null ? file.noiseCaps : {};
+  const spreads = stored["other"]?.values;
+  if (spreads === undefined || spreads.length !== file.jobs.length || spreads.length < MIN_JOBS) return [`The pooled noise cap does not have an A/A spread for each of the ${String(file.jobs.length)} jobs.`];
+  const again: Readonly<Record<string, NoiseCap>> = noiseCapTable(file.jobs, spreads);
+  return [...new Set([...Object.keys(again), ...Object.keys(stored)])].flatMap((cpu) =>
+    JSON.stringify(stored[cpu]) === JSON.stringify(again[cpu]) ? [] : [`The noise cap of ${cpu} is not noiseCapOf the A/A spreads of its jobs.`],
+  );
 }
 
 /** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, and the ceiling `other`. The key of a model is its full name. */
@@ -268,7 +330,8 @@ export interface JobGate {
  * - A case is `within` when its value is at most its limit, and `beyond` when its value is above the limit.
  * - The limit is the entry of the exact CPU name in the table of the case, or the ceiling with the note `CEILING_ONLY` (`limitOnModel`).
  *   A part of a name does not match. A model of the freeze with few runs can have a name that holds the name of a table model.
- * - Each case is `cannot decide` when the job has no A/A read, or when the A/A spread or the A/A bias is above the noise cap.
+ * - Each case is `cannot decide` when the job has no A/A read. It is also `cannot decide` when the A/A spread or bias is above the noise cap of the model.
+ *   A model with its own limit has its own noise cap. Each other model has the pooled noise cap (`noiseCapTable`).
  * - Each case is `cannot decide` when the CPU model of the job has no frozen value, or when there is no file of limits.
  * - A case that the job or the file does not have is `cannot decide`. `gateOf` makes each `cannot decide` a no read.
  */
@@ -306,9 +369,11 @@ function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | un
   if (limits === undefined) return "There is no file of frozen limits.";
   if (!limits.jobs.some((job) => job.cpu === read.cpu)) return `The CPU model ${read.cpu} has no frozen value.`;
   if (read.aa === undefined) return "The job has no A/A read.";
-  const cap = limits.noiseCap.limit;
-  if (read.aa.spread > cap) return `The A/A spread ${read.aa.spread.toFixed(4)} is above the noise cap ${String(cap)}.`;
-  if (Math.abs(read.aa.median) > cap) return `The A/A bias ${read.aa.median.toFixed(4)} is above the noise cap ${String(cap)}.`;
+  const own = read.cpu !== "other" && Object.hasOwn(limits.noiseCaps, read.cpu) ? limits.noiseCaps[read.cpu] : undefined;
+  const cap = (own ?? limits.noiseCaps.other).limit;
+  const name = own === undefined ? "the pooled noise cap" : `the noise cap of ${read.cpu}`;
+  if (read.aa.spread > cap) return `The A/A spread ${read.aa.spread.toFixed(4)} is above ${name} ${String(cap)}.`;
+  if (Math.abs(read.aa.median) > cap) return `The A/A bias ${read.aa.median.toFixed(4)} is above ${name} ${String(cap)}.`;
   return undefined;
 }
 
@@ -500,7 +565,11 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
       lines.push("", "The candidate group limits of each of these models: runLimit of the lowest value of each run. A group of 2 jobs or more reads against them:", "", `| CPU | ${ids.map((id) => `${id} (ms)`).join(" | ")} |`, `| --- | ${ids.map(() => "---").join(" | ")} |`);
       for (const model of models) lines.push(`| ${model} | ${ids.map((id) => String(candidate.groups[id]?.[model]?.limit ?? "-")).join(" | ")} |`);
     }
-    lines.push("", `The candidate noise cap is ${String(candidate.noiseCap.limit)}, on a log scale.`);
+    lines.push("", `The candidate noise caps, on a log scale (${NOISE_RULE}):`, "", "| CPU | Jobs | Median | Worst | Noise cap |", "| --- | --- | --- | --- | --- |");
+    for (const [model, cap] of Object.entries(candidate.noiseCaps)) {
+      const name = model === "other" ? "The pooled cap (all jobs)" : model;
+      lines.push(`| ${name} | ${String(cap.values.length)} | ${cap.median.toFixed(4)} | ${cap.worst.toFixed(4)} | ${String(cap.limit)} |`);
+    }
   }
   return `${lines.join("\n")}\n`;
 }
