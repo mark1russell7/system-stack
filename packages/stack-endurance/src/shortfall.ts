@@ -1,5 +1,5 @@
 import { type OrderedRing, pathSetReliability, stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { DEFAULT_MAX_SETS, neededParts, type PathOptions } from "@mark1russell7/system-stack";
+import { DEFAULT_MAX_SETS, neededParts, weakestBound, type CutBound, type PathOptions } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 import { stackStops } from "./stops.ts";
@@ -433,6 +433,12 @@ export interface StopCurves {
   readonly coarse: boolean;
   /** This is true when `independent` is `upper`: `coarse` is true, or the expansion of `independentStop` passed its budget. */
   readonly independentUpper: boolean;
+  /**
+   * The weakest bound (`weakestBound` of the core) of the curves of the cuts that the stop uses. Since 0.8.4.
+   * With minimal sets, the stop uses the cuts of the sets. With no minimal sets, it uses each cut with a curve.
+   * Each of the three curves does not decrease when a cut lasts longer, so it has this bound.
+   */
+  readonly bound: CutBound;
 }
 
 /** This function gives the parts of the stack that are down for a list of cut indexes. A case uses one memo for each of its draws. */
@@ -479,7 +485,10 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
   const keptSets = sets?.map((set) => set.map((index) => kept.indexOf(index)));
   const upper = upperStop(curves, keptSets);
   const independent = independentStop(curves, keptSets, budgetsOf(options).maxWork);
-  return { event: eventStop(curves, keptStops), independent: independent ?? upper, upper, coarse: keptSets === undefined, independentUpper: independent === undefined };
+  // A cut in no minimal set does not change a stop, so its bound does not weaken the bound of the stop.
+  const used = sets === undefined ? kept : kept.filter((index) => sets.some((set) => set.includes(index)));
+  const bound = weakestBound(used.map((index) => caseCuts.cuts[relevant[index] ?? -1]?.bound ?? "law"));
+  return { event: eventStop(curves, keptStops), independent: independent ?? upper, upper, coarse: keptSets === undefined, independentUpper: independent === undefined, bound };
 }
 
 /**
@@ -494,6 +503,7 @@ function stopCurvesWith(caseCuts: CaseCuts, draw: Draw, options: StopCurveOption
  * - `event` is `eventStop`. `independent` is `independentStop`, and `upper` is `upperStop`, over the minimal sets of the cuts that count.
  * - With no minimal sets, `upper` is the sum of the curves, `independent` is `upper`, and `coarse` is true.
  * - When the expansion of `independentStop` passes its budget, `independent` is `upper`, and `independentUpper` is true.
+ * - `bound` is the weakest bound of the curves of the cuts that the stop uses. A cut with no `bound` has a law.
  */
 export function stopCurves(caseCuts: CaseCuts, draw: Draw, options: StopCurveOptions = {}): StopCurves | undefined {
   budgetsOf(options);
@@ -520,6 +530,15 @@ export interface Shortfall {
   readonly coarse: readonly string[];
   /** The needs of the draws whose `independent` is `upper` (`StopCurves.independentUpper`). A gate on `independent` shows them. */
   readonly independentUpper: readonly string[];
+  /**
+   * The bound of the shortfall: the weakest bound (`weakestBound` of the core) of the curves that the query uses. Since 0.8.4.
+   * The shortfall does not decrease when a cut lasts longer. So with `upper`, each value is too high or equal, and with `lower` too low or equal.
+   * With `none`, a value can be too high or too low.
+   *
+   * A draw in `unread` and a case that adds 0 do not change the bound. With no curve, the bound is `law`.
+   * The bound is for each of `levels`, `independent` and `upper`, each with its own rule of the dependence of the cuts.
+   */
+  readonly bound: CutBound;
 }
 
 function zeroLevels(layer: EnduranceLayer): Record<string, number> {
@@ -545,6 +564,7 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
   const unread: string[] = [];
   const coarse: string[] = [];
   const independentUpper: string[] = [];
+  const bounds: CutBound[] = [];
   const stoppedOf = stoppedMemo(caseCuts, options);
   for (const draw of caseDraws(layer, caseCuts, caseStopped(caseCuts, options))) {
     const held = endurance.needs[draw.need];
@@ -555,12 +575,13 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
     }
     if (curves.coarse) coarse.push(draw.need);
     if (curves.independentUpper) independentUpper.push(draw.need);
+    bounds.push(curves.bound);
     const users = draw.users ?? 1;
     levels[draw.level] = (levels[draw.level] ?? 0) + tailDays(curves.event, held.days, horizon) * users;
     independent[draw.level] = (independent[draw.level] ?? 0) + tailDays(curves.independent, held.days, horizon) * users;
     upper[draw.level] = (upper[draw.level] ?? 0) + tailDays(curves.upper, held.days, horizon) * users;
   }
-  return { levels, independent, upper, unread, coarse, independentUpper };
+  return { levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds) };
 }
 
 /** The shortfall of one year at one place, with the part of each case. */
@@ -577,6 +598,7 @@ export interface YearShortfall extends Shortfall {
  * - The expected count of a case is `perYear * reach`, from the first prior of the case at the place. Thus the result is the expected user-days of one year.
  * - A case with no prior at the place is not in the sum.
  * - `unread` is the union of the needs that a case cannot read, in the order of the cases. `coarse` and `independentUpper` are unions too.
+ * - `bound` is the weakest bound of the cases in the sum. A case with no prior, or with an expected count of 0, adds 0, so it does not change the bound.
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
@@ -593,6 +615,7 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
   const coarse: string[] = [];
   const independentUpper: string[] = [];
   const cases: YearShortfall["cases"][number][] = [];
+  const bounds: CutBound[] = [];
   for (const caseCuts of layer.cases ?? []) {
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
     if (prior === undefined) continue;
@@ -605,7 +628,8 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
     for (const need of shortfall.coarse) if (!coarse.includes(need)) coarse.push(need);
     for (const need of shortfall.independentUpper) if (!independentUpper.includes(need)) independentUpper.push(need);
+    if (rate > 0) bounds.push(shortfall.bound);
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
-  return { place, levels, independent, upper, unread, coarse, independentUpper, cases };
+  return { place, levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds), cases };
 }

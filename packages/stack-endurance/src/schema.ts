@@ -1,3 +1,4 @@
+import { CUT_BOUNDS } from "@mark1russell7/system-stack";
 import { formErrors } from "@mark1russell7/system-stack/schema";
 import { z } from "zod";
 import { ENDURANCE_SCHEMA, type EnduranceLayer } from "./layer.ts";
@@ -43,6 +44,7 @@ const cut = z.strictObject({
   part: id,
   title: id,
   duration: z.array(point).readonly().optional(),
+  bound: z.enum(CUT_BOUNDS).optional(),
   source: id,
 });
 

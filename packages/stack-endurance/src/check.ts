@@ -1,5 +1,5 @@
 import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { curveFault, dayNumber, type Fault, type Stack } from "@mark1russell7/system-stack";
+import { CUT_BOUNDS, curveFault, dayNumber, isCutBound, type Fault, type Stack } from "@mark1russell7/system-stack";
 import { giftNeed, giftResource } from "./endurance.ts";
 import type { Converter, EnduranceLayer } from "./layer.ts";
 
@@ -18,6 +18,7 @@ import type { Converter, EnduranceLayer } from "./layer.ts";
  * - `endurance-converter-empty`: a converter takes nothing, or it gives an amount of 0.
  * - `endurance-curve`: a survival curve does not start at `[0, 1]`, or it does not end at a chance of 0.
  *   Or its days do not increase, or its chance increases.
+ * - `endurance-bound`: the bound of a cut is not a value of `CUT_BOUNDS` of the core. Since 0.8.4.
  * - `endurance-prior-case`: a prior names a case that the layer does not have.
  * - `endurance-cycle`: converters make a resource from itself, through one converter or a chain. One fault names each cycle.
  * - `endurance-devices`: two converters of one device give two different counts of devices.
@@ -35,6 +36,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-date",
   "endurance-converter-empty",
   "endurance-curve",
+  "endurance-bound",
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-devices",
@@ -50,6 +52,7 @@ export const ENDURANCE_CODES: readonly [
   "endurance-date",
   "endurance-converter-empty",
   "endurance-curve",
+  "endurance-bound",
   "endurance-prior-case",
   "endurance-cycle",
   "endurance-devices",
@@ -176,6 +179,8 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     for (const cut of item.cuts) {
       const at = `${item.case}/${cut.part}`;
       part(at, "cut", cut.part);
+      if (cut.bound !== undefined && !isCutBound(cut.bound))
+        add("error", "endurance-bound", at, `The bound of the cut "${at}" is ${JSON.stringify(cut.bound)}. It must be one of ${CUT_BOUNDS.join(", ")}.`);
       if (cut.duration === undefined) {
         add("warning", "endurance-cut-no-curve", at, `The cut "${at}" has no curve of its duration, so the draws that it can stop are no read.`);
         continue;

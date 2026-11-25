@@ -52,6 +52,17 @@ A draw that only the parts of `down` stop has no curve of its duration. The quer
 
 A cut can have no `duration`, as before a source gives its curve. Then each draw whose stop the cut can be part of goes in `unread`. A draw whose minimal stop sets do not have the cut keeps its curves. When the query has no minimal sets, it cannot tell, so the draw goes in `unread`. The gate gives the warning `endurance-cut-no-curve` for each such cut.
 
+Since 0.8.4, `stopCurves`, `caseShortfall` and `yearShortfall` give a `bound`: the weakest bound of the curves that the result uses (`weakestBound` of the core). A cut with no `bound` has a law. The shortfall does not decrease when a cut lasts longer, so the bound of each curve carries to the result.
+
+| Bounds of the curves | Bound of the result |
+| --- | --- |
+| Each one `law`, or no curve | `law` |
+| `law` and `upper` | `upper`: each value is too high or equal |
+| `law` and `lower` | `lower`: each value is too low or equal |
+| Any `none`, or `upper` and `lower` | `none`: a value can be too high or too low |
+
+A stop uses the cuts of its minimal sets, or each cut with a curve when the query has no minimal sets. A draw in `unread` does not change the bound of its case. In one year, a case with no prior or with an expected count of 0 adds 0, so it does not change the bound. The gate refuses a bound that is not in `CUT_BOUNDS` (`endurance-bound`).
+
 The cuts of one case come from one event. `levels` takes each cut longer together with the event (`eventStop`). Then a stop with two cuts lasts as long as the longer cut. A stop through a need of `any` of two parts ends with the shorter cut. `levels` is not a limit: when the cuts are independent, the true stop can be longer or shorter.
 
 `upper` is an upper limit for each dependence of the cuts (`upperStop`). At each time, its chance is the sum over the minimal sets of cuts of the smallest chance of the set, to 1 or less. A gate of a high level can use `upper`.

@@ -95,7 +95,7 @@ describe("a hazard case as the values of CaseCuts", () => {
       ],
     };
     const hazard = list.hazards[0]!;
-    expect(hazardCase(list, hazard, { region: { scheme: "test-region", code: "A" } }).cuts[0]).toEqual({ part: "power.grid", title: "No power", duration: curve, source: "https://data.example.net/outages" });
+    expect(hazardCase(list, hazard, { region: { scheme: "test-region", code: "A" } }).cuts[0]).toEqual({ part: "power.grid", title: "No power", duration: curve, bound: "law", source: "https://data.example.net/outages" });
     expect(hazardCase(list, hazard, { region: { scheme: "test-region", code: "B" } }).cuts[0]?.duration).toBeUndefined();
     expect(hazardCase(list, hazard, { region: { scheme: "other", code: "A" } }).cuts[0]?.duration).toBeUndefined();
     expect(hazardCase(list, hazard).cuts[0]?.duration).toBeUndefined();
@@ -358,10 +358,28 @@ describe("a hazard case with cuts that follow another cut", () => {
     expect(read("gas.main")).toBeUndefined();
   });
 
+  it("sets the bound of the core on each cut with a curve: law for a cut with its own law, and the bound of follows for a dependent cut", () => {
+    const cuts = hazardCase(list, hazard, { region }).cuts;
+    expect(cuts.map((cut) => [cut.part, cut.bound])).toEqual([
+      ["power.grid", "law"],
+      ["phone.network", "none"],
+      ["water.main", "upper"],
+      ["road.local", "upper"],
+      ["food.retail", "none"],
+      ["heat.main", "upper"],
+      ["air.main", "none"],
+      ["gas.main", undefined],
+    ]);
+    for (const cut of cuts) if (cut.follows !== undefined) expect(cut.bound).toBe(cut.follows.bound);
+    expect(cuts.find((cut) => cut.part === "gas.main")).not.toHaveProperty("bound");
+    // The terms give no lower bound: each onset is an upper bound.
+    expect(new Set<string | undefined>(cuts.map((cut) => cut.bound)).has("lower")).toBe(false);
+  });
+
   it("gives a dependent cut no duration and no field follows when its cause has no curve, as before", () => {
     for (const options of [{}, { region: { scheme: "test-region", code: "B" } }]) {
       const cuts = hazardCase(list, hazard, options).cuts;
-      expect(cuts.every((cut) => cut.duration === undefined && !("follows" in cut))).toBe(true);
+      expect(cuts.every((cut) => cut.duration === undefined && !("follows" in cut) && !("bound" in cut))).toBe(true);
       expect(cuts.map((cut) => cut.source)).toEqual(["definition", "definition", "definition", "definition", "definition", "definition", "definition", "definition"]);
     }
   });

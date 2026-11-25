@@ -1,4 +1,4 @@
-import type { Stack } from "@mark1russell7/system-stack";
+import type { CutBound, Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { enduranceOf } from "./endurance.ts";
@@ -558,6 +558,62 @@ describe("yearShortfall", () => {
   });
 
   it("gives 0 at a place with no prior", () => {
-    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, independent: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], independentUpper: [], cases: [] });
+    expect(yearShortfall(SAMPLE_ENDURANCE, "elsewhere", { at: AT })).toEqual({ place: "elsewhere", levels: { life: 0, health: 0, comfort: 0 }, independent: { life: 0, health: 0, comfort: 0 }, upper: { life: 0, health: 0, comfort: 0 }, unread: [], coarse: [], independentUpper: [], bound: "law", cases: [] });
+  });
+});
+
+describe("the bound of a shortfall", () => {
+  // The bound of each cut of the storm, by its part. A part that is not in the map keeps no bound, so it reads as a law.
+  const bounded = (bounds: Readonly<Record<string, CutBound>>): CaseCuts => ({
+    ...storm,
+    cuts: storm.cuts.map((cut) => (bounds[cut.part] === undefined ? cut : { ...cut, bound: bounds[cut.part] })),
+  });
+  const caseBound = (caseCuts: CaseCuts): CutBound => caseShortfall(SAMPLE_ENDURANCE, caseCuts, enduranceOf(SAMPLE_ENDURANCE, caseCuts, { at: AT })).bound;
+
+  it("reads a missing bound as a law", () => {
+    expect(stopCurves(storm, DRINK, { stack: MAIN_NEEDS_GRID })?.bound).toBe("law");
+    expect(caseBound(storm)).toBe("law");
+  });
+
+  it("gives the weakest bound of the curves of a stop: law and law, law and upper, law and none, upper and lower", () => {
+    const stop = (bounds: Readonly<Record<string, CutBound>>): CutBound | undefined => stopCurves(bounded(bounds), DRINK, { stack: MAIN_NEEDS_GRID })?.bound;
+    expect(stop({ grid: "law", "water-main": "law" })).toBe("law");
+    expect(stop({ grid: "upper" })).toBe("upper");
+    expect(stop({ grid: "law", "water-main": "lower" })).toBe("lower");
+    expect(stop({ grid: "none" })).toBe("none");
+    expect(stop({ grid: "upper", "water-main": "lower" })).toBe("none");
+    // With no stack, the grid cut does not stop the water main, so its bound does not change the stop of the water.
+    expect(stopCurves(bounded({ grid: "none" }), DRINK)?.bound).toBe("law");
+  });
+
+  it("gives the weakest bound of the draws of a case", () => {
+    expect(caseBound(bounded({ "water-main": "upper" }))).toBe("upper");
+    expect(caseBound(bounded({ road: "upper", grid: "upper" }))).toBe("upper");
+    expect(caseBound(bounded({ grid: "none" }))).toBe("none");
+    expect(caseBound(bounded({ road: "upper", "water-main": "lower" }))).toBe("none");
+  });
+
+  it("does not let a case that adds 0 weaken the yearly bound", () => {
+    const loose = { ...bounded({ grid: "none" }), case: "quake", title: "Earthquake" };
+    const lean = { ...bounded({ road: "upper" }), case: "flood", title: "Flood" };
+    const layer = { ...SAMPLE_ENDURANCE, cases: [...(SAMPLE_ENDURANCE.cases ?? []), loose, lean] };
+    // The quake has no prior, and the flood has an expected count of 0. Neither adds to the sum.
+    const quiet = { ...layer, priors: [...(SAMPLE_ENDURANCE.priors ?? []), { case: "flood", place: "home", perYear: 0, reach: 1, source: "sample", asOf: "2025-12-01" }] };
+    const year = yearShortfall(quiet, "home", { at: AT });
+    expect(year.bound).toBe("law");
+    expect(year.cases.find((item) => item.case === "flood")?.shortfall.bound).toBe("upper");
+    // With a prior, the quake weakens the yearly bound to none, and the flood to upper.
+    const prior = (code: string) => ({ case: code, place: "home", perYear: 0.1, reach: 1, source: "sample", asOf: "2025-12-01" });
+    expect(yearShortfall({ ...layer, priors: [...(SAMPLE_ENDURANCE.priors ?? []), prior("flood")] }, "home", { at: AT }).bound).toBe("upper");
+    expect(yearShortfall({ ...layer, priors: [...(SAMPLE_ENDURANCE.priors ?? []), prior("flood"), prior("quake")] }, "home", { at: AT }).bound).toBe("none");
+  });
+
+  it("gives a draw that the query cannot read no part in the bound", () => {
+    // The grid cut has no curve and a bound to ignore. The power draw is no read, so the case keeps a law.
+    const { duration: _, ...bare } = storm.cuts.find((cut) => cut.part === "grid") ?? storm.cuts[0]!;
+    const caseCuts: CaseCuts = { ...storm, cuts: storm.cuts.map((cut) => (cut.part === "grid" ? { ...bare, bound: "none" as const } : cut)) };
+    const shortfall = caseShortfall(SAMPLE_ENDURANCE, caseCuts, enduranceOf(SAMPLE_ENDURANCE, caseCuts, { at: AT }));
+    expect(shortfall.unread).toEqual(["power.electric"]);
+    expect(shortfall.bound).toBe("law");
   });
 });
