@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, quickSoakWater, soakWater, unsoakedCookWater, type CitedRate, type CitedSpan, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, quickSoakWater, soakWater, unsoakedCookWater, type CitedRate, type CitedSpan, type HeatingValue, type RateBound, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -229,8 +229,12 @@ export interface CookFragmentInput {
   readonly prefix?: string | undefined;
 }
 
-/** A value of the cook model with a read, in its unit, or no read with the reasons. A no read is not 0. */
-export type CookRead = { readonly read: true; readonly value: number; readonly unit: string } | { readonly read: false; readonly why: string };
+/**
+ * A value of the cook model with a read, in its unit, or no read with the reasons. A no read is not 0.
+ * A read with the field `bound` holds on one side only, because the stove rate is a bound. With `most`, the true value is at most the read.
+ * A read with no field `bound` is the value of the model. Since 0.10.8.
+ */
+export type CookRead = { readonly read: true; readonly value: number; readonly unit: string; readonly bound?: RateBound | undefined } | { readonly read: false; readonly why: string };
 
 /** The cook values of one dry food of the buy list, for one pot. */
 export interface CookLine {
@@ -269,6 +273,7 @@ export interface CookLine {
    * The time of the stove for one pot: the boil time and the high end of the cook time, in `min`.
    * With the quick soak, it also has the boil time of the soak water and the high end of its boil span. The stand time is off the stove.
    * With no soak, the cook time of a soaked food is `unsoakedTime` of market.
+   * A stove rate with the bound `least` gives a most time, with `bound: "most"`. A limit of the runs of the stove in a day can use it.
    */
   readonly minutes: CookRead;
   /** The fuel of one pot, in `kg`. */
@@ -411,7 +416,7 @@ function stoveRate(rate: CitedRate): StoveRate | undefined {
   return undefined;
 }
 
-const read = (value: number, unit: string): CookRead => ({ read: true, value, unit });
+const read = (value: number, unit: string, bound?: RateBound): CookRead => (bound === undefined ? { read: true, value, unit } : { read: true, value, unit, bound });
 const noRead = (why: string): CookRead => ({ read: false, why });
 
 /** The inputs of one line that do not change with the product. */
@@ -430,7 +435,8 @@ interface StoveContext {
 /**
  * This function gives the cook line of one dry food. Each missing fact gives a no read with its reason.
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
- * Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read.
+ * A stove rate with a bound gives a read only on its safe side, with the field `bound: "most"`. A least rate gives the stove time and no fuel.
+ * A most rate gives the fuel and no stove time. Another bound gives a no read of both.
  * At a high place the cook time is longer. From `SEA_LEVEL_TIME_ELEVATION`, the cook time and the fuel are a no read.
  * A boil fuel from an adverse factor is an estimate (`yieldHeat`), so that fuel is not a proven upper limit.
  */
@@ -531,12 +537,14 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
       `The elevation is ${String(elevationM)} m. From ${String(SEA_LEVEL_TIME_ELEVATION.value)} m (1000 ft), water boils at a lower temperature and a cook time for sea level is not enough. No cited rule gives the longer time.`,
     );
 
-  // Only a rate with no bound is the value. A least rate gives too little fuel for the cook time, and an unknown bound has no side.
+  // A rate with a bound gives a read only on its safe side. The stove time falls when the rate rises, and the fuel of the cook time rises.
+  // So a least rate gives the most stove time and too little fuel. A most rate gives the most fuel and too little stove time. An unknown bound has no side.
   const bound: unknown = stove.rate !== undefined && "bound" in stove.rate ? stove.rate.bound : undefined;
-  const rate = stove.rate === undefined || bound !== undefined ? undefined : stoveRate(stove.rate);
+  const rateBound: RateBound | undefined = bound === "least" || bound === "most" ? bound : undefined;
+  const rate = stove.rate === undefined || (bound !== undefined && rateBound === undefined) ? undefined : stoveRate(stove.rate);
   if (stove.rate === undefined) why.push(`The stove of ${stove.fuel} has no cited fuel rate.`);
-  else if (bound !== undefined)
-    why.push(`The fuel rate of the stove has the bound ${String(bound)}. Only a rate with no bound is the value.${bound === "least" ? " A least rate gives too little fuel for the cook time." : ""}`);
+  else if (bound !== undefined && rateBound === undefined)
+    why.push(`The fuel rate of the stove has the bound ${String(bound)}. Only a rate with no bound, or with the bound least or most, gives a read.`);
   else if (rate === undefined) why.push(`The fuel rate of the stove is in ${stove.rate.unit} for each ${stove.rate.per.unit}, which is not an energy or a mass in a time.`);
 
   // The heat of the stove into the pot for each minute, in kJ/min. It needs a cited share with the same heating value as the energy rate.
@@ -586,15 +594,23 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   const soakShareFuels = shareFuelsOf(soakKJ);
   const soakBoilFuel = quickSoak === undefined ? 0 : Math.max(...soakShareFuels, ...("perKg" in fromYield ? [soakKJ / fromYield.perKg] : []));
   const withSoak = (cook: number, soakPart: number): number => (quickSoak === undefined ? cook : cook + soakPart);
-  const minutes = withSoak(boilFuel / fuelPerMin + cookMin, soakBoilFuel / fuelPerMin + soakBoilMin);
-  const fuel = read(withSoak(boilFuel + cookMin * fuelPerMin, soakBoilFuel + soakBoilMin * fuelPerMin), "kg");
+  // The stove time of a least rate is a most. The fuel of a most rate is a most: the boil fuel does not change with the rate.
+  const minutes =
+    rateBound === "most"
+      ? noRead("The fuel rate of the stove has the bound most. A most rate gives too little stove time, so only the fuel has a read.")
+      : read(withSoak(boilFuel / fuelPerMin + cookMin, soakBoilFuel / fuelPerMin + soakBoilMin), "min", rateBound === "least" ? "most" : undefined);
+  if (rateBound === "least") {
+    const text = "The fuel rate of the stove has the bound least. A least rate gives too little fuel for the cook time, so only the stove time has a read.";
+    return { product: product.id, resource, energy, water, soak, heat, minutes, fuel: noRead(text), ...methodFields };
+  }
+  const fuel = read(withSoak(boilFuel + cookMin * fuelPerMin, soakBoilFuel + soakBoilMin * fuelPerMin), "kg", rateBound);
   // The fuel at each end of the typical range of the adverse factor. The share fuel stays in the most, as in the value.
   const spread = "spread" in fromYield ? fromYield.spread : undefined;
-  if (spread === undefined) return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, ...methodFields };
+  if (spread === undefined) return { product: product.id, resource, energy, water, soak, heat, minutes, fuel, ...methodFields };
   const potFuel = (perKg: number): number =>
     withSoak(Math.max(...shareFuels, heat.value / perKg) + cookMin * fuelPerMin, Math.max(...soakShareFuels, soakKJ / perKg) + soakBoilMin * fuelPerMin);
   const fuelSpread = { low: potFuel(spread.atLow), high: potFuel(spread.atHigh), unit: "kg" as const };
-  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, fuelSpread, ...methodFields };
+  return { product: product.id, resource, energy, water, soak, heat, minutes, fuel, fuelSpread, ...methodFields };
 }
 
 /** This function gives the stove facts of the input: the facts of the caller, or the facts of a product of the catalog. */
@@ -644,7 +660,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   From `SEA_LEVEL_TIME_ELEVATION` (1000 ft, 304.8 m), the cook time of the catalog is not enough, and no cited rule gives the longer time.
  *   Thus each cook time and fuel is a no read there. The heat to 100 °C stays, because it is more than the heat to the true boil.
  *   Below sea level, water boils above 100 °C, so each heat, cook time and fuel is a no read.
- * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
+ * - A stove rate with a bound gives a read only on its safe side. The fuel of the cook time is the rate times the time, and the stove time falls when the rate rises.
+ *   So a least rate gives the stove time as a most and no fuel. A most rate gives the fuel as a most and no stove time. Another bound gives a no read of both.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
  * A dry food is a gift of a food resource in a unit of mass, except `FORMULA_POWDER`. `formulaMixFragment` gives its converter.

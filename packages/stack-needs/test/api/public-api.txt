@@ -419,6 +419,7 @@ export type CookRead = {
   readonly read: true;
   readonly value: number;
   readonly unit: string;
+  readonly bound?: RateBound | undefined;
 } | {
   readonly read: false;
   readonly why: string;

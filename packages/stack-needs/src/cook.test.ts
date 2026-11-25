@@ -177,20 +177,30 @@ describe("the cook fragment", () => {
     }
   });
 
-  it("gives no fuel for a stove rate with a bound, because only a rate with no bound is the value", () => {
-    for (const bound of ["least", "most"]) {
-      const rate = { ...massStove.rate!, bound: bound as never };
-      const stove: StoveFacts = { ...massStove, rate };
-      const line = lineOf(cookFragment({ ...input, stove }).lines, "test.grain-1kg");
-      expect(line.water.read).toBe(true);
-      expect(line.fuel.read).toBe(false);
-      expect(line.minutes.read).toBe(false);
-      if (!line.fuel.read) expect(line.fuel.why).toContain(`the bound ${bound}`);
-      // Only a least rate gives too little fuel. Another bound has no known side.
-      if (!line.fuel.read) expect(line.fuel.why.includes("too little fuel")).toBe(bound === "least");
-    }
-    // A rate with no field bound keeps its read.
-    expect(lineOf(cookFragment({ ...input, stove: massStove }).lines, "test.grain-1kg").fuel.read).toBe(true);
+  it("gives a read on the safe side of a stove rate with a bound, and a no read of the other value", () => {
+    const stoveWith = (bound: string): StoveFacts => ({ ...massStove, rate: { ...massStove.rate!, bound: bound as never } });
+    const lineWith = (bound: string): CookLine => lineOf(cookFragment({ ...input, stove: stoveWith(bound) }).lines, "test.grain-1kg");
+    // The true rate is at least 10 g/min. So the stove time is at most the read, and the fuel of the cook time is too little.
+    const least = lineWith("least");
+    expect(least.water.read).toBe(true);
+    expect(least.minutes).toEqual({ read: true, value: expect.closeTo(MINUTES, 9), unit: "min", bound: "most" });
+    expect(least.fuel.read).toBe(false);
+    if (!least.fuel.read) expect(least.fuel.why).toContain("A least rate gives too little fuel for the cook time");
+    expect(cookFragment({ ...input, stove: stoveWith("least") }).layer.converters).toEqual([]);
+    // The true rate is at most 10 g/min. So the fuel is at most the read: the boil fuel does not change with the rate. The stove time is too little.
+    const most = lineWith("most");
+    expect(most.fuel).toEqual({ read: true, value: expect.closeTo(FUEL, 9), unit: "kg", bound: "most" });
+    expect(most.minutes.read).toBe(false);
+    if (!most.minutes.read) expect(most.minutes.why).toContain("A most rate gives too little stove time");
+    expect(cookFragment({ ...input, stove: stoveWith("most") }).layer.converters).toEqual(cookFragment(input).layer.converters);
+    // Another bound has no known side.
+    const unknown = lineWith("exact");
+    expect(unknown.fuel.read || unknown.minutes.read).toBe(false);
+    if (!unknown.fuel.read) expect(unknown.fuel.why).toContain("the bound exact");
+    // A rate with no field bound keeps both reads, and the reads have no field bound.
+    const plain = lineOf(cookFragment(input).lines, "test.grain-1kg");
+    expect(plain.fuel.read && "bound" in plain.fuel).toBe(false);
+    expect(plain.minutes.read && "bound" in plain.minutes).toBe(false);
   });
 
   it("takes the worst case of two foods of one resource: the most water, the most fuel and the least energy", () => {
@@ -280,7 +290,7 @@ describe("the cook fragment", () => {
       // A share keeps its read beside a yield with no read.
       const shared = fuelOf(yieldStove(10, { bound: "most" }), true);
       expect(shared.read && shared.value).toBeCloseTo(FUEL, 12);
-      // A yield does not make up for a stove rate with a bound: the cook part has no rate.
+      // A yield does not make up for a least stove rate: the cook part of the fuel is too little.
       const boundRate = fuelOf({ ...yieldStove(10), rate: { ...massStove.rate!, bound: "least" as never } });
       expect(boundRate.read).toBe(false);
     });
