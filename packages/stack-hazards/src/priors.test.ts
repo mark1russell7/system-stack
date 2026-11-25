@@ -1,13 +1,29 @@
 import { SAMPLE_ENDURANCE, yearShortfall } from "@mark1russell7/stack-endurance";
+import { gammaQuantile } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "./check.ts";
-import { HAZARDS_SCHEMA, type HazardList, type PriorTable } from "./hazard.ts";
+import { HAZARDS_SCHEMA, type AreaUnits, type HazardList, type PriorTable } from "./hazard.ts";
 import type { OutageEvent } from "./outages.ts";
 import { HAZARD_LIST } from "./data.ts";
-import { EAGLEI_COUNTY_POOLING, EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
+import { EAGLEI_COUNTY_COUNTS, EAGLEI_COUNTY_POOLING, EAGLEI_COUNTY_PRIORS } from "./eaglei-county-priors.ts";
+import { eagleRegion } from "./eaglei.ts";
 import { EAGLEI_STATE_POOLING, EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { OE417_NATION_PRIORS } from "./oe417.ts";
-import { areaCounts, coverageTally, hazardPriors, observedRegions, pooledRates, regionCounts, regionObservation, regionRates, withoutSilentAreas, type Observation } from "./priors.ts";
+import {
+  areaCounts,
+  areaUnits,
+  coverageTally,
+  hazardPriors,
+  observedRegions,
+  pooledRates,
+  regionCounts,
+  regionObservation,
+  regionRates,
+  regionUnits,
+  upperRates,
+  withoutSilentAreas,
+  type Observation,
+} from "./priors.ts";
 
 const DAY = 86_400;
 const event = (area: string, peak: number): OutageEvent => ({ area, start: 0, seconds: 3600, peak, censored: false });
@@ -384,5 +400,76 @@ describe("hazardPriors", () => {
     // Two tables of one scheme with no shared case, or no shared region, do not overlap.
     expect(prior([county, { ...county, rates: { "met.tornado": { A1: [1, 0.5] } } }])).toEqual([]);
     expect(prior([county, { ...county, codes: ["Z9"], rates: {} }])).toEqual([]);
+  });
+});
+
+describe("the counts of the areas and the upper bounds of their pooled rates", () => {
+  /** The mean of the gamma law of the rate of an area after its events in its years: the pooled rate of the area. */
+  const pooledMean = (law: { shape: number; mean: number }, events: number, years: number): number =>
+    law.shape === Number.POSITIVE_INFINITY || law.mean === 0 ? law.mean : (law.shape + events) / (law.shape / law.mean + years);
+  const units: AreaUnits = { codes: ["A1", "A2", "B1"], years: [2, 4, 3], events: { "met.tornado": [1, 3, 0] } };
+  /** The region of a made-up area: its letter. */
+  const letter = (area: string): string => area.slice(0, 1);
+
+  it("gives the counts of the observed areas, and the counts of the regions", () => {
+    const observation: Observation = { years: { A1: 2, A2: 4, B1: 3, C1: 0 }, customers: { A1: 10, A2: 10, B1: 10, C1: 10 } };
+    expect(areaUnits({ "met.tornado": { A1: { events: 1, share: 0.5 }, A2: { events: 3, share: 1 } } }, observation)).toEqual(units);
+    expect(regionUnits(units, letter)).toEqual({ codes: ["A", "B"], years: [3, 3], events: { "met.tornado": [4, 0] } });
+    // The counts of the regions are the events of regionCounts and the years of regionObservation.
+    const counts = { A1: { events: 1, share: 0.5 }, A2: { events: 3, share: 1 } };
+    expect(regionUnits(units, letter).events["met.tornado"]).toEqual(Object.values(regionCounts(counts, observation, letter)).map((count) => count.events));
+    expect(regionUnits(units, letter).years).toEqual(Object.values(regionObservation(observation, letter).years));
+  });
+
+  it("gives the quantile of the gamma law of each area after its events, and the mean of the law for one rate of each area", () => {
+    const law = { shape: 2, mean: 1 };
+    const bounds = upperRates(units, () => law, 0.9);
+    expect(bounds["met.tornado"]?.["A1"]).toBeCloseTo(gammaQuantile(0.9, 3, 4), 12);
+    expect(bounds["met.tornado"]?.["B1"]).toBeCloseTo(gammaQuantile(0.9, 2, 5), 12);
+    expect(upperRates(units, () => ({ shape: Number.POSITIVE_INFINITY, mean: 0.5 }))["met.tornado"]).toEqual({ A1: 0.5, A2: 0.5, B1: 0.5 });
+    // A higher level gives a higher bound, and each bound is above the pooled rate.
+    const low = upperRates(units, () => law, 0.6)["met.tornado"] ?? {};
+    const high = upperRates(units, () => law, 0.99)["met.tornado"] ?? {};
+    units.codes.forEach((code, at) => {
+      expect(high[code]).toBeGreaterThan(low[code] ?? Number.POSITIVE_INFINITY);
+      expect(low[code]).toBeGreaterThan(pooledMean(law, units.events["met.tornado"]?.[at] ?? 0, units.years[at] ?? 0));
+    });
+    expect(() => upperRates(units, (_name, area) => (area === "B1" ? undefined : law))).toThrow(/the area B1 has no law in the case met\.tornado/);
+    expect(() => upperRates(units, () => law, 1)).toThrow(RangeError);
+  });
+
+  it("gives each rate of the table of the counties from the counts and the laws of the fit", () => {
+    const at = new Map(EAGLEI_COUNTY_COUNTS.codes.map((code, index) => [code, index]));
+    for (const code of EAGLEI_COUNTY_PRIORS.codes) expect(at.has(code)).toBe(true);
+    let checked = 0;
+    for (const [name, rates] of Object.entries(EAGLEI_COUNTY_PRIORS.rates)) {
+      for (const [code, [perYear]] of Object.entries(rates)) {
+        const index = at.get(code) ?? -1;
+        const law = EAGLEI_COUNTY_POOLING.laws[name]?.[eagleRegion(code)];
+        if (law === undefined) throw new Error(`no law of ${code} in ${name}`);
+        // The table and the laws keep 4 significant digits.
+        expect(Math.abs(pooledMean(law, EAGLEI_COUNTY_COUNTS.events[name]?.[index] ?? 0, EAGLEI_COUNTY_COUNTS.years[index] ?? 0) / perYear - 1)).toBeLessThan(2e-3);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(10_000);
+    const bounds = upperRates(EAGLEI_COUNTY_COUNTS, (name, area) => EAGLEI_COUNTY_POOLING.laws[name]?.[eagleRegion(area)]);
+    for (const [name, rates] of Object.entries(EAGLEI_COUNTY_PRIORS.rates)) for (const [code, [perYear]] of Object.entries(rates)) expect(bounds[name]?.[code]).toBeGreaterThanOrEqual(perYear * (1 - 2e-3));
+  });
+
+  it("gives each rate of the table of the states from the counts of the counties and the laws of the states", () => {
+    const states = regionUnits(EAGLEI_COUNTY_COUNTS, eagleRegion);
+    const at = new Map(states.codes.map((code, index) => [code, index]));
+    let checked = 0;
+    for (const [name, rates] of Object.entries(EAGLEI_STATE_PRIORS.rates)) {
+      const law = EAGLEI_STATE_POOLING.laws[name];
+      if (law === undefined) throw new Error(`no law of ${name}`);
+      for (const [code, [perYear]] of Object.entries(rates)) {
+        const index = at.get(code) ?? -1;
+        expect(Math.abs(pooledMean(law, states.events[name]?.[index] ?? 0, states.years[index] ?? 0) / perYear - 1)).toBeLessThan(2e-3);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
   });
 });

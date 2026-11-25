@@ -341,8 +341,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.0
       '@mark1russell7/rigor-statistics':
-        specifier: ^0.2.25
-        version: 0.2.25
+        specifier: ^0.2.27
+        version: 0.2.27
       '@mark1russell7/system-stack':
         specifier: workspace:*
         version: link:../system-stack
@@ -1008,6 +1008,10 @@ packages:
 
   '@mark1russell7/rigor-statistics@0.2.25':
     resolution: {integrity: sha512-rYx7IHbt2VD1x/Eo12VcxS3rskiYQu8ZUJY3eKanDBSMe4eUeWFyK1ILB35FvduBZkxRUdkfesXvnpcO6fdWJg==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-statistics@0.2.27':
+    resolution: {integrity: sha512-ankGEVO2i/U75z9rlpEQr+Kp7LhfaeFCc5b5myjyDMYJrc/Zx/Q7cwZvby9YFKJ1P1RBHEZgnOaD84FkRc3JPg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/service@0.8.20':
@@ -2477,7 +2481,7 @@ snapshots:
       '@mark1russell7/optional': 1.5.0
       '@mark1russell7/quantity': 0.4.8(zod@4.6.7)
       '@mark1russell7/rigor-generators': 0.2.4
-      '@mark1russell7/rigor-statistics': 0.2.25
+      '@mark1russell7/rigor-statistics': 0.2.27
       '@mark1russell7/text': 0.0.18
       zod: 4.6.7
 
@@ -2490,7 +2494,7 @@ snapshots:
   '@mark1russell7/algebra@0.9.11(zod@4.6.7)':
     dependencies:
       '@mark1russell7/quantity': 0.4.8(zod@4.6.7)
-      '@mark1russell7/rigor-statistics': 0.2.25
+      '@mark1russell7/rigor-statistics': 0.2.27
     optionalDependencies:
       zod: 4.6.7
 
@@ -2600,6 +2604,10 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-generators': 0.2.4
 
+  '@mark1russell7/rigor-statistics@0.2.27':
+    dependencies:
+      '@mark1russell7/rigor-generators': 0.2.4
+
   '@mark1russell7/service@0.8.20(zod@4.6.7)':
     dependencies:
       '@mark1russell7/algebra': 0.8.10(zod@4.6.7)
@@ -2613,7 +2621,7 @@ snapshots:
 
   '@mark1russell7/site-pages@0.8.4':
     dependencies:
-      '@mark1russell7/rigor-statistics': 0.2.25
+      '@mark1russell7/rigor-statistics': 0.2.27
 
   '@mark1russell7/sqlite@0.3.12': {}
 
@@ -2630,7 +2638,7 @@ snapshots:
   '@mark1russell7/strategy-space@0.1.1':
     dependencies:
       '@mark1russell7/rigor-generators': 0.2.4
-      '@mark1russell7/rigor-statistics': 0.2.25
+      '@mark1russell7/rigor-statistics': 0.2.27
 
   '@mark1russell7/template-cli@0.1.9':
     dependencies:

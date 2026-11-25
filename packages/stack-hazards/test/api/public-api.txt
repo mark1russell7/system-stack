@@ -7,6 +7,7 @@
 ## . (build/index.d.ts): names
 
 AreaCount: build/index.d.ts#AreaCount
+AreaUnits: build/hazard.chunk.d.ts#AreaUnits
 BasisOptions: build/index.d.ts#BasisOptions
 CAUSE_AFTER: build/index.d.ts#CAUSE_AFTER
 CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
@@ -57,6 +58,7 @@ HazardSource: build/hazard.chunk.d.ts#HazardSource
 INGESTION_ZONE_MILES: build/index.d.ts#INGESTION_ZONE_MILES
 IsoDate: build/hazard.chunk.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
+LawOf: build/index.d.ts#LawOf
 METERS_PER_MILE: build/index.d.ts#METERS_PER_MILE
 NO_COLLAPSE_LAW: build/index.d.ts#NO_COLLAPSE_LAW
 NO_CYBER_LAW: build/index.d.ts#NO_CYBER_LAW
@@ -140,6 +142,7 @@ WILDFIRE_LAYER: build/index.d.ts#WILDFIRE_LAYER
 WildfireClass: build/index.d.ts#WildfireClass
 WildfireExposure: build/index.d.ts#WildfireExposure
 areaCounts: build/index.d.ts#areaCounts
+areaUnits: build/index.d.ts#areaUnits
 boxAround: build/index.d.ts#boxAround
 checkHazards: build/index.d.ts#checkHazards
 coverageTally: build/index.d.ts#coverageTally
@@ -179,10 +182,12 @@ reactorsOf: build/index.d.ts#reactorsOf
 regionCounts: build/index.d.ts#regionCounts
 regionObservation: build/index.d.ts#regionObservation
 regionRates: build/index.d.ts#regionRates
+regionUnits: build/index.d.ts#regionUnits
 stormCauses: build/index.d.ts#stormCauses
 stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
+upperRates: build/index.d.ts#upperRates
 wildfireExposure: build/index.d.ts#wildfireExposure
 wildfireRequest: build/index.d.ts#wildfireRequest
 withoutSilentAreas: build/index.d.ts#withoutSilentAreas
@@ -190,16 +195,27 @@ zoneCounties: build/index.d.ts#zoneCounties
 
 ## ./county-priors (build/eaglei-county-priors.d.ts): names
 
+EAGLEI_COUNTY_COUNTS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_COUNTS
 EAGLEI_COUNTY_POOLING: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_POOLING
 EAGLEI_COUNTY_PRIORS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
 
 ## Declarations
+
+### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_COUNTS
+export declare const EAGLEI_COUNTY_COUNTS: AreaUnits;
 
 ### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_POOLING
 export declare const EAGLEI_COUNTY_POOLING: CountyPooling;
 
 ### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
 export declare const EAGLEI_COUNTY_PRIORS: PriorTable;
+
+### build/hazard.chunk.d.ts#AreaUnits
+interface AreaUnits {
+  readonly codes: readonly string[];
+  readonly years: readonly number[];
+  readonly events: Readonly<Record<string, readonly number[]>>;
+}
 
 ### build/hazard.chunk.d.ts#CLAIM_BASES
 declare const CLAIM_BASES: readonly ["told", "assessed"];
@@ -572,6 +588,9 @@ export declare const INGESTION_ZONE_MILES = 50;
 ### build/index.d.ts#LAW_DAYS
 export declare const LAW_DAYS: readonly number[];
 
+### build/index.d.ts#LawOf
+export type LawOf = (name: string, area: string) => GammaRates | undefined;
+
 ### build/index.d.ts#METERS_PER_MILE
 export declare const METERS_PER_MILE = 1609.344;
 
@@ -733,6 +752,7 @@ export interface Oe417Window {
   readonly tests: readonly {
     readonly first: number;
     readonly p: number;
+    readonly exact: boolean;
   }[];
 }
 
@@ -743,6 +763,7 @@ export interface Oe417WindowOptions {
   readonly level?: number | undefined;
   readonly draws?: number | undefined;
   readonly seed?: number | string | undefined;
+  readonly method?: "draws" | "exact" | "auto" | undefined;
 }
 
 ### build/index.d.ts#Oe417Year
@@ -921,6 +942,9 @@ export interface WildfireExposure {
 ### build/index.d.ts#areaCounts
 export declare function areaCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, AreaCount>;
 
+### build/index.d.ts#areaUnits
+export declare function areaUnits(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation): AreaUnits;
+
 ### build/index.d.ts#boxAround
 export declare function boxAround(point: SitePoint, radiusMeters: number): BBox;
 
@@ -1038,6 +1062,9 @@ export declare function regionObservation(observation: Observation, region: (are
 ### build/index.d.ts#regionRates
 export declare function regionRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, readonly [number, number]>;
 
+### build/index.d.ts#regionUnits
+export declare function regionUnits(units: AreaUnits, region: (area: string) => string): AreaUnits;
+
 ### build/index.d.ts#stormCauses
 export declare function stormCauses(classes: Readonly<Record<string, readonly string[]>>, zones: ReadonlyMap<string, readonly string[]>, options?: CauseOptions): StormCauses;
 
@@ -1049,6 +1076,9 @@ export declare function supplyState(hazard: Hazard, part: string, options?: Basi
 
 ### build/index.d.ts#survivalOf
 export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptions): Survival;
+
+### build/index.d.ts#upperRates
+export declare function upperRates(units: AreaUnits, lawOf: LawOf, level?: number): Record<string, Record<string, number>>;
 
 ### build/index.d.ts#wildfireExposure
 export declare function wildfireExposure(reply: unknown): WildfireExposure | NoExposure;

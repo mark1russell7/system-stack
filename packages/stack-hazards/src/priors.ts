@@ -1,8 +1,8 @@
 import { isRecord } from "@mark1russell7/optional/read";
-import { fitTwoLevelGammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
+import { fitTwoLevelGammaRates, pooledRateUpper, type GammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
 import type { Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
-import type { HazardList, PoolLaw, PriorTable } from "./hazard.ts";
+import type { AreaUnits, HazardList, PoolLaw, PriorTable } from "./hazard.ts";
 import type { OutageCount, OutageEvent } from "./outages.ts";
 
 // The yearly priors of the cases: the events in one year in an area, and the share of the events that reach a place.
@@ -295,6 +295,62 @@ export function hazardPriors(list: HazardList, options: HazardPriorOptions = {})
 }
 
 /** This function gives the areas with one year or more and customers above 0, in their order. */
+/** This function gives the counts of the observed areas in each case. An area with no count of a case has 0 events of the case. */
+export function areaUnits(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation): AreaUnits {
+  const codes = observedAreas(observation);
+  return {
+    codes,
+    years: codes.map((code) => observation.years[code] ?? 0),
+    events: Object.fromEntries(Object.entries(counts).map(([name, entry]) => [name, codes.map((code) => entry[code]?.events ?? 0)])),
+  };
+}
+
+/**
+ * This function gives the counts of the regions. The events of a region are the sum of the events of its areas. Its years are the plain mean of the years of its areas.
+ * These are the events of `regionCounts` and the years of `regionObservation`. Thus `upperRates` of the regions gives the bounds of the pooled rates of the regions.
+ */
+export function regionUnits(units: AreaUnits, region: (area: string) => string): AreaUnits {
+  const members = new Map<string, number[]>();
+  units.codes.forEach((code, at) => {
+    const list = members.get(region(code)) ?? [];
+    list.push(at);
+    members.set(region(code), list);
+  });
+  const codes = [...members.keys()].sort();
+  const lists = codes.map((code) => members.get(code) ?? []);
+  const sum = (values: readonly number[], list: readonly number[]): number => list.reduce((total, at) => total + (values[at] ?? 0), 0);
+  return {
+    codes,
+    years: lists.map((list) => sum(units.years, list) / list.length),
+    events: Object.fromEntries(Object.entries(units.events).map(([name, values]) => [name, lists.map((list) => sum(values, list))])),
+  };
+}
+
+/** This function gives the gamma law of the rates of the group of an area in a case, or undefined when there is none. */
+export type LawOf = (name: string, area: string) => GammaRates | undefined;
+
+/**
+ * This function gives an upper bound of the pooled rate of each area in each case.
+ * - The bound is the quantile `level` of the gamma law of the rate of the area after its events in its years (`pooledRateUpper`).
+ * - The mean of the same law is the pooled rate of the area. A worst-case plan uses the bound, and a plan of the expected events uses the mean.
+ * - A law with a rounded shape and mean gives a bound with about the same digits.
+ *
+ * @throws RangeError when an area has no law in a case, or when the level is not in (0, 1)
+ */
+export function upperRates(units: AreaUnits, lawOf: LawOf, level = 0.95): Record<string, Record<string, number>> {
+  const bounds: Record<string, Record<string, number>> = {};
+  for (const [name, events] of Object.entries(units.events)) {
+    const entry: Record<string, number> = {};
+    units.codes.forEach((code, at) => {
+      const law = lawOf(name, code);
+      if (law === undefined) throw new RangeError(`upperRates: the area ${code} has no law in the case ${name}.`);
+      entry[code] = pooledRateUpper({ count: events[at] ?? 0, exposure: units.years[at] ?? 0 }, law, level);
+    });
+    bounds[name] = entry;
+  }
+  return bounds;
+}
+
 function observedAreas(observation: Observation): string[] {
   return Object.keys(observation.years)
     .filter((area) => (observation.years[area] ?? 0) > 0 && (observation.customers[area] ?? 0) > 0)

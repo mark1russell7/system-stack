@@ -27,10 +27,12 @@ import {
   recordFaults,
   runCases,
   runGate,
+  stampNote,
   type FrozenLimits,
   type JobGate,
   type JobRecord,
 } from "./read.ts";
+import type { StampRecord } from "./stamp.ts";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
 const STAMP = { commit: "0".repeat(40), date: "2026-11-22" };
@@ -569,5 +571,59 @@ describe("the window of a freeze", () => {
     expect(limitFaults({ ...file, window: 6 })).toEqual(["The CPU model cpu-a has 7 runs, more than the window 6."]);
     expect(limitFaults({ ...file, window: 4 })).toEqual(["The window 4 is not a whole number of 5 or more."]);
     expect(limitFaults({ ...file, runs: file.runs.slice(1) })).toEqual(["The runs of the file are not the runs of its jobs."]);
+  });
+});
+
+describe("the stamp of the timed code in the records", () => {
+  /** A made-up stamp record. Its hash joins its parts, as the hash of a real stamp does. */
+  const stamp = (code: string, node = "26"): StampRecord => ({
+    schema: "bench-stamp/1",
+    hash: `hash-${code}-${node}`,
+    parts: { code, engines: "engines-1", data: "data-1", bundler: "esbuild@0.25.0", node },
+    inputs: ["bench/child.ts"],
+    engines: [],
+  });
+  const stamped = (records: readonly JobRecord[], code: (index: number) => StampRecord | undefined): JobRecord[] =>
+    records.map((record, index) => {
+      const value = code(index);
+      return value === undefined ? record : { ...record, stamp: value };
+    });
+
+  it("keeps the one stamp of the jobs in the file, and no stamp when no job has one", () => {
+    const file = freezeLimits(stamped(JOBS, () => stamp("a")).map(jobRead), STAMP);
+    expect(file.stamp).toEqual(stamp("a"));
+    expect(limitFaults(file)).toEqual([]);
+    expect(frozen().stamp).toBeUndefined();
+    expect(jobRead(stamped(JOBS, () => stamp("a"))[0] as JobRecord).stamp).toEqual(stamp("a"));
+  });
+
+  it("refuses a freeze of jobs with other timed code, or with a stamp in only some jobs", () => {
+    expect(() => freezeLimits(stamped(JOBS, (index) => stamp(index === 3 ? "b" : "a")).map(jobRead), STAMP)).toThrow(/The job job-4 of the run job-4 times other code than the job job-1: the parts code differ/);
+    expect(() => freezeLimits(stamped(JOBS, (index) => stamp("a", index === 1 ? "24" : "26")).map(jobRead), STAMP)).toThrow(/the parts node differ/);
+    expect(() => freezeLimits(stamped(JOBS, (index) => (index < 2 ? undefined : stamp("a"))).map(jobRead), STAMP)).toThrow(/The jobs job-1, job-2 have no stamp/);
+  });
+
+  it("is a fault when the stamp of the file is not a stamp record", () => {
+    const file = freezeLimits(stamped(JOBS, () => stamp("a")).map(jobRead), STAMP);
+    expect(limitFaults({ ...file, stamp: { ...stamp("a"), schema: "other" } as unknown as StampRecord })).toEqual(["The stamp of the file is not a stamp record."]);
+  });
+
+  it("finds a record with other timed code than the file, and no stamp fault for a file with no stamp", () => {
+    const records = stamped(JOBS, () => stamp("a"));
+    const file = freezeLimits(records.map(jobRead), STAMP);
+    expect(recordFaults(file, records.map(jobRead))).toEqual([]);
+    const other = records.map((record, index) => (index === 2 ? { ...record, stamp: stamp("b") } : record));
+    expect(recordFaults(file, other.map(jobRead))).toEqual(["The job job-3 of the run job-3 has other timed code in its record than the file: code."]);
+    const bare = records.map((record, index) => (index === 0 ? JOBS[0] as JobRecord : record));
+    expect(recordFaults(file, bare.map(jobRead))).toEqual(["The job job-1 of the run job-1 has other timed code in its record than the file: record."]);
+    expect(recordFaults(frozen(), records.map(jobRead))).toEqual([]);
+  });
+
+  it("tells if the jobs of a run time the code of the freeze", () => {
+    const file = freezeLimits(stamped(JOBS, () => stamp("a")).map(jobRead), STAMP);
+    const reads = stamped(JOBS.slice(0, 3), (index) => (index === 0 ? stamp("a") : index === 1 ? stamp("b") : undefined)).map(jobRead);
+    expect(stampNote(file, reads)).toBe("The timed code of 1 of the 3 jobs is the timed code of the freeze. The timed code of 1 jobs differs from the freeze in the parts code. 1 jobs have no stamp.");
+    expect(stampNote(file, stamped(JOBS, () => stamp("a")).map(jobRead))).toBe("The timed code of 5 of the 5 jobs is the timed code of the freeze.");
+    expect(stampNote(frozen(), reads)).toMatch(/^The file of limits has no stamp/);
   });
 });

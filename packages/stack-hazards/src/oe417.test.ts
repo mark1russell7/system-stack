@@ -168,7 +168,7 @@ describe("the events of a physical attack", () => {
 });
 
 describe("the prior of a physical attack", () => {
-  it("calculates the first year of the prior from the events: the year after the last window that fails the dispersion test", { timeout: 30_000 }, () => {
+  it("calculates the first year of the prior from the events: the year after the last window that fails the dispersion test", () => {
     // A new summary adds a year to OE417_LAST_YEAR, so the pin of the counts fails, and the window is calculated again.
     expect([OE417_COUNTS_FIRST, OE417_LAST_YEAR]).toEqual([2011, 2023]);
     const window = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: OE417_COUNTS_FIRST, last: OE417_LAST_YEAR });
@@ -178,10 +178,10 @@ describe("the prior of a physical attack", () => {
     expect(OE417_NATION_PRIORS.method).toContain(`are ${window.counts.join(", ")}.`);
     expect(OE417_NATION_PRIORS.method).toContain(`the window from ${String(window.first)} passes it`);
     const p = Object.fromEntries(window.tests.map((test) => [test.first, test.p]));
-    // The exact p values are 0.0447 from 2014 and 0.3526 from 2015. The seeded draws are near them.
-    expect(p[2014]).toBeGreaterThan(0.04);
-    expect(p[2014]).toBeLessThan(0.05);
-    expect(p[2015]).toBeGreaterThan(0.3);
+    // Each p value is exact: a sum over the partitions of the total, with no draws.
+    expect(window.tests.every((test) => test.exact)).toBe(true);
+    expect(p[2014]).toBeCloseTo(0.0447, 4);
+    expect(p[2015]).toBeCloseTo(0.3526, 4);
     expect(p[2023]).toBe(1);
     expect(window.tests.filter((test) => test.first >= 2015).every((test) => test.p >= 0.05)).toBe(true);
   });
@@ -194,6 +194,11 @@ describe("the prior of a physical attack", () => {
     expect(oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2000, last: 2010 })).toMatchObject({ first: 2000, counts: Array.from({ length: 11 }, () => 0) });
     // A higher level fails the window from 2015 too.
     expect(oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, level: 0.5, draws: 2000 }).first).toBeGreaterThan(2015);
+    // The method draws gives a p near the exact p, and no window of it is exact.
+    const drawn = oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2014, last: 2023, draws: 20_000, method: "draws" });
+    expect(drawn.tests[0]?.exact).toBe(false);
+    expect(drawn.tests[0]?.p).toBeGreaterThan(0.035);
+    expect(drawn.tests[0]?.p).toBeLessThan(0.055);
     expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2023, last: 2011 })).toThrow(RangeError);
     expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011.5, last: 2023 })).toThrow(RangeError);
     expect(() => oe417PriorWindow(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, level: 1 })).toThrow(RangeError);

@@ -208,6 +208,11 @@ export interface Oe417WindowOptions {
   readonly draws?: number | undefined;
   /** The seed of the draws. The default is `OE417_WINDOW_SEED`. */
   readonly seed?: number | string | undefined;
+  /**
+   * The method of the p value of each window, as in `dispersionTest`. The default is `auto`.
+   * `auto` gives the exact p when the partitions of the total are few enough, and else seeded draws. `draws` always uses the draws. Since 0.7.5.
+   */
+  readonly method?: "draws" | "exact" | "auto" | undefined;
 }
 
 /** The window of a prior, with the test of each window. */
@@ -216,12 +221,15 @@ export interface Oe417Window {
   readonly first: number;
   /** The yearly counts of the events of the law, from `first` to `last` of the options. */
   readonly counts: readonly number[];
-  /** The p value of each window to `last`, by its first year. A window with fewer than 2 years or no event has p 1. */
-  readonly tests: readonly { readonly first: number; readonly p: number }[];
+  /**
+   * The p value of each window to `last`, by its first year. A window with fewer than 2 years or no event has p 1.
+   * The field `exact` is true when the p value is exact: no draws were used (since 0.7.5).
+   */
+  readonly tests: readonly { readonly first: number; readonly p: number; readonly exact: boolean }[];
 }
 
 /**
- * The count of the draws of each test of `oe417PriorWindow`. With 10000 draws, the p value of the window from 2014 is
+ * The count of the draws of each test of `oe417PriorWindow` with the method `draws`. The method `auto` uses them when the exact sum is too large. With 10000 draws, the p value of the window from 2014 is
  * 2.6 standard errors from 0.05. With 100000 draws, it is more than 6 standard errors from 0.05.
  */
 export const OE417_WINDOW_DRAWS = 100_000;
@@ -235,7 +243,8 @@ export const OE417_WINDOW_SEED = "oe417-attack-window";
  * The test of a window asks if its yearly counts agree with one rate.
  *
  * - The counts are the events of the law of each year (`oe417LawEvents`), with 0 for a year with no event.
- * - The test of each window is `dispersionTest` of `@mark1russell7/rigor-statistics`: the Pearson statistic, with seeded draws given the total.
+ * - The test of each window is `dispersionTest` of `@mark1russell7/rigor-statistics`: the Pearson statistic given the total.
+ * - With the method `auto` (the default), the p value is exact when the partitions of the total are few enough. Else it comes from seeded draws.
  * - The window starts in the year after the last window that fails the test at `level`.
  *
  * A new summary changes the counts, so it can move the window. The function is pure.
@@ -243,10 +252,11 @@ export const OE417_WINDOW_SEED = "oe417-attack-window";
  * @param events - The events
  * @param options - The years of the counts, the level, the count of draws and the seed
  * @throws RangeError when a year is not a whole number, when `last` is before `first`, or when the level is not between 0 and 1
- * @throws RangeError from `dispersionTest` when the draws times the events of a window are more than 2 ** 26. With the default draws, a window of more than 671 events gives this error.
+ * @throws RangeError from `dispersionTest` when the draws times the events of a window are more than 2 ** 26. It also throws for the method `exact` with too many partitions.
+ *   With the default draws, a window of more than 671 events that needs draws gives this error.
  */
 export function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417WindowOptions): Oe417Window {
-  const { first, last, level = 0.05, draws = OE417_WINDOW_DRAWS, seed = OE417_WINDOW_SEED } = options;
+  const { first, last, level = 0.05, draws = OE417_WINDOW_DRAWS, seed = OE417_WINDOW_SEED, method = "auto" } = options;
   if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || last < first) throw new RangeError(`oe417PriorWindow: the years ${String(first)} to ${String(last)} are not a range of whole years.`);
   if (!(level > 0 && level < 1)) throw new RangeError(`oe417PriorWindow: the level ${String(level)} is not between 0 and 1.`);
   const law = oe417LawEvents(events);
@@ -254,8 +264,9 @@ export function oe417PriorWindow(events: readonly Oe417Event[], options: Oe417Wi
   const tests = counts.map((_, index) => {
     const window = counts.slice(index);
     const total = window.reduce((sum, count) => sum + count, 0);
-    const p = window.length < 2 || total === 0 ? 1 : dispersionTest(window, { draws, seed }).p;
-    return { first: first + index, p };
+    if (window.length < 2 || total === 0) return { first: first + index, p: 1, exact: true };
+    const test = dispersionTest(window, { draws, seed, method });
+    return { first: first + index, p: test.p, exact: test.exact };
   });
   const fails = tests.filter((test) => test.p < level);
   return { first: fails.length === 0 ? first : (fails.at(-1)?.first ?? first) + 1, counts, tests };

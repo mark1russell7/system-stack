@@ -301,10 +301,19 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   For the states, the pooled score is above the raw score in 5 of the 6 cases. In the other case, it is at most 0.1% under the raw score. The pooled squared error is at most 1.2% above the raw error.
 
   A test holds the gate of the holdout over time. Each limit is the next multiple of 5% above the worst ratio of the fit of 2026-02-25. The fit gives the same numbers for the same version of the dataset, so the margin is for a new version.
+- A pooled rate is a mean. A worst-case plan needs an upper bound of the rate (since 0.7.6). `EAGLEI_COUNTY_COUNTS` of the entry `county-priors` has the years of each observed county, and the events of each case in each county.
+  `upperRates` gives the quantile of the gamma law of each county after its events in its years. The mean of the same law is the pooled rate of the table.
+  `regionUnits` gives the counts of the states from the counts of the counties. Then `upperRates` with the laws of `EAGLEI_STATE_POOLING` gives the bounds of the states.
+  A test makes each rate of the two tables from the counts and the laws. Each rate agrees to within the 4 digits of the tables.
+
+  ```ts
+  const county = upperRates(EAGLEI_COUNTY_COUNTS, (name, area) => EAGLEI_COUNTY_POOLING.laws[name]?.[eagleRegion(area)]);
+  const state = upperRates(regionUnits(EAGLEI_COUNTY_COUNTS, eagleRegion), (name) => EAGLEI_STATE_POOLING.laws[name]);
+  ```
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 - The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING`, and the state module has `EAGLEI_STATE_POOLING`.
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING` and `EAGLEI_COUNTY_COUNTS`, and the state module has `EAGLEI_STATE_POOLING`.
 
 The state module also has `EAGLEI_NATION_CUSTOMERS`, the sum of the customers of each observed county. A county in a state over the limit of the table is also in the sum. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
@@ -324,8 +333,8 @@ The OE-417 annual summaries of DOE list the electric disturbance events of each 
 | `OE417_ATTACK_LAW` | The law of the 70 events with customers: 62 ends of 15 minutes or more and 8 open events. |
 | `oe417LawEvents(events)` | It gives the events that the law reads. The prior counts the same events. |
 | `oe417AttackPrior(events, { first, last, customers, note })` | It gives the table of the prior of a physical attack for the nation, from the events of the years `first` to `last`. The method tells only what it calculates, and then the text `note`. |
-| `oe417PriorWindow(events, { first, last, level, draws, seed })` | It gives the first year of a prior: the year after the last window to `last` that fails the dispersion test. It also gives the yearly counts and the p value of each window. |
-| `OE417_WINDOW_DRAWS`, `OE417_WINDOW_SEED` | The 100000 seeded draws of each test, and their seed. |
+| `oe417PriorWindow(events, { first, last, level, draws, seed, method })` | It gives the first year of a prior: the year after the last window to `last` that fails the dispersion test. It also gives the yearly counts and the p value of each window. With the method `auto` (the default), each p is exact when it can be, and the field `exact` tells it. |
+| `OE417_WINDOW_DRAWS`, `OE417_WINDOW_SEED` | The 100000 seeded draws of a test that is not exact, and their seed. |
 | `OE417_LAST_YEAR`, `OE417_COUNTS_FIRST` | The last year of the summaries (2023), and the first year with an event of the law (2011). |
 | `OE417_PRIOR_FIRST` | 2015, the first year of the prior. A test calculates it again with `oe417PriorWindow`. |
 | `OE417_NATION_PRIORS` | The prior of 2015 to 2023: 66 events in 9 years, with the customers `EAGLEI_NATION_CUSTOMERS`. |
@@ -358,7 +367,7 @@ The prior of a physical attack is one rate for the nation:
 The years of the prior come from a rule:
 
 - The counts of the years 2011 to 2023 are 1, 0, 3, 0, 4, 6, 6, 5, 8, 8, 7, 14 and 8. The summaries of 2000 to 2010 list no such event.
-- The rule: the years are the longest window to the last year that passes the test, with each shorter window to the last year. The test asks if the yearly counts agree with one rate. It is `dispersionTest` of `@mark1russell7/rigor-statistics` at 5%: the Pearson statistic, with seeded draws given the total.
+- The rule: the years are the longest window to the last year that passes the test, with each shorter window to the last year. The test asks if the yearly counts agree with one rate. It is `dispersionTest` of `@mark1russell7/rigor-statistics` at 5%: the Pearson statistic given the total. Each p value is exact: a sum over the partitions of the total, with no draws.
 - The window from 2014 fails the test (the exact p is 0.0447). The window from 2015 passes it (the exact p is 0.3526).
 - With 2011 to 2023, the rate is 5.4 events in one year, below each year from 2016 but one. The mean of years that do not agree with one rate is not the rate of the next year.
 - A gate calculates the window from the events with `oe417PriorWindow`. A new summary changes the counts. Then the gate moves the window, or it fails until `OE417_PRIOR_FIRST` changes.
@@ -390,7 +399,7 @@ The reader of the archived files is not in this repository yet. Each row names t
 
 ## The exposure of a site
 
-Since 0.7.5, the package reads three official layers at the point of a site. Each layer is data: its case, its address, its fields and its source in `EXPOSURE_SOURCES`.
+Since 0.7.7, the package reads three official layers at the point of a site. Each layer is data: its case, its address, its fields and its source in `EXPOSURE_SOURCES`.
 
 A function gives each request, and a function reads each reply. The caller sends the request, for example through `polite-crawler`. The caller gives the user agent. The package has no default user agent.
 
@@ -426,3 +435,4 @@ if (!("read" in dams)) console.log(damExposure(site, dams, radius).counts.high);
 | Entry | What it has |
 | --- | --- |
 | `@mark1russell7/stack-hazards` | The records, the reference data, the gate and `hazardCase`. |
+| `@mark1russell7/stack-hazards/county-priors` | `EAGLEI_COUNTY_PRIORS`, `EAGLEI_COUNTY_POOLING` and `EAGLEI_COUNTY_COUNTS`. This entry is large, so the root entry does not import it. |

@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import type { CountyPooling, PoolHoldout, PoolLaw, PoolTimeHoldout, PoolTimeScore, PriorTable, StatePooling } from "../src/hazard.ts";
+import type { AreaUnits, CountyPooling, PoolHoldout, PoolLaw, PoolTimeHoldout, PoolTimeScore, PriorTable, StatePooling } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
-import { observedRegions, pooledRates, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
+import { areaUnits, observedRegions, pooledRates, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
 import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type CaseOverlap, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { poolHoldout, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, timeHoldout } from "./eaglei-pooling.ts";
@@ -33,6 +33,8 @@ export interface EaglePriorTables {
   readonly pooling: CountyPooling;
   /** The laws of the pooled rates of the states, and their holdout. */
   readonly statePooling: StatePooling;
+  /** The counts of the observed counties, also of a county over the limit of the table. With the laws, they give each pooled rate and its bound. */
+  readonly counts: AreaUnits;
 }
 
 /** The rates of the regions of one case, from the counts of the areas. */
@@ -127,6 +129,7 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     county,
     state,
     nation,
+    counts: areaUnits(priors.counts, observation),
     pooling: {
       laws: Object.fromEntries(Object.entries(pooled).map(([name, entry]) => [name, entry.laws])),
       holdout: poolHoldout({ ...priors, observation }),
@@ -253,7 +256,7 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
   return {
     "eaglei-county-priors.ts": [
       ...head.slice(0, -2),
-      'import type { CountyPooling, PriorTable } from "./hazard.ts";',
+      'import type { AreaUnits, CountyPooling, PriorTable } from "./hazard.ts";',
       "",
       ...tableLines("EAGLEI_COUNTY_PRIORS", "The yearly priors of the power outage and of each storm case in each county, from the outages of EAGLE-I.", tables.county),
       "",
@@ -267,6 +270,18 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       `  silent: ${literal(pooling.silent)},`,
       "  laws: {",
       ...Object.entries(pooling.laws).map(([name, entry]) => `    ${JSON.stringify(name)}: ${literal(entry)},`),
+      "  },",
+      "};",
+      "",
+      "/**",
+      " * The counts of the observed counties of the fit. The arrays give the years of each county and the events of each case in each county, in the order of `codes`.",
+      " * With the laws of `EAGLEI_COUNTY_POOLING`, they give each pooled rate of the table and its upper bound (`upperRates`). A county over the limit of the table is here too.",
+      " */",
+      "export const EAGLEI_COUNTY_COUNTS: AreaUnits = {",
+      `  codes: ${JSON.stringify(tables.counts.codes)},`,
+      `  years: ${JSON.stringify(tables.counts.years)},`,
+      "  events: {",
+      ...Object.entries(tables.counts.events).map(([name, events]) => `    ${JSON.stringify(name)}: ${JSON.stringify(events)},`),
       "  },",
       "};",
       "",

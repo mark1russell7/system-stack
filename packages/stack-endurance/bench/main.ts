@@ -1,7 +1,8 @@
 /**
  * The bench of `independentStop`. It is for CI: a timed run on a shared computer does not give a valid value.
  *
- * - `node bench/main.ts run --out <folder> --job <label> [--job-index <n>] [--commit <sha>] [--run <id>]` times each case in fresh children and writes `records.json`.
+ * - `node bench/main.ts run --out <folder> --job <label> [--job-index <n>] [--commit <sha>] [--run <id>] [--root <checkout>]` times each case in fresh children and writes `records.json`.
+ *   The record keeps the stamp of the timed code of the checkout (`bench/stamp.ts`).
  *   The job of index `n` (from 1) starts its rounds at `(n - 1) * JOB_ROUNDS`, so the jobs of a run turn the order on.
  * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
  *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
@@ -20,7 +21,7 @@ import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import { benchStamp, stampChanges, stampRecord } from "./stamp.ts";
-import { AA_ARM, AA_CASE, FREEZE_WINDOW, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, FREEZE_WINDOW, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, stampNote, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
 export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
@@ -28,6 +29,11 @@ export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
 const CHILD_MS = 120_000;
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+/** This function gives the checkout of the stamp: `--root`, or the checkout of this bench. */
+function checkoutRoot(args: Record<string, string | boolean | undefined>): string {
+  return resolve(String(args["root"] ?? join(here, "..", "..", "..")));
+}
 
 /** This function gives the first round of the job of an index from 1: `(index - 1) * JOB_ROUNDS`. With no index, it is 0. */
 function roundOffset(index: string | boolean | undefined): number {
@@ -42,6 +48,8 @@ async function run(args: Record<string, string | boolean | undefined>): Promise<
   const job = String(args["job"] ?? "");
   if (out === "" || job === "") throw new Error("run needs --out and --job.");
   const rounds = Number(args["rounds"] ?? JOB_ROUNDS);
+  // The stamp comes before the timed children, so a checkout that the stamp cannot read fails fast.
+  const code = stampRecord(await benchStamp(checkoutRoot(args)));
   const arms = [...BENCH_CUTS.map((cuts) => ({ id: caseId(cuts), case: caseId(cuts) })), { id: AA_ARM, case: AA_CASE }];
   const result = await freshArms({
     arms,
@@ -65,6 +73,7 @@ async function run(args: Record<string, string | boolean | undefined>): Promise<
     warnings: result.warnings,
     processes: result.processes,
     aa: result.aa,
+    stamp: code,
   };
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "records.json"), `${JSON.stringify(record, null, 2)}\n`);
@@ -120,7 +129,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
     reads.length >= 5 && commits.length === 1 && commits[0] !== ""
       ? freezeLimits(reads, { commit: commits[0] ?? "", date: typeof args["date"] === "string" ? args["date"] : new Date().toISOString().slice(0, 10), runs, window })
       : undefined;
-  const report = readReport(reads, gates, candidate);
+  const report = `${readReport(reads, gates, candidate)}${limits === undefined ? "" : `\n${stampNote(limits, reads)}\n`}`;
   process.stdout.write(report);
   const summary = process.env["GITHUB_STEP_SUMMARY"];
   if (summary !== undefined && summary !== "") writeFileSync(summary, report, { flag: "a" });
@@ -139,7 +148,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
 
 /** This function writes the stamp record of the timed code of a checkout to stdout and, with `--out`, to a file. */
 async function stamp(args: Record<string, string | boolean | undefined>): Promise<void> {
-  const root = resolve(String(args["root"] ?? join(here, "..", "..", "..")));
+  const root = checkoutRoot(args);
   const text = `${JSON.stringify(stampRecord(await benchStamp(root)), null, 2)}\n`;
   if (typeof args["out"] === "string") writeFileSync(args["out"], text);
   process.stdout.write(text);

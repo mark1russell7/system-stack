@@ -15,6 +15,7 @@
 import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, recentRuns, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
+import { stampChanges, type StampRecord } from "./stamp.ts";
 
 /** The schema of the record of one job. */
 export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
@@ -55,6 +56,8 @@ export interface JobRecord {
   readonly warnings: readonly string[];
   readonly processes: readonly ArmProcess[];
   readonly aa: readonly FreshRecord[];
+  /** The stamp of the timed code of the job (`bench/stamp.ts`). A record from before the stamp has none. */
+  readonly stamp?: StampRecord;
 }
 
 /** The value of one case in one job. */
@@ -79,6 +82,8 @@ export interface JobRead {
   readonly cases: readonly CaseValue[];
   /** The A/A statistics of the pair of `AA_CASE`. A job with no A/A records has none. */
   readonly aa: CaseAaStat | undefined;
+  /** The stamp of the timed code of the job, when its record has one. */
+  readonly stamp?: StampRecord;
 }
 
 /** This function gives the read of one job. Only the arm with the id of its case gives the value. The A/A copy gives only the noise. */
@@ -96,6 +101,7 @@ export function jobRead(record: JobRecord): JobRead {
     ...(record.commit === undefined ? {} : { commit: record.commit }),
     cases,
     aa,
+    ...(record.stamp === undefined ? {} : { stamp: record.stamp }),
   };
 }
 
@@ -123,6 +129,11 @@ export interface FrozenLimits {
   readonly noiseCaps: NoiseCapTable;
   /** The group limit of each case for each CPU model with jobs of `MIN_RUNS` runs or more (`groupTables`). `limitFaults` computes each one again from the jobs. */
   readonly groups: Readonly<Record<string, Readonly<Record<string, GroupLimit>>>>;
+  /**
+   * The stamp of the timed code of each job of the freeze. Thus the claim that the runs of the freeze time the same code is a check.
+   * A file from records with no stamp has none. Then that claim is the judgement of a review.
+   */
+  readonly stamp?: StampRecord;
 }
 
 /** The group limit of one case on one CPU model: `runLimit` of the lowest value of each run, with the run of each value. */
@@ -171,7 +182,10 @@ export interface FreezeStamp {
  * - Each read needs its CI run. A model limit counts the runs of the model, so a job with no run cannot count as a run of its own.
  * - The freeze keeps the last `window` runs of each CPU model in the order of the runs. The jobs of the file stay in the order of the reads.
  *
+ * - Each job of the window has the same stamp of its timed code, or no job has a stamp. The file keeps that stamp.
+ *
  * @throws RangeError when there are fewer than `MIN_JOBS` jobs in the window. Also when a job has no run, no A/A read or no value of each case. Also when the order does not name each run one time
+ * @throws RangeError when the jobs of the window have different stamps, or only some of them have a stamp
  */
 export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
   for (const read of all) {
@@ -181,6 +195,7 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
   const reads = recentRuns(all, (read) => ({ model: read.cpu, run: read.run ?? "" }), { perModel: window, minimumRuns: MIN_RUNS, ...(stamp.runs === undefined ? {} : { order: stamp.runs }) });
   if (reads.length < MIN_JOBS) throw new RangeError(`A freeze needs ${String(MIN_JOBS)} jobs or more, not ${String(reads.length)}.`);
   const runs = reads.map((read) => read.run ?? "");
+  const code = freezeStamp(reads);
   const order = stamp.runs ?? [...new Set(all.map((read) => read.run ?? ""))];
   const cases: Record<string, RunLimit> = {};
   for (const cuts of BENCH_CUTS) {
@@ -212,7 +227,21 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
     // Each job stays: a freeze keeps the worst job, and a noisy job widens a cap only in this file, which a review reads.
     noiseCaps: noiseCapTable(jobs, spreads),
     groups: groupTables(jobs, cases),
+    ...(code === undefined ? {} : { stamp: code }),
   };
+}
+
+/** This function gives the one stamp of the jobs of a freeze, or undefined when no job has a stamp. */
+function freezeStamp(reads: readonly JobRead[]): StampRecord | undefined {
+  const missing = reads.filter((read) => read.stamp === undefined).map((read) => read.job);
+  if (missing.length === reads.length) return undefined;
+  if (missing.length > 0) throw new RangeError(`The jobs ${missing.join(", ")} have no stamp of their timed code, and the other jobs have one. A freeze needs a stamp in each job or in none.`);
+  const first = reads[0]?.stamp as StampRecord;
+  for (const read of reads) {
+    const parts = stampChanges(first, read.stamp);
+    if (parts.length > 0) throw new RangeError(`The job ${read.job} of the run ${read.run ?? ""} times other code than the job ${reads[0]?.job ?? ""}: the parts ${parts.join(", ")} differ. A freeze needs the same timed code in each job.`);
+  }
+  return first;
 }
 
 /** This function gives the faults of the window of a file. Each CPU model has at most `window` runs. The field `runs` names the runs of the jobs. */
@@ -246,6 +275,7 @@ export function limitFaults(file: FrozenLimits): string[] {
     if (typeof job.commit !== "string" || !/^[0-9a-f]{40}$/.test(job.commit)) faults.push(`The job ${job.job} has no full SHA of its commit.`);
   }
   for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
+  if (file.stamp !== undefined && stampChanges(file.stamp, file.stamp).length > 0) faults.push("The stamp of the file is not a stamp record.");
   faults.push(...windowFaults(file));
   faults.push(...noiseCapFaults(file));
   // Each group limit must be the limit that the jobs and the values of the file give. Thus a review of the jobs is also a review of the group limits.
@@ -277,6 +307,7 @@ function noiseCapFaults(file: FrozenLimits): string[] {
  * - This function finds each job of the file in the reads by its job and its run. The CPU model, the value of each case and the A/A spread of the read must be the values of the file.
  * - A read that is not a job of the file is not a fault. The folder of the records can hold other runs.
  * - The values are equal with no tolerance, because the freeze copies them from the reads.
+ * - When the file has a stamp, the record of each job has the same stamp.
  */
 export function recordFaults(file: FrozenLimits, reads: readonly JobRead[]): string[] {
   const faults: string[] = [];
@@ -296,8 +327,31 @@ export function recordFaults(file: FrozenLimits, reads: readonly JobRead[]): str
       if (value !== file.cases[id]?.values[index]) faults.push(`${name} has the value ${String(value)} of ${id} in its record, not ${String(file.cases[id]?.values[index])}.`);
     }
     if (read.aa?.spread !== spreads[index]) faults.push(`${name} has the A/A spread ${String(read.aa?.spread)} in its record, not ${String(spreads[index])}.`);
+    if (file.stamp !== undefined) {
+      const parts = stampChanges(file.stamp, read.stamp);
+      if (parts.length > 0) faults.push(`${name} has other timed code in its record than the file: ${parts.join(", ")}.`);
+    }
   }
   return faults;
+}
+
+/**
+ * This function tells if the jobs of a run time the code of the freeze. It does not change the gate.
+ * - The same stamp: the job times the frozen code. Thus a block is noise or a change of the runner.
+ * - Another stamp: the line names the parts of the stamp that differ.
+ * - A file or a job with no stamp gives no answer.
+ */
+export function stampNote(limits: FrozenLimits | undefined, reads: readonly JobRead[]): string {
+  if (limits?.stamp === undefined) return "The file of limits has no stamp of its timed code, so the read cannot compare the timed code.";
+  const frozen = limits.stamp;
+  const missing = reads.filter((read) => read.stamp === undefined).length;
+  const changed = reads.filter((read) => read.stamp !== undefined && stampChanges(frozen, read.stamp).length > 0);
+  const parts = [...new Set(changed.flatMap((read) => stampChanges(frozen, read.stamp)))];
+  const same = reads.length - missing - changed.length;
+  const lines = [`The timed code of ${String(same)} of the ${String(reads.length)} jobs is the timed code of the freeze.`];
+  if (changed.length > 0) lines.push(`The timed code of ${String(changed.length)} jobs differs from the freeze in the parts ${parts.join(", ")}.`);
+  if (missing > 0) lines.push(`${String(missing)} jobs have no stamp.`);
+  return lines.join(" ");
 }
 
 /** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, and the ceiling `other`. The key of a model is its full name. */
