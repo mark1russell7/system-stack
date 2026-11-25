@@ -39,7 +39,7 @@ describe("a hazard case as the values of CaseCuts", () => {
     const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
     const cuts = hazardCase(HAZARD_LIST, outage, { region: { scheme: "us-state-fips", code: "48" } }).cuts;
     expect(cuts.find((cut) => cut.part === "power.grid")?.duration).toEqual(EAGLEI_GRID_LAW.curves["48"]);
-    // Before 0.6.9, only the grid cut had a curve. Each other cut follows the grid cut.
+    // Before 0.7.0, only the grid cut had a curve. Each other cut follows the grid cut.
     expect(cuts.filter((cut) => cut.duration !== undefined).map((cut) => cut.part)).toEqual(outage.cuts.map((cut) => cut.part));
     expect(cuts.filter((cut) => cut.follows === undefined).map((cut) => cut.part)).toEqual(["power.grid"]);
     expect(hazardCase(HAZARD_LIST, outage).cuts.every((cut) => cut.duration === undefined)).toBe(true);

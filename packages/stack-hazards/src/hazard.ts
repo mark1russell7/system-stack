@@ -108,24 +108,24 @@ export interface NoLaw {
   readonly reason: string;
 }
 
-/** The units of a cited span, in a fixed order. Since 0.6.9. */
+/** The units of a cited span, in a fixed order. Since 0.7.0. */
 export const SPAN_UNITS: readonly ["hours", "days"] = ["hours", "days"];
 
-/** The unit of a cited span. Since 0.6.9. */
+/** The unit of a cited span. Since 0.7.0. */
 export type SpanUnit = (typeof SPAN_UNITS)[number];
 
-/** The bases of a cited span, in a fixed order. Since 0.6.9. */
+/** The bases of a cited span, in a fixed order. Since 0.7.0. */
 export const SPAN_BASES: readonly ["range", "minimum"] = ["range", "minimum"];
 
 /**
- * The basis of a cited span. Since 0.6.9.
+ * The basis of a cited span. Since 0.7.0.
  * - `range`: the sources give the range of the value.
  * - `minimum`: the sources give a least value, for example a rule minimum. The real value is at least the low end.
  */
 export type SpanBasis = (typeof SPAN_BASES)[number];
 
 /**
- * A cited span of a time: a low end and a high end in a unit, with the claims of its sources. Since 0.6.9.
+ * A cited span of a time: a low end and a high end in a unit, with the claims of its sources. Since 0.7.0.
  * The text `says` tells how the span comes from the claims, in own words. It is not a quote.
  * Each claim of a span names a source. A span has no claim of the definition.
  */
@@ -143,7 +143,7 @@ export interface CitedSpan {
 }
 
 /**
- * The cause of a dependent cut: the cut of another part in the same case. Since 0.6.9.
+ * The cause of a dependent cut: the cut of another part in the same case. Since 0.7.0.
  * The dependent cut occurs only when the cause lasts longer than the onset.
  * Then its duration is the time of the cause after the onset, plus the recovery.
  */
@@ -166,7 +166,7 @@ export interface HazardCut {
   readonly claims: readonly Claim[];
   readonly duration: DurationLaw | NoLaw;
   /**
-   * The cause of the cut, for a cut that a stop of another part causes. Since 0.6.9.
+   * The cause of the cut, for a cut that a stop of another part causes. Since 0.7.0.
    * A cut with `follows` has no law of its own. `hazardCase` gives it the curve of the cause with the shift of the terms.
    */
   readonly follows?: Follows | undefined;

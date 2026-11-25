@@ -30,7 +30,7 @@ import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
  *   Or its scheme is empty, or a region is two times in its codes.
  *   Or it has a rate that is not a pair of a count of 0 or more and a share from 0 to 1.
  *   Or two tables have the same scheme, case and region.
- * - `hazards-follows`: a cut has `follows` and a law of its own. Since 0.6.9.
+ * - `hazards-follows`: a cut has `follows` and a law of its own. Since 0.7.0.
  *   Or it follows a part that is not a cut of the case, or a chain of `follows` comes back to the cut.
  *   Or an end of a span of its onset or recovery is not finite or is below 0.
  *   Or the low end of the span is above the high end.
@@ -38,7 +38,7 @@ import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
  *   Or the span has no text, no claim, or a claim of the definition.
  *   A claim of a span with no source in the table, or with no basis, is a `hazards-source`.
  * - `hazards-no-law` (warning): a cut has no law of its duration. Its draws are no read in the shortfall.
- *   Since 0.6.9, a cut that follows a cause with a law gets no warning, because `hazardCase` gives it a curve.
+ *   Since 0.7.0, a cut that follows a cause with a law gets no warning, because `hazardCase` gives it a curve.
  */
 export const HAZARD_CODES: readonly [
   "hazards-twice",

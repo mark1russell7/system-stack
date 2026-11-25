@@ -16,8 +16,8 @@ Each function is a plain function with no clock, no network and no file.
 | `ClaimBasis` | The basis of a claim of a source. `told`: what the event does when it happens. `assessed`: a judgment about the threat itself. |
 | `DurationLaw` | A survival curve of the duration for each region of its source, with its fit. |
 | `NoLaw` | No law is read yet. The cut has no curve, so its draws are no read. |
-| `Follows` | The cause of a dependent cut: the cut of another part in the same case, with an onset and a recovery. Since 0.6.9. |
-| `CitedSpan` | A cited span of a time: its two ends, a unit of `SPAN_UNITS`, a basis of `SPAN_BASES`, a text and the claims of its sources. Since 0.6.9. |
+| `Follows` | The cause of a dependent cut: the cut of another part in the same case, with an onset and a recovery. Since 0.7.0. |
+| `CitedSpan` | A cited span of a time: its two ends, a unit of `SPAN_UNITS`, a basis of `SPAN_BASES`, a text and the claims of its sources. Since 0.7.0. |
 | `Hazard` | A case: its code, its name, its cuts and the sources that the dataset examined for it. |
 
 ## The rules of the data
@@ -31,7 +31,7 @@ Each function is a plain function with no clock, no network and no file.
 
 `checkHazards` is the gate of the rules. The fields of each source go through `checkSources`, the source gate of the guidebook. With the option `at`, the gate also examines the check date of each source. A check after `at` is an error. A check older than `maxAgeDays` (365 by default) is a warning.
 
-The gate refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law. Since 0.6.9, a cut that follows a cause with a law gets no warning.
+The gate refuses a law with no source or no license, and a law with no curve for a region of its source. It gives a warning for each cut with no law. Since 0.7.0, a cut that follows a cause with a law gets no warning.
 
 The gate refuses a claim of a source with no basis or with a basis that is not in `CLAIM_BASES`. It also refuses a claim of the definition with a basis. Each of these faults has the code `hazards-source`.
 
@@ -67,7 +67,7 @@ A part of a stack that needs a public supply names a reference id in its needs. 
 
 ## The cuts that follow another cut
 
-Since 0.6.9, a cut can have the field `follows`: a stop of another part of the same case causes it. Before 0.6.9, such a cut had no curve. A caller that dropped it then counted the water cut only for the time of the grid cut, which is too short.
+Since 0.7.0, a cut can have the field `follows`: a stop of another part of the same case causes it. Before 0.7.0, such a cut had no curve. A caller that dropped it then counted the water cut only for the time of the grid cut, which is too short.
 
 | Field of `follows` | What it tells |
 | --- | --- |
@@ -92,7 +92,7 @@ The dependent cut occurs only when the cause lasts longer than the onset. Then i
 | `onset`, `recovery` | Each term (`FollowTerm`): its days, `cited`, its side (`upper` or `lower`) and a text, for example "recovery not cited: 0, a lower bound". |
 | `bound` | `upper` when each term is an upper bound and the cause is a law or an upper bound. Else `none`: the curve is not a bound of the days of the cut. |
 
-The source of the cut is the source of the cause curve, and then the sources of the claims of its terms. A cause with no curve gives the dependent cut no `duration` and no field `follows`, as before 0.6.9. A chain of cuts is permitted.
+The source of the cut is the source of the cause curve, and then the sources of the claims of its terms. A cause with no curve gives the dependent cut no `duration` and no field `follows`, as before 0.7.0. A chain of cuts is permitted.
 
 The gate gives `hazards-follows` for a cause that is not a cut of the case, or a chain that comes back to the cut. It gives the same code for a cut with `follows` and a law of its own. It gives the same code for a span with wrong ends, no text, no claim, or a claim of the definition. It also gives it for a unit that is not in `SPAN_UNITS` or a basis that is not in `SPAN_BASES`.
 
@@ -110,7 +110,7 @@ Three cases have a stop of the grid: a power outage, a physical attack and a lon
 - EPA 815-B-24-008 (January 2024): the results of the Colisure method can be read after an incubation of 24 hours.
 - Thus the low end is 24 hours: one round with its incubation. The high end is 48 hours: two sets 24 hours apart, with the incubation of the second set.
 
-The real recovery is at least the rule minimum of its state, and it can be longer. So the span is not a range of the real value, and its basis is `minimum`. The water main gets the cause curve plus 24 hours. That curve is a lower bound, so its bound is `none`.
+The real recovery is at least the rule minimum of its state, and it can be longer. So the span is not a range of the real value, and its basis is `minimum`. The water main gets the cause curve plus 24 hours. The missing onset (0) is an upper side and the minimum recovery a lower side, so the curve is no bound of the days. Its bound is `none`. The other five cuts have no cited onset and no cited recovery. Onset 0 is an upper side and recovery 0 a lower side, so their bound is `none` too.
 
 The text of a state rule has no copyright: the government edicts doctrine (Georgia v. Public.Resource.Org, 2020). Thus the license of each state rule is `public-domain`, not `us-public-domain`, which is only for a federal work.
 
@@ -176,7 +176,7 @@ The claims of the cases of 0.1.0 come from the hazard pages of FEMA (Ready.gov) 
 
 The law of the grid cut of a power outage comes from EAGLE-I of Oak Ridge National Laboratory (CC BY 4.0, DOI `10.6084/m9.figshare.24237376`). It has one curve for each state, the District of Columbia, Puerto Rico and the US Virgin Islands. The curves are a derived work.
 
-This law is for all causes. The grid cut of each storm case has a law of its own, from the outages that start in a storm event of the case. The law has a source of its own. Its regions are the states with 30 such outages or more. The grid cut of a physical attack has the law of the OE-417 summaries. Each other cut has no law. Since 0.6.9, the cuts that follow a grid cut with a law get its curve with the shift of their terms.
+This law is for all causes. The grid cut of each storm case has a law of its own, from the outages that start in a storm event of the case. The law has a source of its own. Its regions are the states with 30 such outages or more. The grid cut of a physical attack has the law of the OE-417 summaries. Each other cut has no law. Since 0.7.0, the cuts that follow a grid cut with a law get its curve with the shift of their terms.
 
 ## The catastrophic cases
 
@@ -205,7 +205,7 @@ Since 0.1.1, the list also has 12 catastrophic cases. The claims of these cases 
 | `NO_COLLAPSE_LAW` | The grid cut of a long collapse of the grid | The event summaries of DOE tell of one such collapse: Puerto Rico after Hurricane Maria in 2017. The OE-417 summary of 2017 has no row of Puerto Rico. The OE-417 summaries give the last restoration of each event, and their long storms are not a collapse. One event gives no law. |
 | `NO_CYBER_LAW` | The grid cut of a cyberattack | The CISA alert IR-ALERT-H-16-056-01 tells of one grid outage from a cyberattack, in Ukraine in 2015, with no duration. Of the 42 cyber events of the OE-417 summaries, one tells of a loss, with an unknown count of customers. Two events give no law. |
 | `NO_GEOMAGNETIC_LAW` | The grid cut of a solar storm | The page of NOAA SWPC names three blackouts from space weather. Only one has a duration: 9 hours in Canada in 1989. No type of an event of the OE-417 summaries names a geomagnetic, solar, magnetic or space weather cause. |
-| `NO_FOLLOW_LAW` | The cuts that follow the stop of the grid in a collapse or a solar storm | The grid cut of the case has no law, and no source read gives a duration of its own. Since 0.6.9, the cuts of a collapse have `follows`, and they get a curve when the grid cut gets a law. |
+| `NO_FOLLOW_LAW` | The cuts that follow the stop of the grid in a collapse or a solar storm | The grid cut of the case has no law, and no source read gives a duration of its own. Since 0.7.0, the cuts of a collapse have `follows`, and they get a curve when the grid cut gets a law. |
 | `NO_EVENT_LAW` | Each other cut | No source read gives a duration of the cut or a record of its events. |
 
 - The law of EAGLE-I comes from usual outages, so it does not tell the duration of a long collapse of the grid. The early counts of DOE for Puerto Rico are estimates from the load, not counts of customers.
@@ -338,7 +338,7 @@ The law reads only the events with more than 0 customers. The question of a home
 - One of the open events is the attack in Moore County, North Carolina, in December 2022, with 45,000 customers.
 - The summary of 2023 prints 32 events two times, the second time with no start. The set and the counts read each such event one time.
 - The times are local times. An event across a change of the clock can be one hour off.
-- The case `infra.power.physical-attack` uses this law on its grid cut. Its other cuts are the cuts of a power outage, with no law of their own. Since 0.6.9, they follow the grid cut, so they get its curve.
+- The case `infra.power.physical-attack` uses this law on its grid cut. Its other cuts are the cuts of a power outage, with no law of their own. Since 0.7.0, they follow the grid cut, so they get its curve.
 
 The prior of a physical attack is one rate for the nation:
 

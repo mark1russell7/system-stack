@@ -185,7 +185,7 @@ const assessed = (source: string, says: string): Claim => ({ source, basis: "ass
 const defined = (says: string): Claim => ({ definition: true, says });
 
 /**
- * The time from the end of a stop of the grid to the end of the boil order of the water main. Since 0.6.9.
+ * The time from the end of a stop of the grid to the end of the boil order of the water main. Since 0.7.0.
  * It is a rule minimum.
  * The rules give the samples that end the order, and the method table gives the time of the incubation. It is not a measured time.
  */
@@ -211,7 +211,7 @@ const GRID = "power.grid";
  * This function gives the cuts that a stop of the grid causes, from the page on power outages. A power outage, a physical attack on the grid and a long collapse of the grid share them.
  * A long collapse has a different reason for no law.
  *
- * Since 0.6.9, each cut follows the grid cut of its case, so `hazardCase` gives it the curve of the grid cut.
+ * Since 0.7.0, each cut follows the grid cut of its case, so `hazardCase` gives it the curve of the grid cut.
  * Only the water main has a cited recovery: the boil order after the stop. Each other cut has no onset and no recovery.
  */
 const outageEffects = (duration: NoLaw): HazardCut[] => [

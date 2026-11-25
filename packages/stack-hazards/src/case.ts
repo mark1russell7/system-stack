@@ -42,10 +42,10 @@ export const NO_TOLD_LAW: NoLaw = { read: false, reason: "Each claim of this cut
 /** The state of a supply in a case: the cut, or no read when no source that the dataset read names the cut. */
 export type SupplyState = { readonly state: "cut"; readonly cut: HazardCut } | { readonly state: "no-read" };
 
-/** The side of a term of a dependent cut. `upper` can only make the cut longer, and `lower` can only make it shorter. Since 0.6.9. */
+/** The side of a term of a dependent cut. `upper` can only make the cut longer, and `lower` can only make it shorter. Since 0.7.0. */
 export type TermSide = "upper" | "lower";
 
-/** A term of a dependent cut in the output of `hazardCase`: the onset or the recovery. Since 0.6.9. */
+/** A term of a dependent cut in the output of `hazardCase`: the onset or the recovery. Since 0.7.0. */
 export interface FollowTerm {
   /** The days of the term in the curve. */
   readonly days: number;
@@ -56,7 +56,7 @@ export interface FollowTerm {
   readonly says: string;
 }
 
-/** The terms of a dependent cut with a curve, in the output of `hazardCase`. Since 0.6.9. */
+/** The terms of a dependent cut with a curve, in the output of `hazardCase`. Since 0.7.0. */
 export interface FollowRead {
   /** The reference part of the cause cut. */
   readonly part: string;
@@ -69,12 +69,12 @@ export interface FollowRead {
   readonly bound: "upper" | "none";
 }
 
-/** A cut in the output of `hazardCase`: a `Cut` of the core, with the terms of a dependent cut with a curve. Since 0.6.9. */
+/** A cut in the output of `hazardCase`: a `Cut` of the core, with the terms of a dependent cut with a curve. Since 0.7.0. */
 export interface HazardCaseCut extends Cut {
   readonly follows?: FollowRead | undefined;
 }
 
-/** The output of `hazardCase`: the values of `CaseCuts` of the core, with the cuts of `HazardCaseCut`. Since 0.6.9. */
+/** The output of `hazardCase`: the values of `CaseCuts` of the core, with the cuts of `HazardCaseCut`. Since 0.7.0. */
 export interface HazardCaseCuts extends CaseCuts {
   readonly cuts: readonly HazardCaseCut[];
 }
@@ -98,9 +98,9 @@ export function supplyState(hazard: Hazard, part: string, options: BasisOptions 
  * A cut with no law, or with no curve for the region, has no `duration`. Then the shortfall gives no read for its draws.
  * The source of each cut is the URL of the source of its law, or the URLs of its claims.
  *
- * Since 0.6.9, a cut with `follows` gets the curve of its cause cut in the same case, with the shift of `followCurve`.
+ * Since 0.7.0, a cut with `follows` gets the curve of its cause cut in the same case, with the shift of `followCurve`.
  * Its field `follows` then tells the side of each term. Its source is the source of the cause curve and the sources of the terms.
- * A cause with no curve gives the dependent cut no `duration`, as before 0.6.9.
+ * A cause with no curve gives the dependent cut no `duration`, as before 0.7.0.
  *
  * The option `assessed` can drop the claims of assessed risks. A cut with only assessed claims then has no `duration`. The function is pure.
  */
@@ -118,7 +118,7 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
 }
 
 /**
- * This function gives the curve of a dependent cut from the curve of its cause, in days. Since 0.6.9.
+ * This function gives the curve of a dependent cut from the curve of its cause, in days. Since 0.7.0.
  * The dependent cut occurs only when the cause lasts longer than `onset`. Then it lasts the time of the cause after `onset`, plus `recovery`.
  * Thus the curve is the cause curve, shifted down by `onset` and then up by `recovery`.
  *
