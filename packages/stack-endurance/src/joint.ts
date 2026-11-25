@@ -1,8 +1,9 @@
 import { type Constraint, type Objective, solveLexicographic } from "@mark1russell7/linear";
-import { add, div, equals, fromFloat, mul, neg, ONE, type Rational, sign, toNumber, ZERO } from "@mark1russell7/rational";
-import { canRun, inputsOf } from "./converter.ts";
+import { add, div, equals, mul, neg, ONE, type Rational, sign, toNumber, ZERO } from "@mark1russell7/rational";
+import { canRun, deviceKey, inputsOf } from "./converter.ts";
 import { type CaseOptions, caseDraws, caseStopped, drawDemand, giftNeed, giftResource, storeAmounts } from "./endurance.ts";
 import type { CaseCuts, Converter, EnduranceLayer, IsoDate } from "./layer.ts";
+import { addTo, dense, exact, type Row } from "./rows.ts";
 
 // The joint days: the largest count of days that a set of draws holds together, with the best share of the stores.
 // The query is a linear program over the totals of the span, with exact rationals (@mark1russell7/linear).
@@ -40,22 +41,6 @@ export interface JointDays {
    */
   readonly capped: readonly string[];
 }
-
-/** A sparse row: the coefficient of each variable, by its index. */
-type Row = Map<number, Rational>;
-
-function addTo(row: Row, index: number, value: Rational): void {
-  row.set(index, add(row.get(index) ?? ZERO, value));
-}
-
-function dense(row: Row, count: number): Rational[] {
-  const out = new Array<Rational>(count).fill(ZERO);
-  for (const [index, value] of row) out[index] = value;
-  return out;
-}
-
-/** This function gives the exact rational of a finite double, with no rounding. A double is a dyadic rational. */
-const exact = (value: number): Rational => fromFloat(value);
 
 /**
  * This function gives the joint days of a set of draws. These are the largest count of days `d` at which each draw holds `d` days.
@@ -158,7 +143,7 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
       for (const index of indexes) rows.push({ row: new Map([[index, ONE]]), relation: "<=", rhs: ZERO });
       continue;
     }
-    const key = converter.device === undefined ? `converter:${converter.id}` : `device:${converter.device}`;
+    const key = deviceKey(converter);
     const limit = limits.get(key) ?? { row: new Map([[days, neg(exact(converter.devices ?? 1))]]), converters: [] };
     limits.set(key, limit);
     limit.converters.push(converter);
