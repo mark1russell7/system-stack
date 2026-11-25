@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import type { Exchange, Pace, Reply, Transport } from "polite-crawler/api";
 import { HostScheduler } from "polite-crawler/politeness";
 import { describe, expect, it } from "vitest";
-import { caseOverlap, EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, raiseCustomers, ranges, sweepTable, yearsOf, type EagleLaws } from "./eaglei-fit.ts";
+import { caseOverlap, EAGLE_ARTICLE, JOIN_SWEEP, PRIOR_LIMIT, eagleFiles, fitEagle, joinSweep, lawsTable, linesOf, peakTally, peaksTable, raiseCustomers, ranges, sweepTable, yearCounts, yearsOf, type EagleLaws } from "./eaglei-fit.ts";
 import { RANGE_TRIES, type FitContext } from "./fetch.ts";
 import { STORM_BASE, stormFiles } from "./storm-files.ts";
 import type { OutageEvent } from "../src/outages.ts";
@@ -249,6 +249,8 @@ describe("fitEagle", () => {
     expect(laws.priors).toEqual({
       observation: { years: { "90001": 2, "90009": 2 }, customers: { "90001": 1000, "90009": 100_000 } },
       counts: { "infra.power.outage": { "90001": { events: 1, share: 0.04 } } },
+      // The counts of each year: the one event starts in 2020.
+      yearly: { observed: { "90001": [2020, 2021], "90009": [2020, 2021] }, counts: { "infra.power.outage": { "2020": { "90001": 1 } } } },
     });
     expect(laws.peaks).toEqual({ "90001": { peak: 40, held: 0, over: 0, days: 0 }, "90009": { peak: 1, held: 0, over: 0, days: 0 } });
     expect(peaksTable(laws)).toContain("0 counties have a count above their customers.");
@@ -332,6 +334,17 @@ describe("fitEagle", () => {
     const wrong = article((file) => (file["name"] === "eaglei_outages_2021.csv" ? { ...file, computed_md5: md5("other") } : file));
     await expect(fitEagle(context(fake(wrong).transport), { now: () => new Date() })).rejects.toThrow(/MD5 of eaglei_outages_2021\.csv/);
     await expect(fitEagle(context(fake(article(), { redirect: 200 }).transport), { now: () => new Date() })).rejects.toThrow(/not a redirect/);
+  });
+});
+
+describe("yearCounts", () => {
+  it("counts the events of each county with customers in the UTC year of their start, in the order of the years and the codes", () => {
+    const at = (area: string, iso: string) => ({ area, start: Date.parse(iso) / 1000, seconds: 900, peak: 10, censored: false });
+    const events = [at("90003", "2021-03-01T00:00:00Z"), at("90001", "2021-12-31T23:59:59Z"), at("90001", "2020-01-01T00:00:00Z"), at("90001", "2021-06-01T00:00:00Z"), at("90005", "2020-05-01T00:00:00Z")];
+    const counts = yearCounts(events, new Map([["90001", 100], ["90003", 100], ["90005", 0]]));
+    expect(counts).toEqual({ "2020": { "90001": 1 }, "2021": { "90001": 2, "90003": 1 } });
+    expect(Object.keys(counts["2021"] ?? {})).toEqual(["90001", "90003"]);
+    expect(yearCounts([], new Map())).toEqual({});
   });
 });
 

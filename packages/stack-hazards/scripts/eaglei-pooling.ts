@@ -1,14 +1,15 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { gammaPoissonLogLikelihood } from "@mark1russell7/rigor-statistics";
 import { eagleRegion } from "../src/eaglei.ts";
-import type { PoolHoldout, PoolScore } from "../src/hazard.ts";
-import { pooledRates, type AreaCount, type Observation } from "../src/priors.ts";
-import type { EaglePriors } from "./eaglei-fit.ts";
+import type { PoolHoldout, PoolScore, PoolTimeHoldout, PoolTimeScore } from "../src/hazard.ts";
+import { pooledRates, regionCounts, regionObservation, type AreaCount, type Observation } from "../src/priors.ts";
+import type { EaglePriors, YearlyCounts } from "./eaglei-fit.ts";
 
-// The gate of the pooled rates of the counties and of the states: a holdout by the thinning of the counts.
-// The record of a fit has the total events of each county, not the events of each year. Thus a holdout of the later years is not possible.
-// Each event goes to the fit half or to the score half with the chance 1/2. Each half of a Poisson count is then an independent
+// The gates of the pooled rates of the counties and of the states: a holdout by the thinning of the counts, and a holdout over time.
+// Thinning: each event goes to the fit half or to the score half with the chance 1/2. Each half of a Poisson count is then an independent
 // Poisson count with half the rate. A method fits its rates on the fit half, and the score half scores them.
+// Over time: a method fits its rates on the events of the early years, and the events of the later years score them (`timeHoldout`).
+// It needs the counts of each year, which a record of a fit before 0.6.8 does not have.
 
 /** The seed of the holdout of the committed modules. */
 export const POOL_HOLDOUT_SEED = 20261124;
@@ -39,11 +40,20 @@ function logLikelihood(count: number, years: number, rate: number): number {
 /**
  * This function gives the scores of the methods of one case on one split.
  * The default group of an area is its state (`eagleRegion`). With the states as the areas and one group for the nation, it scores the pooled state rates.
+ * The rates come from the counts of `fit` in the years of `observation`.
+ * The option `scoreYears` gives the years of the counts of `score`, for a split over time. Then only an area with years in the two halves has a score.
+ * With no option, the counts of `score` are in the years of `observation`, as in a thinning split.
  */
-export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string = eagleRegion): PoolScore {
+export function poolScore(
+  fit: Readonly<Record<string, AreaCount>>,
+  score: Readonly<Record<string, AreaCount>>,
+  observation: Observation,
+  group: (area: string) => string = eagleRegion,
+  scoreYears?: Readonly<Record<string, number>>,
+): PoolScore {
   const pooled = pooledRates(fit, observation, group);
   const areas = Object.keys(observation.years)
-    .filter((area) => (observation.years[area] ?? 0) > 0 && (observation.customers[area] ?? 0) > 0)
+    .filter((area) => (observation.years[area] ?? 0) > 0 && (observation.customers[area] ?? 0) > 0 && (scoreYears === undefined || (scoreYears[area] ?? 0) > 0))
     .sort();
   // One rate for each state: the events of its observed counties over their years.
   const totals = new Map<string, { events: number; years: number }>();
@@ -82,15 +92,16 @@ export function poolScore(fit: Readonly<Record<string, AreaCount>>, score: Reado
   }
   for (const area of areas) {
     const years = observation.years[area] ?? 0;
+    const held = scoreYears === undefined ? years : (scoreYears[area] ?? 0);
     const count = score[area]?.events ?? 0;
     const code = group(area);
     const total = totals.get(code) ?? { events: 0, years: 1 };
     const law = pooled.laws[code];
     const rate = { raw: (fit[area]?.events ?? 0) / years, pooled: pooled.rates[area]?.[0] ?? 0, state: law?.from === "nation" ? law.mean : total.events / total.years };
     for (const method of ["raw", "pooled", "state"] as const) {
-      sums[method] += logLikelihood(count, years, rate[method]);
-      squared[method] += (count - rate[method] * years) ** 2;
-      if (rate.raw > 0) seen[method] += logLikelihood(count, years, rate[method]);
+      sums[method] += logLikelihood(count, held, rate[method]);
+      squared[method] += (count - rate[method] * held) ** 2;
+      if (rate.raw > 0) seen[method] += logLikelihood(count, held, rate[method]);
     }
     if (rate.raw > 0) seen.areas += 1;
     if (rate.raw === 0 && count > 0) lost += 1;
@@ -135,4 +146,90 @@ export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEE
     cases[name] = meanScore(scores);
   }
   return { seed, rounds, cases };
+}
+
+/** The counts of the areas in one part of the years: the observation of the part and the counts of each case. */
+export interface YearPart {
+  readonly observation: Observation;
+  readonly counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>;
+}
+
+/** The two parts of a split over time, with the first and the last year of each part. */
+export interface YearSplit {
+  readonly fit: YearPart;
+  readonly score: YearPart;
+  readonly years: { readonly fit: readonly [number, number]; readonly score: readonly [number, number] };
+}
+
+/**
+ * This function splits the counts of each year at a year: the fit part has the years before it, and the score part has that year and the later years.
+ * Only an area of `observation` with years in the two parts is in the parts. Its years in a part are the calendar years of the part in which the files list it.
+ * The share of each count is 0, so a holdout over time does not score the reach.
+ * The default split is the middle of the years of the areas: with the years 2014 to 2025, the fit part has 2014 to 2019.
+ *
+ * @throws RangeError when the areas have no year, or the split leaves a part with no year
+ */
+export function splitYears(yearly: YearlyCounts, observation: Observation, split?: number): YearSplit {
+  const candidates = Object.keys(observation.years)
+    .filter((area) => (observation.years[area] ?? 0) > 0 && (observation.customers[area] ?? 0) > 0)
+    .sort();
+  const all = candidates.flatMap((area) => yearly.observed[area] ?? []);
+  if (all.length === 0) throw new RangeError("splitYears: the areas have no year.");
+  const first = all.reduce((low, year) => Math.min(low, year), Number.POSITIVE_INFINITY);
+  const last = all.reduce((high, year) => Math.max(high, year), Number.NEGATIVE_INFINITY);
+  const cut = split ?? first + Math.ceil((last - first + 1) / 2);
+  if (!(Number.isSafeInteger(cut) && cut > first && cut <= last)) throw new RangeError(`splitYears: the split ${String(cut)} leaves a part with no year of ${String(first)} to ${String(last)}.`);
+  const fitObservation = { years: {} as Record<string, number>, customers: {} as Record<string, number> };
+  const scoreObservation = { years: {} as Record<string, number>, customers: {} as Record<string, number> };
+  for (const area of candidates) {
+    const years = yearly.observed[area] ?? [];
+    const early = years.filter((year) => year < cut).length;
+    const late = years.length - early;
+    if (early === 0 || late === 0) continue;
+    const customers = observation.customers[area] ?? 0;
+    fitObservation.years[area] = early;
+    fitObservation.customers[area] = customers;
+    scoreObservation.years[area] = late;
+    scoreObservation.customers[area] = customers;
+  }
+  const fitCounts: Record<string, Record<string, AreaCount>> = {};
+  const scoreCounts: Record<string, Record<string, AreaCount>> = {};
+  for (const name of Object.keys(yearly.counts).sort()) {
+    const early = new Map<string, number>();
+    const late = new Map<string, number>();
+    for (const [year, areas] of Object.entries(yearly.counts[name] ?? {})) {
+      const part = Number(year) < cut ? early : late;
+      for (const [area, events] of Object.entries(areas)) if (fitObservation.years[area] !== undefined) part.set(area, (part.get(area) ?? 0) + events);
+    }
+    const record = (sums: ReadonlyMap<string, number>): Record<string, AreaCount> => Object.fromEntries([...sums.keys()].sort().map((area) => [area, { events: sums.get(area) ?? 0, share: 0 }]));
+    fitCounts[name] = record(early);
+    scoreCounts[name] = record(late);
+  }
+  return {
+    fit: { observation: fitObservation, counts: fitCounts },
+    score: { observation: scoreObservation, counts: scoreCounts },
+    years: { fit: [first, cut - 1], score: [cut, last] },
+  };
+}
+
+/** This function gives a part of the years with each region as one area, as `regionObservation` and `regionCounts` give it. The default region is the state. */
+export function regionPart(part: YearPart, region: (area: string) => string = eagleRegion): YearPart {
+  return {
+    observation: regionObservation(part.observation, region),
+    counts: Object.fromEntries(Object.entries(part.counts).map(([name, counts]) => [name, regionCounts(counts, part.observation, region)])),
+  };
+}
+
+/**
+ * This function gives the holdout over time of each case of a split: the rates come from the fit part, and the score part scores them (`poolScore`).
+ * The option `group` gives the group of each area, as in `poolScore`.
+ */
+export function timeHoldout(split: YearSplit, group: (area: string) => string = eagleRegion): PoolTimeHoldout {
+  const cases: Record<string, PoolTimeScore> = {};
+  for (const name of Object.keys(split.fit.counts).sort()) {
+    const { reach: _, ...score } = poolScore(split.fit.counts[name] ?? {}, split.score.counts[name] ?? {}, split.fit.observation, group, split.score.observation.years);
+    cases[name] = score;
+  }
+  const areas = Object.keys(split.fit.observation.years).filter((area) => (split.fit.observation.years[area] ?? 0) > 0 && (split.score.observation.years[area] ?? 0) > 0).length;
+  return { fit: split.years.fit, score: split.years.score, areas, cases };
 }

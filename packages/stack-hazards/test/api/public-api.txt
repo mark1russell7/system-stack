@@ -87,6 +87,8 @@ OutageTally: build/index.d.ts#OutageTally
 PoolHoldout: build/hazard.chunk.d.ts#PoolHoldout
 PoolLaw: build/hazard.chunk.d.ts#PoolLaw
 PoolScore: build/hazard.chunk.d.ts#PoolScore
+PoolTimeHoldout: build/hazard.chunk.d.ts#PoolTimeHoldout
+PoolTimeScore: build/hazard.chunk.d.ts#PoolTimeScore
 PooledRates: build/index.d.ts#PooledRates
 PriorTable: build/hazard.chunk.d.ts#PriorTable
 ReachScore: build/hazard.chunk.d.ts#ReachScore
@@ -177,6 +179,7 @@ type ClaimBasis = (typeof CLAIM_BASES)[number];
 interface CountyPooling {
   readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
   readonly holdout: PoolHoldout;
+  readonly time?: PoolTimeHoldout | undefined;
   readonly silent: {
     readonly areas: number;
     readonly expected: number;
@@ -280,6 +283,17 @@ interface PoolScore {
   };
 }
 
+### build/hazard.chunk.d.ts#PoolTimeHoldout
+interface PoolTimeHoldout {
+  readonly fit: readonly [number, number];
+  readonly score: readonly [number, number];
+  readonly areas: number;
+  readonly cases: Readonly<Record<string, PoolTimeScore>>;
+}
+
+### build/hazard.chunk.d.ts#PoolTimeScore
+type PoolTimeScore = Omit<PoolScore, "reach">;
+
 ### build/hazard.chunk.d.ts#PriorTable
 interface PriorTable {
   readonly source: string;
@@ -309,6 +323,7 @@ declare const SUPPLY_PARTS: readonly Part[];
 interface StatePooling {
   readonly laws: Readonly<Record<string, PoolLaw>>;
   readonly holdout: PoolHoldout;
+  readonly time?: PoolTimeHoldout | undefined;
 }
 
 ### build/index.d.ts#AreaCount
@@ -346,6 +361,7 @@ export interface CauseTally {
 export interface CoverageTally {
   add(count: OutageCount): void;
   years(): Map<string, number>;
+  calendar(): Map<string, number[]>;
 }
 
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS

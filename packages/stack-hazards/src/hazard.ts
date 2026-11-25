@@ -218,11 +218,30 @@ export interface PoolHoldout {
   readonly cases: Readonly<Record<string, PoolScore>>;
 }
 
+/** The scores of the methods of one case in a holdout over time. They are the scores of `PoolScore` with no score of the reach. */
+export type PoolTimeScore = Omit<PoolScore, "reach">;
+
+/**
+ * The holdout over time of each case of a fit (`scripts/eaglei-pooling.ts`). The rates come from the events of the early years, and the events of the later years score them.
+ * Only an area with years in the two parts is in the holdout. The years of an area in a part are the calendar years of the part in which the files list it.
+ */
+export interface PoolTimeHoldout {
+  /** The first year and the last year of the fit part. */
+  readonly fit: readonly [number, number];
+  /** The first year and the last year of the score part. */
+  readonly score: readonly [number, number];
+  /** The count of the areas with years in the two parts. */
+  readonly areas: number;
+  readonly cases: Readonly<Record<string, PoolTimeScore>>;
+}
+
 /** The pooling of the county rates of one fit: the law of each state in each case, and the holdout. The holdout is the gate of the pooled rates. */
 export interface CountyPooling {
   /** The law of each state with an observed county, by the code of the case and the code of the state. */
   readonly laws: Readonly<Record<string, Readonly<Record<string, PoolLaw>>>>;
   readonly holdout: PoolHoldout;
+  /** The holdout over time. A fit with no counts of each year does not have it. */
+  readonly time?: PoolTimeHoldout | undefined;
   /** The counties with no event in any case, which are not observed (`withoutSilentAreas`), and the count of such counties that the laws expect. */
   readonly silent: { readonly areas: number; readonly expected: number };
 }
@@ -235,4 +254,6 @@ export interface StatePooling {
   /** The law of the rates of the states in each case, by the code of the case. */
   readonly laws: Readonly<Record<string, PoolLaw>>;
   readonly holdout: PoolHoldout;
+  /** The holdout over time, with each state as one area. A fit with no counts of each year does not have it. */
+  readonly time?: PoolTimeHoldout | undefined;
 }

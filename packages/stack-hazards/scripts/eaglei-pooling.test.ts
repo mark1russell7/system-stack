@@ -1,7 +1,7 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { describe, expect, it } from "vitest";
 import type { AreaCount, Observation } from "../src/priors.ts";
-import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, thinCounts } from "./eaglei-pooling.ts";
+import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, thinCounts, timeHoldout } from "./eaglei-pooling.ts";
 
 // Made-up counties of the made-up states 98 and 99.
 const observation: Observation = { years: { "99001": 5, "99002": 5, "99003": 1, "98001": 5, "98002": 5 }, customers: { "99001": 10, "99002": 10, "99003": 10, "98001": 10, "98002": 10 } };
@@ -44,6 +44,57 @@ describe("poolScore", () => {
     const without = poolScore(fit, {}, only98);
     // The county 98001 adds the same term to each of the two methods.
     expect(result.pooled - without.pooled).toBeCloseTo(result.state - without.state, 12);
+  });
+});
+
+describe("poolScore with the years of the score part", () => {
+  it("scores each count in its own years, and leaves out an area with no year in the score part", () => {
+    const fit = { "99001": { events: 10, share: 0 }, "99002": { events: 5, share: 0 } };
+    const score = { "99001": { events: 4, share: 0 } };
+    // 99001 has 5 fit years and 2 score years. 99002 has no score year, so it is not scored.
+    const result = poolScore(fit, score, observation, undefined, { "99001": 2 });
+    // The raw rate of 99001 is 10 / 5 = 2 a year: 4 expected events in 2 years, and 4 events.
+    expect(result.squared.raw).toBeCloseTo(0, 12);
+    expect(result.seen.areas).toBe(1);
+    // The Poisson log-likelihood of 4 events with the mean 4.
+    expect(result.raw).toBeCloseTo(4 * Math.log(4) - 4 - Math.log(24), 12);
+    // With the same years in the two parts, the score is the thinning score.
+    expect(poolScore(fit, score, observation, undefined, observation.years)).toEqual(poolScore(fit, score, observation));
+  });
+});
+
+describe("splitYears and timeHoldout", () => {
+  const yearly = {
+    observed: { "99001": [2014, 2015, 2016, 2017], "99002": [2014, 2017], "99003": [2016, 2017], "98001": [2014, 2015] },
+    counts: { "case.a": { "2014": { "99001": 2, "99002": 1, "98001": 7 }, "2016": { "99001": 1, "99003": 3 }, "2017": { "99001": 5, "99002": 2 } } },
+  };
+  const seen: Observation = { years: { "99001": 4, "99002": 2, "99003": 2, "98001": 2 }, customers: { "99001": 10, "99002": 10, "99003": 10, "98001": 10 } };
+
+  it("fits the early half of the years and scores the later half, with only the areas in the two parts", () => {
+    const split = splitYears(yearly, seen);
+    expect(split.years).toEqual({ fit: [2014, 2015], score: [2016, 2017] });
+    // 99003 has no early year and 98001 has no late year, so they are not in the parts.
+    expect(split.fit.observation).toEqual({ years: { "99001": 2, "99002": 1 }, customers: { "99001": 10, "99002": 10 } });
+    expect(split.score.observation).toEqual({ years: { "99001": 2, "99002": 1 }, customers: { "99001": 10, "99002": 10 } });
+    expect(split.fit.counts).toEqual({ "case.a": { "99001": { events: 2, share: 0 }, "99002": { events: 1, share: 0 } } });
+    expect(split.score.counts).toEqual({ "case.a": { "99001": { events: 6, share: 0 }, "99002": { events: 2, share: 0 } } });
+    expect(splitYears(yearly, seen, 2017).years).toEqual({ fit: [2014, 2016], score: [2017, 2017] });
+    expect(() => splitYears(yearly, seen, 2014)).toThrow(RangeError);
+    expect(() => splitYears(yearly, seen, 2018)).toThrow(RangeError);
+    expect(() => splitYears({ observed: {}, counts: {} }, seen)).toThrow(RangeError);
+  });
+
+  it("gives the scores of poolScore with no reach, and a holdout of the states as areas", () => {
+    const split = splitYears(yearly, seen);
+    const holdout = timeHoldout(split);
+    expect(holdout).toMatchObject({ fit: [2014, 2015], score: [2016, 2017], areas: 2 });
+    const { reach: _, ...expected } = poolScore(split.fit.counts["case.a"] ?? {}, split.score.counts["case.a"] ?? {}, split.fit.observation, undefined, split.score.observation.years);
+    expect(holdout.cases["case.a"]).toEqual(expected);
+    const states = { ...split, fit: regionPart(split.fit), score: regionPart(split.score) };
+    expect(states.fit.counts["case.a"]).toEqual({ "99": { events: 3, share: 0 } });
+    const nation = timeHoldout(states, () => "nation");
+    expect(nation.areas).toBe(1);
+    expect(Object.keys(nation.cases)).toEqual(["case.a"]);
   });
 });
 
