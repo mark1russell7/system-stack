@@ -188,6 +188,33 @@ describe("the pooled rates of the areas", () => {
       expect(Object.keys(EAGLEI_COUNTY_POOLING.laws[name] ?? {}).length, name).toBeGreaterThanOrEqual(50);
     }
   });
+
+  // Each limit of a gate over time is the next multiple of 5% above the worst ratio of the fit of 2026-02-25 (run 45497257588).
+  it("holds the gate of the holdout over time of the counties: the early years fit, and the later years score", () => {
+    const time = EAGLEI_COUNTY_POOLING.time;
+    if (time === undefined) throw new Error("The county pooling has no holdout over time.");
+    expect(time.fit[1]).toBeLessThan(time.score[0]);
+    expect(time.areas).toBeGreaterThanOrEqual(2900);
+    const cases = Object.keys(EAGLEI_COUNTY_PRIORS.rates).sort();
+    expect(Object.keys(time.cases)).toEqual(cases);
+    let better = 0;
+    for (const name of cases) {
+      const score = time.cases[name];
+      if (score === undefined) throw new Error(`The holdout over time has no case ${name}.`);
+      // On the counties with events in the fit years, the pooled score is at most 10% under the raw score (worst 8.3%, met.heat.extreme).
+      expect(score.seen.pooled, name).toBeGreaterThanOrEqual(1.1 * score.seen.raw);
+      if (score.seen.pooled > score.seen.raw) better += 1;
+      // On these counties, the pooled score is above the score of one rate for each state in each case (the smallest gain is 8%).
+      expect(score.seen.pooled, name).toBeGreaterThan(score.seen.state);
+      // The pooled squared error is at most 5% above the raw error (worst 2.2%) and at most 10% above the state error (worst 6.2%).
+      expect(score.squared.pooled, name).toBeLessThanOrEqual(1.05 * score.squared.raw);
+      expect(score.squared.pooled, name).toBeLessThanOrEqual(1.1 * score.squared.state);
+      // Over time, one rate for each state can score better than the pooled rates: the pooled score is at most 10% under (worst 7.2%).
+      expect(score.pooled, name).toBeGreaterThanOrEqual(1.1 * score.state);
+    }
+    // The pooled rates score above the raw rates in 5 of the 6 cases. The gate is 4.
+    expect(better).toBeGreaterThanOrEqual(4);
+  });
 });
 
 describe("the pooled rates of the states", () => {
@@ -233,6 +260,27 @@ describe("the pooled rates of the states", () => {
     }
     // In some cases, the raw rates lose a state: it has no event in the fit half and events in the score half.
     expect(Object.values(EAGLEI_STATE_POOLING.holdout.cases).some((score) => score.raw === Number.NEGATIVE_INFINITY && score.lost > 0)).toBe(true);
+  });
+
+  it("holds the gate of the holdout over time of the states: the pooled score is finite and above the score of one rate for the nation", () => {
+    const time = EAGLEI_STATE_POOLING.time;
+    if (time === undefined) throw new Error("The state pooling has no holdout over time.");
+    expect(time.fit[1]).toBeLessThan(time.score[0]);
+    const cases = Object.keys(EAGLEI_STATE_PRIORS.rates).sort();
+    expect(Object.keys(time.cases)).toEqual(cases);
+    let better = 0;
+    for (const name of cases) {
+      const score = time.cases[name];
+      if (score === undefined) throw new Error(`The holdout over time has no case ${name}.`);
+      expect(Number.isFinite(score.pooled), name).toBe(true);
+      expect(score.pooled, name).toBeGreaterThan(score.state);
+      // The limits are the next multiple of 5% above the worst ratio of the fit of 2026-02-25: 0.1% for the score and 1.2% for the squared error.
+      expect(score.seen.pooled, name).toBeGreaterThanOrEqual(1.05 * score.seen.raw);
+      expect(score.squared.pooled, name).toBeLessThanOrEqual(1.05 * score.squared.raw);
+      if (score.seen.pooled > score.seen.raw) better += 1;
+    }
+    // The pooled rates score above the raw rates in 5 of the 6 cases. The gate is 4.
+    expect(better).toBeGreaterThanOrEqual(4);
   });
 });
 

@@ -212,6 +212,24 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   In each case, the pooled score is finite and higher than the score of one rate for the nation. The raw rates lose a state in 4 cases: it has no event in the fit half and events in the score half. Thus their score is `-Infinity`.
 
   On the states with events in the fit half, the pooled score is at most 0.3% under the raw score. The pooled squared error is lower in 4 cases, and at most 2.1% higher in the other 2 cases. A test holds the gate with the limits 1% and 5%.
+- Each pooling also has a holdout over time (`time`, since 0.6.8). The rates come from the early years (2014 to 2019), and the later years (2020 to 2025) score them.
+  The fit record has the events of each case in each county in each year (`priors.yearly`). A record from before 0.6.8 has no such counts, so its modules have no `time`.
+
+  The two holdouts have different limits:
+
+  - The thinning holdout puts the events of one storm in the two halves. So the fit half knows the score half, and pooled versus raw looks too good.
+  - The thinning holdout fits from half of the events of each county. The holdout over time fits from all the events of the early years.
+  - The holdout over time scores only the counties with years in the two parts: 2971 counties and 52 states in the fit of 2026-02-25. It does not score the reach.
+  - The rates go up over time: the later years have 1.07 to 3.87 times the rate of the early years. Some of this change can come from the growth of the coverage of EAGLE-I.
+    So the holdout over time also tests a change of the rates, not only the noise of the counts.
+
+  On the counties with events in the early years, the pooled score is above the raw score in 5 of the 6 cases. In the case `met.heat.extreme`, it is 8.3% under the raw score. That case has the largest change of the rate.
+  On these counties, the pooled score is above the score of one rate for each state in each case.
+  On all the counties, one rate for each state scores above the pooled rates in 4 cases, by at most 7.2%. A county with no event in the early years gets a low pooled rate, and some such counties have events later.
+
+  For the states, the pooled score is above the raw score in 5 of the 6 cases, and at most 0.1% under it in the other case. The pooled squared error is at most 1.2% above the raw error.
+
+  A test holds the gate of the holdout over time. Each limit is the next multiple of 5% above the worst ratio of the fit of 2026-02-25. The fit gives the same numbers for the same version of the dataset, so the margin is for a new version.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 - The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
