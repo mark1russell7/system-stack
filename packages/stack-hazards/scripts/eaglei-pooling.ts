@@ -1,13 +1,14 @@
 import { random } from "@mark1russell7/rigor-generators";
-import { gammaPoissonLogLikelihood } from "@mark1russell7/rigor-statistics";
+import { splitHoldout, thinUnits, type RateUnit, type ThinningScore } from "@mark1russell7/rigor-statistics";
 import { eagleRegion } from "../src/eaglei.ts";
 import type { PoolHoldout, PoolScore, PoolTimeHoldout, PoolTimeScore } from "../src/hazard.ts";
 import { pooledRates, regionCounts, regionObservation, type AreaCount, type Observation } from "../src/priors.ts";
 import type { EaglePriors, YearlyCounts } from "./eaglei-fit.ts";
 
 // The gates of the pooled rates of the counties and of the states: a holdout by the thinning of the counts, and a holdout over time.
-// Thinning: each event goes to the fit half or to the score half with the chance 1/2. Each half of a Poisson count is then an independent
-// Poisson count with half the rate. A method fits its rates on the fit half, and the score half scores them.
+// Thinning: each event goes to the fit half or to the score half with the chance 1/2 (`thinUnits` of `rigor-statistics`).
+// Each half of a Poisson count is then an independent Poisson count with half the rate. A method fits its rates on the fit half, and the score half scores them.
+// `splitHoldout` of `rigor-statistics` gives the scores of the rates of each split.
 // Over time: a method fits its rates on the events of the early years, and the events of the later years score them (`timeHoldout`).
 // It needs the counts of each year, which a record of a fit before 0.6.8 does not have.
 
@@ -17,24 +18,15 @@ export const POOL_HOLDOUT_SEED = 20261124;
 /** The number of splits of each case in the holdout of the committed modules. The mean of some splits makes the margins less noisy. */
 export const POOL_HOLDOUT_ROUNDS = 5;
 
-/** This function splits the events of each county into two halves, each event with the chance 1/2. The share of an event goes with it in proportion. */
-export function thinCounts(counts: Readonly<Record<string, AreaCount>>, draw: () => boolean): readonly [Record<string, AreaCount>, Record<string, AreaCount>] {
-  const fit: Record<string, AreaCount> = {};
-  const score: Record<string, AreaCount> = {};
-  for (const area of Object.keys(counts).sort()) {
-    const { events, share } = counts[area] as AreaCount;
-    let kept = 0;
-    for (let k = 0; k < events; k++) if (draw()) kept += 1;
-    const each = events > 0 ? share / events : 0;
-    fit[area] = { events: kept, share: each * kept };
-    score[area] = { events: events - kept, share: each * (events - kept) };
-  }
-  return [fit, score];
+/** A county as a unit of a split: its events, its years and the mean share of its events. Each half of a split keeps the mean share. */
+interface AreaUnit extends RateUnit {
+  readonly area: string;
+  readonly each: number;
 }
 
-/** The Poisson log-likelihood of a count in its years, with a rate of events in one year. */
-function logLikelihood(count: number, years: number, rate: number): number {
-  return gammaPoissonLogLikelihood([{ count, exposure: years }], Number.POSITIVE_INFINITY, rate);
+/** This function gives the counts of the areas of the units of one half of a split. The share of an area is its events times their mean share. */
+function unitCounts(units: readonly AreaUnit[]): Record<string, AreaCount> {
+  return Object.fromEntries(units.map((unit) => [unit.area, { events: unit.count, share: unit.each * unit.count }]));
 }
 
 /**
@@ -63,10 +55,6 @@ export function poolScore(
     total.years += observation.years[area] ?? 0;
     totals.set(group(area), total);
   }
-  const sums = { raw: 0, pooled: 0, state: 0 };
-  const squared = { raw: 0, pooled: 0, state: 0 };
-  const seen = { raw: 0, pooled: 0, state: 0, areas: 0 };
-  let lost = 0;
   // The events-weighted reach of each state in the fit half, and of all states for a state with no event.
   const shares = new Map<string, { share: number; events: number }>();
   for (const area of areas) {
@@ -90,23 +78,33 @@ export function poolScore(
     }
     reach.areas += 1;
   }
+  // The rate of each area in each method, from the fit half. The score half scores them in the years of the score part.
+  const rates = { raw: [] as number[], pooled: [] as number[], state: [] as number[] };
   for (const area of areas) {
-    const years = observation.years[area] ?? 0;
-    const held = scoreYears === undefined ? years : (scoreYears[area] ?? 0);
-    const count = score[area]?.events ?? 0;
     const code = group(area);
     const total = totals.get(code) ?? { events: 0, years: 1 };
     const law = pooled.laws[code];
-    const rate = { raw: (fit[area]?.events ?? 0) / years, pooled: pooled.rates[area]?.[0] ?? 0, state: law?.from === "nation" ? law.mean : total.events / total.years };
-    for (const method of ["raw", "pooled", "state"] as const) {
-      sums[method] += logLikelihood(count, held, rate[method]);
-      squared[method] += (count - rate[method] * held) ** 2;
-      if (rate.raw > 0) seen[method] += logLikelihood(count, held, rate[method]);
-    }
-    if (rate.raw > 0) seen.areas += 1;
-    if (rate.raw === 0 && count > 0) lost += 1;
+    rates.raw.push((fit[area]?.events ?? 0) / (observation.years[area] ?? 0));
+    rates.pooled.push(pooled.rates[area]?.[0] ?? 0);
+    rates.state.push(law?.from === "nation" ? law.mean : total.events / total.years);
   }
-  return { ...sums, lost, squared, seen, reach };
+  if (areas.length === 0) return { raw: 0, pooled: 0, state: 0, lost: 0, squared: { raw: 0, pooled: 0, state: 0 }, seen: { raw: 0, pooled: 0, state: 0, areas: 0 }, reach };
+  const held = splitHoldout(
+    areas.map((area) => ({ count: fit[area]?.events ?? 0, exposure: observation.years[area] ?? 0 })),
+    areas.map((area) => ({ count: score[area]?.events ?? 0, exposure: scoreYears === undefined ? (observation.years[area] ?? 0) : (scoreYears[area] ?? 0) })),
+    { raw: () => rates.raw, pooled: () => rates.pooled, state: () => rates.state },
+  );
+  const { raw, pooled: pool, state } = held.methods as Readonly<Record<"raw" | "pooled" | "state", ThinningScore>>;
+  return {
+    raw: raw.logLikelihood,
+    pooled: pool.logLikelihood,
+    state: state.logLikelihood,
+    // A county with no event in the fit half has the raw rate 0. Thus only the raw rates lose a county.
+    lost: raw.lost,
+    squared: { raw: raw.squared, pooled: pool.squared, state: state.squared },
+    seen: { raw: raw.seen, pooled: pool.seen, state: state.seen, areas: held.seenUnits },
+    reach,
+  };
 }
 
 /** The mean of some scores. */
@@ -138,10 +136,18 @@ export function poolHoldout(priors: EaglePriors, seed: number = POOL_HOLDOUT_SEE
   const cases: Record<string, PoolScore> = {};
   for (const name of Object.keys(priors.counts).sort()) {
     const stream = draws.fork(name);
+    const counts = priors.counts[name] ?? {};
+    // The units in the order of the codes. The draws go in the order of the units, and then in the order of the events.
+    const units: AreaUnit[] = Object.keys(counts)
+      .sort()
+      .map((area) => {
+        const { events, share } = counts[area] as AreaCount;
+        return { area, count: events, exposure: priors.observation.years[area] ?? 0, each: events > 0 ? share / events : 0 };
+      });
     const scores: PoolScore[] = [];
     for (let round = 0; round < rounds; round++) {
-      const [fit, score] = thinCounts(priors.counts[name] ?? {}, () => stream.chance(0.5));
-      scores.push(poolScore(fit, score, priors.observation, group));
+      const [fit, score] = thinUnits(units, () => stream.chance(0.5));
+      scores.push(poolScore(unitCounts(fit), unitCounts(score), priors.observation, group));
     }
     cases[name] = meanScore(scores);
   }

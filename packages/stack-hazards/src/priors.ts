@@ -1,5 +1,5 @@
 import { isRecord } from "@mark1russell7/optional/read";
-import { fitGammaRates, pooledRate } from "@mark1russell7/rigor-statistics";
+import { fitTwoLevelGammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
 import type { Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
 import type { HazardList, PoolLaw, PriorTable } from "./hazard.ts";
@@ -151,8 +151,9 @@ export interface PooledRates {
 /**
  * This function gives a pooled rate of each area toward the areas of its group, for example a county toward the counties of its state.
  *
- * - The fit of each group is the gamma-Poisson law of the events of its observed areas in their years (`fitGammaRates`).
- * - `perYear` of an area is the mean of its rate after its count (`pooledRate`). An area with few years gets a rate near the mean of its group.
+ * - The fit is the two-level gamma-Poisson fit of the events of the observed areas in their years (`fitTwoLevelGammaRates` of `rigor-statistics`).
+ * - Each group gets the gamma law of the rates of its areas. `perYear` of an area is the mean of its rate after its count.
+ *   An area with few years gets a rate near the mean of its group.
  * - `reach` of an area with events is the mean peak share of its events, as in `regionRates`. An area with no event gets the plain mean of the reach of the areas of its group with events.
  *   The plain mean gives each area one weight. A mean over the events gives more weight to the areas with many events, and their events reach a smaller share.
  * - A group with no event gets the shape `Infinity` and its pooled mean toward all groups. That fit has the events of each group in the years of its areas.
@@ -164,43 +165,39 @@ export interface PooledRates {
  * @param group - This function gives the code of the group of an area, for example `eagleRegion`
  */
 export function pooledRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string): PooledRates {
-  const members = new Map<string, string[]>();
-  for (const area of observedAreas(observation)) {
-    const code = group(area);
-    members.set(code, [...(members.get(code) ?? []), area]);
-  }
-  const rates: Record<string, readonly [number, number]> = {};
-  const laws: Record<string, PoolLaw> = {};
-  const codes = [...members.keys()].sort();
-  const unitsOf = (code: string): { count: number; exposure: number }[] =>
-    (members.get(code) ?? []).map((area) => ({ count: counts[area]?.events ?? 0, exposure: observation.years[area] ?? 0 }));
-  // The groups as units of one fit: the events of each group in the years of its areas. It gives the mean of a group with no event.
-  const groups = codes.map((code) => unitsOf(code).reduce((sum, unit) => ({ count: sum.count + unit.count, exposure: sum.exposure + unit.exposure }), { count: 0, exposure: 0 }));
-  const nation = groups.length > 0 ? fitGammaRates(groups) : { shape: Number.POSITIVE_INFINITY, mean: 0 };
+  const areas = observedAreas(observation);
+  if (areas.length === 0) return { rates: {}, laws: {} };
+  const fit = fitTwoLevelGammaRates(areas.map((area) => ({ count: counts[area]?.events ?? 0, exposure: observation.years[area] ?? 0, group: group(area) })));
   // The reach of each area with events: the mean peak share of its events. The plain mean of the reach of all areas is for a group with no event.
   const reachOf = (area: string): number | undefined => {
     const count = counts[area];
     return count !== undefined && count.events > 0 ? count.share / count.events : undefined;
   };
-  const plainMean = (areas: readonly string[]): number => {
-    const reaches = areas.map(reachOf).filter((reach) => reach !== undefined);
+  const plainMean = (list: readonly string[]): number => {
+    const reaches = list.map(reachOf).filter((reach) => reach !== undefined);
     return reaches.length > 0 ? reaches.reduce((sum, reach) => sum + reach, 0) / reaches.length : 0;
   };
+  const members = new Map<string, string[]>();
+  for (const area of areas) {
+    const list = members.get(group(area)) ?? [];
+    list.push(area);
+    members.set(group(area), list);
+  }
+  const codes = [...members.keys()].sort();
   const allReach = plainMean(codes.flatMap((code) => members.get(code) ?? []));
-  codes.forEach((code, position) => {
-    const areas = members.get(code) ?? [];
-    const units = unitsOf(code);
-    const events = units.reduce((sum, unit) => sum + unit.count, 0);
-    const law = events > 0 ? fitGammaRates(units) : { shape: Number.POSITIVE_INFINITY, mean: pooledRate(groups[position] as { count: number; exposure: number }, nation) };
-    const groupReach = events > 0 ? plainMean(areas) : allReach;
-    laws[code] = { shape: law.shape, mean: law.mean, areas: areas.length, events, from: events > 0 ? "group" : "nation" };
-    areas.forEach((area, index) => {
-      const perYear = pooledRate(units[index] as { count: number; exposure: number }, law);
-      if (!(perYear > 0)) return;
-      rates[area] = [perYear, Math.min(1, reachOf(area) ?? groupReach)];
-    });
+  const laws: Record<string, PoolLaw> = {};
+  const reaches = new Map<string, number>();
+  for (const code of codes) {
+    const law = fit.laws[code] as GroupLaw;
+    laws[code] = { shape: law.shape, mean: law.mean, areas: law.units, events: law.count, from: law.from === "group" ? "group" : "nation" };
+    reaches.set(code, law.count > 0 ? plainMean(members.get(code) ?? []) : allReach);
+  }
+  const rates: Record<string, readonly [number, number]> = {};
+  areas.forEach((area, index) => {
+    const perYear = fit.rates[index] ?? 0;
+    if (perYear > 0) rates[area] = [perYear, Math.min(1, reachOf(area) ?? reaches.get(group(area)) ?? 0)];
   });
-  return { rates: Object.fromEntries(Object.keys(rates).sort().map((area) => [area, rates[area] as readonly [number, number]])), laws };
+  return { rates, laws };
 }
 
 /** The areas with no event in any case, and the observation without them (`withoutSilentAreas`). */
