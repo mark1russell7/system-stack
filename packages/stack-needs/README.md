@@ -221,13 +221,26 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | A heating value of the share or of the rate that is not the heating value of the fuel energy | The stove time and the fuel. |
 | No cited energy of the fuel, with a rate in an energy or a share on a rate in a mass | The stove time and the fuel. |
 | A cited soak rate that does not convert to `L/kg`, for example a rate for each volume with no bulk mass | The soak water. The resource then has no converter. |
+| The quick soak (`soak: "quick"`) for a product with a cold soak and no quick soak | The soak water, the stove time and the fuel. The model does not take the cold soak in its place. |
+| No soak (`soak: "none"`) for a product with a cited soak and no `unsoakedTime` | The stove time and the fuel. The cook time of the food with no soak has no source. |
 | No food energy of the product | The energy. |
 | A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
 
 A dry resource with a no read in a line has no converter. It is in `noReads`, and `read` is false. Two products of the list can give one dry resource, for example rice and oats. The converter then takes the worst case of their lines: the most water, the most fuel and the least energy.
 
-The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water: the market fact `usda.refried-beans-soak` cites the USDA recipe, which tells to discard it. Thus the soak adds to the water take, and it adds no heat and no fuel.
+The water take of a pot is the cook water and the soak water. The cook discards the soak water: the market fact `usda.refried-beans-soak` cites the USDA recipe, which tells to discard it. Thus the soak adds to the water take.
 For example, the dry beans of the catalog take 3.65 L/kg of soak water and 3.65 L/kg of cook water. A product with no cited soak takes no soak water.
+
+The input `soak` gives the soak method of the buy list. Since 0.10.5. The line of a quick soak or of no soak tells the method in `soakMethod`.
+
+| `soak` | The soak water | The heat and the fuel of the soak | The cook time |
+| --- | --- | --- | --- |
+| `cold` (the default) | `soakWater` of market | None. The soak is cold. | `time` |
+| `quick` | `quickSoakWater` of market | The heat to boil the soak water and the dry food from the start temperature (`soakHeat`), with the rule of the cook water. The boil fuel of that heat, and the full rate for the high end of the boil span (`quickSoak.boil`). The stand time is off the heat, so it takes no fuel. | `time` |
+| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. |
+
+The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater` with each method.
+The fuel of the quick soak also adds to each end of `fuelSpread`.
 
 The cook water and the drinking water are one store, `water.stored`. A cook can use tap water. The subset converter of `householdFragment` also gives the bottled water of the buy list as `water.stored`, so a cook takes the two. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
 `jointDays` of `@mark1russell7/stack-endurance` gives the joint answer: the days that the drink and the cook hold together, with the best share of the water.

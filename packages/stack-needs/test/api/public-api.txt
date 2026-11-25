@@ -128,6 +128,7 @@ STORE_BRAND_INFANT_SOURCE: build/index.d.ts#STORE_BRAND_INFANT_SOURCE
 STORE_BRAND_LABEL: build/index.d.ts#STORE_BRAND_LABEL
 SUNRISE_EQUATION_SOURCE: build/index.d.ts#SUNRISE_EQUATION_SOURCE
 SUN_POSITION_SOURCE: build/index.d.ts#SUN_POSITION_SOURCE
+SoakMethod: build/index.d.ts#SoakMethod
 StoveShare: build/index.d.ts#StoveShare
 SubsetConverter: build/index.d.ts#SubsetConverter
 THERMAL_TRANSMITTANCE_SOURCE: build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
@@ -365,6 +366,7 @@ export interface CookFragmentInput {
   readonly batch: Quantity;
   readonly share?: StoveShare | undefined;
   readonly start?: CookStart | undefined;
+  readonly soak?: SoakMethod | undefined;
   readonly device?: string | undefined;
   readonly prefix?: string | undefined;
 }
@@ -384,6 +386,8 @@ export interface CookLine {
   readonly energy: CookRead;
   readonly water: CookRead;
   readonly soak: CookRead;
+  readonly soakMethod?: "quick" | "none" | undefined;
+  readonly soakHeat?: CookRead | undefined;
   readonly heat: CookRead;
   readonly minutes: CookRead;
   readonly fuel: CookRead;
@@ -912,6 +916,9 @@ export declare const SUNRISE_EQUATION_SOURCE: Source;
 
 ### build/index.d.ts#SUN_POSITION_SOURCE
 export declare const SUN_POSITION_SOURCE: Source;
+
+### build/index.d.ts#SoakMethod
+export type SoakMethod = "cold" | "quick" | "none";
 
 ### build/index.d.ts#StoveShare
 export interface StoveShare {

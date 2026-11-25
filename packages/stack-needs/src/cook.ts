@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, soakWater, type CitedRate, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, quickSoakWater, soakWater, type CitedRate, type CitedSpan, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -148,6 +148,14 @@ export interface StoveShare {
   readonly cite: string;
 }
 
+/**
+ * The soak method of the dry food. Since 0.10.5.
+ * - `cold`: the cold soak, `soak` of market. The soak water gets no heat and no fuel.
+ * - `quick`: the quick soak, `quickSoak` of market. The soak water boils for its cited boil time, then the food stands off the heat.
+ * - `none`: no soak. The cook time is `unsoakedTime` of market.
+ */
+export type SoakMethod = "cold" | "quick" | "none";
+
 /** The inputs of the cook fragment. */
 export interface CookFragmentInput {
   /** The catalog of supplies of `@mark1russell7/market`. */
@@ -168,6 +176,11 @@ export interface CookFragmentInput {
   readonly share?: StoveShare | undefined;
   /** The start temperature of the cook water. The default is `COLD_START_CELSIUS`. */
   readonly start?: CookStart | undefined;
+  /**
+   * The soak method of each dry food of the buy list. The default is `cold`, which gives the same lines as before 0.10.5. Since 0.10.5.
+   * A product with no cited soak, cold or quick, takes no soak with each method.
+   */
+  readonly soak?: SoakMethod | undefined;
   /** The `id` of the stove in the stack. The converters stop when the stove stops. */
   readonly device?: string | undefined;
   /** The start of the `id` of each converter. The default is `cook`. */
@@ -187,13 +200,31 @@ export interface CookLine {
   /** The cook water, in `L/kg` of dry food, from `cookWater` of market. */
   readonly water: CookRead;
   /**
-   * The soak water, in `L/kg` of dry food, from `soakWater` of market. The cook discards it, so it gets no heat and no fuel.
-   * A product with no cited soak has 0. A cited soak that does not convert to `L/kg` is a no read.
+   * The soak water, in `L/kg` of dry food. The cook discards it. The water comes from the soak method (`soakMethod`):
+   * - The cold soak (the default) takes `soakWater` of market. That water gets no heat and no fuel.
+   * - The quick soak takes `quickSoakWater` of market. That water gets heat and fuel (`soakHeat`). Since 0.10.5.
+   * - With no soak, the line has 0. Since 0.10.5.
+   *
+   * A product with no cited soak, cold or quick, has 0. A cited soak that does not convert to `L/kg` is a no read.
+   * A product with a cold soak and no quick soak is a no read of the quick soak.
    */
   readonly soak: CookRead;
+  /**
+   * The soak method of the line, `quick` or `none`. A line of the cold soak, the default, has no field. Since 0.10.5.
+   */
+  readonly soakMethod?: "quick" | "none" | undefined;
+  /**
+   * The heat to boil the quick soak water and the dry food of one pot, in `kJ`. Only a line of the quick soak has the field. Since 0.10.5.
+   * A product with no cited soak has 0.
+   */
+  readonly soakHeat?: CookRead | undefined;
   /** The heat to boil the cook water of one pot, in `kJ`. */
   readonly heat: CookRead;
-  /** The time of the stove for one pot: the boil time and the high end of the cook time, in `min`. */
+  /**
+   * The time of the stove for one pot: the boil time and the high end of the cook time, in `min`.
+   * With the quick soak, it also has the boil time of the soak water and the high end of its boil span. The stand time is off the stove.
+   * With no soak, the cook time of a soaked food is `unsoakedTime` of market.
+   */
   readonly minutes: CookRead;
   /** The fuel of one pot, in `kg`. */
   readonly fuel: CookRead;
@@ -346,6 +377,7 @@ interface StoveContext {
   readonly startC: number;
   /** The energy of the fuel in `kJ/kg`, and its heating value, or `undefined` when the fuel has no cited energy. */
   readonly fuelEnergy: { readonly perKg: number; readonly heating: HeatingValue } | undefined;
+  readonly method: SoakMethod;
 }
 
 /**
@@ -356,7 +388,7 @@ interface StoveContext {
  * A boil fuel from an adverse factor is an estimate (`yieldHeat`), so that fuel is not a proven upper limit.
  */
 function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
-  const { stove, batchKg, share, startC, fuelEnergy } = context;
+  const { stove, batchKg, share, startC, fuelEnergy, method } = context;
 
   let energy: CookRead;
   if (foodGifts > 1) energy = noRead(`The product ${product.id} gives ${String(foodGifts)} foods. The catalog gives one energy for the whole product, not the energy of each food.`);
@@ -371,24 +403,64 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
 
   const litres = cookWater(product);
   const water = litres === undefined ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`) : read(valueIn(litres, "L/kg"), "L/kg");
-  // The soak water. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
-  const soakLitres = product.cook?.soak === undefined ? undefined : soakWater(product);
-  const soak =
-    product.cook?.soak === undefined
-      ? read(0, "L/kg")
-      : soakLitres === undefined
-        ? noRead(`The soak water of the product ${product.id} does not convert to L/kg. A rate for each volume needs a bulk mass.`)
-        : read(valueIn(soakLitres, "L/kg"), "L/kg");
+  // The soak water of the soak method. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
+  const facts = product.cook;
+  const soaked = facts?.soak !== undefined || facts?.quickSoak !== undefined;
+  const quickSoak = method === "quick" ? facts?.quickSoak : undefined;
+  let soak: CookRead;
+  if (method === "cold") {
+    const soakLitres = facts?.soak === undefined ? undefined : soakWater(product);
+    soak =
+      facts?.soak === undefined
+        ? read(0, "L/kg")
+        : soakLitres === undefined
+          ? noRead(`The soak water of the product ${product.id} does not convert to L/kg. A rate for each volume needs a bulk mass.`)
+          : read(valueIn(soakLitres, "L/kg"), "L/kg");
+  } else if (method === "none" || !soaked) soak = read(0, "L/kg");
+  else if (quickSoak === undefined)
+    soak = noRead(`The product ${product.id} cites a cold soak and no quick soak. The cold soak gives no water and no boil time for the quick soak.`);
+  else {
+    const quickLitres = quickSoakWater(product);
+    soak = quickLitres === undefined ? noRead(`The quick soak water of the product ${product.id} does not convert to L/kg. A rate for each volume needs a bulk mass.`) : read(valueIn(quickLitres, "L/kg"), "L/kg");
+  }
 
   // The heat to boil one pot: the mass of the water and the dry food times the specific heat of water times the rise to the boil.
   const heat = water.read ? read((water.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ") : noRead(`The heat to boil is a no read: ${water.why}`);
+  // The heat to boil the quick soak water, with the same rule. The dry food is in the soak water, so the mass also has the dry food.
+  let soakHeat: CookRead | undefined;
+  if (method === "quick") {
+    if (!soak.read) soakHeat = noRead(`The heat of the quick soak is a no read: ${soak.why}`);
+    else if (quickSoak === undefined) soakHeat = read(0, "kJ");
+    else soakHeat = read((soak.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ");
+  }
+  // The fields of the soak method. A line of the cold soak has none, so its shape stays as before 0.10.5.
+  const methodFields = method === "cold" ? {} : { soakMethod: method, ...(soakHeat === undefined ? {} : { soakHeat }) };
 
   const why: string[] = [];
   if (!heat.read) why.push(heat.why);
-  const time = product.cook?.time;
+  if (soakHeat !== undefined && !soakHeat.read) why.push(soakHeat.why);
+  // The boil time of the quick soak: the high end of its span, as for the cook time. The stand time is off the heat, so it takes no fuel.
+  let soakBoilMin = 0;
+  if (quickSoak !== undefined) {
+    // The check of the field stays, because a catalog of a caller can have a bad value.
+    const boil = quickSoak.boil as CitedSpan | undefined;
+    const boilMin = boil === undefined ? undefined : inUnit(boil.high, boil.unit, "min");
+    if (boil === undefined) why.push(`The quick soak of the product ${product.id} has no cited boil time.`);
+    else if (boilMin === undefined || !(boilMin >= 0)) why.push(`The boil time of the quick soak of the product ${product.id} is ${String(boil.high)} ${boil.unit}, which is not a time of 0 min or more.`);
+    else soakBoilMin = boilMin;
+  }
+  // With no soak, a soaked food cooks for its unsoaked time. A food with no soak facts keeps its one cook time.
+  const unsoaked = method === "none" && soaked;
+  const time = unsoaked ? facts?.unsoakedTime : facts?.time;
+  const timeName = unsoaked ? "unsoaked cook time" : "cook time";
   const cookMin = time === undefined ? undefined : inUnit(time.high, time.unit, "min");
-  if (time === undefined) why.push(`The catalog cites no cook time for the product ${product.id}.`);
-  else if (cookMin === undefined) why.push(`The cook time of the product ${product.id} is in ${time.unit}, which does not convert to min.`);
+  if (time === undefined)
+    why.push(
+      unsoaked
+        ? `The product ${product.id} cites a soak and no unsoaked cook time. The cook time of the food with no soak has no source.`
+        : `The catalog cites no cook time for the product ${product.id}.`,
+    );
+  else if (cookMin === undefined) why.push(`The ${timeName} of the product ${product.id} is in ${time.unit}, which does not convert to min.`);
 
   // Only a rate with no bound is the value. A least rate gives too little fuel for the cook time, and an unknown bound has no side.
   const bound: unknown = stove.rate !== undefined && "bound" in stove.rate ? stove.rate.bound : undefined;
@@ -428,25 +500,32 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
 
   if (why.length > 0 || !heat.read || cookMin === undefined || fuelPerMin === undefined || !(fuelPerMin > 0)) {
     const text = why.join(" ");
-    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text) };
+    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text), ...methodFields };
   }
   // The boil fuel in kg: from the share, the boil time at the full rate; from the yield, the heat over the heat of 1 kg of fuel.
-  const shareFuels = potPerMin !== undefined && potPerMin > 0 ? [(heat.value / potPerMin) * fuelPerMin] : [];
+  const shareFuelsOf = (kJ: number): number[] => (potPerMin !== undefined && potPerMin > 0 ? [(kJ / potPerMin) * fuelPerMin] : []);
+  const shareFuels = shareFuelsOf(heat.value);
   const boilFuels = [...shareFuels, ...("perKg" in fromYield ? [heat.value / fromYield.perKg] : [])];
   // The checks above give a share above 0 or a yield with a read. The guard keeps a line with no boil fuel from a value of -Infinity.
   if (boilFuels.length === 0) {
     const text = `The fuel of the boil is a no read. ${boilWhy.join(" ")}`;
-    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text) };
+    return { product: product.id, resource, energy, water, soak, heat, minutes: noRead(text), fuel: noRead(text), ...methodFields };
   }
   const boilFuel = Math.max(...boilFuels);
-  const minutes = boilFuel / fuelPerMin + cookMin;
-  const fuel = read(boilFuel + cookMin * fuelPerMin, "kg");
+  // The fuel of the quick soak: the boil fuel of the soak heat by the same rule, and the full rate for the boil time of the soak.
+  const soakKJ = quickSoak !== undefined && soakHeat?.read === true ? soakHeat.value : 0;
+  const soakShareFuels = shareFuelsOf(soakKJ);
+  const soakBoilFuel = quickSoak === undefined ? 0 : Math.max(...soakShareFuels, ...("perKg" in fromYield ? [soakKJ / fromYield.perKg] : []));
+  const withSoak = (cook: number, soakPart: number): number => (quickSoak === undefined ? cook : cook + soakPart);
+  const minutes = withSoak(boilFuel / fuelPerMin + cookMin, soakBoilFuel / fuelPerMin + soakBoilMin);
+  const fuel = read(withSoak(boilFuel + cookMin * fuelPerMin, soakBoilFuel + soakBoilMin * fuelPerMin), "kg");
   // The fuel at each end of the typical range of the adverse factor. The share fuel stays in the most, as in the value.
   const spread = "spread" in fromYield ? fromYield.spread : undefined;
-  if (spread === undefined) return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel };
-  const potFuel = (perKg: number): number => Math.max(...shareFuels, heat.value / perKg) + cookMin * fuelPerMin;
+  if (spread === undefined) return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, ...methodFields };
+  const potFuel = (perKg: number): number =>
+    withSoak(Math.max(...shareFuels, heat.value / perKg) + cookMin * fuelPerMin, Math.max(...soakShareFuels, soakKJ / perKg) + soakBoilMin * fuelPerMin);
   const fuelSpread = { low: potFuel(spread.atLow), high: potFuel(spread.atHigh), unit: "kg" as const };
-  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, fuelSpread };
+  return { product: product.id, resource, energy, water, soak, heat, minutes: read(minutes, "min"), fuel, fuelSpread, ...methodFields };
 }
 
 /** This function gives the stove facts of the input: the facts of the caller, or the facts of a product of the catalog. */
@@ -503,8 +582,17 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * the most water, the most fuel and the least food energy. When a line of the resource has no read, the resource has no converter.
  * A store of the resource from a different fragment gets the converter of this list.
  *
- * The water take of a pot is the cook water and the soak water, from `cookWater` and `soakWater` of market. The cook discards the soak water.
- * Thus the soak adds to the water take, and it adds no heat and no fuel. A product with no cited soak takes no soak water.
+ * The water take of a pot is the cook water and the soak water. The cook discards the soak water, so the soak adds to the water take.
+ * The input `soak` gives the soak method. Since 0.10.5. A product with no cited soak, cold or quick, takes no soak water with each method.
+ * - `cold`, the default: the soak water is `soakWater` of market. It adds no heat and no fuel. The lines are the same as before 0.10.5.
+ * - `quick`: the soak water is `quickSoakWater` of market. Its heat to boil has the rule of the cook water, from the start temperature.
+ *   The fuel adds the boil fuel of that heat. It also adds the full rate for the high end of the boil span (`quickSoak.boil`).
+ *   The stand time is off the heat, so it adds no fuel.
+ * - A product with a cold soak and no quick soak gives a no read of the quick soak. It does not take the cold soak.
+ * - `none`: no soak water. A food with a cited soak, cold or quick, cooks for the high end of `unsoakedTime` of market.
+ *   Such a food with no `unsoakedTime` gives a no read, because the cook time of the food with no soak has no source.
+ *   A food with no soak facts keeps its cook time `time`. The cook water stays `cookWater` with each method.
+ *
  * A soak rate that does not convert to `L/kg` gives a no read.
  * A product that gives more than one food has no energy for each food, so its energy is a no read.
  *
@@ -519,6 +607,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * @returns The fragment, the line of each dry food and the dry resources with no converter
  * @throws RangeError when the batch is not a mass above 0, or when the share is not above 0 and up to 1
  * @throws RangeError when the start is not from 0 up to less than 100 °C
+ * @throws RangeError when the soak method is not `cold`, `quick` or `none`
  * @throws RangeError when the stove is a product with no stove facts
  * @throws RangeError when the catalog has no product of an `id` of the buy list
  * @throws RangeError when the catalog has no resource of the fuel in a unit of mass
@@ -533,6 +622,8 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   if (share !== undefined && !(share.value > 0 && share.value <= 1)) throw new RangeError(`The stove share is ${String(share.value)}. It must be above 0 and up to 1.`);
   const startC = input.start?.celsius ?? COLD_START_CELSIUS;
   if (!(startC >= 0 && startC < BOIL_CELSIUS)) throw new RangeError(`The start temperature is ${String(startC)} °C. It must be from 0 up to less than ${String(BOIL_CELSIUS)} °C.`);
+  const method = input.soak ?? "cold";
+  if (method !== "cold" && method !== "quick" && method !== "none") throw new RangeError(`The soak method is ${String(method)}. It must be cold, quick or none.`);
   const stove = stoveOf(catalog, input.stove);
   const fuel = catalog.resources.find((resource) => resource.code === stove.fuel);
   const fuelUnitPerKg = fuel === undefined ? undefined : inUnit(1, "kg", fuel.unit);
@@ -544,6 +635,7 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
     share,
     startC,
     fuelEnergy: perKg === undefined || fuel.fuelEnergy === undefined ? undefined : { perKg: valueIn(perKg, "kJ/kg"), heating: fuel.fuelEnergy.heating },
+    method,
   };
 
   const unitOf = new Map(catalog.resources.map((resource) => [resource.code, resource.unit]));
