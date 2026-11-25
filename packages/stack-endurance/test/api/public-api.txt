@@ -37,6 +37,7 @@ StopCurves: build/index.d.ts#StopCurves
 Store: build/layer.chunk.d.ts#Store
 type Survival: @mark1russell7/system-stack#Survival (external)
 YearShortfall: build/index.d.ts#YearShortfall
+bestEndurance: build/index.d.ts#bestEndurance
 caseDraws: build/index.d.ts#caseDraws
 caseShortfall: build/index.d.ts#caseShortfall
 caseStopped: build/index.d.ts#caseStopped
@@ -165,6 +166,9 @@ export interface YearShortfall extends Shortfall {
     readonly shortfall: Shortfall;
   }[];
 }
+
+### build/index.d.ts#bestEndurance
+export declare function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions): Endurance;
 
 ### build/index.d.ts#caseDraws
 export declare function caseDraws(layer: EnduranceLayer, caseCuts: CaseCuts, stoppedParts: ReadonlySet<string>): Draw[];
