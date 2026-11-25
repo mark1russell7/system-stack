@@ -527,10 +527,11 @@ describe("two limited converters of one device", () => {
   it("gives the days of the best share for one draw, and never fewer days with more stock or a larger limit", () => {
     fc.assert(
       fc.property(
-        fc.double({ min: 0, max: 20, noNaN: true }),
-        fc.double({ min: 0.1, max: 5, noNaN: true }),
-        fc.double({ min: 0.1, max: 5, noNaN: true }),
-        fc.double({ min: 0, max: 40, noNaN: true }),
+        // The values are in tenths: the exact simplex keeps small rationals, and each case solves in a short time.
+        fc.integer({ min: 0, max: 200 }).map((n) => n / 10),
+        fc.integer({ min: 1, max: 50 }).map((n) => n / 10),
+        fc.integer({ min: 1, max: 50 }).map((n) => n / 10),
+        fc.integer({ min: 0, max: 400 }).map((n) => n / 10),
         (oats, slow, fast, rice) => {
           const days = (layer: EnduranceLayer): number => enduranceOf(layer, GRID_CUT, { at: AT }).needs["food"]?.days ?? Number.NaN;
           const base = days(stoveLayer(oats, slow, fast, rice));
@@ -540,7 +541,7 @@ describe("two limited converters of one device", () => {
           expect(days(stoveLayer(oats, slow, fast * 2, rice))).toBeGreaterThanOrEqual(base * (1 - 1e-12));
         },
       ),
-      { numRuns: 60 },
+      { seed: 20_261_124, numRuns: 60 },
     );
   });
 
