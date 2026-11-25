@@ -1,7 +1,7 @@
 import { random } from "@mark1russell7/rigor-generators";
 import { thinUnits } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import type { AreaCount, Observation } from "../src/priors.ts";
+import type { Observation } from "../src/priors.ts";
 import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, timeHoldout } from "./eaglei-pooling.ts";
 
 // Made-up counties of the made-up states 98 and 99.
