@@ -295,7 +295,7 @@ export function independentStop(curves: readonly Survival[], sets: readonly (rea
   // With one group, the chance of the group is the result, with no rounding of 1 - (1 - chance).
   const [only] = groupChances;
   if (groupChances.length === 1 && only !== undefined) return curveFrom(points, only);
-  return curveFrom(points, (days) => Math.min(1, Math.max(0, 1 - groupChances.reduce((works, chanceAt) => works * (1 - chanceAt(days)), 1))));
+  return curveFrom(points, (days) => Math.min(1, Math.max(0, 1 - groupChances.reduce((works, chanceAt) => (1 - chanceAt(days)) * works, 1))));
 }
 
 /** The groups of the cuts `0` to `count - 1`: two cuts are in one group when a chain of sets joins them. Each set has its cuts in one group. */
