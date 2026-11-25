@@ -128,8 +128,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
 /** This function writes the stamp record of the timed code of a checkout to stdout and, with `--out`, to a file. */
 async function stamp(args: Record<string, string | boolean | undefined>): Promise<void> {
   const root = resolve(String(args["root"] ?? join(here, "..", "..", "..")));
-  const text = `${JSON.stringify(stampRecord(await benchStamp(root)), null, 2)}
-`;
+  const text = `${JSON.stringify(stampRecord(await benchStamp(root)), null, 2)}\n`;
   if (typeof args["out"] === "string") writeFileSync(args["out"], text);
   process.stdout.write(text);
 }
@@ -145,11 +144,8 @@ function changed(args: Record<string, string | boolean | undefined>): void {
   };
   const parts = stampChanges(readRecord(args["base"]), readRecord(args["head"]));
   const match = parts.length > 0;
-  process.stdout.write(match ? `The timed code differs: ${parts.join(", ")}. So the bench runs.
-` : "The timed code is the same. So the bench does not run.
-");
-  if (process.env["GITHUB_OUTPUT"] !== undefined) appendFileSync(process.env["GITHUB_OUTPUT"], `match=${String(match)}
-`);
+  process.stdout.write(match ? `The timed code differs: ${parts.join(", ")}. So the bench runs.\n` : "The timed code is the same. So the bench does not run.\n");
+  if (process.env["GITHUB_OUTPUT"] !== undefined) appendFileSync(process.env["GITHUB_OUTPUT"], `match=${String(match)}\n`);
 }
 
 const { positionals, values } = parseArgs({
