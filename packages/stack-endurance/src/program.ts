@@ -59,6 +59,11 @@ export function caseParts(layer: EnduranceLayer, stoppedParts: ReadonlySet<strin
   const live = (layer.converters ?? []).filter((converter) => canRun(converter, stoppedParts));
   const cooks = live.filter((converter) => needs.has(giftNeed(converter) ?? ""));
   const makers = live.filter((converter) => giftResource(converter) !== undefined);
+  return partsOf(stock, direct, cooks, makers);
+}
+
+/** This function gives the parts of a case from its stock, its direct uses, its cooks and its makers. */
+export function partsOf(stock: ReadonlyMap<string, number>, direct: readonly DirectUse[], cooks: readonly Converter[], makers: readonly Converter[]): CaseParts {
   const resources = new Set<string>([...direct.map((use) => use.resource), ...[...cooks, ...makers].flatMap((converter) => [...inputsOf(converter).keys()])]);
   for (const maker of makers) resources.add(giftResource(maker) ?? "");
   const stocked = [...resources].filter((resource) => (stock.get(resource) ?? 0) > 0).sort();

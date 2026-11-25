@@ -2,6 +2,7 @@ import { dayNumber, stopped, type Stack } from "@mark1russell7/system-stack";
 import { canRun, deviceKey, inputsOf } from "./converter.ts";
 import { largestFit, type Try } from "./fit.ts";
 import type { CaseCuts, Converter, DirectUse, Draw, Endurance, EnduranceLayer, IsoDate } from "./layer.ts";
+import { inputClosure as closureOf } from "./program.ts";
 import { bestShare } from "./share.ts";
 
 // The endurance query: the days that each draw holds when a case stops its supply.
@@ -222,14 +223,11 @@ function take(left: Map<string, number>, ways: Ways, amount: number): number {
 
 /** This function gives each resource that a need can use: the inputs of its ways, and the inputs of their makers, through each chain. */
 function inputClosure(ways: Ways): Set<string> {
-  const out = new Set<string>();
-  const queue = [...ways.direct.map((use) => use.resource), ...ways.converters.flatMap((converter) => [...inputsOf(converter).keys()])];
-  for (let resource = queue.shift(); resource !== undefined; resource = queue.shift()) {
-    if (out.has(resource)) continue;
-    out.add(resource);
-    for (const maker of ways.makers.get(resource) ?? []) queue.push(...inputsOf(maker).keys());
-  }
-  return out;
+  return closureOf(
+    ways.direct.map((use) => use.resource),
+    ways.converters,
+    [...ways.makers.values()].flat(),
+  );
 }
 
 /** The relative tolerance of a used-up resource. */
@@ -286,7 +284,7 @@ export function enduranceOf(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
     const reach = new Set([...ways.converters, ...[...closure].flatMap((resource) => makers.get(resource) ?? [])]);
     // With two limited converters of one device, the shortfall of the take order can decrease when the days increase.
     // For such a draw, a linear program gives the best share of the device-days and of the stocks.
-    const share = sharesDevice(reach) ? bestShare({ stock: before, room, direct: ways.direct, converters: ways.converters, makers, demand }) : undefined;
+    const share = sharesDevice(reach) ? bestShare({ draw, stock: before, room, direct: ways.direct, converters: ways.converters, makers: [...reach].filter((converter) => !ways.converters.includes(converter)), demand }) : undefined;
     let low: number;
     let left: Map<string, number>;
     if (share !== undefined) {
