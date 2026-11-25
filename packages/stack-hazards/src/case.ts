@@ -1,4 +1,4 @@
-import type { CaseCuts, Cut, Survival } from "@mark1russell7/system-stack";
+import { survivalAt, type CaseCuts, type Cut, type CutFollows, type FollowSide, type FollowTerm, type Survival } from "@mark1russell7/system-stack";
 import type { CitedSpan, Hazard, HazardCut, HazardList, NoLaw } from "./hazard.ts";
 
 // The bind of a hazard case to a stack: the values of `CaseCuts` of stack-endurance, with the curve of the region of the user.
@@ -42,32 +42,13 @@ export const NO_TOLD_LAW: NoLaw = { read: false, reason: "Each claim of this cut
 /** The state of a supply in a case: the cut, or no read when no source that the dataset read names the cut. */
 export type SupplyState = { readonly state: "cut"; readonly cut: HazardCut } | { readonly state: "no-read" };
 
-/** The side of a term of a dependent cut. `upper` can only make the cut longer, and `lower` can only make it shorter. Since 0.7.0. */
-export type TermSide = "upper" | "lower";
+/** The side of a term of a dependent cut: `FollowSide` of the core. Since 0.7.0. The core has the type since 0.1.13. */
+export type TermSide = FollowSide;
 
-/** A term of a dependent cut in the output of `hazardCase`: the onset or the recovery. Since 0.7.0. */
-export interface FollowTerm {
-  /** The days of the term in the curve. */
-  readonly days: number;
-  /** `true` when a cited span gives the term. */
-  readonly cited: boolean;
-  readonly side: TermSide;
-  /** The term in plain words, for example "onset not cited: 0, an upper bound". */
-  readonly says: string;
-}
+/** The terms of a dependent cut with a curve, in the output of `hazardCase`: `CutFollows` of the core. Since 0.7.0. */
+export type FollowRead = CutFollows;
 
-/** The terms of a dependent cut with a curve, in the output of `hazardCase`. Since 0.7.0. */
-export interface FollowRead {
-  /** The reference part of the cause cut. */
-  readonly part: string;
-  readonly onset: FollowTerm;
-  readonly recovery: FollowTerm;
-  /**
-   * `upper` when each term is an upper bound and the cause is a law or an upper bound. Then the curve is an upper bound of the days of the cut, for the cited spans.
-   * `none` in each other case. Then the curve is not a bound of the days of the cut.
-   */
-  readonly bound: "upper" | "none";
-}
+export type { FollowTerm };
 
 /** A cut in the output of `hazardCase`: a `Cut` of the core, with the terms of a dependent cut with a curve. Since 0.7.0. */
 export interface HazardCaseCut extends Cut {
@@ -140,7 +121,7 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
 export function followCurve(cause: Survival, onset: number, recovery: number): Survival | undefined {
   if (!(Number.isFinite(onset) && onset >= 0 && Number.isFinite(recovery) && recovery >= 0)) throw new RangeError("followCurve: the onset or the recovery is not a finite number of 0 or more.");
   const points: [number, number][] = [[0, 1]];
-  if (recovery > 0) points.push([recovery, chanceAt(cause, onset)]);
+  if (recovery > 0) points.push([recovery, survivalAt(cause, onset)]);
   for (const [day, chance] of cause) if (day > onset) points.push([day - onset + recovery, chance]);
   return points.length > 1 ? points : undefined;
 }
@@ -209,20 +190,6 @@ function followTerm(name: "onset" | "recovery", span: CitedSpan | undefined): Fo
 /** This function gives the URLs of the claims of a span. */
 function spanSources(list: HazardList, span: CitedSpan): string[] {
   return span.claims.flatMap((claim) => (claim.source === undefined ? [] : [sourceUrl(list, claim.source)]));
-}
-
-/** This function gives the chance of a curve of the core at a day. Between two points the chance is linear. After the last point it is 0. */
-function chanceAt(curve: Survival, day: number): number {
-  let previous: readonly [number, number] = [0, 1];
-  for (const point of curve) {
-    const [t1, p1] = point;
-    if (t1 >= day) {
-      const [t0, p0] = previous;
-      return t1 === t0 ? p1 : p0 + ((p1 - p0) * (day - t0)) / (t1 - t0);
-    }
-    previous = point;
-  }
-  return 0;
 }
 
 /** This function gives the regions of the option `region` as a list: no region, one region, or the list as it is. */

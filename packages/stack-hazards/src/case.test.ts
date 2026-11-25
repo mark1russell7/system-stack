@@ -1,4 +1,5 @@
 import { caseShortfall, checkEndurance, enduranceOf, SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK, stopCurves, type EnduranceLayer, type Survival } from "@mark1russell7/stack-endurance";
+import { parseEndurance } from "@mark1russell7/stack-endurance/schema";
 import { describe, expect, it } from "vitest";
 import { curveFault } from "@mark1russell7/system-stack";
 import { followCurve, hazardCase, hazardOf, NO_TOLD_LAW, supplyState, type HazardCaseOptions } from "./case.ts";
@@ -43,6 +44,14 @@ describe("a hazard case as the values of CaseCuts", () => {
     expect(cuts.filter((cut) => cut.duration !== undefined).map((cut) => cut.part)).toEqual(outage.cuts.map((cut) => cut.part));
     expect(cuts.filter((cut) => cut.follows === undefined).map((cut) => cut.part)).toEqual(["power.grid"]);
     expect(hazardCase(HAZARD_LIST, outage).cuts.every((cut) => cut.duration === undefined)).toBe(true);
+  });
+
+  it("gives a case that the schema of an endurance layer reads from JSON, with the terms of each dependent cut", () => {
+    const outage = hazardOf(HAZARD_LIST, "infra.power.outage")!;
+    const read = hazardCase(HAZARD_LIST, outage, { region: { scheme: "us-state-fips", code: "48" } });
+    expect(read.cuts.some((cut) => cut.follows !== undefined)).toBe(true);
+    const parsed = parseEndurance(JSON.parse(JSON.stringify({ ...SAMPLE_ENDURANCE, cases: [read] })));
+    expect(parsed.ok ? parsed.layer.cases?.[0]?.cuts : parsed.errors).toEqual(read.cuts);
   });
 
   it("gives the law of the nation to the grid cut of a physical attack, and a state law to a power outage, from one list of regions", () => {

@@ -73,8 +73,8 @@ describe("benchStamp", () => {
     const stamp = await benchStamp(root);
     expect(stamp.inputs).toContain(TIMED_ENTRY);
     expect(stamp.inputs).toContain("src/shortfall.ts");
-    // independentStop calls no function of system-stack. The imports of shortfall.ts from it serve other functions, so the tree shake drops them.
-    expect(stamp.inputs.filter((input) => input.includes("system-stack/src/"))).toEqual([]);
+    // independentStop calls survivalAt of the core (since system-stack 0.1.13). The other imports of shortfall.ts from the core serve other functions, so the tree shake drops them.
+    expect(stamp.inputs.filter((input) => input.includes("system-stack/src/"))).toEqual(["../system-stack/src/cuts.ts"]);
     const engines = stampRecord(stamp).engines.map((engine) => engine.replace(/@[^@]*$/, ""));
     expect(engines).toEqual(expect.arrayContaining(["@mark1russell7/collections", "@mark1russell7/rigor-bench", "@mark1russell7/rigor-generators"]));
     expect(engines).not.toContain("@mark1russell7/system-stack");

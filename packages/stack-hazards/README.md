@@ -92,6 +92,8 @@ The dependent cut occurs only when the cause lasts longer than the onset. Then i
 | `onset`, `recovery` | Each term (`FollowTerm`): its days, `cited`, its side (`upper` or `lower`) and a text, for example "recovery not cited: 0, a lower bound". |
 | `bound` | `upper` when each term is an upper bound and the cause is a law or an upper bound. Else `none`: the curve is not a bound of the days of the cut. |
 
+Since 0.7.4, the types of `follows` are the types `CutFollows`, `FollowTerm` and `FollowSide` of the core. The schema of stack-endurance reads the field, so a case of `hazardCase` goes through `parseEndurance` as JSON.
+
 Since 0.7.2, each cut with a curve also has the field `bound` of the core (`CutBound`). A cut with a law of its own has `law`. A dependent cut has the `bound` of `follows`: `upper` or `none`. Each onset is an upper bound, so no cut gets `lower`. A reader of the core record alone, for example the shortfall of stack-endurance, can thus tell a law from a curve that is no bound.
 
 The source of the cut is the source of the cause curve, and then the sources of the claims of its terms. A cause with no curve gives the dependent cut no `duration` and no field `follows`, as before 0.7.0. A chain of cuts is permitted.
@@ -237,6 +239,8 @@ The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. 
 The fit job also reads the details files of NOAA Storm Events and the zone-county file of the National Weather Service. Each is in the public domain. An outage is in a case when a storm event of the case covers its county at its start. The window starts 1 hour before the event and ends 3 hours after it. The table `STORM_CLASSES` gives the event types of each case. The match is in time and place only, so it does not prove the cause of an outage.
 
 The fit record gives the outages in a storm case and the outages in two storm cases or more (`priors.overlap`). Its field `byState` gives the two counts for each state (`us-state-fips`). Thus a reader can compare the share of each state with the share of the nation.
+
+The attack case of OE-417 and the outage case of EAGLE-I can count one outage two times. An outage that the two cases count is at most each attack event. At one customer of each state, the attack prior is at most 0.21% of the sum of the two priors. That is far below the line of 10% for a fix, so the priors keep the overcount. A test of `oe417.test.ts` holds the limit.
 
 ## The yearly priors from outage records
 

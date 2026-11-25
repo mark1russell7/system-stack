@@ -26,7 +26,7 @@ EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
 Fit: build/hazard.chunk.d.ts#Fit
 FollowRead: build/index.d.ts#FollowRead
-FollowTerm: build/index.d.ts#FollowTerm
+type FollowTerm: @mark1russell7/system-stack#FollowTerm (external)
 Follows: build/hazard.chunk.d.ts#Follows
 HAZARDS_SCHEMA: build/hazard.chunk.d.ts#HAZARDS_SCHEMA
 HAZARD_CODES: build/index.d.ts#HAZARD_CODES
@@ -423,20 +423,7 @@ export declare const EAGLE_INTERVAL = 900;
 export declare const EAGLE_SCHEME = "us-state-fips";
 
 ### build/index.d.ts#FollowRead
-export interface FollowRead {
-  readonly part: string;
-  readonly onset: FollowTerm;
-  readonly recovery: FollowTerm;
-  readonly bound: "upper" | "none";
-}
-
-### build/index.d.ts#FollowTerm
-export interface FollowTerm {
-  readonly days: number;
-  readonly cited: boolean;
-  readonly side: TermSide;
-  readonly says: string;
-}
+export type FollowRead = CutFollows;
 
 ### build/index.d.ts#HAZARD_CODES
 export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-follows", "hazards-no-law"];
@@ -764,7 +751,7 @@ export interface SurvivalOptions {
 }
 
 ### build/index.d.ts#TermSide
-export type TermSide = "upper" | "lower";
+export type TermSide = FollowSide;
 
 ### build/index.d.ts#WATER_RECOVERY
 export declare const WATER_RECOVERY: CitedSpan;
