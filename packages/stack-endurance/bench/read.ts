@@ -4,7 +4,7 @@
  * - The value of a case in a job is the median time of one call over the fresh children of its arm, in milliseconds.
  * - The limit of a case is `runLimit` of rigor-bench: the worst value of 5 jobs or more plus their spread.
  * - A CPU model with jobs of 5 runs or more in the freeze gets its own limit. Each other model of the freeze gets the ceiling: the limit over all the jobs.
- * - The noise cap is the worst A/A spread of the jobs plus the high side of their spread (`noiseCapOf`). A job above it is a no read.
+ * - The noise cap is the worst A/A spread of the jobs plus the high side of their spread (`NOISE_SPREAD`). A job above it is a no read.
  *   A CPU model with its own limit has its own noise cap. Each other model reads against the pooled noise cap (`noiseCapTable`).
  * - A job on a CPU model with no frozen value is a no read. A no read is not a pass.
  * - The gate reads the jobs of one CPU model in one run as one group. A group is beyond only when its lowest value is above the limit (`groupCases`).
@@ -12,9 +12,8 @@
  *   The group limit is `runLimit` of the lowest value of each run of the model.
  *   A group of 1 job reads against the limit of one job.
  */
-import { aaStats, CEILING_ONLY, gateOf, limitOnModel, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type RunLimit } from "@mark1russell7/rigor-bench";
+import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
-import { median } from "@mark1russell7/rigor-statistics";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 
 /** The schema of the record of one job. */
@@ -121,47 +120,31 @@ export interface FrozenLimits {
 /** The group limit of one case on one CPU model: `runLimit` of the lowest value of each run, with the run of each value. */
 export type GroupLimit = RunLimit & { readonly runs: readonly string[] };
 
-/** A noise cap: the limit of the A/A spread of a job, on a log scale, with its values (`noiseCapOf`). */
-export interface NoiseCap {
-  readonly limit: number;
-  /** The largest A/A spread of the jobs. */
-  readonly worst: number;
-  /** The median A/A spread of the jobs. */
-  readonly median: number;
-  /** The high side of the spread of the values: worst - median. */
-  readonly high: number;
-  /** The A/A spread of each job. */
-  readonly values: readonly number[];
-}
+/**
+ * A noise cap: the limit of the A/A spread of a job, on a log scale, with its values.
+ * It is `runLimit` of rigor-bench with the spread `worse-half` (`NOISE_SPREAD`). The field `spread` is the worst spread minus the median spread.
+ */
+export type NoiseCap = RunLimit;
 
 /** The noise caps of a freeze: the cap of each CPU model with jobs of `MIN_RUNS` runs or more, and the pooled cap `other`. The key of a model is its full name. */
-export type NoiseCapTable = Readonly<Record<string, NoiseCap>> & { readonly other: NoiseCap };
+export type NoiseCapTable = ModelTable<NoiseCap>;
 
 /**
- * This function gives the noise cap of the A/A spreads of 5 jobs or more. It is the worst spread plus the high side (worst - median).
- *
- * - It is `runLimit` of the spreads, with each spread under the median at the median. Thus the spreads under the median do not set the cap.
- * - `runLimit` of the raw spreads adds the low side too. With it, a job with less noise makes the cap larger.
- * - A job with less noise in place of a job under the median does not change the cap. A lower worst spread makes the cap smaller.
- *
- * @throws RangeError when there are fewer than 5 spreads, or when a spread is not finite
+ * The options of `runLimit` for a noise cap. The cap is the worst spread plus the high side (worst - median).
+ * A spread under the median does not set the cap. Thus a job with less noise does not make the cap larger. A cap needs `MIN_JOBS` spreads or more.
  */
-export function noiseCapOf(values: readonly number[]): NoiseCap {
-  if (values.length < MIN_JOBS) throw new RangeError(`A noise cap needs ${String(MIN_JOBS)} A/A spreads or more, not ${String(values.length)}.`);
-  const center = median(values);
-  const { limit, worst, spread } = runLimit(values.map((value) => Math.max(value, center)));
-  return { limit, worst, median: center, high: spread, values: [...values] };
-}
+export const NOISE_SPREAD = { spread: "worse-half", minimum: MIN_JOBS } as const;
 
 /**
  * This function gives the noise caps of the jobs of a freeze from the A/A spread of each job, in the order of the jobs.
  *
- * - Each CPU model with jobs of `MIN_RUNS` runs or more has the noise cap of the spreads of its jobs. These are the models of `modelTables`.
+ * - Each CPU model with jobs of `MIN_RUNS` runs or more has the noise cap of the spreads of its jobs (`modelTable` of rigor-bench).
  * - The entry `other` is the pooled noise cap of all the jobs. Each other model reads against it.
+ *   Its values stay in the order of the jobs, because `limitFaults` reads the spread of each job from them.
  */
 export function noiseCapTable(jobs: FrozenLimits["jobs"], spreads: readonly number[]): NoiseCapTable {
-  const models = [...modelRuns(jobs, spreads)].map(([cpu, runs]) => [cpu, noiseCapOf([...runs.values()].flat())] as const);
-  return { ...Object.fromEntries(models), other: noiseCapOf(spreads) };
+  const models = modelTable(runValues(jobs, spreads), (runs) => runLimit(runs.flat(), NOISE_SPREAD), { minimumRuns: MIN_RUNS });
+  return { ...models, other: runLimit(spreads, NOISE_SPREAD) };
 }
 
 /** The stamp of a freeze. */
@@ -254,7 +237,7 @@ function noiseCapFaults(file: FrozenLimits): string[] {
   if (spreads === undefined || spreads.length !== file.jobs.length || spreads.length < MIN_JOBS) return [`The pooled noise cap does not have an A/A spread for each of the ${String(file.jobs.length)} jobs.`];
   const again: Readonly<Record<string, NoiseCap>> = noiseCapTable(file.jobs, spreads);
   return [...new Set([...Object.keys(again), ...Object.keys(stored)])].flatMap((cpu) =>
-    JSON.stringify(stored[cpu]) === JSON.stringify(again[cpu]) ? [] : [`The noise cap of ${cpu} is not noiseCapOf the A/A spreads of its jobs.`],
+    JSON.stringify(stored[cpu]) === JSON.stringify(again[cpu]) ? [] : [`The noise cap of ${cpu} is not the noise cap of the A/A spreads of its jobs.`],
   );
 }
 
@@ -271,23 +254,18 @@ export type CaseTable = Readonly<Record<string, RunLimit>> & { readonly other: R
 export function modelTables(file: FrozenLimits): Record<string, CaseTable> {
   const tables: Record<string, CaseTable> = {};
   for (const [id, pooled] of Object.entries(file.cases)) {
-    const models = [...modelRuns(file.jobs, pooled.values)].map(([cpu, runs]) => [cpu, runLimit([...runs.values()].flat())] as const);
-    tables[id] = { ...Object.fromEntries(models), other: pooled };
+    // The pooled limit stays as the file has it: its values are in the order of the jobs.
+    tables[id] = { ...modelTable(runValues(file.jobs, pooled.values), (runs) => runLimit(runs.flat()), { minimumRuns: MIN_RUNS }), other: pooled };
   }
   return tables;
 }
 
-/** This function gives the values of each CPU model with jobs of `MIN_RUNS` runs or more, by run, in the order of the jobs. The key of a model is its full name. */
-function modelRuns(jobs: FrozenLimits["jobs"], values: readonly number[]): Map<string, Map<string, number[]>> {
-  const models = new Map<string, Map<string, number[]>>();
-  jobs.forEach((job, index) => {
+/** This function gives the value of each job with its CPU model and its run, for `modelTable` and `modelRuns` of rigor-bench. */
+function runValues(jobs: FrozenLimits["jobs"], values: readonly number[]): RunValue[] {
+  return jobs.flatMap((job, index) => {
     const value = values[index];
-    if (value === undefined || job.cpu === "other") return;
-    const runs = models.get(job.cpu) ?? new Map<string, number[]>();
-    runs.set(job.run, [...(runs.get(job.run) ?? []), value]);
-    models.set(job.cpu, runs);
+    return value === undefined ? [] : [{ model: job.cpu, run: job.run, value }];
   });
-  return new Map([...models].filter(([, runs]) => runs.size >= MIN_RUNS));
 }
 
 /**
@@ -301,7 +279,12 @@ function modelRuns(jobs: FrozenLimits["jobs"], values: readonly number[]): Map<s
 export function groupTables(jobs: FrozenLimits["jobs"], cases: Readonly<Record<string, RunLimit>>): Record<string, Record<string, GroupLimit>> {
   const tables: Record<string, Record<string, GroupLimit>> = {};
   for (const [id, pooled] of Object.entries(cases)) {
-    const models = [...modelRuns(jobs, pooled.values)].map(([cpu, runs]) => [cpu, { ...runLimit([...runs.values()].map((values) => Math.min(...values))), runs: [...runs.keys()] }] as const);
+    const values = runValues(jobs, pooled.values);
+    // modelRuns gives the runs of a model in the order of their first value. So the runs of the jobs of the model, in that order, name each group.
+    const models = [...modelRuns(values, { minimumRuns: MIN_RUNS })].map(([cpu, runs]) => {
+      const names = [...new Set(values.filter((value) => value.model === cpu).map((value) => value.run))];
+      return [cpu, { ...runLimit(runs.map((run) => Math.min(...run))), runs: names }] as const;
+    });
     tables[id] = Object.fromEntries(models);
   }
   return tables;
@@ -582,7 +565,7 @@ export function readReport(reads: readonly JobRead[], gates: readonly JobGate[],
     lines.push("", `The candidate noise caps, on a log scale (${NOISE_RULE}):`, "", "| CPU | Jobs | Median | Worst | Noise cap |", "| --- | --- | --- | --- | --- |");
     for (const [model, cap] of Object.entries(candidate.noiseCaps)) {
       const name = model === "other" ? "The pooled cap (all jobs)" : model;
-      lines.push(`| ${name} | ${String(cap.values.length)} | ${cap.median.toFixed(4)} | ${cap.worst.toFixed(4)} | ${String(cap.limit)} |`);
+      lines.push(`| ${name} | ${String(cap.values.length)} | ${(cap.worst - cap.spread).toFixed(4)} | ${cap.worst.toFixed(4)} | ${String(cap.limit)} |`);
     }
   }
   return `${lines.join("\n")}\n`;

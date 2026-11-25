@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-endurance",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Stores, draws and converters of a system stack: the days that each draw holds when a case cuts its supply, and the shortfall of each level in one year. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@mark1russell7/cue": "^2.0.0",
-    "@mark1russell7/rigor-bench": "^0.3.2",
+    "@mark1russell7/rigor-bench": "^0.3.6",
     "@mark1russell7/rigor-statistics": "^0.2.23",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.3",

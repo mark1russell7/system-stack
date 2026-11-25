@@ -277,7 +277,7 @@ importers:
         specifier: ^2.0.0
         version: 2.1.4
       '@mark1russell7/rigor-bench':
-        specifier: ^0.3.2
+        specifier: ^0.3.6
         version: 0.3.6(esbuild@0.28.2)
       '@mark1russell7/rigor-statistics':
         specifier: ^0.2.23
