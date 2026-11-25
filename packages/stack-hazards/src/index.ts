@@ -9,4 +9,5 @@ export * from "./storms.ts";
 export * from "./oe417.ts";
 export * from "./oe417-read.ts";
 export * from "./priors.ts";
+export * from "./exposure.ts";
 export { EAGLEI_NATION_CUSTOMERS, EAGLEI_STATE_POOLING, EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
