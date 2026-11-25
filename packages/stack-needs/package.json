@@ -47,7 +47,7 @@
     "@mark1russell7/quantity": "^0.4.4"
   },
   "devDependencies": {
-    "@mark1russell7/alerts": "^0.1.26",
+    "@mark1russell7/alerts": "^0.2.7",
     "@mark1russell7/cue": "^2.0.0",
     "@mark1russell7/stack-endurance": "workspace:*",
     "@mark1russell7/stack-hazards": "workspace:*",
