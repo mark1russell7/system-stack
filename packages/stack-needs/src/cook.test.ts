@@ -504,13 +504,15 @@ describe("the cook fragment", () => {
       }
     });
 
-    it("cooks a soaked food for its unsoaked time with no soak, and keeps the time of a food with no soak facts", () => {
+    it("gives a no read of the cook water with no soak for a soaked food, and keeps the time of a food with no soak facts", () => {
+      // The cited cook water is for the food after its soak. The catalog cites no cook water for the food with no soak.
       const result = cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime }), soak: "none" });
       const line = lineOf(result.lines, "test.grain-1kg");
-      expect(line.minutes.read && line.minutes.value).toBeCloseTo(HEAT / 250 + 60, 9);
-      expect(line.fuel.read && line.fuel.value).toBeCloseTo((HEAT / 250 + 60) * 0.01, 12);
+      expect(line.water.read).toBe(false);
+      if (!line.water.read) expect(line.water.why).toMatch(/no cook water for the food with no soak/);
+      expect(line.fuel.read).toBe(false);
       expect(line.soakHeat).toBeUndefined();
-      expect(waterTake(result)).toBeCloseTo(1, 12);
+      expect(result.layer.converters).toEqual([]);
       // A food with no soak facts keeps its cook time, as with the cold soak.
       const plain = lineOf(cookFragment({ ...input, soak: "none" }).lines, "test.grain-1kg");
       const { soakMethod, ...rest } = plain;

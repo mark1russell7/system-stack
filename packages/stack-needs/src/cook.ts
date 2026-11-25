@@ -401,11 +401,17 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
     else energy = read(kcal / perUnitKg, "kcal/kg");
   }
 
-  const litres = cookWater(product);
-  const water = litres === undefined ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`) : read(valueIn(litres, "L/kg"), "L/kg");
-  // The soak water of the soak method. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
   const facts = product.cook;
   const soaked = facts?.soak !== undefined || facts?.quickSoak !== undefined;
+  const litres = cookWater(product);
+  // The cited cook water of a soaked food is for the food after its soak. An unsoaked food takes up more water, so that rate is too low.
+  const water =
+    method === "none" && soaked
+      ? noRead(`The product ${product.id} cites a soak and no cook water for the food with no soak. The cook water after a soak is too low for it.`)
+      : litres === undefined
+        ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`)
+        : read(valueIn(litres, "L/kg"), "L/kg");
+  // The soak water of the soak method. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
   const quickSoak = method === "quick" ? facts?.quickSoak : undefined;
   let soak: CookRead;
   if (method === "cold") {
@@ -591,7 +597,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - A product with a cold soak and no quick soak gives a no read of the quick soak. It does not take the cold soak.
  * - `none`: no soak water. A food with a cited soak, cold or quick, cooks for the high end of `unsoakedTime` of market.
  *   Such a food with no `unsoakedTime` gives a no read, because the cook time of the food with no soak has no source.
- *   A food with no soak facts keeps its cook time `time`. The cook water stays `cookWater` with each method.
+ *   A food with a cited soak also gives a no read of the cook water. The cited cook water is for the food after its soak, and an unsoaked food takes up more water.
+ *   A food with no soak facts keeps its cook time `time` and its cook water `cookWater`.
  *
  * A soak rate that does not convert to `L/kg` gives a no read.
  * A product that gives more than one food has no energy for each food, so its energy is a no read.

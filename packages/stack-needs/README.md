@@ -223,6 +223,7 @@ Each value of a line is a read or a no read with its reasons. These facts give a
 | A cited soak rate that does not convert to `L/kg`, for example a rate for each volume with no bulk mass | The soak water. The resource then has no converter. |
 | The quick soak (`soak: "quick"`) for a product with a cold soak and no quick soak | The soak water, the stove time and the fuel. The model does not take the cold soak in its place. |
 | No soak (`soak: "none"`) for a product with a cited soak and no `unsoakedTime` | The stove time and the fuel. The cook time of the food with no soak has no source. |
+| No soak (`soak: "none"`) for a product with a cited soak | The cook water, the stove time and the fuel. The cited cook water is for the food after its soak. An unsoaked food takes up more water, so that rate is too low. The catalog cites no cook water for the food with no soak. |
 | No food energy of the product | The energy. |
 | A product that gives more than one food | The energy. The catalog gives one energy for the whole product. |
 
@@ -237,9 +238,9 @@ The input `soak` gives the soak method of the buy list. Since 0.10.5. The line o
 | --- | --- | --- | --- |
 | `cold` (the default) | `soakWater` of market | None. The soak is cold. | `time` |
 | `quick` | `quickSoakWater` of market | The heat to boil the soak water and the dry food from the start temperature (`soakHeat`), with the rule of the cook water. The boil fuel of that heat, and the full rate for the high end of the boil span (`quickSoak.boil`). The stand time is off the heat, so it takes no fuel. | `time` |
-| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. |
+| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. A food with a cited soak has a no read of its cook water. |
 
-The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater` with each method.
+The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater`, except for a soaked food with no soak.
 The fuel of the quick soak also adds to each end of `fuelSpread`.
 
 The cook water and the drinking water are one store, `water.stored`. A cook can use tap water. The subset converter of `householdFragment` also gives the bottled water of the buy list as `water.stored`, so a cook takes the two. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
