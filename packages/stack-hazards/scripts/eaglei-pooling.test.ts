@@ -1,25 +1,11 @@
 import { random } from "@mark1russell7/rigor-generators";
+import { thinUnits } from "@mark1russell7/rigor-statistics";
 import { describe, expect, it } from "vitest";
-import type { AreaCount, Observation } from "../src/priors.ts";
-import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, thinCounts, timeHoldout } from "./eaglei-pooling.ts";
+import type { Observation } from "../src/priors.ts";
+import { poolHoldout, poolScore, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, timeHoldout } from "./eaglei-pooling.ts";
 
 // Made-up counties of the made-up states 98 and 99.
 const observation: Observation = { years: { "99001": 5, "99002": 5, "99003": 1, "98001": 5, "98002": 5 }, customers: { "99001": 10, "99002": 10, "99003": 10, "98001": 10, "98002": 10 } };
-
-describe("thinCounts", () => {
-  it("puts each event in one half, with its share, and gives the same halves for the same draws", () => {
-    const counts: Record<string, AreaCount> = { "99001": { events: 40, share: 8 }, "99002": { events: 0, share: 0 } };
-    const draws = random(7);
-    const [fit, score] = thinCounts(counts, () => draws.chance(0.5));
-    expect((fit["99001"]?.events ?? 0) + (score["99001"]?.events ?? 0)).toBe(40);
-    expect((fit["99001"]?.share ?? 0) + (score["99001"]?.share ?? 0)).toBeCloseTo(8, 12);
-    expect(fit["99002"]).toEqual({ events: 0, share: 0 });
-    const again = random(7);
-    expect(thinCounts(counts, () => again.chance(0.5))).toEqual([fit, score]);
-    // All events go to the fit half when each draw is true.
-    expect(thinCounts(counts, () => true)[1]["99001"]).toEqual({ events: 0, share: 0 });
-  });
-});
 
 describe("poolScore", () => {
   it("gives -Infinity to the raw rates when a county with no event in the fit half has an event in the score half", () => {
@@ -110,9 +96,15 @@ describe("poolHoldout", () => {
     // A new case does not change the draws of the other cases.
     expect(poolHoldout({ ...priors, counts: { ...priors.counts, "case.c": {} } }).cases["case.a"]).toEqual(holdout.cases["case.a"]);
     // With one round, the score is the score of the first split of the stream of the case.
+    // Each county keeps the mean share of its events in each half.
     const stream = random(POOL_HOLDOUT_SEED).fork("case.a");
-    const [fit, score] = thinCounts(priors.counts["case.a"], () => stream.chance(0.5));
-    expect(poolHoldout(priors, POOL_HOLDOUT_SEED, 1)).toMatchObject({ rounds: 1, cases: { "case.a": poolScore(fit, score, observation) } });
+    const units = [
+      { area: "99001", count: 30, exposure: 5, each: 0.1 },
+      { area: "99003", count: 1, exposure: 1, each: 0.5 },
+    ];
+    const half = (list: readonly (typeof units)[number][]) => Object.fromEntries(list.map((unit) => [unit.area, { events: unit.count, share: unit.each * unit.count }]));
+    const [fit, score] = thinUnits(units, () => stream.chance(0.5));
+    expect(poolHoldout(priors, POOL_HOLDOUT_SEED, 1)).toMatchObject({ rounds: 1, cases: { "case.a": poolScore(half(fit), half(score), observation) } });
     expect(() => poolHoldout(priors, POOL_HOLDOUT_SEED, 0)).toThrow(/rounds/u);
   });
 });
