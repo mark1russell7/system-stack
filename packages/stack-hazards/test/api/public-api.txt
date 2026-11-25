@@ -617,6 +617,7 @@ export interface Oe417Window {
   readonly tests: readonly {
     readonly first: number;
     readonly p: number;
+    readonly exact: boolean;
   }[];
 }
 
@@ -627,6 +628,7 @@ export interface Oe417WindowOptions {
   readonly level?: number | undefined;
   readonly draws?: number | undefined;
   readonly seed?: number | string | undefined;
+  readonly method?: "draws" | "exact" | "auto" | undefined;
 }
 
 ### build/index.d.ts#Oe417Year
