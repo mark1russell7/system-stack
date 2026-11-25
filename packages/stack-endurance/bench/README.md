@@ -36,6 +36,7 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - A group blocks the run only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it. One slow machine makes one job slower, and the group stays within.
 - A group of 2 jobs or more reads against the group limit of its model (`groupTables`). It is `runLimit` of the lowest value of each run of the model in the freeze.
 - `limits.json` keeps each group limit with its runs. `limitFaults` computes each group limit again from the jobs of the file.
+- `limitFaults` finds a file that does not agree with itself. To compare the file with the records of its runs, download the records and run `node bench/main.ts read --in <folder> --limits bench/limits.json --verify`. Each job of the file must have one record with its CPU model, its values and its A/A spread (`recordFaults`).
 - One slow machine in a run of the freeze widens the limit of one job by 2 times its excess. In a run of 2 jobs or more, the group limit stays the same, because the other jobs of its run give the lowest value.
 - A lone slow job in a run of the freeze widens the group limit too, because its value is the lowest value of its run. In the current freeze, lone jobs give the highest lowest value of the EPYC 7763 at each case.
 - A group of 1 job reads against the limit of one job. Its only value is its lowest value, so its limit must hold the slow machines of the freeze.

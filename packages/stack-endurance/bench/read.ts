@@ -241,6 +241,35 @@ function noiseCapFaults(file: FrozenLimits): string[] {
   );
 }
 
+/**
+ * This function gives the faults of a file of frozen limits against the records of its jobs.
+ * - `limitFaults` computes each limit and each cap again from the values of the file. So it finds a file that does not agree with itself, but not a value that is not the value of its job.
+ * - This function finds each job of the file in the reads by its job and its run. The CPU model, the value of each case and the A/A spread of the read must be the values of the file.
+ * - A read that is not a job of the file is not a fault. The folder of the records can hold other runs.
+ * - The values are equal with no tolerance, because the freeze copies them from the reads.
+ */
+export function recordFaults(file: FrozenLimits, reads: readonly JobRead[]): string[] {
+  const faults: string[] = [];
+  const spreads = file.noiseCaps?.other?.values ?? [];
+  for (const [index, job] of file.jobs.entries()) {
+    const found = reads.filter((read) => read.job === job.job && read.run === job.run);
+    const name = `The job ${job.job} of the run ${job.run}`;
+    if (found.length !== 1) {
+      faults.push(`${name} has ${String(found.length)} records, not 1.`);
+      continue;
+    }
+    const read = found[0] as JobRead;
+    if (read.cpu !== job.cpu) faults.push(`${name} has the CPU model ${read.cpu} in its record, not ${job.cpu}.`);
+    for (const cuts of BENCH_CUTS) {
+      const id = caseId(cuts);
+      const value = read.cases.find((item) => item.case === id)?.ms;
+      if (value !== file.cases[id]?.values[index]) faults.push(`${name} has the value ${String(value)} of ${id} in its record, not ${String(file.cases[id]?.values[index])}.`);
+    }
+    if (read.aa?.spread !== spreads[index]) faults.push(`${name} has the A/A spread ${String(read.aa?.spread)} in its record, not ${String(spreads[index])}.`);
+  }
+  return faults;
+}
+
 /** The limits of one case: the limit of each CPU model with jobs of `MIN_RUNS` runs or more, and the ceiling `other`. The key of a model is its full name. */
 export type CaseTable = Readonly<Record<string, RunLimit>> & { readonly other: RunLimit };
 
