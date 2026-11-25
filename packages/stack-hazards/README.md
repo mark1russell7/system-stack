@@ -234,6 +234,8 @@ The workflow `hazards-fit` of the repository makes the curves of EAGLE-I in CI. 
 
 The fit job also reads the details files of NOAA Storm Events and the zone-county file of the National Weather Service. Each is in the public domain. An outage is in a case when a storm event of the case covers its county at its start. The window starts 1 hour before the event and ends 3 hours after it. The table `STORM_CLASSES` gives the event types of each case. The match is in time and place only, so it does not prove the cause of an outage.
 
+The fit record gives the outages in a storm case and the outages in two storm cases or more (`priors.overlap`). Its field `byState` gives the two counts for each state (`us-state-fips`). Thus a reader can compare the share of each state with the share of the nation.
+
 ## The yearly priors from outage records
 
 `HAZARD_LIST` has the table of the yearly priors of each state (`us-state-fips`) from EAGLE-I. The table of each county (`us-county-fips`) is large, so it has its own entry. Add it to the list when the user gives a county:

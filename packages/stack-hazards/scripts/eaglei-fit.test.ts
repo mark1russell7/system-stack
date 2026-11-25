@@ -279,6 +279,8 @@ describe("fitEagle", () => {
     // The one event is in a winter storm and a tornado, so the power outage, which counts the events in no storm case, has no event.
     const one = { "90001": { events: 1, share: 0.04 } };
     expect(laws.priors?.counts).toEqual({ "infra.power.outage": {}, "met.winter.storm": one, "met.heat.extreme": {}, "met.tropical.hurricane": {}, "met.flood": {}, "met.tornado": one });
+    // The one event is in two storm cases, in the state 90.
+    expect(laws.priors?.overlap).toEqual({ events: 1, multiple: 1, byState: { "90": { events: 1, multiple: 1 } } });
     expect(laws.regions).toEqual((await fitEagle(context(fake(article()).transport), { now: () => new Date() })).regions);
   });
 
@@ -349,12 +351,33 @@ describe("yearCounts", () => {
 });
 
 describe("caseOverlap", () => {
+  const event = (area: string, start: number): OutageEvent => ({ area, start, seconds: 900, peak: 10, censored: false });
+
   it("counts each outage of the storm cases one time, and the outages in two cases or more", () => {
-    const [a, b, c] = [{}, {}, {}] as unknown as OutageEvent[];
-    if (a === undefined || b === undefined || c === undefined) throw new Error("No events.");
+    const [a, b, c] = [event("90001", 0), event("90001", 900), event("90003", 0)];
     // The outage b is in three cases. An outage two times in one list counts one time in that case.
-    expect(caseOverlap([[a, b], [b, c], [b, b]])).toEqual({ events: 3, multiple: 1 });
-    expect(caseOverlap([[a], [c]])).toEqual({ events: 2, multiple: 0 });
-    expect(caseOverlap([])).toEqual({ events: 0, multiple: 0 });
+    expect(caseOverlap([[a, b], [b, c], [b, b]])).toMatchObject({ events: 3, multiple: 1 });
+    expect(caseOverlap([[a], [c]])).toMatchObject({ events: 2, multiple: 0 });
+    expect(caseOverlap([])).toEqual({ events: 0, multiple: 0, byState: {} });
+  });
+
+  it("gives the two counts for each state, by the code of the state", () => {
+    // Two equal outages are two outages: the function counts each object of a list.
+    const [a, b, c, d, e] = [event("12086", 0), event("12011", 0), event("48201", 0), event("01001", 0), event("12086", 0)];
+    const overlap = caseOverlap([[a, b, c], [a, c, d], [e]]);
+    expect(overlap).toEqual({ events: 5, multiple: 2, byState: { "01": { events: 1, multiple: 0 }, "12": { events: 3, multiple: 1 }, "48": { events: 1, multiple: 1 } } });
+    // A JavaScript record puts an integer key ("12") before a key with a leading zero ("01"), so the test compares the set of the keys.
+    expect(Object.keys(overlap.byState ?? {}).sort()).toEqual(["01", "12", "48"]);
+    // The sums over the states are the counts of the nation.
+    const states = Object.values(overlap.byState ?? {});
+    expect(states.reduce((sum, state) => sum + state.events, 0)).toBe(overlap.events);
+    expect(states.reduce((sum, state) => sum + state.multiple, 0)).toBe(overlap.multiple);
+  });
+
+  it("takes the state of a county from the option, and does not change the lists", () => {
+    const lists = [[event("90001", 0), event("90002", 0)], [event("80001", 0)]];
+    const copy = structuredClone(lists);
+    expect(caseOverlap(lists, (area) => (area.startsWith("9") ? "north" : "south")).byState).toEqual({ north: { events: 2, multiple: 0 }, south: { events: 1, multiple: 0 } });
+    expect(lists).toEqual(copy);
   });
 });
