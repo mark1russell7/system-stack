@@ -79,6 +79,7 @@ readLayer: @mark1russell7/coeval/layers#readLayer (external)
 smallestStop: build/index.d.ts#smallestStop
 stopSets: build/index.d.ts#stopSets
 stopped: build/index.d.ts#stopped
+survivalAt: build/index.d.ts#survivalAt
 weakestBound: build/index.d.ts#weakestBound
 working: build/index.d.ts#working
 works: build/index.d.ts#works
@@ -255,6 +256,9 @@ export declare function stopSets(stack: Stack, part: string, options?: StopOptio
 
 ### build/index.d.ts#stopped
 export declare function stopped(stack: Stack, down: Iterable<string>): string[];
+
+### build/index.d.ts#survivalAt
+export declare function survivalAt(curve: Survival, days: number): number;
 
 ### build/index.d.ts#weakestBound
 export declare function weakestBound(bounds: Iterable<CutBound>): CutBound;

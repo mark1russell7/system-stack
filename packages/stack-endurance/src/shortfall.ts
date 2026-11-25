@@ -1,26 +1,13 @@
 import { type OrderedRing, pathSetReliability, stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { DEFAULT_MAX_SETS, neededParts, weakestBound, type CutBound, type PathOptions } from "@mark1russell7/system-stack";
+import { DEFAULT_MAX_SETS, neededParts, survivalAt, weakestBound, type CutBound, type PathOptions } from "@mark1russell7/system-stack";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 import { stackStops } from "./stops.ts";
 
 // The shortfall: the user-days in which a draw does not get its need, for one case and for one year.
 
-/** This function gives the chance that a cut lasts more than `days`, linear between the points of the curve. After the last point it is 0. */
-export function survivalAt(curve: Survival, days: number): number {
-  if (days <= 0) return curve[0]?.[1] ?? 0;
-  for (let index = 1; index < curve.length; index += 1) {
-    const [t0, p0] = curve[index - 1] ?? [0, 1];
-    const [t1, p1] = curve[index] ?? [0, 0];
-    if (days < t1) {
-      // The chance stays between the chances of the two points, so a rounding does not go below the lower one.
-      const chance = p0 + (p1 - p0) * ((days - t0) / (t1 - t0));
-      return Math.min(Math.max(p0, p1), Math.max(Math.min(p0, p1), chance));
-    }
-    if (days === t1) return p1;
-  }
-  return 0;
-}
+/** The read of a curve at a time is in the core since system-stack 0.1.13. This package gives it again, so its API does not change. */
+export { survivalAt };
 
 /**
  * This function gives the expected days of a cut after a time, up to a horizon: `E[max(0, min(D, to) - from)]`.

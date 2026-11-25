@@ -1,4 +1,4 @@
-import type { CaseCuts, Cut, CutFollows, FollowSide, FollowTerm, Survival } from "@mark1russell7/system-stack";
+import { survivalAt, type CaseCuts, type Cut, type CutFollows, type FollowSide, type FollowTerm, type Survival } from "@mark1russell7/system-stack";
 import type { CitedSpan, Hazard, HazardCut, HazardList, NoLaw } from "./hazard.ts";
 
 // The bind of a hazard case to a stack: the values of `CaseCuts` of stack-endurance, with the curve of the region of the user.
@@ -121,7 +121,7 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
 export function followCurve(cause: Survival, onset: number, recovery: number): Survival | undefined {
   if (!(Number.isFinite(onset) && onset >= 0 && Number.isFinite(recovery) && recovery >= 0)) throw new RangeError("followCurve: the onset or the recovery is not a finite number of 0 or more.");
   const points: [number, number][] = [[0, 1]];
-  if (recovery > 0) points.push([recovery, chanceAt(cause, onset)]);
+  if (recovery > 0) points.push([recovery, survivalAt(cause, onset)]);
   for (const [day, chance] of cause) if (day > onset) points.push([day - onset + recovery, chance]);
   return points.length > 1 ? points : undefined;
 }
@@ -190,20 +190,6 @@ function followTerm(name: "onset" | "recovery", span: CitedSpan | undefined): Fo
 /** This function gives the URLs of the claims of a span. */
 function spanSources(list: HazardList, span: CitedSpan): string[] {
   return span.claims.flatMap((claim) => (claim.source === undefined ? [] : [sourceUrl(list, claim.source)]));
-}
-
-/** This function gives the chance of a curve of the core at a day. Between two points the chance is linear. After the last point it is 0. */
-function chanceAt(curve: Survival, day: number): number {
-  let previous: readonly [number, number] = [0, 1];
-  for (const point of curve) {
-    const [t1, p1] = point;
-    if (t1 >= day) {
-      const [t0, p0] = previous;
-      return t1 === t0 ? p1 : p0 + ((p1 - p0) * (day - t0)) / (t1 - t0);
-    }
-    previous = point;
-  }
-  return 0;
 }
 
 /** This function gives the regions of the option `region` as a list: no region, one region, or the list as it is. */

@@ -55,7 +55,7 @@ longestStop: build/index.d.ts#longestStop
 minimalStops: build/index.d.ts#minimalStops
 stopCurves: build/index.d.ts#stopCurves
 storeAmounts: build/index.d.ts#storeAmounts
-survivalAt: build/index.d.ts#survivalAt
+survivalAt: @mark1russell7/system-stack#survivalAt (external)
 survivalQuantile: build/index.d.ts#survivalQuantile
 tailDays: build/index.d.ts#tailDays
 upperStop: build/index.d.ts#upperStop
@@ -216,9 +216,6 @@ export declare function stopCurves(caseCuts: CaseCuts, draw: Draw, options?: Sto
 
 ### build/index.d.ts#storeAmounts
 export declare function storeAmounts(layer: EnduranceLayer, at: IsoDate, stoppedParts?: ReadonlySet<string>): Map<string, number>;
-
-### build/index.d.ts#survivalAt
-export declare function survivalAt(curve: Survival, days: number): number;
 
 ### build/index.d.ts#survivalQuantile
 export declare function survivalQuantile(curve: Survival, chance: number): number;

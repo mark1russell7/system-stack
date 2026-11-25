@@ -203,6 +203,7 @@ A case is an event that stops some parts at the same time, for example a winter 
 | `Survival` | The chance that a cut lasts more than a time: points `[days, chance]` from `[0, 1]` down to a chance of 0. |
 | `Prior` | The events of a case in one year in an area (`perYear`), and the share of them that reach one place (`reach`). |
 | `curveFault(curve)` | The first fault of a survival curve, or `undefined`. |
+| `survivalAt(curve, days)` | The chance that a cut lasts more than `days`, linear between the points. After the last point it is 0. stack-endurance and stack-hazards read their curves with it. Since 0.1.13. |
 | `CutBound`, `CUT_BOUNDS` | What the curve of a cut tells about the true days: `law`, `upper`, `lower` or `none`. Since 0.1.12. |
 | `cutBound(cut)` | The bound of the curve of a cut. A cut with a curve and no `bound` has a law. A cut with no curve gives `undefined`. |
 | `weakestBound(bounds)` | The weakest bound of some curves. Any `none`, or `upper` with `lower`, gives `none`. |

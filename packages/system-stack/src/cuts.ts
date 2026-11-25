@@ -147,3 +147,19 @@ export function curveFault(curve: Survival): string | undefined {
   if (curve[curve.length - 1]?.[1] !== 0) return "The curve does not end at a chance of 0.";
   return undefined;
 }
+
+/** This function gives the chance that a cut lasts more than `days`, linear between the points of the curve. After the last point it is 0. Since 0.1.13. */
+export function survivalAt(curve: Survival, days: number): number {
+  if (days <= 0) return curve[0]?.[1] ?? 0;
+  for (let index = 1; index < curve.length; index += 1) {
+    const [t0, p0] = curve[index - 1] ?? [0, 1];
+    const [t1, p1] = curve[index] ?? [0, 0];
+    if (days < t1) {
+      // The chance stays between the chances of the two points, so a rounding does not go below the lower one.
+      const chance = p0 + (p1 - p0) * ((days - t0) / (t1 - t0));
+      return Math.min(Math.max(p0, p1), Math.max(Math.min(p0, p1), chance));
+    }
+    if (days === t1) return p1;
+  }
+  return 0;
+}
