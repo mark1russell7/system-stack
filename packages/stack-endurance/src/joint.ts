@@ -1,8 +1,8 @@
-import { type Constraint, type Objective, solveLexicographic } from "@mark1russell7/linear";
+import { type Objective, solveLexicographic } from "@mark1russell7/linear";
 import { add, div, equals, mul, neg, ONE, type Rational, sign, toNumber, ZERO } from "@mark1russell7/rational";
-import { canRun, deviceKey, inputsOf } from "./converter.ts";
-import { type CaseOptions, caseDraws, caseStopped, drawDemand, giftNeed, giftResource, storeAmounts } from "./endurance.ts";
+import { type CaseOptions, caseDraws, caseStopped, drawDemand, storeAmounts } from "./endurance.ts";
 import type { CaseCuts, Converter, EnduranceLayer, IsoDate } from "./layer.ts";
+import { caseParts, deviceUse, drawBlock, fewestRow, Program, reachOf, valueAt } from "./program.ts";
 import { addTo, dense, exact, type Row } from "./rows.ts";
 
 // The joint days: the largest count of days that a set of draws holds together, with the best share of the stores.
@@ -83,156 +83,83 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
   const endless: JointDays = { ...base, days: Infinity, takes: {}, binding: [], runs: {}, capped: [] };
   if (plan.length === 0) return endless;
 
-  const direct = (layer.direct ?? []).filter((use) => planned.has(use.need) && use.amount > 0);
-  const live = (layer.converters ?? []).filter((converter) => canRun(converter, stoppedParts));
-  const cooks = live.filter((converter) => planned.has(giftNeed(converter) ?? ""));
-  const makers = live.filter((converter) => giftResource(converter) !== undefined);
-  const resources = new Set<string>([...direct.map((use) => use.resource), ...[...cooks, ...makers].flatMap((converter) => [...inputsOf(converter).keys()])]);
-  for (const maker of makers) resources.add(giftResource(maker) ?? "");
-  const stocked = [...resources].filter((resource) => (stock.get(resource) ?? 0) > 0).sort();
-
-  // The variables: the days, the take of each direct use, the runs of each converter that gives a need of the plan,
-  // and for each draw of the plan the runs of each maker and the share of each stock. The shares tell the takes of each draw.
-  let count = 0;
-  const next = (): number => count++;
-  const days = next();
-  const useCol = direct.map(next);
-  const cookCol = cooks.map(next);
-  const makerCol = plan.map(() => makers.map(next));
-  const shareCol = plan.map(() => new Map(stocked.map((resource) => [resource, next()] as const)));
-
-  const rows: { readonly row: Row; readonly relation: Constraint["relation"]; readonly rhs: Rational }[] = [];
-  plan.forEach((draw, i) => {
+  const parts = caseParts(layer, stoppedParts, stock, planned);
+  const program = new Program();
+  const days = program.next();
+  const blocks = plan.map((draw) => {
+    const block = drawBlock(program, parts, draw);
     // The need of the draw: its gifts are not less than its demand times the days.
-    const need: Row = new Map([[days, neg(exact(drawDemand(draw, caseCuts)))]]);
-    direct.forEach((use, k) => {
-      if (use.need === draw.need) addTo(need, useCol[k] as number, exact(use.amount));
-    });
-    cooks.forEach((cook, c) => {
-      if (giftNeed(cook) === draw.need) addTo(need, cookCol[c] as number, exact(cook.gives.amount));
-    });
-    rows.push({ row: need, relation: ">=", rhs: ZERO });
-    // The balance of each resource of the draw: its takes are not more than its share of the stock plus the gifts of its makers.
-    const balance = new Map<string, Row>([...resources].map((resource) => [resource, new Map()]));
-    const consume = (resource: string, index: number, amount: Rational): void => addTo(balance.get(resource) as Row, index, amount);
-    direct.forEach((use, k) => {
-      if (use.need === draw.need) consume(use.resource, useCol[k] as number, ONE);
-    });
-    cooks.forEach((cook, c) => {
-      if (giftNeed(cook) !== draw.need) return;
-      for (const [resource, each] of inputsOf(cook)) consume(resource, cookCol[c] as number, exact(each));
-    });
-    makers.forEach((maker, m) => {
-      const index = makerCol[i]?.[m] as number;
-      for (const [resource, each] of inputsOf(maker)) consume(resource, index, exact(each));
-      consume(giftResource(maker) as string, index, neg(exact(maker.gives.amount)));
-    });
-    for (const [resource, index] of shareCol[i] ?? []) consume(resource, index, neg(ONE));
-    for (const row of balance.values()) if (row.size > 0) rows.push({ row, relation: "<=", rhs: ZERO });
+    const need: Row = new Map(block.gifts);
+    addTo(need, days, neg(exact(drawDemand(draw, caseCuts))));
+    program.push(need, ">=", ZERO);
+    return block;
   });
-  // The limit of each device: one run uses `1 / perDay` of a day of one device, so the runs use `devices` times `d` device-days or less.
-  // The converters of one device share one limit. A converter with no device has a limit of its own. A limit of 0 stops the converter.
-  const runCols = new Map<Converter, readonly number[]>([
-    ...cooks.map((cook, c) => [cook, [cookCol[c] as number]] as const),
-    ...makers.map((maker, m) => [maker, makerCol.map((row) => row[m] as number)] as const),
-  ]);
-  const limits = new Map<string, { readonly row: Row; readonly converters: Converter[] }>();
-  for (const [converter, indexes] of runCols) {
-    if (converter.perDay === undefined) continue;
-    if (!(converter.perDay > 0)) {
-      for (const index of indexes) rows.push({ row: new Map([[index, ONE]]), relation: "<=", rhs: ZERO });
-      continue;
-    }
-    const key = deviceKey(converter);
-    const limit = limits.get(key) ?? { row: new Map([[days, neg(exact(converter.devices ?? 1))]]), converters: [] };
-    limits.set(key, limit);
-    limit.converters.push(converter);
-    for (const index of indexes) addTo(limit.row, index, div(ONE, exact(converter.perDay)));
+  // The limit of each device: the runs use `devices` times `d` device-days or less. A limit of 0 stops the converter.
+  const runCols = blocks.flatMap((block) => [...block.runs]);
+  const { limits, stopped } = deviceUse(runCols);
+  for (const index of stopped) program.push(new Map([[index, ONE]]), "<=", ZERO);
+  for (const limit of limits.values()) {
+    const row: Row = new Map(limit.row);
+    addTo(row, days, neg(exact(limit.devices)));
+    program.push(row, "<=", ZERO);
   }
-  for (const { row } of limits.values()) rows.push({ row, relation: "<=", rhs: ZERO });
   // The shares of each stock are not more than the stock.
-  for (const resource of stocked) {
+  for (const resource of parts.stocked) {
     const row: Row = new Map();
-    for (const shares of shareCol) addTo(row, shares.get(resource) as number, ONE);
-    rows.push({ row, relation: "<=", rhs: exact(stock.get(resource) ?? 0) });
+    for (const block of blocks) addTo(row, block.shares.get(resource) as number, ONE);
+    program.push(row, "<=", exact(stock.get(resource) ?? 0));
   }
 
-  const constraints: Constraint[] = rows.map(({ row, relation, rhs }) => ({ coefficients: dense(row, count), relation, rhs }));
   const most: Row = new Map([[days, ONE]]);
   const least: Row = new Map();
-  for (const shares of shareCol) for (const [resource, index] of shares) addTo(least, index, div(ONE, exact(stock.get(resource) ?? 1)));
-  // The third objective takes the fewest device-days: the runs over `perDay`, or the runs with no limit. Thus a converter whose inputs cost
-  // no stock does not give more runs than the plan uses, and `runs` and `capped` have one value.
-  const fewest: Row = new Map();
-  for (const [converter, indexes] of runCols) {
-    const weight = converter.perDay !== undefined && converter.perDay > 0 ? div(ONE, exact(converter.perDay)) : ONE;
-    for (const index of indexes) addTo(fewest, index, weight);
-  }
+  for (const block of blocks) for (const [resource, index] of block.shares) addTo(least, index, div(ONE, exact(stock.get(resource) ?? 1)));
+  // The third objective takes the fewest device-days. Thus a converter whose inputs cost no stock does not give more runs than the plan uses,
+  // and `runs` and `capped` have one value.
   const objectives: Objective[] = [
-    { sense: "max", coefficients: dense(most, count) },
-    { sense: "min", coefficients: dense(least, count) },
-    { sense: "min", coefficients: dense(fewest, count) },
+    { sense: "max", coefficients: dense(most, program.count) },
+    { sense: "min", coefficients: dense(least, program.count) },
+    { sense: "min", coefficients: dense(fewestRow(runCols), program.count) },
   ];
-  const solved = solveLexicographic(constraints, objectives);
+  const solved = solveLexicographic(program.constraints(), objectives);
   // The point 0 is feasible and the later objectives are not less than 0. So only an unbounded first stage has no optimum.
   if (solved.status !== "optimal") return endless;
 
   const x = solved.x;
-  const at = (index: number): Rational => x[index] ?? ZERO;
   const takes: Record<string, Record<string, number>> = {};
-  plan.forEach((draw, i) => {
+  for (const block of blocks) {
     const record: Record<string, number> = {};
-    for (const [resource, index] of shareCol[i] ?? []) if (sign(at(index)) > 0) record[resource] = toNumber(at(index));
-    takes[draw.need] = record;
-  });
-  const runs: Record<string, number> = {};
+    for (const [resource, index] of block.shares) if (sign(x[index] ?? ZERO) > 0) record[resource] = toNumber(x[index] ?? ZERO);
+    takes[block.draw.need] = record;
+  }
   // A converter gives a need or a resource, so it is a cook or a maker, not the two.
-  const ran = (converter: Converter, value: Rational): void => {
-    if (sign(value) > 0) runs[converter.id] = toNumber(value);
-  };
-  cooks.forEach((cook, c) => ran(cook, at(cookCol[c] as number)));
-  makers.forEach((maker, m) => ran(maker, makerCol.reduce((sum, row) => add(sum, at(row[m] as number)), ZERO)));
+  const total = new Map<Converter, Rational>();
+  for (const [converter, index] of runCols) total.set(converter, add(total.get(converter) ?? ZERO, x[index] ?? ZERO));
+  const runs: Record<string, number> = {};
+  for (const [converter, value] of total) if (sign(value) > 0) runs[converter.id] = toNumber(value);
 
   const withStore = new Set(layer.stores.map((store) => store.resource));
-  const closure = inputClosure(direct.map((use) => use.resource), cooks, makers);
   // The converters that the plan can use: the converters that give a need of the plan, and the makers of the resources of the closure.
-  const reach = new Set([...cooks, ...makers.filter((maker) => closure.has(giftResource(maker) ?? ""))]);
+  const { closure, reach } = reachOf(parts, planned);
   const binding = [...closure]
     .filter((resource) => withStore.has(resource))
     .filter((resource) => {
       // A resource with no live stock has no share, so its take is 0 and it is used up.
-      const taken = shareCol.reduce((sum, shares) => {
-        const index = shares.get(resource);
-        return index === undefined ? sum : add(sum, at(index));
+      const taken = blocks.reduce((sum, block) => {
+        const index = block.shares.get(resource);
+        return index === undefined ? sum : add(sum, x[index] ?? ZERO);
       }, ZERO);
       return equals(taken, exact(stock.get(resource) ?? 0));
     })
     .sort();
   const best = solved.values[0] ?? ZERO;
-  const used = (row: Row): Rational => [...row].reduce((sum, [index, value]) => add(sum, mul(value, at(index))), ZERO);
   const capped = sign(best) > 0
     ? [
-        ...[...runCols.keys()].filter((converter) => converter.perDay !== undefined && !(converter.perDay > 0)),
-        ...[...limits.values()].filter(({ row }) => sign(used(row)) === 0).flatMap(({ converters }) => converters),
+        ...[...total.keys()].filter((converter) => converter.perDay !== undefined && !(converter.perDay > 0)),
+        ...[...limits.values()].filter((limit) => equals(valueAt(limit.row, x), mul(exact(limit.devices), best))).flatMap((limit) => limit.converters),
       ]
         .filter((converter) => reach.has(converter))
         .map((converter) => converter.id)
         .sort()
     : [];
   return { ...base, days: toNumber(best), takes, binding, runs, capped };
-}
-
-/**
- * This function gives each resource that the plan can use: the direct resources and the inputs of the converters of the plan.
- * It also gives the inputs of their makers, through each chain.
- */
-function inputClosure(direct: readonly string[], cooks: readonly Converter[], makers: readonly Converter[]): Set<string> {
-  const out = new Set<string>();
-  const queue = [...direct, ...cooks.flatMap((cook) => [...inputsOf(cook).keys()])];
-  for (let resource = queue.shift(); resource !== undefined; resource = queue.shift()) {
-    if (out.has(resource)) continue;
-    out.add(resource);
-    for (const maker of makers) if (giftResource(maker) === resource) queue.push(...inputsOf(maker).keys());
-  }
-  return out;
 }

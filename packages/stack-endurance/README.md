@@ -29,7 +29,7 @@ Each function is a plain function with no clock, no network and no file. The uni
 - The days of a draw are the largest `T` at which the stores give `T` days of its demand, after each higher draw.
 - Each higher draw keeps back its own days times its demand. Thus the takes of all the draws are not more than the stores at any time.
 - The take order is a rule, not the best share. The days are the days of this order. A draw with a shared device is different (refer to the limit `perDay` below). `takes` gives the amount of each resource that a draw takes.
-- `jointDays` gives the best share for a set of draws. Refer to the section on the joint days.
+- `jointDays` gives the best share for a set of draws. `bestEndurance` gives the best share for all the draws, level by level. Refer to the sections on the joint days and on the best endurance.
 - A store gives nothing on its due date and after it. A store or a converter whose part stops gives nothing.
 - A converter can have a limit `perDay`, the most runs of one device in a day, and a count `devices` (default 1). Over `T` days, the converters of one device use `devices` times `T` days of the device or less. One run uses `1 / perDay` of a day of the device. A maker and its taker on one device share these days.
 - The higher draws use the days of a device first. Each higher draw keeps back its part of each day for all the days of a lower draw. This is the safe side.
@@ -107,11 +107,40 @@ The take order gives the drink 6.667 days. The drink keeps back all the water fo
 
 The joint days are not more than the days of each draw alone. The take order tells the days of a rule of priority. The joint days tell the days of the best share.
 
+## The best endurance
+
+`bestEndurance(layer, caseCuts, options)` gives the days of each draw with the best share of the stores and of the devices. Its result has the form of `enduranceOf`, so `caseShortfall` takes it.
+
+- The share is lexicographic by level. The draws of the first level get their best days. Then the draws of the next level get their best days, and so on.
+- In one level, the share is the best for the draw with the fewest days, then for the next draw, and so on. This is the leximin share.
+- Thus a draw cannot take a store that another draw of its level needs more. A higher draw does not take a store that a lower draw needs, when the higher draw has a second way.
+- Each step is a linear program with exact rationals. It takes the largest common floor of the open draws.
+- A draw whose floor row has a dual value that is not 0 cannot get more days. The step fixes its days. Each step fixes one draw or more.
+- A fixed draw keeps its days. Its share of the stocks can change in a later step.
+- A fixed draw keeps the device-days of each day that it uses, for all the days of the later draws. This is the safe side, as in `enduranceOf`.
+- A draw with no end gets `Infinity` days. It takes no stock.
+- The stores, the uses, the converters and the devices follow the rules of `jointDays`.
+- The fewest days of the first level are the joint days of the draws of that level.
+
+An example: the draw `a` drinks water or juice, and the draw `b` drinks only water. Each draw takes 1 L each day, and the stores have 10 L of each. The two draws are at one level.
+
+```ts
+import { bestEndurance, enduranceOf } from "@mark1russell7/stack-endurance";
+
+const ordered = enduranceOf(layer, dry, { at: "2026-12-01" });
+// ordered.needs.a.days is 20, and ordered.needs.b.days is 0.
+const best = bestEndurance(layer, dry, { at: "2026-12-01" });
+// best.needs.a is { days: 10, binding: ["juice", "water"], takes: { juice: 10 } }.
+// best.needs.b is { days: 10, binding: ["water"], takes: { water: 10 } }.
+```
+
+The take order gives the water to `a` first, so `b` gets 0 days. The best share gives the juice to `a` and the water to `b`.
+
 ## The entries
 
 | Entry | What it has |
 | --- | --- |
-| `@mark1russell7/stack-endurance` | The records of a layer, the endurance, joint days and shortfall queries, the gate, the join and a sample. |
+| `@mark1russell7/stack-endurance` | The records of a layer, the endurance, joint days, best endurance and shortfall queries, the gate, the join and a sample. |
 | `@mark1russell7/stack-endurance/schema` | `enduranceSchema`, the zod schema of a layer, with `parseEndurance`. |
 | `@mark1russell7/stack-endurance/add-on` | `enduranceAddOn`, the add-on in the form of the layer contract of the core. |
 
