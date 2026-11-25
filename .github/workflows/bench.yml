@@ -107,7 +107,7 @@ jobs:
           [ "$EVENT" = pull_request ] || times "The event is $EVENT, not a pull request."
           [ "$INSTALL" = success ] || times "The install of the head gave $INSTALL."
           base=$(git merge-base "$BASE" "$HEAD") || times "The merge base of $BASE and $HEAD is not known."
-          git diff --quiet "$base" "$HEAD" -- packages/stack-endurance/bench .github/workflows/bench.yml || times "The pull request changes the bench or its workflow."
+          git diff --quiet "$base" "$HEAD" -- packages/stack-endurance/bench .github/workflows/bench.yml ':(exclude)*.md' || times "The pull request changes the bench or its workflow."
           git worktree add --detach "$RUNNER_TEMP/base" "$base" > /dev/null 2>&1 || times "The checkout of the merge base $base failed."
           (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile) > "$RUNNER_TEMP/base-install.log" 2>&1 || times "The install of the merge base failed."
           cd packages/stack-endurance

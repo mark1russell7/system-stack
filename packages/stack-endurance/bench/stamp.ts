@@ -81,7 +81,8 @@ export function stampRecord(stamp: CodeStamp): StampRecord {
 
 /**
  * This function gives the parts of the stamp that differ between two records: `code`, `engines`, `data` or `node`.
- * An empty list means the same timed code. A record that is not a stamp record gives `record`, so the caller times again.
+ * When these parts are the same and the hashes differ, it gives `hash`.
+ * A record that is not a stamp record gives `record`, so the caller times again. An empty list means the same timed code.
  */
 export function stampChanges(base: unknown, head: unknown): string[] {
   const valid = (record: unknown): record is StampRecord =>
