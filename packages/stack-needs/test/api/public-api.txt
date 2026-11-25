@@ -33,6 +33,7 @@ CitedFormulaWater: build/index.d.ts#CitedFormulaWater
 CitedMilk: build/index.d.ts#CitedMilk
 CookCheck: build/index.d.ts#CookCheck
 CookConstant: build/index.d.ts#CookConstant
+CookElevation: build/index.d.ts#CookElevation
 CookFragment: build/index.d.ts#CookFragment
 CookFragmentInput: build/index.d.ts#CookFragmentInput
 CookFragmentResult: build/index.d.ts#CookFragmentResult
@@ -123,6 +124,7 @@ RESOURCE_SUBSETS: build/index.d.ts#RESOURCE_SUBSETS
 ReferenceNeed: build/index.d.ts#ReferenceNeed
 ReferencePart: build/index.d.ts#ReferencePart
 ResourceSubset: build/index.d.ts#ResourceSubset
+SEA_LEVEL_TIME_ELEVATION: build/index.d.ts#SEA_LEVEL_TIME_ELEVATION
 STORED_WATER: build/index.d.ts#STORED_WATER
 STORE_BRAND_INFANT_SOURCE: build/index.d.ts#STORE_BRAND_INFANT_SOURCE
 STORE_BRAND_LABEL: build/index.d.ts#STORE_BRAND_LABEL
@@ -132,6 +134,7 @@ SoakMethod: build/index.d.ts#SoakMethod
 StoveShare: build/index.d.ts#StoveShare
 SubsetConverter: build/index.d.ts#SubsetConverter
 THERMAL_TRANSMITTANCE_SOURCE: build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
+USDA_CANNING_GUIDE_SOURCE: build/index.d.ts#USDA_CANNING_GUIDE_SOURCE
 USGS_WATER_DENSITY_SOURCE: build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 WARMTH_NEED: build/index.d.ts#WARMTH_NEED
 WATER_DENSITY_MAX: build/index.d.ts#WATER_DENSITY_MAX
@@ -345,6 +348,12 @@ export interface CookConstant {
   readonly check?: CookCheck;
 }
 
+### build/index.d.ts#CookElevation
+export interface CookElevation {
+  readonly meters: number;
+  readonly cite: string;
+}
+
 ### build/index.d.ts#CookFragment
 export interface CookFragment {
   readonly schema: "endurance/1";
@@ -366,6 +375,7 @@ export interface CookFragmentInput {
   readonly batch: Quantity;
   readonly share?: StoveShare | undefined;
   readonly start?: CookStart | undefined;
+  readonly elevation?: CookElevation | undefined;
   readonly soak?: SoakMethod | undefined;
   readonly device?: string | undefined;
   readonly prefix?: string | undefined;
@@ -902,6 +912,9 @@ export interface ResourceSubset {
   readonly of: string;
 }
 
+### build/index.d.ts#SEA_LEVEL_TIME_ELEVATION
+export declare const SEA_LEVEL_TIME_ELEVATION: CookConstant;
+
 ### build/index.d.ts#STORED_WATER
 export declare const STORED_WATER = "water.stored";
 
@@ -942,6 +955,9 @@ export interface SubsetConverter {
 
 ### build/index.d.ts#THERMAL_TRANSMITTANCE_SOURCE
 export declare const THERMAL_TRANSMITTANCE_SOURCE: Source;
+
+### build/index.d.ts#USDA_CANNING_GUIDE_SOURCE
+export declare const USDA_CANNING_GUIDE_SOURCE: Source;
 
 ### build/index.d.ts#USGS_WATER_DENSITY_SOURCE
 export declare const USGS_WATER_DENSITY_SOURCE: Source;

@@ -3,7 +3,7 @@ import { SUPPLY_CATALOG, type CitedRate, type StoveFacts, type SupplyCatalog, ty
 import { checkEndurance, enduranceOf, hasEnduranceError, joinEndurance, type CaseCuts, type EnduranceLayer } from "@mark1russell7/stack-endurance";
 import { describe, expect, it } from "vitest";
 import type { Person } from "./calorie.ts";
-import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, NIST_WEBBOOK_WATER_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_DENSITY_MIN, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
+import { BOIL_CELSIUS, cookFragment, NIST_SI_GUIDE_SOURCE, NIST_WEBBOOK_WATER_SOURCE, SEA_LEVEL_TIME_ELEVATION, USDA_CANNING_GUIDE_SOURCE, USGS_WATER_DENSITY_SOURCE, WATER_DENSITY_MAX, WATER_DENSITY_MIN, WATER_SPECIFIC_HEAT, type CookFragmentInput, type CookLine, type StoveShare } from "./cook.ts";
 import { householdFragment } from "./household.ts";
 import { FOOD_NEED, STORED_WATER, WATER_NEED } from "./uses.ts";
 
@@ -520,8 +520,70 @@ describe("the cook fragment", () => {
       expect(rest).toEqual(lineOf(cookFragment(input).lines, "test.grain-1kg"));
     });
 
+    it("takes the cited unsoaked cook water with no soak for a soaked food", () => {
+      // A made-up unsoaked cook water of 2.5 L for each kg. One pot of 0.5 kg takes 1.25 L, and the cook time is the high end of unsoakedTime.
+      const unsoakedWater: CitedRate = { amount: 2.5, unit: "L", per: { amount: 1, unit: "kg" }, fact };
+      const result = cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater }), soak: "none" });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      const heat = 1.75 * 4.19002 * 80;
+      expect(line.water).toEqual({ read: true, value: 2.5, unit: "L/kg" });
+      expect(line.heat.read && line.heat.value).toBeCloseTo(heat, 9);
+      expect(line.minutes.read && line.minutes.value).toBeCloseTo(heat / 250 + 60, 9);
+      expect(line.fuel.read && line.fuel.value).toBeCloseTo((heat / 250 + 60) * 0.01, 9);
+      expect(waterTake(result)).toBeCloseTo(1.25, 9);
+      // The cold soak and the quick soak keep the cook water after the soak.
+      expect(lineOf(cookFragment(grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater })).lines, "test.grain-1kg").water).toEqual({ read: true, value: 2, unit: "L/kg" });
+      // An unsoaked water for each volume with no bulk mass gives no L/kg.
+      const perVolume = lineOf(cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater: { ...unsoakedWater, per: { amount: 1, unit: "L" } } }), soak: "none" }).lines, "test.grain-1kg");
+      expect(perVolume.water.read).toBe(false);
+      if (!perVolume.water.read) expect(perVolume.water.why).toMatch(/unsoaked cook water .* bulk mass/);
+    });
+
     it("refuses an unknown soak method", () => {
       expect(() => cookFragment({ ...input, soak: "hot" as never })).toThrow(RangeError);
+    });
+  });
+
+  describe("the elevation", () => {
+    it("cites the elevation limit of the cook time from USDA Guide 1, a work of the US government", () => {
+      expect(SEA_LEVEL_TIME_ELEVATION.value).toBeCloseTo(1000 * 0.3048, 12);
+      expect(SEA_LEVEL_TIME_ELEVATION.unit).toBe("m");
+      expect(SEA_LEVEL_TIME_ELEVATION.source).toBe(USDA_CANNING_GUIDE_SOURCE);
+      expect(SEA_LEVEL_TIME_ELEVATION.locator).toMatch(/^Page 1-10/u);
+      expect(USDA_CANNING_GUIDE_SOURCE.license).toBe("us-public-domain");
+      expect(checkSources([USDA_CANNING_GUIDE_SOURCE], { require: ["by", "terms", "sha256"], https: true, at: "2026-11-24" })).toEqual([]);
+    });
+
+    it("keeps the lines below the limit, from sea level", () => {
+      const before = JSON.stringify(cookFragment(input));
+      for (const meters of [0, 100, 304.7]) expect(JSON.stringify(cookFragment({ ...input, elevation: { meters, cite: fact } })), String(meters)).toBe(before);
+    });
+
+    it("gives a no read of the cook time and the fuel from 1000 ft, and keeps the heat", () => {
+      for (const meters of [304.8, 2000]) {
+        const result = cookFragment({ ...input, elevation: { meters, cite: fact } });
+        const line = lineOf(result.lines, "test.grain-1kg");
+        expect(line.heat.read && line.heat.value).toBeCloseTo(HEAT, 9);
+        expect(line.minutes.read).toBe(false);
+        expect(line.fuel.read).toBe(false);
+        if (!line.fuel.read) expect(line.fuel.why).toMatch(/1000 ft.*No cited rule gives the longer time/u);
+        expect(result.layer.converters).toEqual([]);
+        expect(result.read).toBe(false);
+      }
+    });
+
+    it("gives a no read of the heat below sea level, where water boils above 100 °C", () => {
+      const result = cookFragment({ ...input, elevation: { meters: -50, cite: fact } });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      expect(line.water.read).toBe(true);
+      expect(line.heat.read).toBe(false);
+      if (!line.heat.read) expect(line.heat.why).toMatch(/Below sea level, water boils above 100 °C/u);
+      expect(line.fuel.read).toBe(false);
+      expect(result.layer.converters).toEqual([]);
+    });
+
+    it("refuses an elevation that is not a finite number", () => {
+      for (const meters of [Number.NaN, Number.POSITIVE_INFINITY]) expect(() => cookFragment({ ...input, elevation: { meters, cite: fact } })).toThrow(RangeError);
     });
   });
 

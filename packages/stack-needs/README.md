@@ -202,7 +202,7 @@ The model of one pot:
    Its boil fuel is 4 times the calm fuel. The line also gives the fuel of the pot at each end of the range (`fuelSpread`).
    A factor with no bound and no range is the value. The cook part stays the rate times the cook time.
 4. The stove time is the boil time plus the high end of the cook time. The cook time starts when the water boils.
-5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit. A boil fuel from an adverse factor is an estimate (step 3), so that fuel is not a proven upper limit.
+5. The fuel is a safe upper limit: the stove burns at its full rate for all of the stove time. Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. At a high place the cook time is longer. From 1000 ft, the cook time and the fuel are a no read (see the elevation). A boil fuel from an adverse factor is an estimate (step 3), so that fuel is not a proven upper limit.
 6. A rate in a mass gives the fuel mass directly. A rate in an energy gives a mass only through the cited energy of the fuel (`fuelEnergy`), with the same heating value.
 7. The dry mass of one pot (`batch`) is a plan of the caller. It has no default. Give the smallest pot that the cook makes. Each pot takes its own cook time, so a batch above the real pot gives too little fuel.
 
@@ -238,9 +238,20 @@ The input `soak` gives the soak method of the buy list. Since 0.10.5. The line o
 | --- | --- | --- | --- |
 | `cold` (the default) | `soakWater` of market | None. The soak is cold. | `time` |
 | `quick` | `quickSoakWater` of market | The heat to boil the soak water and the dry food from the start temperature (`soakHeat`), with the rule of the cook water. The boil fuel of that heat, and the full rate for the high end of the boil span (`quickSoak.boil`). The stand time is off the heat, so it takes no fuel. | `time` |
-| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. A food with a cited soak has a no read of its cook water. |
+| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. A food with a cited soak takes `unsoakedCookWater`, or has a no read of its cook water. |
 
 The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater`, except for a soaked food with no soak.
+Since 0.10.7, a soaked food with no soak takes the cited cook water `unsoakedCookWater` of market. The catalog of market cites none for its beans, so they stay a no read.
+
+### The elevation
+
+The cook times of the catalog are for a boil at sea level. Since 0.10.6, the input `elevation` gives the elevation of the cook in `m`, with its citation.
+
+- Without `elevation`, the model takes a cook at sea level.
+- From `SEA_LEVEL_TIME_ELEVATION` (1000 ft, 304.8 m), each cook time and fuel is a no read. The heat to 100 °C stays, because it is more than the heat to the true boil.
+- USDA Guide 1 of the Complete Guide to Home Canning gives the limit. A time for sea level is not enough from 1000 ft, because water boils at a lower temperature.
+- The guide gives the limit for canning. The model applies it to the cook time of a dry food in boiling water. No cited rule gives the longer time.
+- Below sea level, water boils above 100 °C. Each heat, cook time and fuel is then a no read.
 The fuel of the quick soak also adds to each end of `fuelSpread`.
 
 The cook water and the drinking water are one store, `water.stored`. A cook can use tap water. The subset converter of `householdFragment` also gives the bottled water of the buy list as `water.stored`, so a cook takes the two. A drinking draw at a higher level takes its water first, by the take order of `enduranceOf`. The drinking draw keeps back its days times its demand, which is all of the store. Thus, when a case cuts the water supply, the dry food adds 0 days at each amount of stored water.
@@ -252,7 +263,8 @@ The cited constants:
 | --- | --- | --- |
 | `WATER_SPECIFIC_HEAT` | 4.19002 kJ/(kg.K) | The NIST Guide to the SI (SP 811). Appendix B.8 gives 4.190 02 J for the calorie (mean). The common definition of that calorie is the mean from 0 °C to 100 °C, and SP 811 does not state the range. Footnote 10 tells that the calorie is the energy to raise 1 g of water by 1 °C. The enthalpy table of water at 0.101325 MPa in the NIST Chemistry WebBook checks the range: the mean from 0.01 °C to the boil is 4.19104 kJ/(kg.K). From a start of 10 °C to 30 °C, the heat is within 0.02% of the table. From 90 °C, the heat is 0.48% less than the table. The WebBook is all rights reserved (the license `all-rights-reserved` of guidebook), so the check cites only its values as facts. US law gives no copyright to facts, and that law permits this use, not the terms of NIST. |
 | `WATER_DENSITY_MAX` | 1 kg/L | The page Water Density of the USGS Water Science School. Its table gives 1.00000 g/cm3 at 4.0 °C, its largest value. Thus the water mass is an upper limit. |
-| `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is less. But the cook time is longer there, and the model does not give it. Thus at a high place the fuel is not an upper limit. |
+| `BOIL_CELSIUS` | 100 °C | The end of the rise. Water boils at a lower temperature at a high place, so the heat is less. But the cook time is longer there. From `SEA_LEVEL_TIME_ELEVATION`, the cook time and the fuel are a no read. |
+| `SEA_LEVEL_TIME_ELEVATION` | 304.8 m | USDA Guide 1 of the Complete Guide to Home Canning, page 1-10. A process time for sea level is not enough at 1000 ft or more, because water boils at a lower temperature. |
 
 The two sources are works of the United States federal government (the license `us-public-domain` of guidebook).
 
