@@ -13,6 +13,7 @@ CAUSE_BEFORE: build/index.d.ts#CAUSE_BEFORE
 CLAIM_BASES: build/hazard.chunk.d.ts#CLAIM_BASES
 CauseOptions: build/index.d.ts#CauseOptions
 CauseTally: build/index.d.ts#CauseTally
+CitedSpan: build/hazard.chunk.d.ts#CitedSpan
 Claim: build/hazard.chunk.d.ts#Claim
 ClaimBasis: build/hazard.chunk.d.ts#ClaimBasis
 CountyPooling: build/hazard.chunk.d.ts#CountyPooling
@@ -24,11 +25,16 @@ EAGLEI_STATE_PRIORS: build/index.d.ts#EAGLEI_STATE_PRIORS
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
 Fit: build/hazard.chunk.d.ts#Fit
+FollowRead: build/index.d.ts#FollowRead
+FollowTerm: build/index.d.ts#FollowTerm
+Follows: build/hazard.chunk.d.ts#Follows
 HAZARDS_SCHEMA: build/hazard.chunk.d.ts#HAZARDS_SCHEMA
 HAZARD_CODES: build/index.d.ts#HAZARD_CODES
 HAZARD_LIST: build/index.d.ts#HAZARD_LIST
 HAZARD_SOURCES: build/index.d.ts#HAZARD_SOURCES
 Hazard: build/hazard.chunk.d.ts#Hazard
+HazardCaseCut: build/index.d.ts#HazardCaseCut
+HazardCaseCuts: build/index.d.ts#HazardCaseCuts
 HazardCaseOptions: build/index.d.ts#HazardCaseOptions
 HazardCode: build/index.d.ts#HazardCode
 HazardCut: build/hazard.chunk.d.ts#HazardCut
@@ -94,22 +100,29 @@ PriorTable: build/hazard.chunk.d.ts#PriorTable
 ReachScore: build/hazard.chunk.d.ts#ReachScore
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
+SPAN_BASES: build/hazard.chunk.d.ts#SPAN_BASES
+SPAN_UNITS: build/hazard.chunk.d.ts#SPAN_UNITS
 STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
 SilentAreas: build/index.d.ts#SilentAreas
+SpanBasis: build/hazard.chunk.d.ts#SpanBasis
+SpanUnit: build/hazard.chunk.d.ts#SpanUnit
 StatePooling: build/hazard.chunk.d.ts#StatePooling
 StormArea: build/index.d.ts#StormArea
 StormCauses: build/index.d.ts#StormCauses
 StormRow: build/index.d.ts#StormRow
 SupplyState: build/index.d.ts#SupplyState
 SurvivalOptions: build/index.d.ts#SurvivalOptions
+TermSide: build/index.d.ts#TermSide
+WATER_RECOVERY: build/index.d.ts#WATER_RECOVERY
 areaCounts: build/index.d.ts#areaCounts
 checkHazards: build/index.d.ts#checkHazards
 coverageTally: build/index.d.ts#coverageTally
 eagleCustomers: build/index.d.ts#eagleCustomers
 eagleLine: build/index.d.ts#eagleLine
 eagleRegion: build/index.d.ts#eagleRegion
+followCurve: build/index.d.ts#followCurve
 hasHazardError: build/index.d.ts#hasHazardError
 hazardCase: build/index.d.ts#hazardCase
 hazardOf: build/index.d.ts#hazardOf
@@ -159,6 +172,16 @@ export declare const EAGLEI_COUNTY_PRIORS: PriorTable;
 ### build/hazard.chunk.d.ts#CLAIM_BASES
 declare const CLAIM_BASES: readonly ["told", "assessed"];
 
+### build/hazard.chunk.d.ts#CitedSpan
+interface CitedSpan {
+  readonly low: number;
+  readonly high: number;
+  readonly unit: SpanUnit;
+  readonly basis: SpanBasis;
+  readonly says: string;
+  readonly claims: readonly Claim[];
+}
+
 ### build/hazard.chunk.d.ts#Claim
 type Claim = {
   readonly source: string;
@@ -202,6 +225,13 @@ interface Fit {
   readonly count: number;
 }
 
+### build/hazard.chunk.d.ts#Follows
+interface Follows {
+  readonly part: string;
+  readonly onset?: CitedSpan | undefined;
+  readonly recovery?: CitedSpan | undefined;
+}
+
 ### build/hazard.chunk.d.ts#HAZARDS_SCHEMA
 declare const HAZARDS_SCHEMA = "hazards/2";
 
@@ -219,6 +249,7 @@ interface HazardCut {
   readonly title: string;
   readonly claims: readonly Claim[];
   readonly duration: DurationLaw | NoLaw;
+  readonly follows?: Follows | undefined;
 }
 
 ### build/hazard.chunk.d.ts#HazardList
@@ -316,8 +347,20 @@ interface Regions {
   readonly codes: readonly string[];
 }
 
+### build/hazard.chunk.d.ts#SPAN_BASES
+declare const SPAN_BASES: readonly ["range", "minimum"];
+
+### build/hazard.chunk.d.ts#SPAN_UNITS
+declare const SPAN_UNITS: readonly ["hours", "days"];
+
 ### build/hazard.chunk.d.ts#SUPPLY_PARTS
 declare const SUPPLY_PARTS: readonly Part[];
+
+### build/hazard.chunk.d.ts#SpanBasis
+type SpanBasis = (typeof SPAN_BASES)[number];
+
+### build/hazard.chunk.d.ts#SpanUnit
+type SpanUnit = (typeof SPAN_UNITS)[number];
 
 ### build/hazard.chunk.d.ts#StatePooling
 interface StatePooling {
@@ -379,14 +422,40 @@ export declare const EAGLE_INTERVAL = 900;
 ### build/index.d.ts#EAGLE_SCHEME
 export declare const EAGLE_SCHEME = "us-state-fips";
 
+### build/index.d.ts#FollowRead
+export interface FollowRead {
+  readonly part: string;
+  readonly onset: FollowTerm;
+  readonly recovery: FollowTerm;
+  readonly bound: "upper" | "none";
+}
+
+### build/index.d.ts#FollowTerm
+export interface FollowTerm {
+  readonly days: number;
+  readonly cited: boolean;
+  readonly side: TermSide;
+  readonly says: string;
+}
+
 ### build/index.d.ts#HAZARD_CODES
-export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-no-law"];
+export declare const HAZARD_CODES: readonly ["hazards-twice", "hazards-part-unknown", "hazards-no-claim", "hazards-source", "hazards-license", "hazards-law-region", "hazards-fit", "hazards-curve", "hazards-prior", "hazards-follows", "hazards-no-law"];
 
 ### build/index.d.ts#HAZARD_LIST
 export declare const HAZARD_LIST: HazardList;
 
 ### build/index.d.ts#HAZARD_SOURCES
 export declare const HAZARD_SOURCES: Readonly<Record<string, HazardSource>>;
+
+### build/index.d.ts#HazardCaseCut
+export interface HazardCaseCut extends Cut {
+  readonly follows?: FollowRead | undefined;
+}
+
+### build/index.d.ts#HazardCaseCuts
+export interface HazardCaseCuts extends CaseCuts {
+  readonly cuts: readonly HazardCaseCut[];
+}
 
 ### build/index.d.ts#HazardCaseOptions
 export interface HazardCaseOptions extends BasisOptions {
@@ -693,6 +762,12 @@ export interface SurvivalOptions {
   readonly end?: number | undefined;
 }
 
+### build/index.d.ts#TermSide
+export type TermSide = "upper" | "lower";
+
+### build/index.d.ts#WATER_RECOVERY
+export declare const WATER_RECOVERY: CitedSpan;
+
 ### build/index.d.ts#areaCounts
 export declare function areaCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, AreaCount>;
 
@@ -711,11 +786,14 @@ export declare function eagleLine(line: string): OutageCount | undefined;
 ### build/index.d.ts#eagleRegion
 export declare function eagleRegion(area: string): string;
 
+### build/index.d.ts#followCurve
+export declare function followCurve(cause: Survival, onset: number, recovery: number): Survival | undefined;
+
 ### build/index.d.ts#hasHazardError
 export declare function hasHazardError(faults: readonly HazardFault[]): boolean;
 
 ### build/index.d.ts#hazardCase
-export declare function hazardCase(list: HazardList, hazard: Hazard, options?: HazardCaseOptions): CaseCuts;
+export declare function hazardCase(list: HazardList, hazard: Hazard, options?: HazardCaseOptions): HazardCaseCuts;
 
 ### build/index.d.ts#hazardOf
 export declare function hazardOf(list: HazardList, code: string): Hazard | undefined;
