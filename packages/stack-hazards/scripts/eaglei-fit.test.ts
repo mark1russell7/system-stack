@@ -361,12 +361,13 @@ describe("caseOverlap", () => {
     expect(caseOverlap([])).toEqual({ events: 0, multiple: 0, byState: {} });
   });
 
-  it("gives the two counts for each state, by the code of the state, in the order of the codes", () => {
+  it("gives the two counts for each state, by the code of the state", () => {
     // Two equal outages are two outages: the function counts each object of a list.
     const [a, b, c, d, e] = [event("12086", 0), event("12011", 0), event("48201", 0), event("01001", 0), event("12086", 0)];
     const overlap = caseOverlap([[a, b, c], [a, c, d], [e]]);
     expect(overlap).toEqual({ events: 5, multiple: 2, byState: { "01": { events: 1, multiple: 0 }, "12": { events: 3, multiple: 1 }, "48": { events: 1, multiple: 1 } } });
-    expect(Object.keys(overlap.byState ?? {})).toEqual(["01", "12", "48"]);
+    // A JavaScript record puts an integer key ("12") before a key with a leading zero ("01"), so the test compares the set of the keys.
+    expect(Object.keys(overlap.byState ?? {}).sort()).toEqual(["01", "12", "48"]);
     // The sums over the states are the counts of the nation.
     const states = Object.values(overlap.byState ?? {});
     expect(states.reduce((sum, state) => sum + state.events, 0)).toBe(overlap.events);

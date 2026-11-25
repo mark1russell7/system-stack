@@ -249,7 +249,7 @@ export function yearCounts(events: readonly OutageEvent[], customers: ReadonlyMa
 export interface CaseOverlap {
   readonly events: number;
   readonly multiple: number;
-  /** The two counts for each state, by the 2-digit FIPS code of `eagleRegion`, in the order of the codes. A record of a fit before it does not have it. */
+  /** The two counts for each state, by the 2-digit FIPS code of `eagleRegion`. The order of the keys is not the order of the codes. A record of a fit before it does not have it. */
   readonly byState?: Readonly<Record<string, { readonly events: number; readonly multiple: number }>> | undefined;
 }
 
