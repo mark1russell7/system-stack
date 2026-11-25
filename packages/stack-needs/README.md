@@ -245,6 +245,15 @@ The input `soak` gives the soak method of the buy list. Since 0.10.5. The line o
 The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater`, except for a soaked food with no soak.
 Since 0.10.7, a soaked food with no soak takes the cited cook water `unsoakedCookWater` of market. The catalog of market cites none for its beans, so they stay a no read.
 
+### The stove day
+
+A stove cooks only so many pots in a day. Since 0.10.9, the input `stoveDay` gives the most time that the stove burns in a day, for example 240 min. It is a plan of the caller, with no default.
+
+- Each converter then has the limit `perDay` of stack-endurance. The limit is the whole pots of the stove day at the most stove time of one pot. A part of a pot is not a pot, so the limit rounds down.
+- The converters of all the dry foods share the day of the stove. So `stoveDay` needs `device`.
+- The stove time of a pot must be a value or a most. A stove time with no read, for example from a most stove rate, gives no converter. A converter with no limit can cook more pots than the stove day gives.
+- A least stove rate gives a most stove time, but too little fuel. Thus a stove rate with a bound gives no converter with a stove day. Only a rate with no bound gives one.
+
 ### The elevation
 
 The cook times of the catalog are for a boil at sea level. Since 0.10.6, the input `elevation` gives the elevation of the cook in `m`, with its citation.

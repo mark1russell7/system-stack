@@ -378,6 +378,7 @@ export interface CookFragmentInput {
   readonly elevation?: CookElevation | undefined;
   readonly soak?: SoakMethod | undefined;
   readonly device?: string | undefined;
+  readonly stoveDay?: Quantity | undefined;
   readonly prefix?: string | undefined;
 }
 
@@ -645,6 +646,7 @@ export interface FragmentConverter {
     readonly need: string;
     readonly amount: number;
   };
+  readonly perDay?: number | undefined;
 }
 
 ### build/index.d.ts#FragmentDirectUse
