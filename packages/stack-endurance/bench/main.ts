@@ -5,16 +5,19 @@
  *   The job of index `n` (from 1) starts its rounds at `(n - 1) * JOB_ROUNDS`, so the jobs of a run turn the order on.
  * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
  *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
+ * - `node bench/main.ts stamp [--root <checkout>] [--out <file>]` gives the stamp of the timed code of a checkout (`bench/stamp.ts`). The default checkout is this one.
+ * - `node bench/main.ts changed --base <file> --head <file>` compares two stamps. It writes `match=true` to `GITHUB_OUTPUT` when the timed code differs, else `match=false`.
  *
  * `read` writes the report to the step summary and the gate line as an annotation. With `--enforce`, a gate that is not `pass` exits with 1.
  */
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell7/rigor-bench";
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
+import { benchStamp, stampChanges, stampRecord } from "./stamp.ts";
 import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
@@ -122,6 +125,33 @@ function read(args: Record<string, string | boolean | undefined>): number {
   return enforced && gate.outcome !== "pass" ? 1 : 0;
 }
 
+/** This function writes the stamp record of the timed code of a checkout to stdout and, with `--out`, to a file. */
+async function stamp(args: Record<string, string | boolean | undefined>): Promise<void> {
+  const root = resolve(String(args["root"] ?? join(here, "..", "..", "..")));
+  const text = `${JSON.stringify(stampRecord(await benchStamp(root)), null, 2)}
+`;
+  if (typeof args["out"] === "string") writeFileSync(args["out"], text);
+  process.stdout.write(text);
+}
+
+/** This function compares two stamp records. A part that differs, or a record that it cannot read, gives `match=true`: the bench runs. */
+function changed(args: Record<string, string | boolean | undefined>): void {
+  const readRecord = (path: string | boolean | undefined): unknown => {
+    try {
+      return JSON.parse(readFileSync(String(path), "utf8"));
+    } catch {
+      return undefined;
+    }
+  };
+  const parts = stampChanges(readRecord(args["base"]), readRecord(args["head"]));
+  const match = parts.length > 0;
+  process.stdout.write(match ? `The timed code differs: ${parts.join(", ")}. So the bench runs.
+` : "The timed code is the same. So the bench does not run.
+");
+  if (process.env["GITHUB_OUTPUT"] !== undefined) appendFileSync(process.env["GITHUB_OUTPUT"], `match=${String(match)}
+`);
+}
+
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
@@ -138,9 +168,14 @@ const { positionals, values } = parseArgs({
     date: { type: "string" },
     runs: { type: "string" },
     expect: { type: "string" },
+    root: { type: "string" },
+    base: { type: "string" },
+    head: { type: "string" },
   },
 });
 const command = positionals[0];
 if (command === "run") await run(values);
 else if (command === "read") process.exitCode = read(values);
-else throw new Error(`The command is run or read, not ${String(command)}.`);
+else if (command === "stamp") await stamp(values);
+else if (command === "changed") changed(values);
+else throw new Error(`The command is run, read, stamp or changed, not ${String(command)}.`);
