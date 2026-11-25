@@ -23,6 +23,7 @@ import {
   inMargin,
   readReport,
   RECORD_SCHEMA,
+  recordFaults,
   runCases,
   runGate,
   type FrozenLimits,
@@ -503,5 +504,37 @@ describe("the noise caps", () => {
     const models = Object.keys(modelTables(limits)["m12"] ?? {});
     expect(Object.keys(limits.noiseCaps).sort()).toEqual(models.sort());
     for (const model of models) expect(limits.noiseCaps[model]?.limit ?? Infinity).toBeLessThanOrEqual(limits.noiseCaps.other.limit);
+  });
+});
+
+describe("the faults of a freeze against the records of its jobs", () => {
+  const B = { ...ENV, cpu: "cpu-b" };
+  const records = (): JobRecord[] => [...JOBS, jobRecord("b-1", 0.6, () => 1.02, B)];
+  const file = (): FrozenLimits => freezeLimits(records().map(jobRead), STAMP);
+
+  it("gives no fault for the records of the freeze, also with the records of other runs", () => {
+    expect(recordFaults(file(), records().map(jobRead))).toEqual([]);
+    expect(recordFaults(file(), [...records(), { ...jobRecord("job-1", 3), run: "r-other" }].map(jobRead))).toEqual([]);
+  });
+
+  it("finds an A/A spread that is not the A/A spread of the record, which limitFaults cannot find", () => {
+    // The file agrees with itself: its caps come from its spreads. Only the records show that a spread changed.
+    const changed = records().map((record, index) => (index === 2 ? jobRecord(record.job, 0.98, (round) => (round % 2 === 0 ? 1.05 : 0.95)) : record));
+    expect(limitFaults(file())).toEqual([]);
+    const faults = recordFaults(file(), changed.map(jobRead));
+    expect(faults).toHaveLength(1);
+    expect(faults[0]).toMatch(/^The job job-3 of the run job-3 has the A\/A spread .* in its record, not /);
+  });
+
+  it("finds a value and a CPU model that are not those of the record", () => {
+    const slower = records().map((record, index) => (index === 0 ? jobRecord(record.job, 1.2, (round) => (round % 2 === 0 ? 1.01 : 0.99)) : record));
+    expect(recordFaults(file(), slower.map(jobRead)).filter((fault) => fault.includes("has the value"))).toHaveLength(IDS.length);
+    const moved = records().map((record, index) => (index === 5 ? { ...record, env: ENV } : record));
+    expect(recordFaults(file(), moved.map(jobRead))).toEqual(["The job b-1 of the run b-1 has the CPU model cpu-a in its record, not cpu-b."]);
+  });
+
+  it("finds a job with no record and a job with two records", () => {
+    expect(recordFaults(file(), records().slice(1).map(jobRead))).toEqual(["The job job-1 of the run job-1 has 0 records, not 1."]);
+    expect(recordFaults(file(), [...records(), JOBS[0] as JobRecord].map(jobRead))).toEqual(["The job job-1 of the run job-1 has 2 records, not 1."]);
   });
 });

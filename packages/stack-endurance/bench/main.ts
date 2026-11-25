@@ -5,6 +5,7 @@
  *   The job of index `n` (from 1) starts its rounds at `(n - 1) * JOB_ROUNDS`, so the jobs of a run turn the order on.
  * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
  *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
+ *   `--verify` with `--limits` compares each job of the file with its record in the folder (`recordFaults`): its CPU model, its values and its A/A spread.
  * - `node bench/main.ts stamp [--root <checkout>] [--out <file>]` gives the stamp of the timed code of a checkout (`bench/stamp.ts`). The default checkout is this one.
  * - `node bench/main.ts changed --base <file> --head <file>` compares two stamps. It writes `match=true` to `GITHUB_OUTPUT` when the timed code differs, else `match=false`.
  *
@@ -18,7 +19,7 @@ import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import { benchStamp, stampChanges, stampRecord } from "./stamp.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
 export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
@@ -96,6 +97,13 @@ function read(args: Record<string, string | boolean | undefined>): number {
   const limits = limitsFile === undefined ? undefined : (JSON.parse(readFileSync(limitsFile, "utf8")) as FrozenLimits);
   const faults = limits === undefined ? [] : limitFaults(limits);
   if (faults.length > 0) throw new Error(`The file of limits has faults:\n${faults.join("\n")}`);
+  // With --verify, the folder holds the records of the freeze. Each value of the file must be the value of its record.
+  if (args["verify"] === true) {
+    if (limits === undefined) throw new Error("read --verify needs --limits.");
+    const wrong = recordFaults(limits, reads);
+    if (wrong.length > 0) throw new Error(`The file of limits does not agree with the records:\n${wrong.join("\n")}`);
+    process.stdout.write(`The ${String(limits.jobs.length)} jobs of the file agree with their records.\n`);
+  }
   const gates = reads.map((item) => jobGate(item, limits));
   // A job that failed gives no record. Each of its cases is a no read, so a lost job does not pass.
   const expected = Number(args["expect"] ?? 0);
@@ -160,6 +168,7 @@ const { positionals, values } = parseArgs({
     in: { type: "string" },
     limits: { type: "string" },
     enforce: { type: "boolean" },
+    verify: { type: "boolean" },
     freeze: { type: "string" },
     date: { type: "string" },
     runs: { type: "string" },
