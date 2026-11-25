@@ -13,7 +13,8 @@ on:
         description: "The gate decides the run. With false, the run only reports."
         type: boolean
         default: true
-  # Each pull request starts the workflow. The job changes skips the bench when no file of the bench changes (CI.md, "A gate with paths").
+  # Each pull request starts the workflow. The job changes skips the bench when the pull request changes only text files (CI.md, "A gate with paths").
+  # Then the job timed compares the stamp of the timed code at the head and at the merge base (bench/stamp.ts). The bench runs only when they differ.
   pull_request:
 
 permissions:
@@ -51,15 +52,86 @@ jobs:
         uses: mark1russell7/template/.github/actions/changes@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
         with:
           pull-request: ${{ steps.pull.outputs.found == 'true' && steps.pull.outputs.number || '' }}
+          # A coarse filter only: the job timed decides from the stamp, so this list names no source file.
           paths: |
-            packages/stack-endurance/src/shortfall.ts
+            **
+            !**/*.md
             packages/stack-endurance/bench/**
-            .github/workflows/bench.yml
+
+  # The stamp of the timed code: the bundle of bench/child.ts after a tree shake, with the lock closure of each package that it imports.
+  # A run of another event times. A change of the bench or its workflow times. Each failure of a step times, so a failure can skip no bench.
+  # The job always runs, and it gives the output match of the gate: "Bench OK" names it as the job of changes, so a skip of the bench is a pass only when match is false.
+  timed:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      match: ${{ steps.decide.outputs.match }}
+    env:
+      EVENT: ${{ github.event_name }}
+      CHANGES: ${{ needs.changes.outputs.match }}
+      BASE: ${{ github.event.pull_request.base.sha }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - id: checkout
+        if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
+        continue-on-error: true
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
+        continue-on-error: true
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - id: install
+        if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
+      - id: decide
+        name: Compare the stamps of the head and the merge base
+        if: ${{ !cancelled() }}
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+        run: |
+          times() {
+            echo "$1 So the bench runs."
+            echo "match=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          if [ "$CHANGES" = false ]; then
+            echo "The job changes found no file of the gate. So the bench does not run."
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$EVENT" = pull_request ] || times "The event is $EVENT, not a pull request."
+          [ "$INSTALL" = success ] || times "The install of the head gave $INSTALL."
+          base=$(git merge-base "$BASE" "$HEAD") || times "The merge base of $BASE and $HEAD is not known."
+          git diff --quiet "$base" "$HEAD" -- packages/stack-endurance/bench .github/workflows/bench.yml ':(exclude)*.md' || times "The pull request changes the bench or its workflow."
+          git worktree add --detach "$RUNNER_TEMP/base" "$base" > /dev/null 2>&1 || times "The checkout of the merge base $base failed."
+          (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile) > "$RUNNER_TEMP/base-install.log" 2>&1 || times "The install of the merge base failed."
+          cd packages/stack-endurance
+          mkdir -p "$RUNNER_TEMP/stamps"
+          node bench/main.ts stamp --out "$RUNNER_TEMP/stamps/head.json" > /dev/null || times "The stamp of the head failed."
+          node bench/main.ts stamp --root "$RUNNER_TEMP/base" --out "$RUNNER_TEMP/stamps/base.json" > /dev/null || times "The stamp of the merge base failed."
+          node bench/main.ts changed --base "$RUNNER_TEMP/stamps/base.json" --head "$RUNNER_TEMP/stamps/head.json" || times "The comparison of the stamps failed."
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: independent-bench-stamps
+          path: ${{ runner.temp }}/stamps
+          if-no-files-found: ignore
 
   bench:
     name: bench (run ${{ matrix.run }})
-    needs: changes
-    if: needs.changes.outputs.match == 'true'
+    needs: timed
+    if: needs.timed.outputs.match == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -95,8 +167,8 @@ jobs:
           if-no-files-found: error
 
   read:
-    needs: [changes, bench]
-    if: ${{ !cancelled() && needs.changes.outputs.match == 'true' }}
+    needs: [timed, bench]
+    if: ${{ !cancelled() && needs.timed.outputs.match == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -136,7 +208,7 @@ jobs:
   bench-ok:
     name: Bench OK
     if: ${{ !cancelled() }}
-    needs: [changes, bench, read]
+    needs: [changes, timed, bench, read]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
@@ -144,3 +216,4 @@ jobs:
       - uses: mark1russell7/template/.github/actions/gate-summary@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
         with:
           needs: ${{ toJSON(needs) }}
+          changes: timed
