@@ -227,7 +227,7 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   On these counties, the pooled score is above the score of one rate for each state in each case.
   On all the counties, one rate for each state scores above the pooled rates in 4 cases, by at most 7.2%. A county with no event in the early years gets a low pooled rate, and some such counties have events later.
 
-  For the states, the pooled score is above the raw score in 5 of the 6 cases, and at most 0.1% under it in the other case. The pooled squared error is at most 1.2% above the raw error.
+  For the states, the pooled score is above the raw score in 5 of the 6 cases. In the other case, it is at most 0.1% under the raw score. The pooled squared error is at most 1.2% above the raw error.
 
   A test holds the gate of the holdout over time. Each limit is the next multiple of 5% above the worst ratio of the fit of 2026-02-25. The fit gives the same numbers for the same version of the dataset, so the margin is for a new version.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
