@@ -288,6 +288,19 @@ export interface PoolTimeHoldout {
   readonly cases: Readonly<Record<string, PoolTimeScore>>;
 }
 
+/**
+ * The counts of the observed areas of a fit: the years of each area, and the events of each case in each area. The arrays follow the order of `codes`.
+ * With the laws of the fit, they give each pooled rate and its upper bound (`upperRates` of `priors.ts`). Thus a reader can check each rate of a table.
+ */
+export interface AreaUnits {
+  /** The codes of the observed areas, in their order. */
+  readonly codes: readonly string[];
+  /** The years of each area. */
+  readonly years: readonly number[];
+  /** The events of each case in each area, by the code of the case. */
+  readonly events: Readonly<Record<string, readonly number[]>>;
+}
+
 /** The pooling of the county rates of one fit: the law of each state in each case, and the holdout. The holdout is the gate of the pooled rates. */
 export interface CountyPooling {
   /** The law of each state with an observed county, by the code of the case and the code of the state. */
