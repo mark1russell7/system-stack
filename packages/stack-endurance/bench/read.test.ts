@@ -18,7 +18,7 @@ import {
   MIN_RUNS,
   modelTables,
   NEAR_TITLE,
-  noiseCapOf,
+  NOISE_SPREAD,
   noiseCapTable,
   inMargin,
   readReport,
@@ -446,27 +446,28 @@ describe("the noise caps", () => {
   const spreadOf = (record: JobRecord): number => jobRead(record).aa?.spread ?? Number.NaN;
 
   it("are the worst A/A spread plus the high side of the spreads: worst - median", () => {
-    const cap = noiseCapOf([0.03, 0.01, 0.05, 0.02, 0.04]);
-    expect(cap).toMatchObject({ limit: 0.07, worst: 0.05, median: 0.03, values: [0.03, 0.01, 0.05, 0.02, 0.04] });
-    expect(cap.high).toBeCloseTo(0.02, 12);
-    expect(() => noiseCapOf([0.01, 0.02, 0.03, 0.04])).toThrow(RangeError);
+    const cap = runLimit([0.03, 0.01, 0.05, 0.02, 0.04], NOISE_SPREAD);
+    expect(cap).toMatchObject({ limit: 0.07, worst: 0.05, values: [0.03, 0.01, 0.05, 0.02, 0.04] });
+    // The spread of a noise cap is its high side: the worst spread minus the median spread.
+    expect(cap.spread).toBeCloseTo(0.02, 12);
+    expect(() => runLimit([0.01, 0.02, 0.03, 0.04], NOISE_SPREAD)).toThrow(RangeError);
   });
 
   it("do not go up for a job with less noise, and runLimit of the spreads does", () => {
     const base = [0.01, 0.02, 0.03, 0.04, 0.05];
     const quieter = [0.001, 0.02, 0.03, 0.04, 0.05];
-    expect(noiseCapOf(quieter).limit).toBe(noiseCapOf(base).limit);
+    expect(runLimit(quieter, NOISE_SPREAD).limit).toBe(runLimit(base, NOISE_SPREAD).limit);
     expect(runLimit(quieter).limit).toBeGreaterThan(runLimit(base).limit);
     // A quieter worst job makes the cap smaller.
-    expect(noiseCapOf([0.01, 0.02, 0.03, 0.04, 0.045]).limit).toBeLessThan(noiseCapOf(base).limit);
+    expect(runLimit([0.01, 0.02, 0.03, 0.04, 0.045], NOISE_SPREAD).limit).toBeLessThan(runLimit(base, NOISE_SPREAD).limit);
   });
 
   it("give a model with jobs of 5 runs or more its own cap from the spreads of its jobs", () => {
     const limits = file();
     const spreads = records().map(spreadOf);
     expect(Object.keys(limits.noiseCaps).sort()).toEqual(["cpu-a", "other"]);
-    expect(limits.noiseCaps["cpu-a"]).toEqual(noiseCapOf(spreads.slice(0, 5)));
-    expect(limits.noiseCaps.other).toEqual(noiseCapOf(spreads));
+    expect(limits.noiseCaps["cpu-a"]).toEqual(runLimit(spreads.slice(0, 5), NOISE_SPREAD));
+    expect(limits.noiseCaps.other).toEqual(runLimit(spreads, NOISE_SPREAD));
     expect(limits.noiseCaps["cpu-a"]?.limit).toBeCloseTo(0.022, 12);
     expect(limitFaults(limits)).toEqual([]);
     // A job of cpu-a with a spread above its own cap is a no read, also under the pooled cap.
@@ -491,7 +492,7 @@ describe("the noise caps", () => {
     const limits = file();
     const own = limits.noiseCaps["cpu-a"];
     if (own === undefined) throw new Error("no cap of cpu-a");
-    const fault = "The noise cap of cpu-a is not noiseCapOf the A/A spreads of its jobs.";
+    const fault = "The noise cap of cpu-a is not the noise cap of the A/A spreads of its jobs.";
     expect(limitFaults({ ...limits, noiseCaps: { ...limits.noiseCaps, "cpu-a": { ...own, limit: own.limit * 2 } } })).toEqual([fault]);
     expect(limitFaults({ ...limits, noiseCaps: { other: limits.noiseCaps.other } })).toEqual([fault]);
     expect(noiseCapTable(limits.jobs, limits.noiseCaps.other.values)).toEqual(limits.noiseCaps);
