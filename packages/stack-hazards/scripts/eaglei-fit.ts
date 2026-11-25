@@ -249,15 +249,31 @@ export function yearCounts(events: readonly OutageEvent[], customers: ReadonlyMa
 export interface CaseOverlap {
   readonly events: number;
   readonly multiple: number;
+  /** The two counts for each state, by the 2-digit FIPS code of `eagleRegion`, in the order of the codes. A record of a fit before it does not have it. */
+  readonly byState?: Readonly<Record<string, { readonly events: number; readonly multiple: number }>> | undefined;
 }
 
-/** This function gives the overlap of the lists of the storm cases. The function is pure. */
-export function caseOverlap(lists: Iterable<readonly OutageEvent[]>): CaseOverlap {
+/**
+ * This function gives the overlap of the lists of the storm cases, for the nation and for each state. The function is pure.
+ * @param state - The state of a county. The default is `eagleRegion`.
+ */
+export function caseOverlap(lists: Iterable<readonly OutageEvent[]>, state: (area: string) => string = eagleRegion): CaseOverlap {
   const seen = new Map<OutageEvent, number>();
   for (const list of lists) for (const event of new Set(list)) seen.set(event, (seen.get(event) ?? 0) + 1);
   let multiple = 0;
-  for (const times of seen.values()) if (times > 1) multiple += 1;
-  return { events: seen.size, multiple };
+  const states = new Map<string, { events: number; multiple: number }>();
+  for (const [event, times] of seen) {
+    const code = state(event.area);
+    const counts = states.get(code) ?? { events: 0, multiple: 0 };
+    counts.events += 1;
+    if (times > 1) {
+      multiple += 1;
+      counts.multiple += 1;
+    }
+    states.set(code, counts);
+  }
+  const byState = Object.fromEntries([...states.keys()].sort().map((code) => [code, states.get(code) ?? { events: 0, multiple: 0 }]));
+  return { events: seen.size, multiple, byState };
 }
 
 /** The output of a fit: the source, the options, the counts and the curve of each state. */
