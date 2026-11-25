@@ -10,6 +10,7 @@ type CaseCuts: @mark1russell7/system-stack#CaseCuts (external)
 CaseOptions: build/index.d.ts#CaseOptions
 Converter: build/layer.chunk.d.ts#Converter
 type Cut: @mark1russell7/system-stack#Cut (external)
+type CutBound: @mark1russell7/system-stack#CutBound (external)
 DirectUse: build/layer.chunk.d.ts#DirectUse
 Draw: build/layer.chunk.d.ts#Draw
 DrawEndurance: build/layer.chunk.d.ts#DrawEndurance
@@ -85,7 +86,7 @@ export interface CaseOptions {
 }
 
 ### build/index.d.ts#ENDURANCE_CODES
-export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-device-mix", "endurance-no-way", "endurance-cut-no-curve"];
+export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-bound", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-device-mix", "endurance-no-way", "endurance-cut-no-curve"];
 
 ### build/index.d.ts#EnduranceCode
 export type EnduranceCode = (typeof ENDURANCE_CODES)[number];
@@ -131,6 +132,7 @@ export interface Shortfall {
   readonly unread: readonly string[];
   readonly coarse: readonly string[];
   readonly independentUpper: readonly string[];
+  readonly bound: CutBound$1;
 }
 
 ### build/index.d.ts#ShortfallOptions
@@ -150,6 +152,7 @@ export interface StopCurves {
   readonly upper: Survival;
   readonly coarse: boolean;
   readonly independentUpper: boolean;
+  readonly bound: CutBound$1;
 }
 
 ### build/index.d.ts#YearShortfall

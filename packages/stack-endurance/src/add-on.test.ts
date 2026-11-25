@@ -44,6 +44,14 @@ describe("parseEndurance", () => {
     expect(parseEndurance({ ...layer, converters: [{ ...converter, devices: "2" }] }).ok).toBe(false);
   });
 
+  it("reads the bound of a cut, and refuses a bound that is not a value of CUT_BOUNDS", () => {
+    const storm = SAMPLE_ENDURANCE.cases?.[0];
+    if (storm === undefined) throw new Error("The sample has no case.");
+    const layer = { ...SAMPLE_ENDURANCE, cases: [{ ...storm, cuts: storm.cuts.map((cut, index) => (index === 0 ? { ...cut, bound: "upper" as const } : cut)) }] };
+    expect(parseEndurance(JSON.parse(JSON.stringify(layer)))).toEqual({ ok: true, layer });
+    expect(parseEndurance({ ...layer, cases: [{ ...storm, cuts: [{ ...storm.cuts[0], bound: "exact" }] }] }).ok).toBe(false);
+  });
+
   it("reads the sample, and refuses a field that the format does not have", () => {
     expect(parseEndurance(JSON.parse(JSON.stringify(SAMPLE_ENDURANCE)))).toEqual({ ok: true, layer: SAMPLE_ENDURANCE });
     const read = parseEndurance({ ...SAMPLE_ENDURANCE, extra: 1 });

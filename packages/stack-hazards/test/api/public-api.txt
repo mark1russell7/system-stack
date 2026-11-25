@@ -449,6 +449,7 @@ export declare const HAZARD_SOURCES: Readonly<Record<string, HazardSource>>;
 
 ### build/index.d.ts#HazardCaseCut
 export interface HazardCaseCut extends Cut {
+  readonly bound?: "law" | FollowRead["bound"] | undefined;
   readonly follows?: FollowRead | undefined;
 }
 
