@@ -238,9 +238,10 @@ The input `soak` gives the soak method of the buy list. Since 0.10.5. The line o
 | --- | --- | --- | --- |
 | `cold` (the default) | `soakWater` of market | None. The soak is cold. | `time` |
 | `quick` | `quickSoakWater` of market | The heat to boil the soak water and the dry food from the start temperature (`soakHeat`), with the rule of the cook water. The boil fuel of that heat, and the full rate for the high end of the boil span (`quickSoak.boil`). The stand time is off the heat, so it takes no fuel. | `time` |
-| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. A food with a cited soak has a no read of its cook water. |
+| `none` | None | None | The high end of `unsoakedTime` for a food with a cited soak. A food with no soak facts keeps `time`. A food with a cited soak takes `unsoakedCookWater`, or has a no read of its cook water. |
 
 The default gives the same lines as before 0.10.5. A product with no cited soak, cold or quick, takes no soak with each method. The cook water stays `cookWater`, except for a soaked food with no soak.
+Since 0.10.7, a soaked food with no soak takes the cited cook water `unsoakedCookWater` of market. The catalog of market cites none for its beans, so they stay a no read.
 
 ### The elevation
 

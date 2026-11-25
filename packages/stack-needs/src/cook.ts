@@ -1,5 +1,5 @@
 import type { Source } from "@mark1russell7/guidebook";
-import { fuelEnergyPerMass, giftsOf, cookWater, quickSoakWater, soakWater, type CitedRate, type CitedSpan, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
+import { fuelEnergyPerMass, giftsOf, cookWater, quickSoakWater, soakWater, unsoakedCookWater, type CitedRate, type CitedSpan, type HeatingValue, type StoveFacts, type StoveFactor, type StoveYield, type SupplyCatalog, type SupplyProduct } from "@mark1russell7/market/supplies";
 import { valueIn, type Quantity } from "@mark1russell7/quantity";
 import { FOOD_NEED, FORMULA_POWDER, STORED_WATER } from "./uses.ts";
 
@@ -239,7 +239,10 @@ export interface CookLine {
   readonly resource: string;
   /** The food energy of the dry food, in `kcal/kg`. */
   readonly energy: CookRead;
-  /** The cook water, in `L/kg` of dry food, from `cookWater` of market. */
+  /**
+   * The cook water, in `L/kg` of dry food, from `cookWater` of market.
+   * With no soak, a food with a cited soak takes `unsoakedCookWater` of market. Since 0.10.7.
+   */
   readonly water: CookRead;
   /**
    * The soak water, in `L/kg` of dry food. The cook discards it. The water comes from the soak method (`soakMethod`):
@@ -447,12 +450,16 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
 
   const facts = product.cook;
   const soaked = facts?.soak !== undefined || facts?.quickSoak !== undefined;
-  const litres = cookWater(product);
   // The cited cook water of a soaked food is for the food after its soak. An unsoaked food takes up more water, so that rate is too low.
+  // Thus with no soak, a soaked food takes only its cited cook water with no soak.
+  const unsoakedWater = method === "none" && soaked;
+  const litres = unsoakedWater ? unsoakedCookWater(product) : cookWater(product);
   const water =
-    method === "none" && soaked
+    unsoakedWater && facts?.unsoakedWater === undefined
       ? noRead(`The product ${product.id} cites a soak and no cook water for the food with no soak. The cook water after a soak is too low for it.`)
-      : litres === undefined
+      : unsoakedWater && litres === undefined
+        ? noRead(`The unsoaked cook water of the product ${product.id} does not convert to L/kg. A rate for each volume needs a bulk mass.`)
+        : litres === undefined
         ? noRead(`The catalog cites no cook water for the product ${product.id}, or no bulk mass for its water rate.`)
         : read(valueIn(litres, "L/kg"), "L/kg");
   // The soak water of the soak method. A product with no cited soak has none. A soak rate that gives no L/kg is a no read, not 0.
@@ -656,7 +663,8 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * - A product with a cold soak and no quick soak gives a no read of the quick soak. It does not take the cold soak.
  * - `none`: no soak water. A food with a cited soak, cold or quick, cooks for the high end of `unsoakedTime` of market.
  *   Such a food with no `unsoakedTime` gives a no read, because the cook time of the food with no soak has no source.
- *   A food with a cited soak also gives a no read of the cook water. The cited cook water is for the food after its soak, and an unsoaked food takes up more water.
+ *   Such a food takes the cook water `unsoakedCookWater` of market. Since 0.10.7. With none, the cook water is a no read.
+ *   The cited cook water `cookWater` is for the food after its soak, and an unsoaked food takes up more water.
  *   A food with no soak facts keeps its cook time `time` and its cook water `cookWater`.
  *
  * A soak rate that does not convert to `L/kg` gives a no read.
