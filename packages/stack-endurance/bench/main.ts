@@ -5,6 +5,7 @@
  *   The job of index `n` (from 1) starts its rounds at `(n - 1) * JOB_ROUNDS`, so the jobs of a run turn the order on.
  * - `node bench/main.ts read --in <folder> [--expect <jobs>] [--limits <file>] [--enforce] [--freeze <file>] [--commit <sha>]` reads the records of each job.
  *   `--commit` names the commit of a freeze over the runs of several commits, when the timed code of these commits is the same.
+ *   `--window <n>` sets the most runs of one CPU model in a freeze (default `FREEZE_WINDOW`). `--runs` gives the order of the runs, oldest first. The default order is the order of the run ids.
  *   `--verify` with `--limits` compares each job of the file with its record in the folder (`recordFaults`): its CPU model, its values and its A/A spread.
  * - `node bench/main.ts stamp [--root <checkout>] [--out <file>]` gives the stamp of the timed code of a checkout (`bench/stamp.ts`). The default checkout is this one.
  * - `node bench/main.ts changed --base <file> --head <file>` compares two stamps. It writes `match=true` to `GITHUB_OUTPUT` when the timed code differs, else `match=false`.
@@ -19,7 +20,7 @@ import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import { benchStamp, stampChanges, stampRecord } from "./stamp.ts";
-import { AA_ARM, AA_CASE, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
+import { AA_ARM, AA_CASE, FREEZE_WINDOW, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
 export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
@@ -111,10 +112,13 @@ function read(args: Record<string, string | boolean | undefined>): number {
   // The jobs of a freeze time one commit. With --commit, they can come from runs of several commits with the same timed code, and the file names that commit.
   const stamped = typeof args["commit"] === "string" ? args["commit"] : undefined;
   const commits = stamped === undefined ? [...new Set(records.map((record) => record.commit ?? ""))] : [stamped];
-  const runs = typeof args["runs"] === "string" ? args["runs"].split(",").filter((id) => id !== "") : [...new Set(records.flatMap((record) => (record.run === undefined ? [] : [record.run])))];
+  // The window keeps the last runs of each model, so the order of the runs counts. The id of a CI run of GitHub grows with time, so the default order is the order of the ids.
+  const found = [...new Set(records.flatMap((record) => (record.run === undefined ? [] : [record.run])))];
+  const runs = typeof args["runs"] === "string" ? args["runs"].split(",").filter((id) => id !== "") : found.every((id) => /^\d+$/.test(id)) ? found.sort((a, b) => (BigInt(a) < BigInt(b) ? -1 : 1)) : found;
+  const window = typeof args["window"] === "string" ? Number(args["window"]) : FREEZE_WINDOW;
   const candidate =
     reads.length >= 5 && commits.length === 1 && commits[0] !== ""
-      ? freezeLimits(reads, { commit: commits[0] ?? "", date: typeof args["date"] === "string" ? args["date"] : new Date().toISOString().slice(0, 10), runs })
+      ? freezeLimits(reads, { commit: commits[0] ?? "", date: typeof args["date"] === "string" ? args["date"] : new Date().toISOString().slice(0, 10), runs, window })
       : undefined;
   const report = readReport(reads, gates, candidate);
   process.stdout.write(report);
@@ -169,6 +173,7 @@ const { positionals, values } = parseArgs({
     limits: { type: "string" },
     enforce: { type: "boolean" },
     verify: { type: "boolean" },
+    window: { type: "string" },
     freeze: { type: "string" },
     date: { type: "string" },
     runs: { type: "string" },

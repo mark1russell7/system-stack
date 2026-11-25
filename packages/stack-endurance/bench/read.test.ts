@@ -6,6 +6,7 @@ import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 import {
   AA_ARM,
   AA_CASE,
+  FREEZE_WINDOW,
   freezeLimits,
   groupCases,
   groupTables,
@@ -32,7 +33,7 @@ import {
 } from "./read.ts";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
-const STAMP = { commit: "0".repeat(40), date: "2026-11-22", runs: ["1"] };
+const STAMP = { commit: "0".repeat(40), date: "2026-11-22" };
 
 /** This function gives the record of a job. Each arm has the time `scale * base` in each round. The A/A ratio of round `r` is `aa(r)`. */
 function jobRecord(job: string, scale: number, aa: (round: number) => number = () => 1, env: BenchEnv = ENV): JobRecord {
@@ -200,8 +201,8 @@ describe("the limits of each CPU model", () => {
     expect(file.jobs[1]).toEqual({ job: "job-2", cpu: "cpu-a", run: "job-2", commit: STAMP.commit });
     const faults = limitFaults({ ...file, jobs: file.jobs.map((job, index) => (index === 0 ? { ...job, run: "", commit: "abc" } : job)) });
     expect(faults.filter((fault) => fault.startsWith("The job "))).toEqual(["The job job-1 has no run.", "The job job-1 has no full SHA of its commit."]);
-    // The run of a job also names a group, so a changed run changes the group limits.
-    expect(faults.filter((fault) => !fault.startsWith("The job "))).toEqual(IDS.map((id) => `The group limit of ${id} on cpu-a is not runLimit of the lowest value of each run of its jobs.`));
+    // The run of a job also names a group, so a changed run changes the group limits. The runs of the file are then not the runs of its jobs.
+    expect(faults.filter((fault) => !fault.startsWith("The job "))).toEqual(["The runs of the file are not the runs of its jobs.", ...IDS.map((id) => `The group limit of ${id} on cpu-a is not runLimit of the lowest value of each run of its jobs.`)]);
   });
 });
 
@@ -536,5 +537,37 @@ describe("the faults of a freeze against the records of its jobs", () => {
   it("finds a job with no record and a job with two records", () => {
     expect(recordFaults(file(), records().slice(1).map(jobRead))).toEqual(["The job job-1 of the run job-1 has 0 records, not 1."]);
     expect(recordFaults(file(), [...records(), JOBS[0] as JobRecord].map(jobRead))).toEqual(["The job job-1 of the run job-1 has 2 records, not 1."]);
+  });
+});
+
+describe("the window of a freeze", () => {
+  // Each job is in a run of its own. Run r-i has the scale 1 + i / 100, so a later run is slower.
+  const runs = (count: number, env: BenchEnv = ENV): JobRecord[] =>
+    Array.from({ length: count }, (_, index) => ({ ...jobRecord(`${env.cpu}-${String(index + 1)}`, 1 + index / 100, (round) => (round % 2 === 0 ? 1.01 : 0.99), env), run: String(100 + index) }));
+
+  it("keeps the last runs of each CPU model and names the kept runs", () => {
+    const B = { ...ENV, cpu: "cpu-b" };
+    const file = freezeLimits([...runs(FREEZE_WINDOW + 3), ...runs(3, B)].map(jobRead), STAMP);
+    expect(file.window).toBe(FREEZE_WINDOW);
+    expect(file.jobs.filter((job) => job.cpu === "cpu-a").map((job) => job.run)).toEqual(Array.from({ length: FREEZE_WINDOW }, (_, index) => String(103 + index)));
+    expect(file.jobs.filter((job) => job.cpu === "cpu-b").map((job) => job.run)).toEqual(["100", "101", "102"]);
+    expect(file.runs).toEqual(Array.from({ length: FREEZE_WINDOW + 3 }, (_, index) => String(100 + index)).filter((run) => file.jobs.some((job) => job.run === run)));
+    expect(limitFaults(file)).toEqual([]);
+  });
+
+  it("uses the given order of the runs and refuses an order that does not name each run", () => {
+    const records = runs(7);
+    const reversed = records.map((record) => record.run ?? "").reverse();
+    const file = freezeLimits(records.map(jobRead), { ...STAMP, runs: reversed, window: 5 });
+    expect(file.jobs.map((job) => job.run)).toEqual(["100", "101", "102", "103", "104"]);
+    expect(() => freezeLimits(records.map(jobRead), { ...STAMP, runs: reversed.slice(1) })).toThrow(/not in the order/);
+    expect(() => freezeLimits(records.map(jobRead), { ...STAMP, window: 4 })).toThrow(RangeError);
+  });
+
+  it("is a fault when a model has more runs than the window, or the runs are not the runs of the jobs", () => {
+    const file = freezeLimits(runs(7).map(jobRead), { ...STAMP, window: 7 });
+    expect(limitFaults({ ...file, window: 6 })).toEqual(["The CPU model cpu-a has 7 runs, more than the window 6."]);
+    expect(limitFaults({ ...file, window: 4 })).toEqual(["The window 4 is not a whole number of 5 or more."]);
+    expect(limitFaults({ ...file, runs: file.runs.slice(1) })).toEqual(["The runs of the file are not the runs of its jobs."]);
   });
 });
