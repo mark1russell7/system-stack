@@ -13,10 +13,13 @@ CUT_BOUNDS: build/index.d.ts#CUT_BOUNDS
 CaseCuts: build/index.d.ts#CaseCuts
 Cut: build/index.d.ts#Cut
 CutBound: build/index.d.ts#CutBound
+CutFollows: build/index.d.ts#CutFollows
 DEFAULT_MAX_SETS: build/index.d.ts#DEFAULT_MAX_SETS
 FAULT_LEVELS: build/known.chunk.d.ts#FAULT_LEVELS
 Fault: build/known.chunk.d.ts#Fault
 FaultLevel: build/known.chunk.d.ts#FaultLevel
+FollowSide: build/index.d.ts#FollowSide
+FollowTerm: build/index.d.ts#FollowTerm
 KNOWN_CODES: build/known.chunk.d.ts#KNOWN_CODES
 KNOWN_SCHEMA: build/known.chunk.d.ts#KNOWN_SCHEMA
 KnownCode: build/known.chunk.d.ts#KnownCode
@@ -114,13 +117,33 @@ export interface Cut {
   readonly duration?: Survival | undefined;
   readonly bound?: CutBound | undefined;
   readonly source: string;
+  readonly follows?: CutFollows | undefined;
 }
 
 ### build/index.d.ts#CutBound
 export type CutBound = "law" | "upper" | "lower" | "none";
 
+### build/index.d.ts#CutFollows
+export interface CutFollows {
+  readonly part: string;
+  readonly onset: FollowTerm;
+  readonly recovery: FollowTerm;
+  readonly bound: "upper" | "none";
+}
+
 ### build/index.d.ts#DEFAULT_MAX_SETS
 export declare const DEFAULT_MAX_SETS = 4096;
+
+### build/index.d.ts#FollowSide
+export type FollowSide = "upper" | "lower";
+
+### build/index.d.ts#FollowTerm
+export interface FollowTerm {
+  readonly days: number;
+  readonly cited: boolean;
+  readonly side: FollowSide;
+  readonly says: string;
+}
 
 ### build/index.d.ts#PartSets
 export type PartSets = {
