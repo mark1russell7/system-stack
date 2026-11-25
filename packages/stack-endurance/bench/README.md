@@ -18,7 +18,13 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - A limit of a model is near the noise of its jobs, so a block can come from noise. When a commit changes no timed code, freeze again with the records of the whole run. Do it in a pull request. The rule then widens a limit only by a value of CI.
 - When a commit changes the timed code, a block is a finding. Find the cause before you change a limit.
 - At these margins, the gate cannot tell a slowdown of 1.5% from a change of the runners. So, on the same day, start the bench of the base commit. If the base blocks too, freeze again from that run, then read the pull request again.
-- A job is a no read when its A/A spread is above the noise cap, or when its CPU model has no frozen value. A no read is not a pass.
+- A job is a no read when its A/A spread or its A/A bias is above the noise cap of its CPU model. A job is also a no read when its CPU model has no frozen value. A no read is not a pass.
+- A noise cap is the worst A/A spread of a set of jobs plus the high side of their spreads (`noiseCapOf`). The high side is the worst minus the median. A spread under the median does not set the cap.
+- `runLimit` adds the low side too, so with it a job with less noise makes the cap larger. In the freeze of 78 jobs, a job with the spread 0.0054 moved the pooled cap from 0.2962 to 0.297.
+- Each CPU model with its own limit has its own noise cap from the A/A spreads of its jobs (`noiseCapTable`). Each other model reads against the pooled cap of all the jobs.
+- The pooled cap was 0.297 because of 1 job of a model with 2 jobs. The highest A/A spread of a job on the EPYC 7763 was 0.046. Thus a job that was noisy for its model still gave a read, against limits with 2.5% to 4% of room.
+- In the freeze of 78 jobs, the noise cap of the EPYC 7763 is 0.0763, and the cap of the Xeon 6975P-C is 0.0303. The cap of the EPYC 9V74 is 0.0754. The cap of the EPYC 9V45 is 0.0941, and the cap of the Xeon 8573C is 0.0962. The pooled cap is 0.2858.
+- We read each of 14 runs with the caps of the 13 other runs. 2 of the 84 jobs were above their cap. A job on the Xeon 8573C had the spread 0.0581 against its cap of 0.0403. A job on the Xeon 6973P-C had the spread 0.1512 against the pooled cap of 0.1275. No run had fewer than 3 jobs that read.
 - The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read.
 - The jobs of one CPU model in one run time one commit on one kind of runner. On the limit of their model, they make one group (`groupCases`).
 - A group blocks the run only when its lowest value is above the limit. A change of the code makes each job of the group slower, so the lowest value shows it. One slow machine makes one job slower, and the group stays within.
