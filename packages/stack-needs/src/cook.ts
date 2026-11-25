@@ -47,6 +47,21 @@ export const NIST_WEBBOOK_WATER_SOURCE: Source = {
   note: "The data of water come from the IAPWS-95 formulation. The table read is water, isobaric, 0.101325 MPa, 0 °C to 99.9 °C in steps of 10 °C.",
 };
 
+/**
+ * The source of the elevation limit of the cook time: Guide 1 of the USDA Complete Guide to Home Canning. It is a work of the United States federal government.
+ * The guide is about canning. The model takes from it only the elevation where a time for a boil at sea level stops being enough.
+ */
+export const USDA_CANNING_GUIDE_SOURCE: Source = {
+  id: "usda-home-canning-guide-1",
+  title: "Complete Guide to Home Canning, Guide 1: Principles of Home Canning (Agriculture Information Bulletin No. 539, revised 2015)",
+  url: "https://nchfp.uga.edu/papers/guide/GUIDE01_HomeCan_rev0715.pdf",
+  license: "us-public-domain",
+  checked: "2026-11-24",
+  by: "U.S. Department of Agriculture, through the National Center for Home Food Preservation",
+  terms: "https://www.usa.gov/government-copyright",
+  sha256: "60d1e1a74a9fe61c19e6f5312a76d291905a8ca51b28d0def04c677294416d86",
+};
+
 /** The check of a cited constant against a second source. */
 export interface CookCheck {
   readonly source: Source;
@@ -117,11 +132,33 @@ export const WATER_DENSITY_MIN: CookConstant = {
 };
 
 /**
+ * The lowest elevation where the cited cook times stop being enough: 1000 ft, which is 304.8 m. Since 0.10.6.
+ * The cook times of the catalog are for a boil at sea level. USDA Guide 1 tells that a sea-level time gives spoilage from 1000 ft, because water boils at a lower temperature.
+ * The model has no cited rule for the longer time. Thus, from this elevation, the cook time and the fuel are a no read.
+ */
+export const SEA_LEVEL_TIME_ELEVATION: CookConstant = {
+  value: 304.8,
+  unit: "m",
+  source: USDA_CANNING_GUIDE_SOURCE,
+  locator: "Page 1-10, Process adjustments at high altitudes: the process time for sea level is not enough at altitudes of 1,000 feet or more, because water boils at lower temperatures.",
+  note: "1000 ft times 0.3048 m/ft is 304.8 m. The guide gives the limit for the process time of canning. The model applies the same limit to the cook time of a dry food in boiling water.",
+};
+
+/**
  * The temperature at the end of the heat to boil, in °C.
- * Water boils at a lower temperature at a high place. Then the heat is less.
- * But the cook time is longer there, and the model does not give that time. Thus at a high place the fuel is not an upper limit.
+ * Water boils at a lower temperature at a high place. Then the heat is less, and 100 °C gives more heat than the true boil.
+ * But the cook time is longer there. From `SEA_LEVEL_TIME_ELEVATION`, the cook time and the fuel are a no read.
+ * Below sea level, water boils above 100 °C, so the heat is a no read.
  */
 export const BOIL_CELSIUS = 100;
+
+/** The elevation of the cook, with the citation of the caller, for example the elevation of the home. Since 0.10.6. */
+export interface CookElevation {
+  /** The elevation above sea level in `m`. A place below sea level has a negative value. */
+  readonly meters: number;
+  /** The citation of the value: the `id` of a fact or a source of the caller. */
+  readonly cite: string;
+}
 
 /**
  * The default start temperature of the cook water, in °C: 0, the freezing point. Liquid water at the pressure of the sea is
@@ -176,6 +213,11 @@ export interface CookFragmentInput {
   readonly share?: StoveShare | undefined;
   /** The start temperature of the cook water. The default is `COLD_START_CELSIUS`. */
   readonly start?: CookStart | undefined;
+  /**
+   * The elevation of the cook. It has no default. Without it, the model takes a cook at sea level. Since 0.10.6.
+   * From `SEA_LEVEL_TIME_ELEVATION`, each cook time and fuel is a no read. Below sea level, each heat is a no read.
+   */
+  readonly elevation?: CookElevation | undefined;
   /**
    * The soak method of each dry food of the buy list. The default is `cold`, which gives the same lines as before 0.10.5. Since 0.10.5.
    * A product with no cited soak, cold or quick, takes no soak with each method.
@@ -378,17 +420,19 @@ interface StoveContext {
   /** The energy of the fuel in `kJ/kg`, and its heating value, or `undefined` when the fuel has no cited energy. */
   readonly fuelEnergy: { readonly perKg: number; readonly heating: HeatingValue } | undefined;
   readonly method: SoakMethod;
+  /** The elevation of the cook in `m`, or `undefined` for a cook at sea level. */
+  readonly elevationM: number | undefined;
 }
 
 /**
  * This function gives the cook line of one dry food. Each missing fact gives a no read with its reason.
  * The fuel is a safe upper limit: the stove burns at its full rate for the boil time and the cook time.
  * Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read.
- * At a high place the cook time is longer. The model does not give that time, so there the fuel is not an upper limit.
+ * At a high place the cook time is longer. From `SEA_LEVEL_TIME_ELEVATION`, the cook time and the fuel are a no read.
  * A boil fuel from an adverse factor is an estimate (`yieldHeat`), so that fuel is not a proven upper limit.
  */
 function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | undefined, foodGifts: number, context: StoveContext): CookLine {
-  const { stove, batchKg, share, startC, fuelEnergy, method } = context;
+  const { stove, batchKg, share, startC, fuelEnergy, method, elevationM } = context;
 
   let energy: CookRead;
   if (foodGifts > 1) energy = noRead(`The product ${product.id} gives ${String(foodGifts)} foods. The catalog gives one energy for the whole product, not the energy of each food.`);
@@ -431,12 +475,19 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
   }
 
   // The heat to boil one pot: the mass of the water and the dry food times the specific heat of water times the rise to the boil.
-  const heat = water.read ? read((water.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ") : noRead(`The heat to boil is a no read: ${water.why}`);
+  // Below sea level, water boils above 100 °C. The rise to 100 °C then gives too little heat.
+  const belowSea = elevationM !== undefined && elevationM < 0 ? `The elevation is ${String(elevationM)} m. Below sea level, water boils above ${String(BOIL_CELSIUS)} °C, and the model has no cited boil point there.` : undefined;
+  const heat = !water.read
+    ? noRead(`The heat to boil is a no read: ${water.why}`)
+    : belowSea !== undefined
+      ? noRead(`The heat to boil is a no read. ${belowSea}`)
+      : read((water.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ");
   // The heat to boil the quick soak water, with the same rule. The dry food is in the soak water, so the mass also has the dry food.
   let soakHeat: CookRead | undefined;
   if (method === "quick") {
     if (!soak.read) soakHeat = noRead(`The heat of the quick soak is a no read: ${soak.why}`);
     else if (quickSoak === undefined) soakHeat = read(0, "kJ");
+    else if (belowSea !== undefined) soakHeat = noRead(`The heat of the quick soak is a no read. ${belowSea}`);
     else soakHeat = read((soak.value * WATER_DENSITY_MAX.value + 1) * batchKg * WATER_SPECIFIC_HEAT.value * (BOIL_CELSIUS - startC), "kJ");
   }
   // The fields of the soak method. A line of the cold soak has none, so its shape stays as before 0.10.5.
@@ -467,6 +518,11 @@ function cookLine(product: SupplyProduct, resource: string, perUnitKg: number | 
         : `The catalog cites no cook time for the product ${product.id}.`,
     );
   else if (cookMin === undefined) why.push(`The ${timeName} of the product ${product.id} is in ${time.unit}, which does not convert to min.`);
+  // The cited cook times are for a boil at sea level. From the cited elevation, the time is longer, and no cited rule gives it.
+  if (elevationM !== undefined && elevationM >= SEA_LEVEL_TIME_ELEVATION.value)
+    why.push(
+      `The elevation is ${String(elevationM)} m. From ${String(SEA_LEVEL_TIME_ELEVATION.value)} m (1000 ft), water boils at a lower temperature and a cook time for sea level is not enough. No cited rule gives the longer time.`,
+    );
 
   // Only a rate with no bound is the value. A least rate gives too little fuel for the cook time, and an unknown bound has no side.
   const bound: unknown = stove.rate !== undefined && "bound" in stove.rate ? stove.rate.bound : undefined;
@@ -576,8 +632,11 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *   So is the fuel from a factor with a typical range. The line then gives the fuel at each end of the range (`fuelSpread`).
  *   A factor with no bound is the value.
  *   A factor with the bound `least` gives a no read of the yield.
- * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. At a high place the cook time is longer.
- *   The model does not give that time, so there the fuel is not an upper limit. A boil fuel from an adverse factor is an estimate.
+ * - The fuel is a safe upper limit: the stove burns at its full rate for all of that time. A boil fuel from an adverse factor is an estimate.
+ * - The input `elevation` gives the elevation of the cook. Since 0.10.6. Without it, the model takes a cook at sea level.
+ *   From `SEA_LEVEL_TIME_ELEVATION` (1000 ft, 304.8 m), the cook time of the catalog is not enough, and no cited rule gives the longer time.
+ *   Thus each cook time and fuel is a no read there. The heat to 100 °C stays, because it is more than the heat to the true boil.
+ *   Below sea level, water boils above 100 °C, so each heat, cook time and fuel is a no read.
  * - Only a stove rate with no bound gives the fuel. A rate with a bound, for example `bound: "least"`, gives a no read. The fuel of the cook time is the rate times the time, so a least rate gives too little fuel.
  * - A rate in a mass gives the fuel directly. A rate in an energy gives a mass only through the cited energy of the fuel, with the same heating value.
  *
@@ -615,6 +674,7 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  * @throws RangeError when the batch is not a mass above 0, or when the share is not above 0 and up to 1
  * @throws RangeError when the start is not from 0 up to less than 100 °C
  * @throws RangeError when the soak method is not `cold`, `quick` or `none`
+ * @throws RangeError when the elevation is not a finite number of metres
  * @throws RangeError when the stove is a product with no stove facts
  * @throws RangeError when the catalog has no product of an `id` of the buy list
  * @throws RangeError when the catalog has no resource of the fuel in a unit of mass
@@ -631,6 +691,8 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
   if (!(startC >= 0 && startC < BOIL_CELSIUS)) throw new RangeError(`The start temperature is ${String(startC)} °C. It must be from 0 up to less than ${String(BOIL_CELSIUS)} °C.`);
   const method = input.soak ?? "cold";
   if (method !== "cold" && method !== "quick" && method !== "none") throw new RangeError(`The soak method is ${String(method)}. It must be cold, quick or none.`);
+  const elevationM = input.elevation?.meters;
+  if (elevationM !== undefined && !Number.isFinite(elevationM)) throw new RangeError(`The elevation is ${String(elevationM)} m. It must be a finite number of metres.`);
   const stove = stoveOf(catalog, input.stove);
   const fuel = catalog.resources.find((resource) => resource.code === stove.fuel);
   const fuelUnitPerKg = fuel === undefined ? undefined : inUnit(1, "kg", fuel.unit);
@@ -643,6 +705,7 @@ export function cookFragment(input: CookFragmentInput): CookFragmentResult {
     startC,
     fuelEnergy: perKg === undefined || fuel.fuelEnergy === undefined ? undefined : { perKg: valueIn(perKg, "kJ/kg"), heating: fuel.fuelEnergy.heating },
     method,
+    elevationM,
   };
 
   const unitOf = new Map(catalog.resources.map((resource) => [resource.code, resource.unit]));
