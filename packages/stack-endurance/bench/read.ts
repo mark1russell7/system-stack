@@ -67,8 +67,8 @@ export interface CaseValue {
 export interface JobRead {
   readonly job: string;
   readonly cpu: string;
-  /** The CI run of the job. A record with no run gives the id of the job. */
-  readonly run: string;
+  /** The CI run of the job, when the record has one. A freeze refuses a read with no run. */
+  readonly run?: string;
   /** The commit that the job timed, when the record has one. */
   readonly commit?: string;
   readonly cases: readonly CaseValue[];
@@ -84,7 +84,14 @@ export function jobRead(record: JobRecord): JobRead {
     return arm === undefined ? [] : [{ case: arm.case, cuts, ms: arm.median, p10: arm.p10, p90: arm.p90, processes: arm.processes }];
   });
   const aa = record.aa.length === 0 ? undefined : aaStats(record.aa).find((stat) => stat.case === AA_CASE);
-  return { job: record.job, cpu: record.env.cpu, run: record.run ?? record.job, ...(record.commit === undefined ? {} : { commit: record.commit }), cases, aa };
+  return {
+    job: record.job,
+    cpu: record.env.cpu,
+    ...(record.run === undefined ? {} : { run: record.run }),
+    ...(record.commit === undefined ? {} : { commit: record.commit }),
+    cases,
+    aa,
+  };
 }
 
 /** The file of the frozen limits, with the values, the commit and the date of each limit. */
@@ -167,10 +174,16 @@ export interface FreezeStamp {
 /**
  * This function gives the frozen limits of the reads of 5 jobs or more.
  *
- * @throws RangeError when there are fewer than `MIN_JOBS` jobs, when a job has no A/A read, or when a job does not have each case
+ * - Each read needs its CI run. A model limit counts the runs of the model, so a job with no run cannot count as a run of its own.
+ *
+ * @throws RangeError when there are fewer than `MIN_JOBS` jobs. Also when a job has no run, no A/A read or no value of each case
  */
 export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
   if (reads.length < MIN_JOBS) throw new RangeError(`A freeze needs ${String(MIN_JOBS)} jobs or more, not ${String(reads.length)}.`);
+  const runs = reads.map((read) => {
+    if (read.run === undefined || read.run === "") throw new RangeError(`The job ${read.job} has no run. A freeze counts the CI runs of each model, so each job needs its run.`);
+    return read.run;
+  });
   const cases: Record<string, RunLimit> = {};
   for (const cuts of BENCH_CUTS) {
     const id = caseId(cuts);
@@ -185,7 +198,7 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     if (read.aa === undefined) throw new RangeError(`The job ${read.job} has no A/A read.`);
     return read.aa.spread;
   });
-  const jobs = reads.map((read) => ({ job: read.job, cpu: read.cpu, run: read.run, commit: read.commit ?? stamp.commit }));
+  const jobs = reads.map((read, index) => ({ job: read.job, cpu: read.cpu, run: runs[index] ?? "", commit: read.commit ?? stamp.commit }));
   return {
     schema: LIMITS_SCHEMA,
     measure: MEASURE,
@@ -362,7 +375,8 @@ export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGat
     if (limit === undefined) return { case: id, outcome: "cannot decide", ms, limit, reason: "The file has no limit of the case." };
     return { case: id, outcome: ms <= limit ? "within" : "beyond", ms, limit, ...place };
   });
-  return { job: read.job, cpu: read.cpu, run: read.run, cases, gate: gateOf(cases) };
+  // A job out of CI has no run. Its gate uses the id of the job as its run.
+  return { job: read.job, cpu: read.cpu, run: read.run ?? read.job, cases, gate: gateOf(cases) };
 }
 
 function jobNoRead(read: JobRead, limits: FrozenLimits | undefined): string | undefined {
