@@ -12,14 +12,14 @@
  *   The group limit is `runLimit` of the lowest value of each run of the model.
  *   A group of 1 job reads against the limit of one job.
  */
-import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
+import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, recentRuns, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
 
 /** The schema of the record of one job. */
 export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
 /** The schema of the file of the frozen limits. */
-export const LIMITS_SCHEMA = "stack-endurance/independent-limits/3";
+export const LIMITS_SCHEMA = "stack-endurance/independent-limits/4";
 /** The measure of each value and each limit. */
 export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
@@ -36,6 +36,12 @@ export const AA_ARM = `${AA_CASE}#aa`;
 export const MIN_JOBS = 5;
 /** The fewest CI runs of one CPU model that give the model its own limit. */
 export const MIN_RUNS = 5;
+/**
+ * The window of a freeze: the most CI runs of one CPU model that a freeze keeps. A freeze keeps the last runs of each model (`recentRuns` of rigor-bench).
+ * - A freeze that only adds runs only makes each limit larger. With the window, an old run of a model goes out when a new run comes in.
+ * - The window is `MIN_RUNS` or more, so a model with `MIN_RUNS` runs keeps its own limit.
+ */
+export const FREEZE_WINDOW = 8;
 
 /** The record of one job of the bench, as `main.ts run` writes it. */
 export interface JobRecord {
@@ -103,8 +109,10 @@ export interface FrozenLimits {
   readonly commit: string;
   /** The date of the freeze, `YYYY-MM-DD`. */
   readonly date: string;
-  /** The CI runs of the jobs. */
+  /** The CI runs of the jobs, oldest first. */
   readonly runs: readonly string[];
+  /** The most runs of one CPU model in the file (`FREEZE_WINDOW` by default). `limitFaults` checks it. */
+  readonly window: number;
   /** The job and the CPU model of each value, in the order of the values. */
   readonly jobs: readonly { readonly job: string; readonly cpu: string; readonly run: string; readonly commit: string }[];
   /** The limit of each case, in milliseconds, with its values. */
@@ -151,22 +159,29 @@ export function noiseCapTable(jobs: FrozenLimits["jobs"], spreads: readonly numb
 export interface FreezeStamp {
   readonly commit: string;
   readonly date: string;
-  readonly runs: readonly string[];
+  /** The order of the CI runs, oldest first. It names each run of the reads one time. The default is the order of the first read of each run. */
+  readonly runs?: readonly string[];
+  /** The most runs of one CPU model that the freeze keeps. The default is `FREEZE_WINDOW`. */
+  readonly window?: number;
 }
 
 /**
  * This function gives the frozen limits of the reads of 5 jobs or more.
  *
  * - Each read needs its CI run. A model limit counts the runs of the model, so a job with no run cannot count as a run of its own.
+ * - The freeze keeps the last `window` runs of each CPU model in the order of the runs. The jobs of the file stay in the order of the reads.
  *
- * @throws RangeError when there are fewer than `MIN_JOBS` jobs. Also when a job has no run, no A/A read or no value of each case
+ * @throws RangeError when there are fewer than `MIN_JOBS` jobs in the window. Also when a job has no run, no A/A read or no value of each case. Also when the order does not name each run one time
  */
-export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
-  if (reads.length < MIN_JOBS) throw new RangeError(`A freeze needs ${String(MIN_JOBS)} jobs or more, not ${String(reads.length)}.`);
-  const runs = reads.map((read) => {
+export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
+  for (const read of all) {
     if (read.run === undefined || read.run === "") throw new RangeError(`The job ${read.job} has no run. A freeze counts the CI runs of each model, so each job needs its run.`);
-    return read.run;
-  });
+  }
+  const window = stamp.window ?? FREEZE_WINDOW;
+  const reads = recentRuns(all, (read) => ({ model: read.cpu, run: read.run ?? "" }), { perModel: window, minimumRuns: MIN_RUNS, ...(stamp.runs === undefined ? {} : { order: stamp.runs }) });
+  if (reads.length < MIN_JOBS) throw new RangeError(`A freeze needs ${String(MIN_JOBS)} jobs or more, not ${String(reads.length)}.`);
+  const runs = reads.map((read) => read.run ?? "");
+  const order = stamp.runs ?? [...new Set(all.map((read) => read.run ?? ""))];
   const cases: Record<string, RunLimit> = {};
   for (const cuts of BENCH_CUTS) {
     const id = caseId(cuts);
@@ -189,7 +204,8 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     seed: BENCH_SEED,
     commit: stamp.commit,
     date: stamp.date,
-    runs: stamp.runs,
+    runs: order.filter((run) => runs.includes(run)),
+    window,
     jobs,
     cases,
     noiseRule: NOISE_RULE,
@@ -197,6 +213,19 @@ export function freezeLimits(reads: readonly JobRead[], stamp: FreezeStamp): Fro
     noiseCaps: noiseCapTable(jobs, spreads),
     groups: groupTables(jobs, cases),
   };
+}
+
+/** This function gives the faults of the window of a file. Each CPU model has at most `window` runs. The field `runs` names the runs of the jobs. */
+function windowFaults(file: FrozenLimits): string[] {
+  if (!Number.isInteger(file.window) || file.window < MIN_RUNS) return [`The window ${String(file.window)} is not a whole number of ${String(MIN_RUNS)} or more.`];
+  const faults: string[] = [];
+  for (const cpu of new Set(file.jobs.map((job) => job.cpu))) {
+    const count = new Set(file.jobs.filter((job) => job.cpu === cpu).map((job) => job.run)).size;
+    if (count > file.window) faults.push(`The CPU model ${cpu} has ${String(count)} runs, more than the window ${String(file.window)}.`);
+  }
+  const runs = new Set(file.jobs.map((job) => job.run));
+  if (!Array.isArray(file.runs) || file.runs.length !== runs.size || file.runs.some((run) => !runs.has(run))) faults.push("The runs of the file are not the runs of its jobs.");
+  return faults;
 }
 
 /** This function gives the faults of a file of frozen limits. It computes each limit again from its values. */
@@ -217,6 +246,7 @@ export function limitFaults(file: FrozenLimits): string[] {
     if (typeof job.commit !== "string" || !/^[0-9a-f]{40}$/.test(job.commit)) faults.push(`The job ${job.job} has no full SHA of its commit.`);
   }
   for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
+  faults.push(...windowFaults(file));
   faults.push(...noiseCapFaults(file));
   // Each group limit must be the limit that the jobs and the values of the file give. Thus a review of the jobs is also a review of the group limits.
   const again = groupTables(file.jobs, file.cases);
