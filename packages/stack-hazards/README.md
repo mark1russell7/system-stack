@@ -397,6 +397,39 @@ To leave the open events out gives a lower curve, and a lower curve makes a plan
 
 The reader of the archived files is not in this repository yet. Each row names the year of its summary, and `OE417_FILES` gives the archived copy of each year. Thus a reader can check each row and each count.
 
+## The exposure of a site
+
+Since 0.7.7, the package reads three official layers at the point of a site. Each layer is data: its case, its address, its fields and its source in `EXPOSURE_SOURCES`.
+
+A function gives each request, and a function reads each reply. The caller sends the request, for example through `polite-crawler`. The caller gives the user agent. The package has no default user agent.
+
+| Layer | Case | Request | Reader | Exposure |
+| --- | --- | --- | --- | --- |
+| `WILDFIRE_LAYER`: the wildfire hazard potential of the Forest Service, version 2023, cells of 270 m | `fire.wildfire` | `wildfireRequest` | `wildfireExposure` | The class of the cell, from `WILDFIRE_CLASSES` |
+| `REACTOR_LAYER`: the power reactors of FEMA, with the daily status of the NRC | `cbrne.radiological` | `reactorRequest` | `reactorsOf` | `nuclearExposure`: the nearest plant, its distance and the zone |
+| `DAM_LAYER`: the National Inventory of Dams of USACE | `met.flood` | `damRequest` | `damsOf` | `damExposure`: the count of each hazard class and the high hazard dams in a radius |
+
+A reply with an error, a wrong shape or no value gives `NoExposure`, with the reason. A no read is not a pass.
+
+The zones of a plant are the nominal radii of 10 CFR 50.47(c)(2). The plume exposure pathway is approximately 10 miles, and the ingestion pathway is approximately 50 miles. The real zone of a plant follows local bounds. `nuclearExposure` uses only the reactors with a status. A reactor that is shut down for good has no status.
+
+The hazard potential of a dam is the result of a failure, not the condition of the dam. A failure of a `high` dam will probably cause loss of human life. The public layer has no inundation area, so a dam in the radius is not always upstream.
+
+The requests ask for no name of an owner and no address. The dam request also asks for no dam name, because a dam name can be the name of a person.
+
+```ts
+import { damExposure, damRequest, damsOf, METERS_PER_MILE, type ExposureRequest } from "@mark1russell7/stack-hazards";
+
+// The fetch of the caller, for example through polite-crawler. It gives the JSON of the reply.
+declare function send(request: ExposureRequest): Promise<unknown>;
+
+const site = { lat: 40, lon: -100 };
+const radius = 5 * METERS_PER_MILE;
+const reply = await send(damRequest(site, radius, "my-app/1.0"));
+const dams = damsOf(reply);
+if (!("read" in dams)) console.log(damExposure(site, dams, radius).counts.high);
+```
+
 ## The entries
 
 | Entry | What it has |

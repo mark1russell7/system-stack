@@ -19,12 +19,21 @@ Claim: build/hazard.chunk.d.ts#Claim
 ClaimBasis: build/hazard.chunk.d.ts#ClaimBasis
 CountyPooling: build/hazard.chunk.d.ts#CountyPooling
 CoverageTally: build/index.d.ts#CoverageTally
+DAM_HAZARDS: build/index.d.ts#DAM_HAZARDS
+DAM_LAYER: build/index.d.ts#DAM_LAYER
+Dam: build/index.d.ts#Dam
+DamDistance: build/index.d.ts#DamDistance
+DamExposure: build/index.d.ts#DamExposure
+DamHazard: build/index.d.ts#DamHazard
 DurationLaw: build/hazard.chunk.d.ts#DurationLaw
 EAGLEI_NATION_CUSTOMERS: build/index.d.ts#EAGLEI_NATION_CUSTOMERS
 EAGLEI_STATE_POOLING: build/index.d.ts#EAGLEI_STATE_POOLING
 EAGLEI_STATE_PRIORS: build/index.d.ts#EAGLEI_STATE_PRIORS
 EAGLE_INTERVAL: build/index.d.ts#EAGLE_INTERVAL
 EAGLE_SCHEME: build/index.d.ts#EAGLE_SCHEME
+EXPOSURE_SOURCES: build/index.d.ts#EXPOSURE_SOURCES
+ExposureLayer: build/index.d.ts#ExposureLayer
+ExposureRequest: build/index.d.ts#ExposureRequest
 Fit: build/hazard.chunk.d.ts#Fit
 FollowRead: build/index.d.ts#FollowRead
 type FollowTerm: @mark1russell7/system-stack#FollowTerm (external)
@@ -46,9 +55,11 @@ HazardPrior: build/index.d.ts#HazardPrior
 HazardPriorOptions: build/index.d.ts#HazardPriorOptions
 HazardRegion: build/index.d.ts#HazardRegion
 HazardSource: build/hazard.chunk.d.ts#HazardSource
+INGESTION_ZONE_MILES: build/index.d.ts#INGESTION_ZONE_MILES
 IsoDate: build/hazard.chunk.d.ts#IsoDate
 LAW_DAYS: build/index.d.ts#LAW_DAYS
 LawOf: build/index.d.ts#LawOf
+METERS_PER_MILE: build/index.d.ts#METERS_PER_MILE
 NO_COLLAPSE_LAW: build/index.d.ts#NO_COLLAPSE_LAW
 NO_CYBER_LAW: build/index.d.ts#NO_CYBER_LAW
 NO_EVENT_LAW: build/index.d.ts#NO_EVENT_LAW
@@ -57,7 +68,10 @@ NO_GEOMAGNETIC_LAW: build/index.d.ts#NO_GEOMAGNETIC_LAW
 NO_LAW: build/index.d.ts#NO_LAW
 NO_STORM_LAW: build/index.d.ts#NO_STORM_LAW
 NO_TOLD_LAW: build/index.d.ts#NO_TOLD_LAW
+NoExposure: build/index.d.ts#NoExposure
 NoLaw: build/hazard.chunk.d.ts#NoLaw
+NuclearExposure: build/index.d.ts#NuclearExposure
+NuclearZone: build/index.d.ts#NuclearZone
 OE417_ATTACK_CASE: build/index.d.ts#OE417_ATTACK_CASE
 OE417_ATTACK_EVENTS: build/index.d.ts#OE417_ATTACK_EVENTS
 OE417_ATTACK_LAW: build/index.d.ts#OE417_ATTACK_LAW
@@ -92,6 +106,8 @@ OutageOptions: build/index.d.ts#OutageOptions
 OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
+PLUME_ZONE_MILES: build/index.d.ts#PLUME_ZONE_MILES
+PlantDistance: build/index.d.ts#PlantDistance
 PoolHoldout: build/hazard.chunk.d.ts#PoolHoldout
 PoolLaw: build/hazard.chunk.d.ts#PoolLaw
 PoolScore: build/hazard.chunk.d.ts#PoolScore
@@ -99,7 +115,9 @@ PoolTimeHoldout: build/hazard.chunk.d.ts#PoolTimeHoldout
 PoolTimeScore: build/hazard.chunk.d.ts#PoolTimeScore
 PooledRates: build/index.d.ts#PooledRates
 PriorTable: build/hazard.chunk.d.ts#PriorTable
+REACTOR_LAYER: build/index.d.ts#REACTOR_LAYER
 ReachScore: build/hazard.chunk.d.ts#ReachScore
+Reactor: build/index.d.ts#Reactor
 RegionCurve: build/index.d.ts#RegionCurve
 Regions: build/hazard.chunk.d.ts#Regions
 SPAN_BASES: build/hazard.chunk.d.ts#SPAN_BASES
@@ -108,6 +126,7 @@ STORM_CLASSES: build/index.d.ts#STORM_CLASSES
 STORM_STATE_CODES: build/index.d.ts#STORM_STATE_CODES
 SUPPLY_PARTS: build/hazard.chunk.d.ts#SUPPLY_PARTS
 SilentAreas: build/index.d.ts#SilentAreas
+SitePoint: build/index.d.ts#SitePoint
 SpanBasis: build/hazard.chunk.d.ts#SpanBasis
 SpanUnit: build/hazard.chunk.d.ts#SpanUnit
 StatePooling: build/hazard.chunk.d.ts#StatePooling
@@ -118,10 +137,18 @@ SupplyState: build/index.d.ts#SupplyState
 SurvivalOptions: build/index.d.ts#SurvivalOptions
 TermSide: build/index.d.ts#TermSide
 WATER_RECOVERY: build/index.d.ts#WATER_RECOVERY
+WILDFIRE_CLASSES: build/index.d.ts#WILDFIRE_CLASSES
+WILDFIRE_LAYER: build/index.d.ts#WILDFIRE_LAYER
+WildfireClass: build/index.d.ts#WildfireClass
+WildfireExposure: build/index.d.ts#WildfireExposure
 areaCounts: build/index.d.ts#areaCounts
 areaUnits: build/index.d.ts#areaUnits
+boxAround: build/index.d.ts#boxAround
 checkHazards: build/index.d.ts#checkHazards
 coverageTally: build/index.d.ts#coverageTally
+damExposure: build/index.d.ts#damExposure
+damRequest: build/index.d.ts#damRequest
+damsOf: build/index.d.ts#damsOf
 eagleCustomers: build/index.d.ts#eagleCustomers
 eagleLine: build/index.d.ts#eagleLine
 eagleRegion: build/index.d.ts#eagleRegion
@@ -131,6 +158,7 @@ hazardCase: build/index.d.ts#hazardCase
 hazardOf: build/index.d.ts#hazardOf
 hazardPriors: build/index.d.ts#hazardPriors
 hazardRegions: build/index.d.ts#hazardRegions
+nuclearExposure: build/index.d.ts#nuclearExposure
 observedRegions: build/index.d.ts#observedRegions
 oe417AttackLaw: build/index.d.ts#oe417AttackLaw
 oe417AttackPrior: build/index.d.ts#oe417AttackPrior
@@ -149,6 +177,8 @@ outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
 priorTableFaults: build/index.d.ts#priorTableFaults
 priorTableOverlaps: build/index.d.ts#priorTableOverlaps
+reactorRequest: build/index.d.ts#reactorRequest
+reactorsOf: build/index.d.ts#reactorsOf
 regionCounts: build/index.d.ts#regionCounts
 regionObservation: build/index.d.ts#regionObservation
 regionRates: build/index.d.ts#regionRates
@@ -158,6 +188,8 @@ stormLine: build/index.d.ts#stormLine
 supplyState: build/index.d.ts#supplyState
 survivalOf: build/index.d.ts#survivalOf
 upperRates: build/index.d.ts#upperRates
+wildfireExposure: build/index.d.ts#wildfireExposure
+wildfireRequest: build/index.d.ts#wildfireRequest
 withoutSilentAreas: build/index.d.ts#withoutSilentAreas
 zoneCounties: build/index.d.ts#zoneCounties
 
@@ -423,6 +455,43 @@ export interface CoverageTally {
   calendar(): Map<string, number[]>;
 }
 
+### build/index.d.ts#DAM_HAZARDS
+export declare const DAM_HAZARDS: readonly ["high", "significant", "low", "undetermined"];
+
+### build/index.d.ts#DAM_LAYER
+export declare const DAM_LAYER: ExposureLayer;
+
+### build/index.d.ts#Dam
+export interface Dam {
+  readonly id: string;
+  readonly hazard: DamHazard | null;
+  readonly lat: number;
+  readonly lon: number;
+  readonly river: string | null;
+  readonly condition: string | null;
+  readonly eap: string | null;
+  readonly storageAcreFeet: number | null;
+  readonly heightFt: number | null;
+}
+
+### build/index.d.ts#DamDistance
+export interface DamDistance extends Dam {
+  readonly meters: number;
+}
+
+### build/index.d.ts#DamExposure
+export interface DamExposure {
+  readonly read: true;
+  readonly case: string;
+  readonly radiusMeters: number;
+  readonly counts: Readonly<Record<DamHazard | "none", number>>;
+  readonly high: readonly DamDistance[];
+  readonly source: string;
+}
+
+### build/index.d.ts#DamHazard
+export type DamHazard = (typeof DAM_HAZARDS)[number];
+
 ### build/index.d.ts#EAGLEI_NATION_CUSTOMERS
 export declare const EAGLEI_NATION_CUSTOMERS = 154857853;
 
@@ -437,6 +506,25 @@ export declare const EAGLE_INTERVAL = 900;
 
 ### build/index.d.ts#EAGLE_SCHEME
 export declare const EAGLE_SCHEME = "us-state-fips";
+
+### build/index.d.ts#EXPOSURE_SOURCES
+export declare const EXPOSURE_SOURCES: Readonly<Record<string, HazardSource>>;
+
+### build/index.d.ts#ExposureLayer
+export interface ExposureLayer {
+  readonly case: string;
+  readonly url: string;
+  readonly fields: readonly string[];
+  readonly source: string;
+}
+
+### build/index.d.ts#ExposureRequest
+export interface ExposureRequest {
+  readonly method: "GET";
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: null;
+}
 
 ### build/index.d.ts#FollowRead
 export type FollowRead = CutFollows;
@@ -494,11 +582,17 @@ export interface HazardRegion {
   readonly code: string;
 }
 
+### build/index.d.ts#INGESTION_ZONE_MILES
+export declare const INGESTION_ZONE_MILES = 50;
+
 ### build/index.d.ts#LAW_DAYS
 export declare const LAW_DAYS: readonly number[];
 
 ### build/index.d.ts#LawOf
 export type LawOf = (name: string, area: string) => GammaRates | undefined;
+
+### build/index.d.ts#METERS_PER_MILE
+export declare const METERS_PER_MILE = 1609.344;
 
 ### build/index.d.ts#NO_COLLAPSE_LAW
 export declare const NO_COLLAPSE_LAW: NoLaw;
@@ -523,6 +617,28 @@ export declare const NO_STORM_LAW: NoLaw;
 
 ### build/index.d.ts#NO_TOLD_LAW
 export declare const NO_TOLD_LAW: NoLaw;
+
+### build/index.d.ts#NoExposure
+export interface NoExposure {
+  readonly read: false;
+  readonly case: string;
+  readonly reason: string;
+  readonly source: string;
+}
+
+### build/index.d.ts#NuclearExposure
+export interface NuclearExposure {
+  readonly read: true;
+  readonly case: string;
+  readonly nearest: PlantDistance | null;
+  readonly zone: NuclearZone;
+  readonly within: readonly PlantDistance[];
+  readonly unreported: number;
+  readonly source: string;
+}
+
+### build/index.d.ts#NuclearZone
+export type NuclearZone = "plume" | "ingestion" | "outside";
 
 ### build/index.d.ts#OE417_ATTACK_CASE
 export declare const OE417_ATTACK_CASE = "infra.power.physical-attack";
@@ -710,10 +826,32 @@ export interface OutageTally {
   readonly joined: number;
 }
 
+### build/index.d.ts#PLUME_ZONE_MILES
+export declare const PLUME_ZONE_MILES = 10;
+
+### build/index.d.ts#PlantDistance
+export interface PlantDistance {
+  readonly plant: string;
+  readonly meters: number;
+  readonly miles: number;
+}
+
 ### build/index.d.ts#PooledRates
 export interface PooledRates {
   readonly rates: Record<string, readonly [number, number]>;
   readonly laws: Record<string, PoolLaw>;
+}
+
+### build/index.d.ts#REACTOR_LAYER
+export declare const REACTOR_LAYER: ExposureLayer;
+
+### build/index.d.ts#Reactor
+export interface Reactor {
+  readonly plant: string;
+  readonly unit: string;
+  readonly lat: number;
+  readonly lon: number;
+  readonly reported: boolean;
 }
 
 ### build/index.d.ts#RegionCurve
@@ -736,6 +874,12 @@ export interface SilentAreas {
   readonly observation: Observation;
   readonly silent: readonly string[];
   readonly expected: number;
+}
+
+### build/index.d.ts#SitePoint
+export interface SitePoint {
+  readonly lat: number;
+  readonly lon: number;
 }
 
 ### build/index.d.ts#StormArea
@@ -777,17 +921,47 @@ export type TermSide = FollowSide;
 ### build/index.d.ts#WATER_RECOVERY
 export declare const WATER_RECOVERY: CitedSpan;
 
+### build/index.d.ts#WILDFIRE_CLASSES
+export declare const WILDFIRE_CLASSES: readonly ["very-low", "low", "moderate", "high", "very-high", "non-burnable", "water"];
+
+### build/index.d.ts#WILDFIRE_LAYER
+export declare const WILDFIRE_LAYER: ExposureLayer;
+
+### build/index.d.ts#WildfireClass
+export type WildfireClass = (typeof WILDFIRE_CLASSES)[number];
+
+### build/index.d.ts#WildfireExposure
+export interface WildfireExposure {
+  readonly read: true;
+  readonly case: string;
+  readonly value: number;
+  readonly class: WildfireClass;
+  readonly source: string;
+}
+
 ### build/index.d.ts#areaCounts
 export declare function areaCounts(events: readonly OutageEvent[], customers: ReadonlyMap<string, number>): Record<string, AreaCount>;
 
 ### build/index.d.ts#areaUnits
 export declare function areaUnits(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation): AreaUnits;
 
+### build/index.d.ts#boxAround
+export declare function boxAround(point: SitePoint, radiusMeters: number): BBox;
+
 ### build/index.d.ts#checkHazards
 export declare function checkHazards(list: HazardList, parts?: readonly Part[], options?: HazardGateOptions): HazardFault[];
 
 ### build/index.d.ts#coverageTally
 export declare function coverageTally(): CoverageTally;
+
+### build/index.d.ts#damExposure
+export declare function damExposure(point: SitePoint, dams: readonly Dam[], radiusMeters: number): DamExposure;
+
+### build/index.d.ts#damRequest
+export declare function damRequest(point: SitePoint, radiusMeters: number, userAgent: string): ExposureRequest;
+
+### build/index.d.ts#damsOf
+export declare function damsOf(reply: unknown): readonly Dam[] | NoExposure;
 
 ### build/index.d.ts#eagleCustomers
 export declare function eagleCustomers(text: string): Map<string, number>;
@@ -815,6 +989,9 @@ export declare function hazardPriors(list: HazardList, options?: HazardPriorOpti
 
 ### build/index.d.ts#hazardRegions
 export declare function hazardRegions(region: HazardCaseOptions["region"]): readonly HazardRegion[];
+
+### build/index.d.ts#nuclearExposure
+export declare function nuclearExposure(point: SitePoint, reactors: readonly Reactor[]): NuclearExposure;
 
 ### build/index.d.ts#observedRegions
 export declare function observedRegions(observation: Observation, region: (area: string) => string): string[];
@@ -870,6 +1047,12 @@ export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<s
 ### build/index.d.ts#priorTableOverlaps
 export declare function priorTableOverlaps(tables: readonly PriorTable[]): string[];
 
+### build/index.d.ts#reactorRequest
+export declare function reactorRequest(userAgent: string): ExposureRequest;
+
+### build/index.d.ts#reactorsOf
+export declare function reactorsOf(reply: unknown): readonly Reactor[] | NoExposure;
+
 ### build/index.d.ts#regionCounts
 export declare function regionCounts(counts: Readonly<Record<string, AreaCount>>, observation: Observation, region: (area: string) => string): Record<string, AreaCount>;
 
@@ -896,6 +1079,12 @@ export declare function survivalOf(curve: SurvivalCurve, options?: SurvivalOptio
 
 ### build/index.d.ts#upperRates
 export declare function upperRates(units: AreaUnits, lawOf: LawOf, level?: number): Record<string, Record<string, number>>;
+
+### build/index.d.ts#wildfireExposure
+export declare function wildfireExposure(reply: unknown): WildfireExposure | NoExposure;
+
+### build/index.d.ts#wildfireRequest
+export declare function wildfireRequest(point: SitePoint, userAgent: string): ExposureRequest;
 
 ### build/index.d.ts#withoutSilentAreas
 export declare function withoutSilentAreas(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation, group: (area: string) => string): SilentAreas;
