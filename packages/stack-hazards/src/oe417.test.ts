@@ -2,7 +2,7 @@ import { curveFault } from "@mark1russell7/system-stack";
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "./check.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, NO_CYBER_LAW, NO_GEOMAGNETIC_LAW } from "./data.ts";
-import { EAGLEI_NATION_CUSTOMERS } from "./eaglei-state-priors.ts";
+import { EAGLEI_NATION_CUSTOMERS, EAGLEI_STATE_PRIORS } from "./eaglei-state-priors.ts";
 import { HAZARDS_SCHEMA } from "./hazard.ts";
 import { hazardPriors } from "./priors.ts";
 import {
@@ -243,5 +243,20 @@ describe("the prior of a physical attack", () => {
     expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011.5, last: 2023, customers: 1 })).toThrow(RangeError);
     expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2011, last: 2023, customers: 0 })).toThrow(RangeError);
     expect(() => oe417AttackPrior(OE417_ATTACK_EVENTS, { first: 2000, last: 2010, customers: 1 })).toThrow(RangeError);
+  });
+});
+
+describe("the overlap of the attack case and the outage case", () => {
+  it("counts an outage two times in at most 0.21% of the sum of the two priors at one customer of each state", () => {
+    // An outage that the two cases count is at most each attack event. Thus the share of the sum that counts it two times is at most min(A, O) / (A + O).
+    // A is the attack events at one customer in one year, from the prior of the nation. O is the same for the outage case of the state.
+    const attack = OE417_NATION_PRIORS.rates[OE417_ATTACK_CASE]?.["US"] ?? [];
+    expect(attack).toHaveLength(2);
+    const a = attack[0]! * attack[1]!;
+    const outage = Object.values(EAGLEI_STATE_PRIORS.rates["infra.power.outage"] ?? {});
+    expect(outage.length).toBeGreaterThan(50);
+    const shares = outage.map(([perYear, reach]) => Math.min(a, perYear * reach) / (a + perYear * reach));
+    // The line of a fix is 10%, as for the overlap of the storm cases. The largest share is 0.20%.
+    expect(Math.max(...shares)).toBeLessThan(0.0021);
   });
 });

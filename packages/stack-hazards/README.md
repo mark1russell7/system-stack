@@ -240,6 +240,8 @@ The fit job also reads the details files of NOAA Storm Events and the zone-count
 
 The fit record gives the outages in a storm case and the outages in two storm cases or more (`priors.overlap`). Its field `byState` gives the two counts for each state (`us-state-fips`). Thus a reader can compare the share of each state with the share of the nation.
 
+The attack case of OE-417 and the outage case of EAGLE-I can count one outage two times. An outage that the two cases count is at most each attack event. At one customer of each state, the attack prior is at most 0.21% of the sum of the two priors. That is far below the line of 10% for a fix, so the priors keep the overcount. A test of `oe417.test.ts` holds the limit.
+
 ## The yearly priors from outage records
 
 `HAZARD_LIST` has the table of the yearly priors of each state (`us-state-fips`) from EAGLE-I. The table of each county (`us-county-fips`) is large, so it has its own entry. Add it to the list when the user gives a county:
