@@ -520,6 +520,25 @@ describe("the cook fragment", () => {
       expect(rest).toEqual(lineOf(cookFragment(input).lines, "test.grain-1kg"));
     });
 
+    it("takes the cited unsoaked cook water with no soak for a soaked food", () => {
+      // A made-up unsoaked cook water of 2.5 L for each kg. One pot of 0.5 kg takes 1.25 L, and the cook time is the high end of unsoakedTime.
+      const unsoakedWater: CitedRate = { amount: 2.5, unit: "L", per: { amount: 1, unit: "kg" }, fact };
+      const result = cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater }), soak: "none" });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      const heat = 1.75 * 4.19002 * 80;
+      expect(line.water).toEqual({ read: true, value: 2.5, unit: "L/kg" });
+      expect(line.heat.read && line.heat.value).toBeCloseTo(heat, 9);
+      expect(line.minutes.read && line.minutes.value).toBeCloseTo(heat / 250 + 60, 9);
+      expect(line.fuel.read && line.fuel.value).toBeCloseTo((heat / 250 + 60) * 0.01, 9);
+      expect(waterTake(result)).toBeCloseTo(1.25, 9);
+      // The cold soak and the quick soak keep the cook water after the soak.
+      expect(lineOf(cookFragment(grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater })).lines, "test.grain-1kg").water).toEqual({ read: true, value: 2, unit: "L/kg" });
+      // An unsoaked water for each volume with no bulk mass gives no L/kg.
+      const perVolume = lineOf(cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime, unsoakedWater: { ...unsoakedWater, per: { amount: 1, unit: "L" } } }), soak: "none" }).lines, "test.grain-1kg");
+      expect(perVolume.water.read).toBe(false);
+      if (!perVolume.water.read) expect(perVolume.water.why).toMatch(/unsoaked cook water .* bulk mass/);
+    });
+
     it("refuses an unknown soak method", () => {
       expect(() => cookFragment({ ...input, soak: "hot" as never })).toThrow(RangeError);
     });
