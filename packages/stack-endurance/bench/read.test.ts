@@ -47,7 +47,8 @@ function jobRecord(job: string, scale: number, aa: (round: number) => number = (
     const a = (base[AA_CASE] ?? 1) * scale;
     aaRecords.push({ case: AA_CASE, round, first: round % 2 === 0 ? "a" : "b", a, b: a * aa(round), job, env });
   }
-  return { schema: RECORD_SCHEMA, job, seed: BENCH_SEED, env, rounds, warnings: [], processes, aa: aaRecords };
+  // Each made-up job is in a CI run of its own, with the id of the job.
+  return { schema: RECORD_SCHEMA, job, run: job, seed: BENCH_SEED, env, rounds, warnings: [], processes, aa: aaRecords };
 }
 
 const IDS = BENCH_CUTS.map(caseId);
@@ -181,6 +182,15 @@ describe("the limits of each CPU model", () => {
     expect(MIN_RUNS).toBe(5);
     expect(Object.keys(modelTables(file)["m12"] ?? {})).toEqual(["other"]);
     expect(jobGate(jobRead(oneRun[0] as JobRecord), file).cases[0]?.note).toBe(CEILING_ONLY);
+  });
+
+  it("refuse a freeze with a job that has no run, and gate that job with the id of the job as its run", () => {
+    const bare: JobRecord = { ...(JOBS[0] as JobRecord) };
+    delete (bare as { run?: string }).run;
+    expect(jobRead(bare).run).toBeUndefined();
+    expect(() => freezeLimits([bare, ...JOBS.slice(1)].map(jobRead), STAMP)).toThrow(/The job job-1 has no run/);
+    expect(() => freezeLimits([{ ...bare, run: "" }, ...JOBS.slice(1)].map(jobRead), STAMP)).toThrow(RangeError);
+    expect(jobGate(jobRead(bare), frozen()).run).toBe("job-1");
   });
 
   it("keep the run and the commit of each job, and show a job with no run or commit as a fault", () => {
