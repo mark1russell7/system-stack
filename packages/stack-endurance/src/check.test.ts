@@ -68,6 +68,15 @@ describe("checkEndurance", () => {
     expect(codes(layer)).toContain("endurance-curve");
   });
 
+  it("refuses a cut with a bound that is not a value of CUT_BOUNDS, and passes each value", () => {
+    const storm = SAMPLE_ENDURANCE.cases?.[0];
+    if (storm === undefined) throw new Error("no case");
+    const withBound = (bound: unknown): EnduranceLayer => ({ ...SAMPLE_ENDURANCE, cases: [{ ...storm, cuts: [{ ...(storm.cuts[0] as (typeof storm.cuts)[number]), bound: bound as "law" }, ...storm.cuts.slice(1)] }] });
+    const faults = checkEndurance(withBound("exact"), SAMPLE_ENDURANCE_STACK);
+    expect(faults.find((fault) => fault.code === "endurance-bound")).toMatchObject({ level: "error", at: `storm/${storm.cuts[0]?.part ?? ""}` });
+    for (const bound of ["law", "upper", "lower", "none"]) expect(codes(withBound(bound))).not.toContain("endurance-bound");
+  });
+
   it("warns about a cut with no curve, and does not refuse it", () => {
     const storm = SAMPLE_ENDURANCE.cases?.[0];
     if (storm === undefined) throw new Error("no case");
@@ -126,7 +135,7 @@ describe("checkEndurance", () => {
   });
 
   it("has a code for each fault", () => {
-    expect(ENDURANCE_CODES).toHaveLength(14);
+    expect(ENDURANCE_CODES).toHaveLength(15);
   });
 });
 

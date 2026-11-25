@@ -71,6 +71,12 @@ export interface FollowRead {
 
 /** A cut in the output of `hazardCase`: a `Cut` of the core, with the terms of a dependent cut with a curve. Since 0.7.0. */
 export interface HazardCaseCut extends Cut {
+  /**
+   * The bound of the curve, on each cut with a curve. Since 0.7.2.
+   * `law` for a cut with a law of its own. For a dependent cut, the `bound` of `follows`: `upper` or `none`.
+   * The terms give no `lower`, because each onset is an upper bound.
+   */
+  readonly bound?: "law" | FollowRead["bound"] | undefined;
   readonly follows?: FollowRead | undefined;
 }
 
@@ -102,6 +108,9 @@ export function supplyState(hazard: Hazard, part: string, options: BasisOptions 
  * Its field `follows` then tells the side of each term. Its source is the source of the cause curve and the sources of the terms.
  * A cause with no curve gives the dependent cut no `duration`, as before 0.7.0.
  *
+ * Since 0.7.2, each cut with a curve has the field `bound` of the core. A cut with a law of its own has `law`.
+ * A dependent cut has the `bound` of its field `follows`. A reader of `bound` alone thus tells a law from a curve that is no bound.
+ *
  * The option `assessed` can drop the claims of assessed risks. A cut with only assessed claims then has no `duration`. The function is pure.
  */
 export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCaseOptions = {}): HazardCaseCuts {
@@ -112,7 +121,7 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
     const read = cutCurve({ list, hazard, regions, options }, item, new Set());
     const source = read === undefined ? claimSources(list, item) : read.source;
     const follows = read?.follows === undefined ? {} : { follows: read.follows };
-    return ids.map((part) => ({ part, title: item.title, ...(read === undefined ? {} : { duration: read.curve }), source, ...follows }));
+    return ids.map((part) => ({ part, title: item.title, ...(read === undefined ? {} : { duration: read.curve, bound: read.bound }), source, ...follows }));
   });
   return { case: hazard.case, title: hazard.title, cuts };
 }

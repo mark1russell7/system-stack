@@ -92,7 +92,7 @@ export interface Converter {
 }
 
 // The core holds the records of the cuts of a case, so that each add-on shares them. This entry gives them again.
-export type { CaseCuts, Cut, Prior, Survival } from "@mark1russell7/system-stack";
+export type { CaseCuts, Cut, CutBound, Prior, Survival } from "@mark1russell7/system-stack";
 
 /** The days that one draw holds, and the resources that are used up at that time. */
 export interface DrawEndurance {

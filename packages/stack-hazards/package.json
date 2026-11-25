@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-hazards",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Hazard cases as reference data: the public supplies that each case can stop, each with a source, and the law of the duration of the stop or no read. An add-on of system-stack.",
   "license": "MIT",
   "repository": {
