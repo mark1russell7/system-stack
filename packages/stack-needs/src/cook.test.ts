@@ -394,6 +394,137 @@ describe("the cook fragment", () => {
     expect(lineOf(bulk.lines, "test.grain-1kg").soak).toEqual({ read: true, value: 4, unit: "L/kg" });
   });
 
+  describe("the soak methods", () => {
+    /** The input with the cook facts of the made-up grain changed by `more`. */
+    const grainWith = (more: object, base: CookFragmentInput = input): CookFragmentInput => ({
+      ...base,
+      catalog: { ...catalog, products: catalog.products.map((product) => (product.id === grain.id ? { ...grain, cook: { ...grain.cook, ...more } } : product)) },
+    });
+    const coldSoak: CitedRate = { amount: 3, unit: "L", per: { amount: 1, unit: "kg" }, fact };
+    /** A made-up quick soak: 4 L for each kg, a boil of 2 to 3 min, and a stand of 60 min off the heat. */
+    const quickSoak = { amount: 4, unit: "L", per: { amount: 1, unit: "kg" }, fact, boil: { low: 2, high: 3, unit: "min", fact }, stand: { low: 60, high: 60, unit: "min", fact } };
+    // One pot of 0.5 kg takes 2 L of quick soak water. Its heat is (2 kg + 0.5 kg) x 4.19002 kJ/(kg.K) x 80 K.
+    const SOAK_HEAT = 2.5 * 4.19002 * 80;
+    const waterTake = (result: ReturnType<typeof cookFragment>): number | undefined => result.layer.converters[0]?.takes.find((take) => take.resource === STORED_WATER)?.amount;
+    const unsoakedTime = { low: 40, high: 60, unit: "min", fact };
+
+    it("keeps the output of the cold soak by default, with no new field", () => {
+      for (const more of [{}, { soak: coldSoak }, { soak: coldSoak, quickSoak, unsoakedTime }]) {
+        const before = cookFragment(grainWith(more));
+        expect(JSON.stringify(cookFragment({ ...grainWith(more), soak: "cold" }))).toBe(JSON.stringify(before));
+        expect(JSON.stringify(cookFragment({ ...grainWith(more), soak: undefined }))).toBe(JSON.stringify(before));
+        expect(Object.keys(lineOf(before.lines, "test.grain-1kg"))).toEqual(["product", "resource", "energy", "water", "soak", "heat", "minutes", "fuel"]);
+      }
+      // The cold soak takes only the cold soak water, with no heat and no fuel. A quick soak fact does not change it.
+      const cold = cookFragment(grainWith({ soak: coldSoak, quickSoak }));
+      const line = lineOf(cold.lines, "test.grain-1kg");
+      expect(line.soak).toEqual({ read: true, value: 3, unit: "L/kg" });
+      expect(line.fuel.read && line.fuel.value).toBeCloseTo(FUEL, 12);
+      expect(waterTake(cold)).toBeCloseTo(2.5, 12);
+    });
+
+    it("gives the quick soak water heat and fuel, and adds the water to the take", () => {
+      const result = cookFragment({ ...grainWith({ soak: coldSoak, quickSoak }), soak: "quick" });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      expect(line.soakMethod).toBe("quick");
+      expect(line.soak).toEqual({ read: true, value: 4, unit: "L/kg" });
+      expect(line.soakHeat?.read && line.soakHeat.value).toBeCloseTo(SOAK_HEAT, 9);
+      expect(line.heat.read && line.heat.value).toBeCloseTo(HEAT, 9);
+      // The soak heat goes into the pot at 250 kJ/min, and the soak water boils for 3 min at the full rate of 0.01 kg/min.
+      expect(line.minutes.read && line.minutes.value).toBeCloseTo(MINUTES + SOAK_HEAT / 250 + 3, 9);
+      expect(line.fuel.read && line.fuel.value).toBeCloseTo(FUEL + (SOAK_HEAT / 250) * 0.01 + 3 * 0.01, 12);
+      // The take is 1 L of cook water and 2 L of quick soak water.
+      expect(waterTake(result)).toBeCloseTo(3, 12);
+      expect(result.layer.converters[0]?.takes[2]?.amount).toBeCloseTo(FUEL + (SOAK_HEAT / 250) * 0.01 + 0.03, 12);
+      // A food with no soak facts takes no soak with the quick soak.
+      const plain = lineOf(cookFragment({ ...input, soak: "quick" }).lines, "test.grain-1kg");
+      expect(plain.soak).toEqual({ read: true, value: 0, unit: "L/kg" });
+      expect(plain.soakHeat).toEqual({ read: true, value: 0, unit: "kJ" });
+      expect(plain.fuel).toEqual(lineOf(cookFragment(input).lines, "test.grain-1kg").fuel);
+      expect(plain.minutes).toEqual(lineOf(cookFragment(input).lines, "test.grain-1kg").minutes);
+    });
+
+    it("adds no fuel and no stove time for the stand time of the quick soak", () => {
+      const { stand: _stand, ...noStand } = quickSoak;
+      const lineWith = (soak: object): CookLine => lineOf(cookFragment({ ...grainWith({ quickSoak: soak }), soak: "quick" }).lines, "test.grain-1kg");
+      const short = lineWith(noStand);
+      const long = lineWith({ ...quickSoak, stand: { low: 600, high: 600, unit: "min", fact } });
+      expect(short.fuel.read).toBe(true);
+      expect(long.fuel).toEqual(short.fuel);
+      expect(long.minutes).toEqual(short.minutes);
+      expect(lineWith(quickSoak).fuel).toEqual(short.fuel);
+      // The fuel takes the high end of the boil span.
+      const longBoil = lineWith({ ...quickSoak, boil: { low: 2, high: 13, unit: "min", fact } });
+      expect(longBoil.fuel.read && short.fuel.read && longBoil.fuel.value - short.fuel.value).toBeCloseTo(10 * 0.01, 12);
+      const badBoil = lineWith({ ...quickSoak, boil: { low: 2, high: 3, unit: "kg", fact } });
+      expect(badBoil.fuel.read).toBe(false);
+      if (!badBoil.fuel.read) expect(badBoil.fuel.why).toMatch(/boil time of the quick soak/);
+    });
+
+    it("adds the quick soak fuel to each end of the spread of the adverse factor", () => {
+      const { share: _share, ...noShare } = input;
+      // A made-up yield of 10 L from 20 °C to 100 °C for 100 g of fuel, with a factor of 3 in a typical range of 2 to 4.
+      const stove: StoveFacts = {
+        ...massStove,
+        boil: { amount: 10, unit: "L", per: { amount: 100, unit: "g" }, fact, start: { celsius: 20, fact }, end: { celsius: 100, fact } } as never,
+        adverse: { factor: 3, typical: { low: 2, high: 4 }, fact } as never,
+      };
+      const calm = (10 * WATER_DENSITY_MIN.value * WATER_SPECIFIC_HEAT.value * 80) / 0.1;
+      const line = lineOf(cookFragment({ ...grainWith({ quickSoak }, { ...noShare, stove }), soak: "quick" }).lines, "test.grain-1kg");
+      const potFuel = (perKg: number): number => (HEAT + SOAK_HEAT) / perKg + 20 * 0.01 + 3 * 0.01;
+      expect(line.fuel.read && line.fuel.value).toBeCloseTo(potFuel(calm / 3), 12);
+      expect(line.fuelSpread?.low).toBeCloseTo(potFuel(calm / 2), 12);
+      expect(line.fuelSpread?.high).toBeCloseTo(potFuel(calm / 4), 12);
+    });
+
+    it("gives a no read for the quick soak of a food with no cited quick soak", () => {
+      const result = cookFragment({ ...grainWith({ soak: coldSoak }), soak: "quick" });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      expect(line.soak.read).toBe(false);
+      if (!line.soak.read) expect(line.soak.why).toMatch(/cold soak and no quick soak/);
+      expect(line.soakHeat?.read).toBe(false);
+      expect(line.fuel.read).toBe(false);
+      expect(result.layer.converters).toEqual([]);
+      expect(result.noReads.map((item) => item.resource)).toEqual(["food.test-grain"]);
+      // A quick soak for each volume of dry food with no bulk mass gives no L/kg.
+      const perVolume = lineOf(cookFragment({ ...grainWith({ quickSoak: { ...quickSoak, per: { amount: 1, unit: "L" } } }), soak: "quick" }).lines, "test.grain-1kg");
+      expect(perVolume.soak.read).toBe(false);
+      if (!perVolume.soak.read) expect(perVolume.soak.why).toMatch(/quick soak water .* bulk mass/);
+    });
+
+    it("gives a no read with no soak for a soaked food with no unsoaked cook time", () => {
+      for (const more of [{ soak: coldSoak }, { quickSoak }]) {
+        const result = cookFragment({ ...grainWith(more), soak: "none" });
+        const line = lineOf(result.lines, "test.grain-1kg");
+        expect(line.soakMethod).toBe("none");
+        expect(line.soak).toEqual({ read: true, value: 0, unit: "L/kg" });
+        expect(line.fuel.read).toBe(false);
+        if (!line.fuel.read) expect(line.fuel.why).toMatch(/no unsoaked cook time/);
+        expect(result.layer.converters).toEqual([]);
+      }
+    });
+
+    it("gives a no read of the cook water with no soak for a soaked food, and keeps the time of a food with no soak facts", () => {
+      // The cited cook water is for the food after its soak. The catalog cites no cook water for the food with no soak.
+      const result = cookFragment({ ...grainWith({ soak: coldSoak, unsoakedTime }), soak: "none" });
+      const line = lineOf(result.lines, "test.grain-1kg");
+      expect(line.water.read).toBe(false);
+      if (!line.water.read) expect(line.water.why).toMatch(/no cook water for the food with no soak/);
+      expect(line.fuel.read).toBe(false);
+      expect(line.soakHeat).toBeUndefined();
+      expect(result.layer.converters).toEqual([]);
+      // A food with no soak facts keeps its cook time, as with the cold soak.
+      const plain = lineOf(cookFragment({ ...input, soak: "none" }).lines, "test.grain-1kg");
+      const { soakMethod, ...rest } = plain;
+      expect(soakMethod).toBe("none");
+      expect(rest).toEqual(lineOf(cookFragment(input).lines, "test.grain-1kg"));
+    });
+
+    it("refuses an unknown soak method", () => {
+      expect(() => cookFragment({ ...input, soak: "hot" as never })).toThrow(RangeError);
+    });
+  });
+
   it("refuses a bad batch, share or start", () => {
     expect(() => cookFragment({ ...input, batch: { value: 0, unit: "kg" } })).toThrow(RangeError);
     expect(() => cookFragment({ ...input, batch: { value: 1, unit: "L" } })).toThrow(RangeError);
