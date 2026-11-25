@@ -373,7 +373,7 @@ describe("a hazard case with cuts that follow another cut", () => {
     for (const cut of cuts) if (cut.follows !== undefined) expect(cut.bound).toBe(cut.follows.bound);
     expect(cuts.find((cut) => cut.part === "gas.main")).not.toHaveProperty("bound");
     // The terms give no lower bound: each onset is an upper bound.
-    expect(cuts.some((cut) => cut.bound === "lower")).toBe(false);
+    expect(new Set<string | undefined>(cuts.map((cut) => cut.bound)).has("lower")).toBe(false);
   });
 
   it("gives a dependent cut no duration and no field follows when its cause has no curve, as before", () => {
