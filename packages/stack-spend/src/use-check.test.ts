@@ -141,5 +141,6 @@ describe("the gate on generated reads", () => {
       }),
       { seed: 20261116, numRuns: 200 },
     );
-  });
+    // 200 seeded runs: on a busy CI runner they took 5.09 s (main c3eea5b, 11-25), over the default limit of 5 s.
+  }, 30_000);
 });
