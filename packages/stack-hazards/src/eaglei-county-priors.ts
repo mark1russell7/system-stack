@@ -41,7 +41,7 @@ export const EAGLEI_COUNTY_POOLING: CountyPooling = {
 };
 
 /**
- * The counts of the observed counties of the fit: the years of each county, and the events of each case in each county, in the order of `codes`.
+ * The counts of the observed counties of the fit. The arrays give the years of each county and the events of each case in each county, in the order of `codes`.
  * With the laws of `EAGLEI_COUNTY_POOLING`, they give each pooled rate of the table and its upper bound (`upperRates`). A county over the limit of the table is here too.
  */
 export const EAGLEI_COUNTY_COUNTS: AreaUnits = {
