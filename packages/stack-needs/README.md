@@ -182,7 +182,7 @@ const cook = cookFragment({
   share: { value: 0.5, heating: "higher", cite: "example.share" },
   batch: { value: 0.5, unit: "kg" },
 });
-// cook.layer has the converter cook:food.grain-dry. Join it with the layer of householdFragment and a store of fuel.
+// cook.layer has the converter cook:food.rice-white-dry. Join it with the layer of householdFragment and a store of fuel.
 ```
 
 The model of one pot:

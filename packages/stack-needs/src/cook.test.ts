@@ -694,8 +694,19 @@ describe("the cook fragment with the catalog of market", () => {
       expect(line.heat.read && line.heat.value).toBeCloseTo((pot * WATER_DENSITY_MAX.value + 0.5) * WATER_SPECIFIC_HEAT.value * 100, 6);
       expect(line.fuel.read && line.minutes.read && line.fuel.value).toBeCloseTo((line.minutes.read ? line.minutes.value : 0) * perMin, 9);
     }
-    expect(result.layer.converters.map((converter) => converter.id)).toEqual(["cook:food.grain-dry", "cook:food.pasta-dry", "cook:food.legume-dry"]);
+    expect(result.layer.converters.map((converter) => converter.id)).toEqual(["cook:food.rice-white-dry", "cook:food.pasta-dry", "cook:food.legume-dry"]);
     expect(result.noReads).toEqual([]);
+  });
+
+  it("gives rice and oats their own cook water, not the cook water of the worst line of one grain resource", () => {
+    // Before market 0.11.0, rice and oats were one resource. The converter took the oats water for each pot of rice: 122.7 L for these 21 kg.
+    const result = cookFragment({ ...catalogInput, units: { "food.rice-white-1kg": 20, "food.oats-1kg": 1 } });
+    expect(result.layer.converters.map((converter) => converter.id)).toEqual(["cook:food.rice-white-dry", "cook:food.oats-rolled-dry"]);
+    const waterL = result.layer.converters.reduce((sum, converter) => {
+      const pots = (converter.id.endsWith("rice-white-dry") ? 20 : 1) / (converter.takes[0]?.amount ?? Number.NaN);
+      return sum + pots * (converter.takes.find((take) => take.resource === "water.stored")?.amount ?? Number.NaN);
+    }, 0);
+    expect(waterL).toBeCloseTo(57.0, 1);
   });
 });
 

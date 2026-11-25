@@ -62,7 +62,7 @@ function cookFragment(waterL: number, fuelKg: number): EnduranceLayer {
       {
         id: "test:cook-rice",
         takes: [
-          { resource: "food.grain-dry", amount: 1 },
+          { resource: "food.rice-white-dry", amount: 1 },
           { resource: "water.stored", amount: 2 },
           { resource: "fuel.test", amount: 0.1 },
         ],
@@ -94,11 +94,11 @@ describe("the household fragment", () => {
     expect(result.leftOut).toEqual([]);
     expect(result.layer.draws).toEqual([{ need: FOOD_NEED, level: "critical", perDay: DAILY, users: 2, supply: "food.retail" }]);
     expect(result.layer.stores).toEqual([
-      { id: "buy:food.rice-white-1kg:food.grain-dry", resource: "food.grain-dry", amount: 4 },
+      { id: "buy:food.rice-white-1kg:food.rice-white-dry", resource: "food.rice-white-dry", amount: 4 },
       { id: "buy:food.peanut-butter-1kg:food.no-cook", resource: NO_COOK, amount: PEANUT_KCAL },
     ]);
     expect(result.layer.resources).toEqual([
-      { code: "food.grain-dry", unit: "kg" },
+      { code: "food.rice-white-dry", unit: "kg" },
       { code: NO_COOK, unit: "kcal" },
     ]);
     expect(result.layer.direct).toEqual([{ resource: NO_COOK, need: FOOD_NEED, amount: 1 }]);
@@ -384,13 +384,13 @@ describe("the household fragment", () => {
     expect(result.storesRead).toBe(false);
     expect(result.needRead).toBe(true);
     expect(result.noReads).toEqual([expect.objectContaining({ product: "power.anker-737", resource: "energy.battery" })]);
-    expect(result.layer.stores.map((store) => store.resource)).toEqual(["food.grain-dry", NO_COOK]);
+    expect(result.layer.stores.map((store) => store.resource)).toEqual(["food.rice-white-dry", NO_COOK]);
     expect(result.layer.draws[0]).toMatchObject({ perDay: DAILY, users: 2 });
   });
 
   it("uses the prefix of the store ids", () => {
     const result = fragmentOf({ ...input, prefix: "home" });
-    expect(result.layer.stores.map((store) => store.id)).toEqual(["home:food.rice-white-1kg:food.grain-dry", "home:food.peanut-butter-1kg:food.no-cook"]);
+    expect(result.layer.stores.map((store) => store.id)).toEqual(["home:food.rice-white-1kg:food.rice-white-dry", "home:food.peanut-butter-1kg:food.no-cook"]);
   });
 
   it("refuses a catalog with no no-cook food in kcal", () => {

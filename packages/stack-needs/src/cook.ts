@@ -246,7 +246,7 @@ export type CookRead = { readonly read: true; readonly value: number; readonly u
 /** The cook values of one dry food of the buy list, for one pot. */
 export interface CookLine {
   readonly product: string;
-  /** The dry resource of the product, for example `food.grain-dry`. */
+  /** The dry resource of the product, for example `food.rice-white-dry`. */
   readonly resource: string;
   /** The food energy of the dry food, in `kcal/kg`. */
   readonly energy: CookRead;
@@ -651,6 +651,9 @@ function isDryFood(catalog: SupplyCatalog, code: string): boolean {
  *
  * - One run of a converter is one pot of `batch`. It takes the dry food, the cook water from `water.stored` and the fuel of the stove.
  *   It gives the food energy of the pot to the need `food.energy`. Thus a dry food with no fuel or no water gives no meal.
+ * - The converter of a dry resource takes the worst line of its products: the most water, soak and fuel, and the least food energy.
+ *   Since market 0.11.0, the check `supplies-cook-profile` gives the products of one dry resource equal cook values. The worst line is then the line of each product.
+ *   A catalog with no such check can have products with unequal lines. Then the worst line gives too much water and fuel to the other products.
  * - The cook water is `cookWater` of market times the dry mass. It is the resource of the drinking water.
  * - The heat to boil is the mass of the water and the dry food times `WATER_SPECIFIC_HEAT` times the rise from the start to `BOIL_CELSIUS`.
  *   The water mass takes `WATER_DENSITY_MAX`. The dry food takes the specific heat of water, which is higher than its own.
