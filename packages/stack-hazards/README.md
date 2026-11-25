@@ -92,6 +92,8 @@ The dependent cut occurs only when the cause lasts longer than the onset. Then i
 | `onset`, `recovery` | Each term (`FollowTerm`): its days, `cited`, its side (`upper` or `lower`) and a text, for example "recovery not cited: 0, a lower bound". |
 | `bound` | `upper` when each term is an upper bound and the cause is a law or an upper bound. Else `none`: the curve is not a bound of the days of the cut. |
 
+Since 0.7.4, the types of `follows` are the types `CutFollows`, `FollowTerm` and `FollowSide` of the core. The schema of stack-endurance reads the field, so a case of `hazardCase` goes through `parseEndurance` as JSON.
+
 Since 0.7.2, each cut with a curve also has the field `bound` of the core (`CutBound`). A cut with a law of its own has `law`. A dependent cut has the `bound` of `follows`: `upper` or `none`. Each onset is an upper bound, so no cut gets `lower`. A reader of the core record alone, for example the shortfall of stack-endurance, can thus tell a law from a curve that is no bound.
 
 The source of the cut is the source of the cause curve, and then the sources of the claims of its terms. A cause with no curve gives the dependent cut no `duration` and no field `follows`, as before 0.7.0. A chain of cuts is permitted.

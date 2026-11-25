@@ -40,12 +40,17 @@ const converter = z.strictObject({
 
 const point = z.tuple([z.number(), z.number()]).readonly();
 
+const followTerm = z.strictObject({ days: amount, cited: z.boolean(), side: z.enum(["upper", "lower"]), says: z.string() });
+
+const follows = z.strictObject({ part: id, onset: followTerm, recovery: followTerm, bound: z.enum(["upper", "none"]) });
+
 const cut = z.strictObject({
   part: id,
   title: id,
   duration: z.array(point).readonly().optional(),
   bound: z.enum(CUT_BOUNDS).optional(),
   source: id,
+  follows: follows.optional(),
 });
 
 const caseCuts = z.strictObject({

@@ -54,6 +54,38 @@ export function weakestBound(bounds: Iterable<CutBound>): CutBound {
   return upper ? "upper" : lower ? "lower" : "law";
 }
 
+/** The side of a term of a dependent cut. `upper` can only make the cut longer, and `lower` can only make it shorter. Since 0.1.13. */
+export type FollowSide = "upper" | "lower";
+
+/** A term of a dependent cut: the onset or the recovery. Since 0.1.13. */
+export interface FollowTerm {
+  /** The days of the term in the curve. */
+  readonly days: number;
+  /** `true` when a cited span gives the term. */
+  readonly cited: boolean;
+  readonly side: FollowSide;
+  /** The term in plain words, for example "onset not cited: 0, an upper bound". */
+  readonly says: string;
+}
+
+/**
+ * The terms of a dependent cut: a cut that starts after its cause cut starts and ends after the cause ends. Since 0.1.13.
+ * The curve of the dependent cut is the curve of the cause, shifted by the recovery minus the onset.
+ */
+export interface CutFollows {
+  /** The `part` of the cause cut, in the same case. */
+  readonly part: string;
+  /** The days from the start of the cause to the start of the cut. */
+  readonly onset: FollowTerm;
+  /** The days from the end of the cause to the end of the cut. */
+  readonly recovery: FollowTerm;
+  /**
+   * `upper` when each term is an upper bound and the cause is a law or an upper bound. Then the curve is an upper bound of the days of the cut, for the cited spans.
+   * `none` in each other case. Then the curve is not a bound of the days of the cut.
+   */
+  readonly bound: "upper" | "none";
+}
+
 /** A cut of a case: a part that the case stops, and the curve of the duration of the stop. */
 export interface Cut {
   /** The `id` of the part of the stack. */
@@ -72,6 +104,8 @@ export interface Cut {
   readonly bound?: CutBound | undefined;
   /** The source of the curve, or of the cut when it has no curve. */
   readonly source: string;
+  /** The terms of a dependent cut, when its curve comes from the curve of a cause cut (`CutFollows`). The shortfall does not read them. Since 0.1.13. */
+  readonly follows?: CutFollows | undefined;
 }
 
 /** A case: an event that cuts some parts at the same time, and the change that it makes to the draws. */
