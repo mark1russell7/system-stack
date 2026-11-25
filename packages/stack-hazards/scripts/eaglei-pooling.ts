@@ -79,30 +79,30 @@ export function poolScore(
     reach.areas += 1;
   }
   // The rate of each area in each method, from the fit half. The score half scores them in the years of the score part.
-  const rates = { raw: [] as number[], pooled: [] as number[], state: [] as number[] };
+  const methodRates = { raw: [] as number[], pooled: [] as number[], state: [] as number[] };
   for (const area of areas) {
     const code = group(area);
     const total = totals.get(code) ?? { events: 0, years: 1 };
     const law = pooled.laws[code];
-    rates.raw.push((fit[area]?.events ?? 0) / (observation.years[area] ?? 0));
-    rates.pooled.push(pooled.rates[area]?.[0] ?? 0);
-    rates.state.push(law?.from === "nation" ? law.mean : total.events / total.years);
+    methodRates.raw.push((fit[area]?.events ?? 0) / (observation.years[area] ?? 0));
+    methodRates.pooled.push(pooled.rates[area]?.[0] ?? 0);
+    methodRates.state.push(law?.from === "nation" ? law.mean : total.events / total.years);
   }
   if (areas.length === 0) return { raw: 0, pooled: 0, state: 0, lost: 0, squared: { raw: 0, pooled: 0, state: 0 }, seen: { raw: 0, pooled: 0, state: 0, areas: 0 }, reach };
-  const held = splitHoldout(
+  const split = splitHoldout(
     areas.map((area) => ({ count: fit[area]?.events ?? 0, exposure: observation.years[area] ?? 0 })),
     areas.map((area) => ({ count: score[area]?.events ?? 0, exposure: scoreYears === undefined ? (observation.years[area] ?? 0) : (scoreYears[area] ?? 0) })),
-    { raw: () => rates.raw, pooled: () => rates.pooled, state: () => rates.state },
+    { raw: () => methodRates.raw, pooled: () => methodRates.pooled, state: () => methodRates.state },
   );
-  const { raw, pooled: pool, state } = held.methods as Readonly<Record<"raw" | "pooled" | "state", ThinningScore>>;
+  const scores = split.methods as Readonly<Record<"raw" | "pooled" | "state", ThinningScore>>;
   return {
-    raw: raw.logLikelihood,
-    pooled: pool.logLikelihood,
-    state: state.logLikelihood,
+    raw: scores.raw.logLikelihood,
+    pooled: scores.pooled.logLikelihood,
+    state: scores.state.logLikelihood,
     // A county with no event in the fit half has the raw rate 0. Thus only the raw rates lose a county.
-    lost: raw.lost,
-    squared: { raw: raw.squared, pooled: pool.squared, state: state.squared },
-    seen: { raw: raw.seen, pooled: pool.seen, state: state.seen, areas: held.seenUnits },
+    lost: scores.raw.lost,
+    squared: { raw: scores.raw.squared, pooled: scores.pooled.squared, state: scores.state.squared },
+    seen: { raw: scores.raw.seen, pooled: scores.pooled.seen, state: scores.state.seen, areas: split.seenUnits },
     reach,
   };
 }
