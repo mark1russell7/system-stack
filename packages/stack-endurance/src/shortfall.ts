@@ -1,5 +1,6 @@
 import { type OrderedRing, pathSetReliability, stronglyConnectedComponents } from "@mark1russell7/collections/graph";
 import { DEFAULT_MAX_SETS, neededParts, survivalAt, weakestBound, type CutBound, type PathOptions } from "@mark1russell7/system-stack";
+import { bestEndurance } from "./best.ts";
 import { caseDraws, caseStopped, enduranceOf, type CaseOptions } from "./endurance.ts";
 import type { CaseCuts, Draw, Endurance, EnduranceLayer, Prior, Survival } from "./layer.ts";
 import { stackStops } from "./stops.ts";
@@ -571,6 +572,25 @@ export function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, enduran
   return { levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds) };
 }
 
+/**
+ * The share of the stores in a case. `take` is the take order of `enduranceOf`. `best` is the leximin share of
+ * `bestEndurance`, level by level.
+ */
+export type Share = "take" | "best";
+
+/** The shares, with the default first. */
+export const SHARES: readonly Share[] = ["take", "best"];
+
+/** The options of `yearShortfall`: the date, the stack or the parts that are also down, the horizon and the share. */
+export interface YearShortfallOptions extends CaseOptions, ShortfallOptions {
+  /**
+   * The share of the stores in each case. The default `take` gives the endurance from `enduranceOf`. With `best`,
+   * the endurance comes from `bestEndurance`, and the horizon of the shortfall is the horizon of the share. Thus a
+   * draw at the horizon keeps back only the horizon times its demand, and the lower levels get the rest.
+   */
+  readonly share?: Share | undefined;
+}
+
 /** The shortfall of one year at one place, with the part of each case. */
 export interface YearShortfall extends Shortfall {
   readonly place: string;
@@ -589,12 +609,16 @@ export interface YearShortfall extends Shortfall {
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
- * @param options - The date, the stack or the parts that are also down, and the horizon
- * @throws RangeError for a bad date, horizon or `maxSets`: refer to `caseShortfall` and `enduranceOf`
+ * - With `share: "best"`, the endurance of each case comes from `bestEndurance` with the horizon of the shortfall.
+ *
+ * @param options - The date, the stack or the parts that are also down, the horizon and the share
+ * @throws RangeError for a bad date, horizon, `maxSets` or share: refer to `caseShortfall` and `enduranceOf`
  */
-export function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall {
+export function yearShortfall(layer: EnduranceLayer, place: string, options: YearShortfallOptions): YearShortfall {
   horizonOf(options);
   budgetsOf(options);
+  const share = options.share ?? "take";
+  if (!SHARES.includes(share)) throw new RangeError(`The share ${String(options.share)} is not ${SHARES.join(" or ")}.`);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
@@ -607,7 +631,7 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Cas
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
     if (prior === undefined) continue;
     const rate = yearRate(prior);
-    const endurance = enduranceOf(layer, caseCuts, options);
+    const endurance = share === "best" ? bestEndurance(layer, caseCuts, options) : enduranceOf(layer, caseCuts, options);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
     for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
     for (const [level, days] of Object.entries(shortfall.independent)) independent[level] = (independent[level] ?? 0) + rate * days;

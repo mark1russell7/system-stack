@@ -2,7 +2,7 @@ import type { CutBound, Stack } from "@mark1russell7/system-stack";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { enduranceOf } from "./endurance.ts";
-import type { CaseCuts, Survival } from "./layer.ts";
+import { ENDURANCE_SCHEMA, type CaseCuts, type EnduranceLayer, type Survival } from "./layer.ts";
 import { SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK } from "./sample.ts";
 import { curveFault } from "./check.ts";
 import { caseShortfall, eventStop, INDEPENDENT_TOLERANCE, independentStop, longestStop, minimalStops, stopCurves, survivalAt, upperStop, survivalQuantile, tailDays, yearChance, yearRate, yearShortfall } from "./shortfall.ts";
@@ -555,6 +555,67 @@ describe("yearShortfall", () => {
   it("refuses a horizon that is not more than 0", () => {
     expect(() => yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 0 })).toThrow(RangeError);
     expect(() => caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }), { horizon: Number.NaN })).toThrow(RangeError);
+  });
+
+  describe("with the best share", () => {
+    // Water 10 L. The drink takes 1 L a day at the level life. The food at the level health is rice, cooked with 2 L of
+    // water a pot. Each cut lasts 30 days, so a horizon of 5 days is in each event. The case comes one time a year.
+    const LONG: Survival = [[0, 1], [30, 1], [31, 0]];
+    const cook: EnduranceLayer = {
+      schema: ENDURANCE_SCHEMA,
+      levels: ["life", "health"],
+      resources: [{ code: "water", unit: "L" }, { code: "rice", unit: "u" }],
+      stores: [{ id: "water", resource: "water", amount: 10 }, { id: "rice", resource: "rice", amount: 100 }],
+      draws: [
+        { need: "drink", level: "life", perDay: 1, supply: "main" },
+        { need: "food", level: "health", perDay: 1, supply: "shop" },
+      ],
+      direct: [{ resource: "water", need: "drink", amount: 1 }],
+      converters: [{ id: "cook", takes: [{ resource: "rice", amount: 1 }, { resource: "water", amount: 2 }], gives: { need: "food", amount: 1 } }],
+      cases: [
+        {
+          case: "dry",
+          title: "No water and no shop",
+          cuts: [
+            { part: "main", title: "No water from the main", duration: LONG, source: "test" },
+            { part: "shop", title: "Closed shop", duration: LONG, source: "test" },
+          ],
+        },
+      ],
+      priors: [{ case: "dry", place: "home", perYear: 1, reach: 1, source: "test", asOf: "2026-01-01" }],
+    };
+
+    it("gives the food the horizon less 2.5 days, where the take order gives it the horizon", () => {
+      const take = yearShortfall(cook, "home", { at: AT, horizon: 5 });
+      const best = yearShortfall(cook, "home", { at: AT, horizon: 5, share: "best" });
+      expect(take.levels["health"]).toBeCloseTo(5, 9);
+      expect(best.levels["health"]).toBeCloseTo(5 - 2.5, 9);
+      expect(take.levels["life"]).toBeCloseTo(0, 9);
+      expect(best.levels["life"]).toBeCloseTo(0, 9);
+      expect(best.cases[0]?.endurance.needs["drink"]?.atHorizon).toBe(true);
+    });
+
+    it("gives the result of the take order with the default share", () => {
+      expect(yearShortfall(cook, "home", { at: AT, horizon: 5, share: "take" })).toEqual(yearShortfall(cook, "home", { at: AT, horizon: 5 }));
+      expect(yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, share: "take" })).toEqual(yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT }));
+    });
+
+    it("gives the first level of each case of the sample no fewer days than the take order", () => {
+      // The leximin share takes the largest fewest days of the first level. The take order is one share, so it is not more.
+      const [first] = SAMPLE_ENDURANCE.levels;
+      const fewest = (year: ReturnType<typeof yearShortfall>, index: number): number => {
+        const needs = SAMPLE_ENDURANCE.draws.filter((draw) => draw.level === first).map((draw) => year.cases[index]?.endurance.needs[draw.need]?.days);
+        return Math.min(...needs.filter((days): days is number => days !== undefined));
+      };
+      const take = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT });
+      const best = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, share: "best" });
+      expect(best.cases.map((item) => item.case)).toEqual(take.cases.map((item) => item.case));
+      for (const index of take.cases.keys()) expect(fewest(best, index)).toBeGreaterThanOrEqual(fewest(take, index) - 1e-9);
+    });
+
+    it("refuses a share that it does not know", () => {
+      expect(() => yearShortfall(cook, "home", { at: AT, share: "fair" as never })).toThrow(RangeError);
+    });
   });
 
   it("gives 0 at a place with no prior", () => {
