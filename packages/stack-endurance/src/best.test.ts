@@ -34,6 +34,86 @@ function layerOf(stores: Record<string, number>, draws: EnduranceLayer["draws"],
 }
 
 describe("bestEndurance", () => {
+  describe("with a horizon", () => {
+    // Water 10 L. The drink takes 1 L a day at the level life. The food at the level health is rice, cooked with 2 L of water a pot.
+    const layer = layerOf(
+      { water: 10, rice: 100 },
+      [
+        { need: "drink", level: "life", perDay: 1, supply: "main" },
+        { need: "food", level: "health", perDay: 1, supply: "shop" },
+      ],
+      {
+        direct: [{ resource: "water", need: "drink", amount: 1 }],
+        converters: [{ id: "cook", takes: [{ resource: "rice", amount: 1 }, { resource: "water", amount: 2 }], gives: { need: "food", amount: 1 } }],
+      },
+    );
+
+    it("gives the drink all the water with no horizon, and the food 0 days", () => {
+      const best = bestEndurance(layer, DRY, { at: AT });
+      expect(best.needs["drink"]?.days).toBeCloseTo(10, 9);
+      expect(best.needs["food"]?.days).toBeCloseTo(0, 9);
+      expect(best.needs["drink"]?.atHorizon).toBeUndefined();
+    });
+
+    it("keeps back only the horizon of the drink, and the rest of the water cooks", () => {
+      const best = bestEndurance(layer, DRY, { at: AT, horizon: 5 });
+      expect(best.needs["drink"]).toEqual({ days: 5, binding: ["water"], takes: { water: 5 }, atHorizon: true });
+      expect(best.needs["food"]?.days).toBeCloseTo(2.5, 9);
+      expect(best.needs["food"]?.takes).toEqual({ rice: 2.5, water: 5 });
+      expect(best.needs["food"]?.atHorizon).toBeUndefined();
+    });
+
+    it("gives the result with no horizon for a horizon that no draw holds, and for Infinity", () => {
+      const none = bestEndurance(layer, DRY, { at: AT });
+      expect(bestEndurance(layer, DRY, { at: AT, horizon: Infinity })).toEqual(none);
+      const half = layerOf({ water: 3 }, [{ need: "drink", level: "life", perDay: 1, supply: "main" }], { direct: [{ resource: "water", need: "drink", amount: 1 }] });
+      expect(bestEndurance(half, DRY, { at: AT, horizon: 5 })).toEqual(bestEndurance(half, DRY, { at: AT }));
+    });
+
+    it("gives a draw with no end the horizon", () => {
+      // The cycle of the converters double and back gives the drink no end.
+      const endless = layerOf(
+        { x: 1, water: 6 },
+        [
+          { need: "drink", level: "life", perDay: 1, supply: "main" },
+          { need: "wash", level: "health", perDay: 2, supply: "main" },
+        ],
+        {
+          direct: [{ resource: "y", need: "drink", amount: 1 }, { resource: "water", need: "wash", amount: 1 }],
+          converters: [
+            { id: "double", takes: [{ resource: "x", amount: 1 }], gives: { resource: "y", amount: 2 } },
+            { id: "back", takes: [{ resource: "y", amount: 1 }], gives: { resource: "x", amount: 1 } },
+          ],
+        },
+      );
+      expect(bestEndurance(endless, DRY, { at: AT }).needs["drink"]?.days).toBe(Infinity);
+      const capped = bestEndurance(endless, DRY, { at: AT, horizon: 14 });
+      expect(capped.needs["drink"]?.days).toBe(14);
+      expect(capped.needs["drink"]?.atHorizon).toBe(true);
+      expect(capped.needs["wash"]?.days).toBe(3);
+    });
+
+    it("refuses a horizon that is not more than 0", () => {
+      for (const horizon of [0, -1, Number.NaN]) expect(() => bestEndurance(layer, DRY, { at: AT, horizon })).toThrow(RangeError);
+    });
+
+    it("holds each draw of a random layer at the horizon at most, and gives the same days below the horizon", () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 1, max: 30 }), fc.integer({ min: 1, max: 30 }), fc.integer({ min: 1, max: 20 }), (water, rice, horizon) => {
+          const random = layerOf({ water, rice }, layer.draws, { direct: layer.direct, converters: layer.converters });
+          const none = bestEndurance(random, DRY, { at: AT });
+          const capped = bestEndurance(random, DRY, { at: AT, horizon });
+          const drink = capped.needs["drink"]?.days ?? Number.NaN;
+          expect(drink).toBeCloseTo(Math.min(horizon, none.needs["drink"]?.days ?? 0), 9);
+          // The food gets each liter that the drink does not keep back. It cooks with 2 L a pot and 1 rice a pot.
+          const left = water - drink;
+          expect(capped.needs["food"]?.days).toBeCloseTo(Math.min(horizon, rice, left / 2), 9);
+        }),
+        SEED,
+      );
+    });
+  });
+
   it("gives two draws of one level the leximin share, where the take order gives one draw all the water", () => {
     // The draw a can drink water or juice. The draw b can drink only water.
     const layer = layerOf(
