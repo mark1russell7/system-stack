@@ -106,8 +106,12 @@ export function jointDays(layer: EnduranceLayer, caseCuts: CaseCuts, options: Ca
   // The shares of each stock are not more than the stock.
   for (const resource of parts.stocked) {
     const row: Row = new Map();
-    for (const block of blocks) addTo(row, block.shares.get(resource) as number, ONE);
-    program.push(row, "<=", exact(stock.get(resource) ?? 0));
+    // A draw has a share only of a resource that it can use (`drawBlock`).
+    for (const block of blocks) {
+      const index = block.shares.get(resource);
+      if (index !== undefined) addTo(row, index, ONE);
+    }
+    if (row.size > 0) program.push(row, "<=", exact(stock.get(resource) ?? 0));
   }
 
   const most: Row = new Map([[days, ONE]]);

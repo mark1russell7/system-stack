@@ -86,11 +86,16 @@ export interface DrawBlock {
  * In a balance row, the takes of the draw are not more than its share of the stock plus the gifts of its makers.
  * The caller adds the row of the need, with the term of the days.
  *
+ * A draw has columns and rows only for the resources and the makers that it can use (`reachOf`).
+ * A share of another resource or the runs of another maker cannot give the need of the draw. Thus the optimum of each program is the same.
+ * This keeps each program small: the programs are dense, so each column of each draw costs a column in each row.
+ *
  * @param stocked - False for a draw that takes no stock. Its shares are not columns.
  */
 export function drawBlock(program: Program, parts: CaseParts, draw: Draw, stocked = true): DrawBlock {
   const gifts: Row = new Map();
-  const balance = new Map<string, Row>([...parts.resources].map((resource) => [resource, new Map()]));
+  const { closure, reach } = reachOf(parts, new Set([draw.need]));
+  const balance = new Map<string, Row>([...closure].map((resource) => [resource, new Map()]));
   const consume = (resource: string, index: number, amount: Rational): void => addTo(balance.get(resource) as Row, index, amount);
   for (const use of parts.direct) {
     if (use.need !== draw.need) continue;
@@ -107,12 +112,13 @@ export function drawBlock(program: Program, parts: CaseParts, draw: Draw, stocke
     for (const [resource, each] of inputsOf(cook)) consume(resource, index, exact(each));
   }
   for (const maker of parts.makers) {
+    if (!reach.has(maker)) continue;
     const index = program.next();
     runs.set(maker, index);
     for (const [resource, each] of inputsOf(maker)) consume(resource, index, exact(each));
     consume(giftResource(maker) as string, index, neg(exact(maker.gives.amount)));
   }
-  const shares = new Map(stocked ? parts.stocked.map((resource) => [resource, program.next()] as const) : []);
+  const shares = new Map(stocked ? parts.stocked.filter((resource) => closure.has(resource)).map((resource) => [resource, program.next()] as const) : []);
   for (const [resource, index] of shares) consume(resource, index, neg(ONE));
   for (const row of balance.values()) if (row.size > 0) program.push(row, "<=", ZERO);
   return { draw, gifts, shares, runs };
