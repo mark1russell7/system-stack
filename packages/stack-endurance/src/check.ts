@@ -1,5 +1,5 @@
 import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { bandFault, CUT_BOUNDS, curveFault, dayNumber, isCutBound, type Fault, type Stack } from "@mark1russell7/system-stack";
+import { bandFault, CUT_BOUNDS, curveFault, dayNumber, intervalFault, isCutBound, type Fault, type Stack } from "@mark1russell7/system-stack";
 import { giftNeed, giftResource } from "./endurance.ts";
 import type { Converter, EnduranceLayer } from "./layer.ts";
 
@@ -206,6 +206,8 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     range(at, "count of events in one year", prior.perYear);
     if (!(prior.reach >= 0 && prior.reach <= 1)) add("error", "endurance-range", at, `The reach of "${at}" is ${String(prior.reach)}. It must be from 0 to 1.`);
     date(at, prior.asOf);
+    const fault = prior.interval === undefined ? undefined : intervalFault(prior.interval);
+    if (fault !== undefined) add("error", "endurance-range", at, `The interval of the count of events in one year of "${at}" is not valid. ${fault}`);
   }
   return faults;
 }

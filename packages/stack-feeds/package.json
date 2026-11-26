@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/stack-feeds",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "The live lists of a system stack: each feed lists the parts of some kinds from one source, and a gate fails when a record is old or a list is old. An add-on of system-stack.",
   "license": "MIT",
   "repository": {

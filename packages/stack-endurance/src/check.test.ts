@@ -48,6 +48,17 @@ describe("checkEndurance", () => {
     expect(codes(layer)).toEqual(expect.arrayContaining(["endurance-range", "endurance-date", "endurance-prior-case"]));
   });
 
+  it("refuses a bad interval of a prior, and takes a good one", () => {
+    const prior = SAMPLE_ENDURANCE.priors?.[0];
+    if (prior === undefined) throw new Error("The sample has no prior.");
+    for (const interval of [{ level: 1, low: 0, high: 1 }, { level: 0.95, low: -1, high: 1 }, { level: 0.95, low: 2, high: 1 }]) {
+      const faults = checkEndurance({ ...SAMPLE_ENDURANCE, priors: [{ ...prior, interval }] });
+      expect(faults.map((fault) => fault.code)).toEqual(["endurance-range"]);
+      expect(faults[0]?.message).toMatch(/^The interval of the count of events in one year of "storm@home" is not valid\./);
+    }
+    expect(codes({ ...SAMPLE_ENDURANCE, priors: [{ ...prior, interval: { level: 0.95, low: 0.2, high: 0.7 } }] })).toEqual([]);
+  });
+
   it("finds an empty converter and a draw with no way", () => {
     const layer: EnduranceLayer = {
       ...SAMPLE_ENDURANCE,

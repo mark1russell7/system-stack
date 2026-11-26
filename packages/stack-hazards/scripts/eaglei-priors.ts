@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import type { AreaUnits, CountyPooling, PoolHoldout, PoolLaw, PoolTimeHoldout, PoolTimeScore, PriorTable, StatePooling } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
-import { areaUnits, observedRegions, pooledRates, pooledTable, PRIOR_LIMIT, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
+import { areaUnits, observedRegions, pooledRates, pooledTable, PRIOR_LEVEL, PRIOR_LIMIT, rateIntervals, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
 import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, type CaseOverlap, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { poolHoldout, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, timeHoldout } from "./eaglei-pooling.ts";
@@ -72,7 +72,7 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
   const silentText =
     `A county with no event in any case is not observed, so the prior of its state applies: ${String(quiet.silent.length)} counties. ` +
     `The laws of the states expect ${quiet.expected.toPrecision(2)} such counties, and a county that the files do not see has no event too. `;
-  const table = (scheme: string, region: (area: string) => string, ratesOf: RatesOf, method: string): PriorTable => {
+  const table = (scheme: string, region: (area: string) => string, ratesOf: RatesOf, method: string, intervalsOf?: () => IntervalsOf): PriorTable => {
     const codes = observedRegions(observation, region);
     const rates = Object.fromEntries(Object.entries(priors.counts).map(([name, counts]) => [name, rounded(ratesOf(name, counts, observation))]));
     // A region with a case above the limit is not in the table: its codes and its rates go.
@@ -90,13 +90,16 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
         ? ""
         : `The file of the customers gives too few customers to some counties. For ${String(Object.keys(laws.raised).length)} counties, the customers are the count that the county reached on ${String(HELD_DAYS)} different days. `;
     const limit = `A region with more than ${String(PRIOR_LIMIT)} events at one customer in one year in a case is not in the table, so its prior is no read: ${String(over.size)} regions.`;
+    const kept = Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))]));
+    const ends = intervalsOf?.();
     return {
       source: EAGLEI_SOURCE_ID,
       asOf: laws.source.modified.slice(0, 10),
       scheme,
       method: `${method} ${common(laws.options.share ?? DEFAULT_SHARE)} ${overlapText(priors.overlap)}${raise}${silentText}${limit}`,
       codes: codes.filter((code) => !over.has(code)),
-      rates: Object.fromEntries(Object.entries(rates).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
+      rates: kept,
+      ...(ends === undefined ? {} : { intervals: { level: PRIOR_LEVEL, rates: keptEnds(kept, ends) } }),
     };
   };
   // Each state is an area of the one group of the nation: its events over the plain mean of the years of its counties.
@@ -104,13 +107,17 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
   const stateCounts = Object.fromEntries(Object.entries(priors.counts).map(([name, counts]) => [name, regionCounts(counts, observation, eagleRegion)]));
   const nationGroup = (): string => NATION_GROUP;
   const statePooled = Object.fromEntries(Object.entries(stateCounts).map(([name, counts]) => [name, pooledRates(counts, states, nationGroup)]));
+  // The interval of each state rate comes from the same law of the nation as the rate.
+  const stateIntervals = (): IntervalsOf => rateIntervals(areaUnits(stateCounts, states), (name) => statePooled[name]?.laws[NATION_GROUP], PRIOR_LEVEL);
   const state = table(
     laws.scheme,
     eagleRegion,
     (name) => statePooled[name]?.rates ?? {},
     "perYear is the pooled rate of a state toward the states of the nation: a gamma law of the rates of the states in the case, and the mean of the rate of the state after its events. " +
       "The events of a state are the events of its counties, and its years are the plain mean of the years of its counties. A state with no event of a case gets a rate near 0, not 0. " +
-      "reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year. A state with no event gets the plain mean of the reach of the states with events.",
+      "reach is the mean share of the customers of the state that one event reaches, so perYear * reach is the expected events at one customer in one year. A state with no event gets the plain mean of the reach of the states with events. " +
+      `Each rate has its ${String(PRIOR_LEVEL * 100)}% interval: the quantiles of the same gamma law after the events of the state.`,
+    stateIntervals,
   );
   // Each observed county, also in a state that the limit keeps out of the table: a later fit cannot change the reach of a national prior through the limit.
   const nation = observedRegions(observation, (area) => area).reduce((sum, area) => sum + (observation.customers[area] ?? 0), 0);
@@ -125,7 +132,8 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     "perYear is the pooled rate of a county toward the counties of its state: a gamma law of the rates of the counties of the state in the case, and the mean of the rate of the county after its events in its years. " +
       "A county with few years or few events gets a rate near the mean of its state. A state with no event in a case gets its pooled rate toward the states with events. " +
       "reach is the mean of the largest count of customers out of each event over the customers of the county. A county with no event gets the plain mean of the reach of the counties of its state with events. " +
-      "In a state with no event, it gets the plain mean of the reach of all counties with events in the case. A county over the limit is in the laws and in the holdout, but not in the table.",
+      "In a state with no event, it gets the plain mean of the reach of all counties with events in the case. A county over the limit is in the laws and in the holdout, but not in the table. " +
+      `Each rate has its ${String(PRIOR_LEVEL * 100)}% interval: the quantiles of the same gamma law after the events of the county.`,
   );
   return {
     county,
@@ -183,6 +191,23 @@ function checkMadeTable(made: PriorTable, fit: PriorTable): void {
 /** The most relative change of a rate of the table from the rounding of the laws and the reach to `DIGITS` digits. */
 const MADE_TOLERANCE = 2e-3;
 
+/** The interval of each rate of each area in each case, by the code of the case and the code of the area (`rateIntervals`). */
+type IntervalsOf = Readonly<Record<string, Readonly<Record<string, readonly [number, number]>>>>;
+
+/** This function gives the intervals of the kept rates of a table only, with `DIGITS` significant digits. Rounding keeps the order of the low end and the rate. */
+function keptEnds(rates: PriorTable["rates"], ends: IntervalsOf): Record<string, Record<string, readonly [number, number]>> {
+  return Object.fromEntries(
+    Object.entries(rates).map(([name, entry]) => [
+      name,
+      Object.fromEntries(Object.keys(entry).map((code) => {
+        const pair = ends[name]?.[code];
+        if (pair === undefined) throw new RangeError(`eaglePriors: the rate of ${code} in the case ${name} has no interval.`);
+        return [code, [digits(pair[0]), digits(pair[1])] as const];
+      })),
+    ]),
+  );
+}
+
 /** This function gives the rates with `DIGITS` significant digits. */
 function rounded(rates: Readonly<Record<string, readonly [number, number]>>): Record<string, readonly [number, number]> {
   return Object.fromEntries(Object.entries(rates).map(([code, [perYear, reach]]) => [code, [Number(perYear.toPrecision(DIGITS)), Number(reach.toPrecision(DIGITS))]]));
@@ -190,17 +215,23 @@ function rounded(rates: Readonly<Record<string, readonly [number, number]>>): Re
 
 /** This function gives the lines of a table, with the codes on one line and the rates of each case on one line. */
 function tableLines(name: string, doc: string, table: PriorTable): string[] {
-  const { rates, codes, ...head } = table;
+  const { rates, codes, intervals, ...head } = table;
   return [
     `/** ${doc} */`,
     `export const ${name}: PriorTable = {`,
     ...Object.entries(head).map(([key, value]) => `  ${key}: ${JSON.stringify(value)},`),
     `  codes: ${JSON.stringify(codes)},`,
     "  rates: {",
-    ...Object.entries(rates).map(([code, entry]) => `    ${JSON.stringify(code)}: {${Object.entries(entry).map(([region, rate]) => `${JSON.stringify(region)}:${JSON.stringify(rate)}`).join(",")}},`),
+    ...pairLines(rates),
     "  },",
+    ...(intervals === undefined ? [] : ["  intervals: {", `    level: ${JSON.stringify(intervals.level)},`, "    rates: {", ...pairLines(intervals.rates, "      "), "    },", "  },"]),
     "};",
   ];
+}
+
+/** This function gives one line for each case of a record of pairs, with the pairs of its regions on the line. */
+function pairLines(pairs: PriorTable["rates"], indent = "    "): string[] {
+  return Object.entries(pairs).map(([code, entry]) => `${indent}${JSON.stringify(code)}: {${Object.entries(entry).map(([region, pair]) => `${JSON.stringify(region)}:${JSON.stringify(pair)}`).join(",")}},`);
 }
 
 /** This function gives a value as a literal of TypeScript: JSON, with `Infinity` and `-Infinity`, which JSON does not have. */
@@ -294,13 +325,13 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
   const statePooling = roundedStatePooling(tables.statePooling);
   const reach = Object.fromEntries(Object.entries(tables.reach).map(([name, values]) => [name, values.map(digits)]));
   const { codes: _codes, rates: _rates, ...countyHead } = tables.county;
-  checkMadeTable(pooledTable({ head: countyHead, units: tables.counts, laws: pooling.laws, reach, group: eagleRegion, limit: PRIOR_LIMIT }), tables.county);
+  checkMadeTable(pooledTable({ head: countyHead, units: tables.counts, laws: pooling.laws, reach, group: eagleRegion, limit: PRIOR_LIMIT, level: PRIOR_LEVEL }), tables.county);
   return {
     "eaglei-county-priors.ts": [
       ...head.slice(0, -2),
       'import { eagleRegion } from "./eaglei.ts";',
       'import type { AreaUnits, CountyPooling, PriorTable } from "./hazard.ts";',
-      'import { pooledTable, PRIOR_LIMIT } from "./priors.ts";',
+      'import { pooledTable, PRIOR_LEVEL, PRIOR_LIMIT } from "./priors.ts";',
       "",
       "/**",
       " * The gamma law of the rates of the counties of each state in each case. The holdout compares the pooled rates with the raw rates and the state rates.",
@@ -343,6 +374,7 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       "  reach: EAGLEI_COUNTY_REACH,",
       "  group: eagleRegion,",
       "  limit: PRIOR_LIMIT,",
+      "  level: PRIOR_LEVEL,",
       "});",
       "",
     ].join("\n"),

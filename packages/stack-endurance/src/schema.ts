@@ -69,6 +69,7 @@ const prior = z.strictObject({
   reach: amount,
   source: id,
   asOf: id,
+  interval: z.strictObject({ level: amount, low: amount, high: amount }).optional(),
 });
 
 /**

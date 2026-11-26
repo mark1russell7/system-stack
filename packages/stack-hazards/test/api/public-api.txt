@@ -107,6 +107,7 @@ OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
 PLUME_ZONE_MILES: build/index.d.ts#PLUME_ZONE_MILES
+PRIOR_LEVEL: build/index.d.ts#PRIOR_LEVEL
 PRIOR_LIMIT: build/index.d.ts#PRIOR_LIMIT
 PlantDistance: build/index.d.ts#PlantDistance
 PoolHoldout: build/hazard.chunk.d.ts#PoolHoldout
@@ -116,6 +117,7 @@ PoolTimeHoldout: build/hazard.chunk.d.ts#PoolTimeHoldout
 PoolTimeScore: build/hazard.chunk.d.ts#PoolTimeScore
 PooledRates: build/index.d.ts#PooledRates
 PooledTableInput: build/index.d.ts#PooledTableInput
+PriorIntervals: build/hazard.chunk.d.ts#PriorIntervals
 PriorTable: build/hazard.chunk.d.ts#PriorTable
 REACTOR_LAYER: build/index.d.ts#REACTOR_LAYER
 ReachScore: build/hazard.chunk.d.ts#ReachScore
@@ -181,6 +183,7 @@ pooledRates: build/index.d.ts#pooledRates
 pooledTable: build/index.d.ts#pooledTable
 priorTableFaults: build/index.d.ts#priorTableFaults
 priorTableOverlaps: build/index.d.ts#priorTableOverlaps
+rateIntervals: build/index.d.ts#rateIntervals
 reactorRequest: build/index.d.ts#reactorRequest
 reactorsOf: build/index.d.ts#reactorsOf
 regionCounts: build/index.d.ts#regionCounts
@@ -382,6 +385,12 @@ interface PoolTimeHoldout {
 ### build/hazard.chunk.d.ts#PoolTimeScore
 type PoolTimeScore = Omit<PoolScore, "reach">;
 
+### build/hazard.chunk.d.ts#PriorIntervals
+interface PriorIntervals {
+  readonly level: number;
+  readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [low: number, high: number]>>>>;
+}
+
 ### build/hazard.chunk.d.ts#PriorTable
 interface PriorTable {
   readonly source: string;
@@ -390,6 +399,7 @@ interface PriorTable {
   readonly method: string;
   readonly codes: readonly string[];
   readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+  readonly intervals?: PriorIntervals | undefined;
 }
 
 ### build/hazard.chunk.d.ts#ReachScore
@@ -838,6 +848,9 @@ export interface OutageTally {
 ### build/index.d.ts#PLUME_ZONE_MILES
 export declare const PLUME_ZONE_MILES = 10;
 
+### build/index.d.ts#PRIOR_LEVEL
+export declare const PRIOR_LEVEL = .95;
+
 ### build/index.d.ts#PRIOR_LIMIT
 export declare const PRIOR_LIMIT = 12;
 
@@ -856,12 +869,13 @@ export interface PooledRates {
 
 ### build/index.d.ts#PooledTableInput
 export interface PooledTableInput {
-  readonly head: Omit<PriorTable, "codes" | "rates">;
+  readonly head: Omit<PriorTable, "codes" | "rates" | "intervals">;
   readonly units: AreaUnits;
   readonly laws: Readonly<Record<string, Readonly<Record<string, GammaRates>>>>;
   readonly reach: Readonly<Record<string, readonly number[]>>;
   readonly group: (area: string) => string;
   readonly limit: number;
+  readonly level?: number | undefined;
 }
 
 ### build/index.d.ts#REACTOR_LAYER
@@ -1075,6 +1089,9 @@ export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<s
 
 ### build/index.d.ts#priorTableOverlaps
 export declare function priorTableOverlaps(tables: readonly PriorTable[]): string[];
+
+### build/index.d.ts#rateIntervals
+export declare function rateIntervals(units: AreaUnits, lawOf: LawOf, level?: number): Record<string, Record<string, readonly [number, number]>>;
 
 ### build/index.d.ts#reactorRequest
 export declare function reactorRequest(userAgent: string): ExposureRequest;

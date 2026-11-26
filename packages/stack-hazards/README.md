@@ -313,6 +313,10 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   const county = upperRates(EAGLEI_COUNTY_COUNTS, (name, area) => EAGLEI_COUNTY_POOLING.laws[name]?.[eagleRegion(area)]);
   const state = upperRates(regionUnits(EAGLEI_COUNTY_COUNTS, eagleRegion), (name) => EAGLEI_STATE_POOLING.laws[name]);
   ```
+- Since 0.7.11, each rate of the two tables has its 95% interval in `intervals` (`PRIOR_LEVEL`). `rateIntervals` gives the quantiles `0.025` and `0.975` of the same gamma law as the rate.
+  `pooledTable` with the option `level` gives the intervals of the counties at the import. The script writes the intervals of the states with the rates.
+  `hazardPriors` gives the interval of each rate to its prior as `interval` (`RateInterval` of the core). The gate refuses an interval with a low end above its rate.
+  The law is skewed, so a rate with few events can be above the high end of its interval. That is not a fault.
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 - The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 

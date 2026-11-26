@@ -209,6 +209,19 @@ export interface PriorTable {
   readonly codes: readonly string[];
   /** The rate of each case in each region with one event or more. The keys are the code of the case, then the code of the region. */
   readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [perYear: number, reach: number]>>>>;
+  /**
+   * The interval of `perYear` of each rate at one level, with the keys of `rates`. Since 0.7.11.
+   * A table with no intervals, or a rate with no interval, has no read of the sampling error of its rate.
+   */
+  readonly intervals?: PriorIntervals | undefined;
+}
+
+/** The intervals of the rates of a table of priors at one level (`PriorTable.intervals`). Since 0.7.11. */
+export interface PriorIntervals {
+  /** The level of each interval, in (0, 1). Example: 0.95. */
+  readonly level: number;
+  /** The low end and the high end of `perYear` of each rate. The keys are the code of the case, then the code of the region. */
+  readonly rates: Readonly<Record<string, Readonly<Record<string, readonly [low: number, high: number]>>>>;
 }
 
 /** The name of the format of a list of hazard cases. */
