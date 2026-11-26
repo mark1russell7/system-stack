@@ -145,6 +145,7 @@ WildfireClass: build/index.d.ts#WildfireClass
 WildfireExposure: build/index.d.ts#WildfireExposure
 areaCounts: build/index.d.ts#areaCounts
 areaUnits: build/index.d.ts#areaUnits
+bandOf: build/index.d.ts#bandOf
 boxAround: build/index.d.ts#boxAround
 checkHazards: build/index.d.ts#checkHazards
 coverageTally: build/index.d.ts#coverageTally
@@ -271,6 +272,7 @@ interface DurationLaw {
   readonly fit: Fit;
   readonly scheme: string;
   readonly curves: Readonly<Record<string, Survival>>;
+  readonly bands?: Readonly<Record<string, DurationBand>> | undefined;
 }
 
 ### build/hazard.chunk.d.ts#Fit
@@ -881,6 +883,7 @@ export interface RegionCurve {
   readonly censored: number;
   readonly open: number;
   readonly median: number | undefined;
+  readonly band: DurationBand;
 }
 
 ### build/index.d.ts#STORM_CLASSES
@@ -964,6 +967,9 @@ export declare function areaCounts(events: readonly OutageEvent[], customers: Re
 
 ### build/index.d.ts#areaUnits
 export declare function areaUnits(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, observation: Observation): AreaUnits;
+
+### build/index.d.ts#bandOf
+export declare function bandOf(curve: SurvivalCurve, options?: SurvivalOptions, z?: number): DurationBand;
 
 ### build/index.d.ts#boxAround
 export declare function boxAround(point: SitePoint, radiusMeters: number): BBox;

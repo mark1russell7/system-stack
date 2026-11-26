@@ -49,6 +49,7 @@ const cut = z.strictObject({
   title: id,
   duration: z.array(point).readonly().optional(),
   bound: z.enum(CUT_BOUNDS).optional(),
+  band: z.strictObject({ low: z.array(point).readonly(), high: z.array(point).readonly() }).optional(),
   source: id,
   follows: follows.optional(),
 });

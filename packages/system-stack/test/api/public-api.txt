@@ -15,6 +15,7 @@ Cut: build/index.d.ts#Cut
 CutBound: build/index.d.ts#CutBound
 CutFollows: build/index.d.ts#CutFollows
 DEFAULT_MAX_SETS: build/index.d.ts#DEFAULT_MAX_SETS
+DurationBand: build/index.d.ts#DurationBand
 FAULT_LEVELS: build/known.chunk.d.ts#FAULT_LEVELS
 Fault: build/known.chunk.d.ts#Fault
 FaultLevel: build/known.chunk.d.ts#FaultLevel
@@ -57,6 +58,7 @@ StackJoiner: build/index.d.ts#StackJoiner
 StopOptions: build/index.d.ts#StopOptions
 Survival: build/index.d.ts#Survival
 anyCount: build/known.chunk.d.ts#anyCount
+bandFault: build/index.d.ts#bandFault
 checkStack: build/known.chunk.d.ts#checkStack
 checkStackLayers: build/index.d.ts#checkStackLayers
 curveFault: build/index.d.ts#curveFault
@@ -117,6 +119,7 @@ export interface Cut {
   readonly title: string;
   readonly duration?: Survival | undefined;
   readonly bound?: CutBound | undefined;
+  readonly band?: DurationBand | undefined;
   readonly source: string;
   readonly follows?: CutFollows | undefined;
 }
@@ -134,6 +137,12 @@ export interface CutFollows {
 
 ### build/index.d.ts#DEFAULT_MAX_SETS
 export declare const DEFAULT_MAX_SETS = 4096;
+
+### build/index.d.ts#DurationBand
+export interface DurationBand {
+  readonly low: Survival;
+  readonly high: Survival;
+}
 
 ### build/index.d.ts#FollowSide
 export type FollowSide = "upper" | "lower";
@@ -223,6 +232,9 @@ export interface StopOptions extends PathOptions {
 
 ### build/index.d.ts#Survival
 export type Survival = readonly (readonly [days: number, chance: number])[];
+
+### build/index.d.ts#bandFault
+export declare function bandFault(curve: Survival, band: DurationBand): string | undefined;
 
 ### build/index.d.ts#checkStackLayers
 export declare function checkStackLayers(stack: Stack, addOns: readonly StackAddOn<unknown>[]): LayerFinding$1[];

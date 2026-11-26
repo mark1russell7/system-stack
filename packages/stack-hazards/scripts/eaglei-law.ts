@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { countOf } from "@mark1russell7/text";
+import type { DurationBand } from "@mark1russell7/system-stack";
 import type { DurationLaw, HazardSource } from "../src/hazard.ts";
+import type { RegionCurve } from "../src/law.ts";
 import { LAWS_SCHEMA, type CauseLaws, type EagleLaws } from "./eaglei-fit.ts";
 import { ZONE_FILE } from "./storm-files.ts";
 
@@ -63,6 +65,20 @@ export interface EagleLaw {
 
 const hours = (seconds: number): string => countOf(seconds / 3600, "hour");
 
+/**
+ * This function gives the band of each kept region, or `undefined` when a region has no band.
+ * A record of a fit before the bands has no band, so its laws have no `bands`.
+ */
+function bandsOf(regions: Readonly<Record<string, Partial<RegionCurve>>>, kept: readonly string[]): DurationLaw["bands"] {
+  const bands: Record<string, DurationBand> = {};
+  for (const code of kept) {
+    const band = regions[code]?.band;
+    if (band === undefined) return undefined;
+    bands[code] = band;
+  }
+  return bands;
+}
+
 /** This function gives the law of each storm case with one state of `MIN_EVENTS` events or more, and the sources of the causes. */
 function causeLaws(causes: CauseLaws, eaglei: HazardSource, scheme: string): CauseLawSet {
   const { before, after } = causes.options;
@@ -76,8 +92,9 @@ function causeLaws(causes: CauseLaws, eaglei: HazardSource, scheme: string): Cau
     const id = causeSourceId(name);
     const count = kept.reduce((sum, code) => sum + (entry.regions[code]?.count ?? 0), 0);
     const curves = Object.fromEntries(kept.map((code) => [code, entry.regions[code]?.curve ?? []]));
+    const bands = bandsOf(entry.regions, kept);
     const source: HazardSource = { ...eaglei, id, title: `${eaglei.title}, in the storm events of the case ${name}`, regions: { scheme, codes: kept } };
-    return [[name, { id, source, law: { read: true, source: id, fit: { family: "kaplan-meier", method, count }, scheme, curves } }]];
+    return [[name, { id, source, law: { read: true, source: id, fit: { family: "kaplan-meier", method, count }, scheme, curves, ...(bands === undefined ? {} : { bands }) } }]];
   });
   const updated = causes.storms.files
     .flatMap((file) => {
@@ -138,12 +155,14 @@ export function eagleLaw(laws: EagleLaws): EagleLaw {
   };
   const curves = Object.fromEntries(kept.map((code) => [code, laws.regions[code]?.curve ?? []]));
   const count = kept.reduce((sum, code) => sum + (laws.regions[code]?.count ?? 0), 0);
+  const bands = bandsOf(laws.regions, kept);
   const law: DurationLaw = {
     read: true,
     source: EAGLEI_SOURCE_ID,
     fit: { family: "kaplan-meier", method: "product limit with right censoring", count },
     scheme: laws.scheme,
     curves,
+    ...(bands === undefined ? {} : { bands }),
   };
   return { source, law, dropped: codes.filter((code) => !kept.includes(code)), causes: causeLaws(laws.causes, source, laws.scheme) };
 }
@@ -151,6 +170,13 @@ export function eagleLaw(laws: EagleLaws): EagleLaw {
 /** This function gives the lines of the curves of a law, in the order of the codes as text. */
 function curveLines(curves: DurationLaw["curves"], codes: readonly string[], indent: string): string[] {
   return codes.map((code) => `${indent}${JSON.stringify(code)}: ${JSON.stringify(curves[code] ?? [])},`);
+}
+
+/** This function gives the lines of the bands of a law, in the order of the codes as text, or no line for a law with no bands. */
+function bandLines(bands: DurationLaw["bands"], codes: readonly string[], indent: string): string[] {
+  if (bands === undefined) return [];
+  const inner = indent.slice(2);
+  return [`${inner}bands: {`, ...codes.map((code) => `${indent}${JSON.stringify(code)}: ${JSON.stringify(bands[code] ?? { low: [], high: [] })},`), `${inner}},`];
 }
 
 /** This function gives the JSON of a source, with its codes of regions on one line. */
@@ -174,6 +200,7 @@ export function lawModule({ source, law, causes }: EagleLaw): string {
     "    curves: {",
     ...curveLines(one.curves, Object.keys(one.curves).sort(), "      "),
     "    },",
+    ...bandLines(one.bands, Object.keys(one.curves).sort(), "      "),
     "  },",
   ]);
   const sourceLines = cases.map(([, one]) => `  ${JSON.stringify(one.id)}: ${sourceText(one.source, 2)},`);
@@ -194,6 +221,7 @@ export function lawModule({ source, law, causes }: EagleLaw): string {
     "  curves: {",
     ...curves,
     "  },",
+    ...bandLines(law.bands, codes, "    "),
     "};",
     "",
     "/** The source of the causes of the storm cases: the storm events of NOAA. */",

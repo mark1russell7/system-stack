@@ -60,6 +60,27 @@ describe("caseOutlook", () => {
     expect(food?.shortfall.event).toBeCloseTo(2.5 - (25 - 6.25) / 20, 9);
   });
 
+  it("gives the values at each end of the sampling bands, with the same days, and no band for a stop with a cut with no band", () => {
+    const band = { low: [[0, 1], [8, 0]], high: [[0, 1], [12, 0]] } as const;
+    const banded: CaseCuts = { ...dry, cuts: dry.cuts.map((cut) => ({ ...cut, band })) };
+    const outlook = caseOutlook(cook, banded, { at: AT, horizon: 5, share: "best" });
+    const [drink, food] = outlook.draws;
+    expect(drink?.band?.shorter.lasts).toEqual({ event: 1, independent: 1, upper: 1 });
+    expect(food?.days).toBeCloseTo(2.5, 9);
+    // The shorter end: S(t) = 1 - t / 8. The longer end: S(t) = 1 - t / 12.
+    expect(food?.band?.shorter.lasts.event).toBeCloseTo(2.5 / 8, 9);
+    expect(food?.band?.longer.lasts.event).toBeCloseTo(2.5 / 12, 9);
+    expect(food?.band?.shorter.shortfall.event).toBeCloseTo(2.5 - (25 - 6.25) / 16, 9);
+    expect(food?.band?.longer.shortfall.event).toBeCloseTo(2.5 - (25 - 6.25) / 24, 9);
+    // The curve is between the two ends.
+    const lasts = food?.lasts.event ?? Number.NaN;
+    expect((food?.band?.longer.lasts.event ?? 1) <= lasts && lasts <= (food?.band?.shorter.lasts.event ?? 0)).toBe(true);
+    // With no bands, no draw has a band. With a band on the shop only, the drink has none.
+    expect(caseOutlook(cook, dry, { at: AT }).draws.some((draw) => draw.band !== undefined)).toBe(false);
+    const shopOnly: CaseCuts = { ...dry, cuts: dry.cuts.map((cut) => (cut.part === "shop" ? { ...cut, band } : cut)) };
+    expect(caseOutlook(cook, shopOnly, { at: AT }).draws.map((draw) => [draw.need, draw.band !== undefined])).toEqual([["drink", false], ["food", true]]);
+  });
+
   it("puts a draw whose stop has no curve in unread", () => {
     const unsourced: CaseCuts = { ...dry, cuts: dry.cuts.map((cut) => (cut.part === "shop" ? { part: cut.part, title: cut.title, source: "test" } : cut)) };
     const outlook = caseOutlook(cook, unsourced, { at: AT });

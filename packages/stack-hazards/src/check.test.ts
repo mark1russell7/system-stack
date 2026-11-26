@@ -400,7 +400,7 @@ describe("the gate of the cuts and the sources", () => {
   });
 
   it("passes the list of the package at a date after each of its checks", () => {
-    const faults = checkHazards(HAZARD_LIST, undefined, { at: "2026-11-24" });
+    const faults = checkHazards(HAZARD_LIST, undefined, { at: "2026-11-26" });
     expect(faults.filter((fault) => fault.level === "error")).toEqual([]);
     expect(faults.filter((fault) => fault.code === "hazards-source")).toEqual([]);
   });
