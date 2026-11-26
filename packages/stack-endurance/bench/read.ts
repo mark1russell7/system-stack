@@ -185,6 +185,7 @@ export interface FreezeStamp {
  *
  * @throws RangeError when there are fewer than `MIN_JOBS` jobs in the window. Also when a job has no run, no A/A read or no value of each case. Also when the order does not name each run one time
  * @throws RangeError when the jobs of the window have different stamps, or only some of them have a stamp
+ * @throws RangeError when the file has a fault of `limitFaults`, for example a commit that is not a full SHA
  */
 export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
   for (const read of all) {
@@ -210,7 +211,7 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
     return read.aa.spread;
   });
   const jobs = reads.map((read, index) => ({ job: read.job, cpu: read.cpu, run: runs[index] ?? "", commit: read.commit ?? stamp.commit }));
-  return {
+  const file: FrozenLimits = {
     schema: LIMITS_SCHEMA,
     measure: MEASURE,
     rule: RULE,
@@ -227,6 +228,10 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
     groups: groupTables(jobs, cases),
     ...(code === undefined ? {} : { stamp: code }),
   };
+  // A freeze never gives a file that the gate refuses: the read of the file would fail only later, in CI.
+  const faults = limitFaults(file);
+  if (faults.length > 0) throw new RangeError(`The freeze gives a file with faults:\n${faults.join("\n")}`);
+  return file;
 }
 
 /** This function gives the one stamp of the jobs of a freeze, or undefined when no job has a stamp. */

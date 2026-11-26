@@ -94,6 +94,11 @@ describe("the frozen limits", () => {
     expect(() => freezeLimits(JOBS.slice(1).map(jobRead), STAMP)).toThrow(RangeError);
   });
 
+  it("refuse to give a file with a fault, for example a short commit", () => {
+    expect(() => freezeLimits(JOBS.map(jobRead), { ...STAMP, commit: "fb98e99" })).toThrow(/not a full SHA/);
+    expect(() => freezeLimits(JOBS.map(jobRead), { ...STAMP, date: "26-11-2026" })).toThrow(/not YYYY-MM-DD/);
+  });
+
   it("show a limit that is not runLimit of its values as a fault", () => {
     const file = frozen();
     const m12 = file.cases["m12"];

@@ -8,14 +8,16 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - The value of a case in a job is the median time of one call over the children of its arm.
 - An A/A arm repeats the case of 12 cuts. Its spread is the noise of the job.
 - `limits.json` keeps the frozen limit of each case, with its values, the commit and the date. The rule is `runLimit`: the worst value of 5 runs or more plus their spread.
-- The runners of CI have different CPU models. The frozen limits hold 84 jobs of 14 runs on 7 CPU models. The timed code of the 8 commits of these runs is the same.
+- The runners of CI have different CPU models. The frozen limits hold 36 jobs of 6 runs on 7 CPU models. The timed code of the 2 commits of these runs is the same.
+- The case `best` changed the stamp, so the freeze of 2026-11-26 replaces the freeze of 84 jobs of 14 runs. The facts below that name a freeze of 60, 78 or 84 jobs are of the earlier freezes.
+- In the freeze of 2026-11-26, the limit of `best` is 45.6 ms over all the jobs: the worst value 30.0 ms plus the spread 15.7 ms. On the EPYC 7763, the limit of `best` is 31.6 ms.
 - Each CPU model with jobs of 5 runs or more has its own limit: `runLimit` of the values of its jobs (`modelTables`). The gate takes the limit of the exact CPU name of a job.
 - The other models of the freeze get the ceiling: the limit over all the jobs. A read at the ceiling has the note of `limitOnModel`. It stops only a large regression, and it does not hold a gain.
-- At 12 cuts, the limit of the EPYC 7763 is 1.05 times its median value. Its group limit is 1.015 times that median. The ceiling is 1.68 times that median.
+- At 12 cuts, the limit of the EPYC 7763 is 1.09 times its median value. Its group limit is 1.067 times that median. The ceiling is 1.60 times that median.
 - The limits of the first day blocked 1 of 19 jobs of the second day on a model with its own limit. The job was above on 2 cases, by 0.07% and 0.26%. The limits of the second day blocked no job of the first day.
 - A freeze of 60 jobs blocked 1 of 6 jobs of a later run with the same timed code. That job on the Xeon 6975P-C was above by 1.5% at 4 cuts and 1.9% at 14 cuts. The 2 other jobs of that model in the run were 11% to 13% under the limit at 14 cuts. The freeze of 78 jobs holds this run, so the limit of the 6975P-C at 14 cuts is 1.36 times its median. Its group limit is 1.15 times its median.
 - The jobs on the 9V45 have two levels at 12 cuts: 31 ms, and 34 to 35 ms. The jobs on the 8573C have two levels too. The record of a job has no field that tells the two machine kinds apart, so the limit of a model holds its two levels.
-- `node bench/main.ts read --in <folder> --freeze <file> --commit <sha>` freezes the limits of the records under a folder. Give `--commit` when the runs come from several commits. Each job of the file keeps its run and the commit that it timed.
+- `node bench/main.ts read --in <folder> --freeze <file> --commit <sha>` freezes the limits of the records under a folder. Give `--commit` as a full SHA when the runs come from several commits. A freeze refuses a file with a fault of `limitFaults`. Each job of the file keeps its run and the commit that it timed.
 - A freeze keeps the last 8 runs of each CPU model (`FREEZE_WINDOW`, `recentRuns` of rigor-bench). A freeze that only adds runs only makes each limit larger. With the window, an old run of a model goes out when a new run comes in.
   - The order of the runs is the order of their ids, or `--runs`. `--window <n>` sets another window of 5 runs or more. `limitFaults` refuses a file with more runs of a model than its window.
   - A backtest on 2026-11-25 over 22 runs of the same timed code froze from the earlier runs and gated each of the last 8 runs. A window of 5 blocked 1 run. The windows of 6 to 12 blocked none.
@@ -35,6 +37,7 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - `runLimit` adds the low side too, so with it a job with less noise makes the cap larger. In the freeze of 78 jobs, a job with the spread 0.0054 moved the pooled cap from 0.2962 to 0.297.
 - Each CPU model with its own limit has its own noise cap from the A/A spreads of its jobs (`modelTable` of rigor-bench, in `noiseCapTable`). Each other model reads against the pooled cap of all the jobs.
 - The pooled cap was 0.297 because of 1 job of a model with 2 jobs. The highest A/A spread of a job on the EPYC 7763 was 0.046. Thus a job that was noisy for its model still gave a read, against limits with 2.5% to 4% of room.
+- In the freeze of 2026-11-26, the noise cap of the EPYC 7763 is 0.0794. The cap of the Xeon 6975P-C is 0.037, and the cap of the EPYC 9V74 is 0.045. The pooled cap is 0.1101.
 - In the freeze of 84 jobs, the noise cap of the EPYC 7763 is 0.0758, and the cap of the Xeon 6975P-C is 0.0303. The cap of the EPYC 9V74 is 0.0754. The cap of the EPYC 9V45 is 0.0941, and the cap of the Xeon 8573C is 0.0962. The pooled cap is 0.2851.
 - We read each of 14 runs with the caps of the 13 other runs. 2 of the 84 jobs were above their cap. A job on the Xeon 8573C had the spread 0.0581 against its cap of 0.0403. A job on the Xeon 6973P-C had the spread 0.1512 against the pooled cap of 0.1275. No run had fewer than 3 jobs that read.
 - The gate of a case needs 3 jobs or more that read it. With fewer, the case is a no read.
@@ -44,13 +47,13 @@ Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each p
 - `limits.json` keeps each group limit with its runs. `limitFaults` computes each group limit again from the jobs of the file.
 - `limitFaults` finds a file that does not agree with itself. To compare the file with the records of its runs, download the records and run `node bench/main.ts read --in <folder> --limits bench/limits.json --verify`. Each job of the file must have one record with its CPU model, its values and its A/A spread (`recordFaults`).
 - One slow machine in a run of the freeze widens the limit of one job by 2 times its excess. In a run of 2 jobs or more, the group limit stays the same, because the other jobs of its run give the lowest value.
-- A lone slow job in a run of the freeze widens the group limit too, because its value is the lowest value of its run. In the current freeze, lone jobs give the highest lowest value of the EPYC 7763 at each case.
+- A lone slow job in a run of the freeze widens the group limit too, because its value is the lowest value of its run. In the freeze of 84 jobs, lone jobs gave the highest lowest value of the EPYC 7763 at each case.
 - A group of 1 job reads against the limit of one job. Its only value is its lowest value, so its limit must hold the slow machines of the freeze.
 - A job at the ceiling is a group of its own. A job with a no read is not in a group, so its value does not keep a group within.
 - Each job keeps its own outcome against the limit of one job. The report gives it in the column "Gate of the job alone". The gate of the run reads the groups.
 - The report shows each group with a lowest value in the margin of its limit: above the worst value of the freeze. Such a group is slower than each value of the freeze. It also shows each group with a job beyond the limit of one job.
 - A commit can change the timed code, and the rule of one job can give beyond. In that case, read the table of groups before the merge.
-- We read each run with a freeze of the 12 other runs. The groups blocked no run. The rule of one job blocked 1 of 13 runs: the run with the slow 6975P-C job.
+- In the freeze of 84 jobs, we read each run with a freeze of the 12 other runs. The groups blocked no run. The rule of one job blocked 1 of 13 runs: the run with the slow 6975P-C job.
 - With one run out, the median uniform slowdown that blocks a run is 1.8%. The least is 1.0%, and the most is 4.9%. With only the limits of one job, these values were 2.9%, 1.9% and 5.1%.
 - A slowdown of 2% blocks 11 of the 13 runs. With only the limits of one job, it blocked 1 run. The 2 other runs have only groups of 1 job on the EPYC 7763 and the 6975P-C.
 - Timed runs give valid values only in CI. On a local computer, start only the tests of this folder.
