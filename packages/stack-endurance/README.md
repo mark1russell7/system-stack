@@ -136,6 +136,24 @@ const best = bestEndurance(layer, dry, { at: "2026-12-01" });
 
 The take order gives the water to `a` first, so `b` gets 0 days. The best share gives the juice to `a` and the water to `b`.
 
+### A horizon
+
+With the option `horizon` of `h` days, each draw holds `h` days at most. A draw at the horizon keeps back only `h` times its demand. The rest of the stores goes to the lower levels.
+
+- A draw at the horizon has `days: h` and `atHorizon: true`. It can hold more days.
+- A draw with no end also gets `h` days.
+- With no horizon, the result is the same as before the option.
+
+An example: the stores have 10 L of water. The drink at the level `life` takes 1 L each day. The food at the level `health` is rice, cooked with 2 L of water for each pot.
+
+```ts
+const best = bestEndurance(layer, dry, { at: "2026-12-01", horizon: 5 });
+// best.needs.drink is { days: 5, binding: ["water"], takes: { water: 5 }, atHorizon: true }.
+// best.needs.food.days is 2.5: the other 5 L cook 2.5 pots.
+```
+
+With no horizon, the drink takes all the water for 10 days, and the food gets 0 days.
+
 ## The entries
 
 | Entry | What it has |

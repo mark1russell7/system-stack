@@ -18,6 +18,25 @@ interface Fixed {
   readonly keep: ReadonlyMap<string, Rational>;
   /** The `id` of each converter whose limit stops more runs at the step that fixes the draw. */
   readonly capped: readonly string[];
+  /** True for a draw that holds the horizon. */
+  readonly atHorizon: boolean;
+}
+
+/** The options of `bestEndurance`: the options of a case, and a horizon. */
+export interface BestOptions extends CaseOptions {
+  /**
+   * The horizon in days, more than 0. The default is no horizon. A draw holds the horizon at most, thus it keeps back
+   * only the horizon times its demand. The rest of the stores goes to the lower levels. Use the target of a plan, for
+   * example 14 days, to ask if each draw holds the target.
+   */
+  readonly horizon?: number | undefined;
+}
+
+/** This function gives the horizon as a rational, or undefined for no horizon. It throws a `RangeError` for a horizon that is not more than 0. */
+function horizonOf(horizon: number | undefined): Rational | undefined {
+  if (horizon === undefined || horizon === Infinity) return undefined;
+  if (!(horizon > 0) || !Number.isFinite(horizon)) throw new RangeError(`The horizon ${String(horizon)} is not a number of days more than 0.`);
+  return exact(horizon);
 }
 
 /** A program of one step, with the indexes of its parts. */
@@ -54,17 +73,21 @@ interface Step {
  * - At the end, a program takes the smallest sum of the shares of the stocks, each over its stock, then the fewest device-days.
  *   These are the takes of the result. A resource in `binding` has no stock left at this point.
  * - A draw in `capped` used a device with no device-days left at the step that fixed it.
+ * - With a horizon, the floor of each step is the horizon at most. A step whose floor is the horizon fixes each of its
+ *   open draws at the horizon, with `atHorizon`. Such a draw takes only the horizon times its demand. A draw with no
+ *   end also holds the horizon. With no horizon, the result is the same as before the option.
  *
  * The programs use exact rationals, so the result has no error of the method. Only the change back to a number rounds.
  * The fewest days of the first level are the joint days (`jointDays`) of the draws of that level.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
- * @param options - The date, and the stack or the parts that are also down
+ * @param options - The date, the stack or the parts that are also down, and the horizon
  * @returns The endurance of each draw whose supply stops
- * @throws {RangeError} A date is not `YYYY-MM-DD`.
+ * @throws {RangeError} A date is not `YYYY-MM-DD`, or the horizon is not more than 0.
  */
-export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions): Endurance {
+export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options: BestOptions): Endurance {
+  const horizon = horizonOf(options.horizon);
   const stoppedParts = caseStopped(caseCuts, options);
   const stock = storeAmounts(layer, options.at, stoppedParts);
   const draws = caseDraws(layer, caseCuts, stoppedParts);
@@ -76,7 +99,7 @@ export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options
   for (const level of levelGroups(layer, draws)) {
     let open = level;
     while (open.length > 0) {
-      const step = buildStep(parts, caseCuts, draws, fixed, open, devices, "span");
+      const step = buildStep(parts, caseCuts, draws, fixed, open, devices, "span", horizon);
       const solved = solveLexicographic(step.program.constraints(), [
         { sense: "max", coefficients: dense(new Map([[step.floor, ONE]]), step.program.count) },
         { sense: "min", coefficients: dense(fewestRow(step.openRuns), step.program.count) },
@@ -89,7 +112,8 @@ export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options
       const floor = solved.values[0] ?? ZERO;
       const first = solved.stages[0]?.result;
       const dual = first?.status === "optimal" ? first.dual : [];
-      let done = open.filter((draw) => sign(dual[step.floors.get(draw.need) as number] ?? ZERO) !== 0);
+      const atHorizon = horizon !== undefined && equals(floor, horizon);
+      let done = atHorizon ? open : open.filter((draw) => sign(dual[step.floors.get(draw.need) as number] ?? ZERO) !== 0);
       // The dual values of the floor rows add to 1. Thus `done` is not empty. The fallback fixes each open draw at the floor.
       if (done.length === 0) done = open;
       const full = new Set([...step.shared].filter(([, limit]) => equals(valueAt(limit.row, solved.x), mul(limit.room, floor))).map(([key]) => key));
@@ -104,7 +128,7 @@ export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options
               .map((converter) => converter.id)
               .sort()
           : [];
-        fixed.set(draw.need, { span: floor, endless: false, keep, capped });
+        fixed.set(draw.need, { span: floor, endless: false, keep, capped, atHorizon });
       }
       const fixedNow = new Set(done.map((draw) => draw.need));
       open = open.filter((draw) => !fixedNow.has(draw.need));
@@ -145,7 +169,7 @@ export function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options
       })
       .sort();
     const days = toNumber(fix.span);
-    needs[need] = fix.capped.length === 0 ? { days, binding, takes } : { days, binding, takes, capped: fix.capped };
+    needs[need] = { days, binding, takes, ...(fix.capped.length === 0 ? {} : { capped: fix.capped }), ...(fix.atHorizon ? { atHorizon: true as const } : {}) };
   }
   return { case: caseCuts.case, at: options.at, needs };
 }
@@ -172,6 +196,7 @@ function levelGroups(layer: EnduranceLayer, draws: readonly Draw[]): Draw[][] {
  * - With `"span"`, each open draw has a column of its days, not less than the floor. Its runs share the device-days that the fixed draws leave, for the floor.
  *   The device-days of each day are the runs over the span. A span not less than the floor uses fewer of them, so this is the safe side.
  * - With `"day"`, each open draw has a span of one day and takes no stock. Its runs share the device-days of one day.
+ * - With a horizon, the floor is the horizon at most.
  */
 function buildStep(
   parts: CaseParts,
@@ -181,9 +206,11 @@ function buildStep(
   open: readonly Draw[],
   devices: ReadonlyMap<string, number>,
   mode: "span" | "day",
+  horizon?: Rational,
 ): Step {
   const program = new Program();
   const floor = program.next();
+  if (horizon !== undefined) program.push(new Map([[floor, ONE]]), "<=", horizon);
   const opened = new Set(open.map((draw) => draw.need));
   const blocks: DrawBlock[] = [];
   const floors = new Map<string, number>();
@@ -253,6 +280,6 @@ function fixEndless(parts: CaseParts, caseCuts: CaseCuts, draws: readonly Draw[]
     const block = step.blocks.find((item) => item.draw.need === draw.need) as DrawBlock;
     const keep = new Map<string, Rational>();
     for (const [key, limit] of deviceUse(block.runs).limits) keep.set(key, valueAt(limit.row, solved.x));
-    fixed.set(draw.need, { span: ONE, endless: true, keep, capped: [] });
+    fixed.set(draw.need, { span: ONE, endless: true, keep, capped: [], atHorizon: false });
   }
 }

@@ -112,6 +112,11 @@ export interface DrawEndurance {
    * those days as a full shortfall. This is the safe side for a plan.
    */
   readonly capped?: readonly string[] | undefined;
+  /**
+   * True when the draw holds the horizon of the query (`horizon` of `bestEndurance`). Then `days` is the horizon, and
+   * the draw can hold more days. The record has no field `atHorizon` for a draw that stops before the horizon.
+   */
+  readonly atHorizon?: true | undefined;
 }
 
 /** The days that each draw holds when a case stops its supply. A draw whose supply works is not in `needs`. */
