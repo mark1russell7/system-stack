@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { checkHazards } from "../src/check.ts";
-import { HAZARDS_SCHEMA, type CountyPooling, type HazardSource, type PriorTable, type StatePooling } from "../src/hazard.ts";
+import { eagleRegion } from "../src/eaglei.ts";
+import { HAZARDS_SCHEMA, type AreaUnits, type CountyPooling, type HazardSource, type PriorTable, type StatePooling } from "../src/hazard.ts";
+import { pooledTable } from "../src/priors.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
 import { COUNTY_SCHEME, eaglePriors, PRIOR_LIMIT, priorModules } from "./eaglei-priors.ts";
+
+/**
+ * This function runs the text of a made module, and puts each export in `out`. The module is data and one call of `pooledTable`.
+ * Thus its text with no types runs as a script, with the imports as parameters.
+ */
+function runModule(text: string, out: Record<string, unknown>): void {
+  const script = text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: [^=]+)? =/gu, "const $1 = out.$1 =");
+  new Function("out", "pooledTable", "eagleRegion", "PRIOR_LIMIT", script)(out, pooledTable, eagleRegion, PRIOR_LIMIT);
+}
 
 // Made-up counties of the made-up states 98 and 99. The county 99003 has no event, and the county 98001 has no customers.
 function record(change: Partial<EagleLaws> = {}): EagleLaws {
@@ -104,11 +115,14 @@ describe("priorModules", () => {
       expect(text).toContain("// The run of the fit: https://example.org/runs/1 attempt 3.");
       expect(text).toContain("EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.0000/test.1");
       expect(text).toContain("share 0.01, interval 900 s");
-      const script = text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: \w+)? =/gu, "out.$1 =");
-      // The module is plain data, so its text with no types runs as a script.
-      new Function("out", script)(out);
+      runModule(text, out);
     }
+    // The county module keeps the counts, the laws and the reach. Its table is made from them at the import.
     expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
+    expect(out["EAGLEI_COUNTY_COUNTS"] as unknown as AreaUnits).toEqual(tables.counts);
+    // The reach of 99001: 3 events in one year that reach 900 customers in one year, of its 3000 customers. The tornado reaches half of it.
+    expect(out["EAGLEI_COUNTY_REACH"]).toEqual({ [OUTAGE_CASE]: [0.1], "met.tornado": [0.5] });
+    expect(modules["eaglei-county-priors.ts"]).not.toContain("rates: {");
     expect(out["EAGLEI_STATE_PRIORS"]).toEqual(tables.state);
     expect(out["EAGLEI_NATION_CUSTOMERS"]).toBe(tables.nation);
     // The pooling of the states has the one law of the nation in each case, and its holdout.
@@ -146,7 +160,7 @@ describe("priorModules", () => {
     expect(tables.pooling.time?.cases["met.tornado"]).toMatchObject({ raw: Number.NEGATIVE_INFINITY, lost: 1 });
     const out: Record<string, unknown> = {};
     for (const text of Object.values(priorModules(tables, laws, "https://example.org/runs/1 attempt 1"))) {
-      new Function("out", text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: \w+)? =/gu, "out.$1 ="))(out);
+      runModule(text, out);
     }
     const pooling = out["EAGLEI_COUNTY_POOLING"] as CountyPooling;
     expect(pooling.time?.cases[OUTAGE_CASE]?.squared.raw).toBe(2.3);
