@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "@mark1russell7/system-stack",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "A system stack as data: each part is a record with its needs, a shared cause of failure is a part, and each query reads what still works.",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandFault, CUT_BOUNDS, curveFault, cutBound, isCutBound, survivalAt, weakestBound, type CaseCuts, type Cut } from "./cuts.ts";
+import { bandFault, CUT_BOUNDS, curveFault, cutBound, intervalFault, isCutBound, survivalAt, weakestBound, type CaseCuts, type Cut } from "./cuts.ts";
 
 describe("the bound of a cut", () => {
   const curve = [
@@ -79,5 +79,19 @@ describe("curveFault", () => {
   it("takes a cut with no curve", () => {
     const storm: CaseCuts = { case: "met.winter.storm", title: "Winter storm", cuts: [{ part: "grid", title: "No power", source: "definition" }] };
     expect(storm.cuts[0]?.duration).toBeUndefined();
+  });
+});
+
+describe("intervalFault", () => {
+  it("takes an interval at a level in (0, 1) with 0 <= low <= high, also with the mean above the high end", () => {
+    expect(intervalFault({ level: 0.95, low: 0.2, high: 3 })).toBeUndefined();
+    expect(intervalFault({ level: 0.5, low: 0, high: 0 })).toBeUndefined();
+  });
+
+  it("gives the first fault of an interval", () => {
+    expect(intervalFault({ level: 1, low: 0, high: 1 })).toBe("The level 1 is not in (0, 1).");
+    expect(intervalFault({ level: 0.95, low: -1, high: 1 })).toBe("The low end -1 is not a finite count of 0 or more.");
+    expect(intervalFault({ level: 0.95, low: 2, high: 1 })).toBe("The high end 1 is not a finite count at or above the low end.");
+    expect(intervalFault({ level: 0.95, low: 0, high: Number.POSITIVE_INFINITY })).toBe("The high end Infinity is not a finite count at or above the low end.");
   });
 });

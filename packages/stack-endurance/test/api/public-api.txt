@@ -34,17 +34,20 @@ JointDays: build/index.d.ts#JointDays
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
 OutlookOptions: build/index.d.ts#OutlookOptions
 type Prior: @mark1russell7/system-stack#Prior (external)
+RateRange: build/index.d.ts#RateRange
 Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
 SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
 SHARES: build/index.d.ts#SHARES
 Share: build/index.d.ts#Share
 Shortfall: build/index.d.ts#Shortfall
+ShortfallDays: build/index.d.ts#ShortfallDays
 ShortfallOptions: build/index.d.ts#ShortfallOptions
 StopCurveOptions: build/index.d.ts#StopCurveOptions
 StopCurves: build/index.d.ts#StopCurves
 Store: build/layer.chunk.d.ts#Store
 type Survival: @mark1russell7/system-stack#Survival (external)
+YearCase: build/index.d.ts#YearCase
 YearShortfall: build/index.d.ts#YearShortfall
 YearShortfallOptions: build/index.d.ts#YearShortfallOptions
 bestEndurance: build/index.d.ts#bestEndurance
@@ -185,6 +188,14 @@ export declare const MINIMAL_STOP_CUTS = 12;
 ### build/index.d.ts#OutlookOptions
 export type OutlookOptions = YearShortfallOptions;
 
+### build/index.d.ts#RateRange
+export interface RateRange {
+  readonly level: number;
+  readonly low: ShortfallDays;
+  readonly high: ShortfallDays;
+  readonly without: readonly string[];
+}
+
 ### build/index.d.ts#SAMPLE_ENDURANCE
 export declare const SAMPLE_ENDURANCE: EnduranceLayer;
 
@@ -208,6 +219,9 @@ export interface Shortfall {
   readonly bound: CutBound$1;
 }
 
+### build/index.d.ts#ShortfallDays
+export type ShortfallDays = Pick<Shortfall, "levels" | "independent" | "upper">;
+
 ### build/index.d.ts#ShortfallOptions
 export interface ShortfallOptions extends StopCurveOptions {
   readonly horizon?: number | undefined;
@@ -228,15 +242,20 @@ export interface StopCurves {
   readonly bound: CutBound$1;
 }
 
+### build/index.d.ts#YearCase
+export interface YearCase {
+  readonly case: string;
+  readonly rate: number;
+  readonly rateInterval?: readonly [low: number, high: number] | undefined;
+  readonly endurance: Endurance;
+  readonly shortfall: Shortfall;
+}
+
 ### build/index.d.ts#YearShortfall
 export interface YearShortfall extends Shortfall {
   readonly place: string;
-  readonly cases: readonly {
-    readonly case: string;
-    readonly rate: number;
-    readonly endurance: Endurance;
-    readonly shortfall: Shortfall;
-  }[];
+  readonly cases: readonly YearCase[];
+  readonly range?: RateRange | undefined;
 }
 
 ### build/index.d.ts#YearShortfallOptions

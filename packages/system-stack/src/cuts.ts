@@ -136,6 +136,19 @@ export interface CaseCuts {
   readonly leadSeconds?: number | undefined;
 }
 
+/**
+ * The interval of the count of events in one year of a prior (`Prior.perYear`) at a level. Since 0.1.15.
+ * It gives the sampling error of the rate only, not of the reach. The mean of a skewed law can be above `high`.
+ */
+export interface RateInterval {
+  /** The level of the interval, in (0, 1). Example: 0.95. */
+  readonly level: number;
+  /** The low end of the count of events in one year, 0 or more. */
+  readonly low: number;
+  /** The high end of the count of events in one year, at or above `low`. */
+  readonly high: number;
+}
+
 /** The yearly prior of one case at one place: the events in one year in an area, and the share of them that reach the place. */
 export interface Prior {
   readonly case: string;
@@ -147,6 +160,16 @@ export interface Prior {
   readonly source: string;
   /** The date of the data of the source, as an ISO date. */
   readonly asOf: string;
+  /** The interval of `perYear`. A prior with no interval has no read of its sampling error. Since 0.1.15. */
+  readonly interval?: RateInterval | undefined;
+}
+
+/** This function gives the first fault of the interval of a rate, or `undefined`. Since 0.1.15. */
+export function intervalFault(interval: RateInterval): string | undefined {
+  if (!(interval.level > 0 && interval.level < 1)) return `The level ${String(interval.level)} is not in (0, 1).`;
+  if (!(Number.isFinite(interval.low) && interval.low >= 0)) return `The low end ${String(interval.low)} is not a finite count of 0 or more.`;
+  if (!(Number.isFinite(interval.high) && interval.high >= interval.low)) return `The high end ${String(interval.high)} is not a finite count at or above the low end.`;
+  return undefined;
 }
 
 /** This function gives the first fault of a survival curve, or `undefined`. */

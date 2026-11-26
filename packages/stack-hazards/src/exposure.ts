@@ -1,4 +1,5 @@
 import { bboxOfPoints, destinationMeters, distanceMeters, latLon, type BBox } from "@mark1russell7/geo";
+import { readNumber, readRecord, readText } from "@mark1russell7/optional/read";
 import type { HazardSource } from "./hazard.ts";
 
 // The exposure of a site to a hazard case: a read of an official layer at a point, as a typed value with its source.
@@ -101,36 +102,26 @@ function request(url: string, userAgent: string): ExposureRequest {
   return { method: "GET", url, headers: { "user-agent": userAgent, accept: "application/json" }, body: null };
 }
 
-/** This function gives the value as a record, or `undefined`. */
-const recordOf = (value: unknown): Readonly<Record<string, unknown>> | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
-
 /** This function gives the reason of an ArcGIS error reply, or `undefined` for a reply with no error. */
 function errorOf(reply: unknown): string | undefined {
-  const body = recordOf(reply);
+  const body = readRecord(reply);
   if (body === undefined) return "The reply is not a JSON object.";
-  const error = recordOf(body["error"]);
+  const error = readRecord(body["error"]);
   if (error === undefined) return undefined;
   const message = typeof error["message"] === "string" ? error["message"] : "no message";
   return `The server gave an error: ${message}.`;
 }
 
-/** This function gives a finite number of a value, or `null`. */
-const numberOf = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
-
-/** This function gives a text value with no space at the ends, or `null` for no text. */
-const textOf = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
-
 /** This function gives the attribute records of the features of an ArcGIS query reply, or the reason of a no read. */
 function featuresOf(reply: unknown): readonly Readonly<Record<string, unknown>>[] | string {
   const error = errorOf(reply);
   if (error !== undefined) return error;
-  const body = recordOf(reply) ?? {};
+  const body = readRecord(reply) ?? {};
   if (body["exceededTransferLimit"] === true) return "The server gave only a part of the features. Use a smaller radius.";
   const features = body["features"];
   if (!Array.isArray(features)) return "The reply has no list of features.";
   return features.flatMap((feature) => {
-    const attributes = recordOf(recordOf(feature)?.["attributes"]);
+    const attributes = readRecord(readRecord(feature)?.["attributes"]);
     return attributes === undefined ? [] : [attributes];
   });
 }
@@ -200,10 +191,10 @@ export function wildfireExposure(reply: unknown): WildfireExposure | NoExposure 
   const no = (reason: string): NoExposure => ({ read: false, case: WILDFIRE_LAYER.case, reason, source: WILDFIRE_LAYER.url });
   const error = errorOf(reply);
   if (error !== undefined) return no(error);
-  const raw = recordOf(reply)?.["value"];
-  const value = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : numberOf(raw);
-  const label = value !== null && Number.isInteger(value) ? WILDFIRE_CLASSES[value - 1] : undefined;
-  if (value === null || label === undefined) return no(`The layer has no class at the point (the value is ${JSON.stringify(raw ?? null)}).`);
+  const raw = readRecord(reply)?.["value"];
+  const value = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : readNumber(raw);
+  const label = value !== undefined && Number.isInteger(value) ? WILDFIRE_CLASSES[value - 1] : undefined;
+  if (value === undefined || label === undefined) return no(`The layer has no class at the point (the value is ${JSON.stringify(raw ?? null)}).`);
   return { read: true, case: WILDFIRE_LAYER.case, value, class: label, source: WILDFIRE_LAYER.url };
 }
 
@@ -243,11 +234,11 @@ export function reactorsOf(reply: unknown): readonly Reactor[] | NoExposure {
   const features = featuresOf(reply);
   if (typeof features === "string") return { read: false, case: REACTOR_LAYER.case, reason: features, source: REACTOR_LAYER.url };
   return features.flatMap((a) => {
-    const lat = numberOf(a["latitude"]);
-    const lon = numberOf(a["longitude"]);
-    const plant = textOf(a["power_plant"]);
-    if (lat === null || lon === null || plant === null) return [];
-    return [{ plant, unit: textOf(a["reactor_name"]) ?? plant, lat, lon, reported: textOf(a["status"]) !== null }];
+    const lat = readNumber(a["latitude"]);
+    const lon = readNumber(a["longitude"]);
+    const plant = readText(a["power_plant"]);
+    if (lat === undefined || lon === undefined || plant === undefined) return [];
+    return [{ plant, unit: readText(a["reactor_name"]) ?? plant, lat, lon, reported: readText(a["status"]) !== undefined }];
   });
 }
 
@@ -359,7 +350,7 @@ export function damRequest(point: SitePoint, radiusMeters: number, userAgent: st
 
 /** This function gives the class of a value of the field `HAZARD_POTENTIAL`, or `null`. */
 function damHazardOf(value: unknown): DamHazard | null {
-  const text = textOf(value)?.toLowerCase();
+  const text = readText(value)?.toLowerCase();
   return DAM_HAZARDS.find((hazard) => hazard === text) ?? null;
 }
 
@@ -368,10 +359,10 @@ export function damsOf(reply: unknown): readonly Dam[] | NoExposure {
   const features = featuresOf(reply);
   if (typeof features === "string") return { read: false, case: DAM_LAYER.case, reason: features, source: DAM_LAYER.url };
   return features.flatMap((a) => {
-    const id = textOf(a["NIDID"]);
-    const lat = numberOf(a["LATITUDE"]);
-    const lon = numberOf(a["LONGITUDE"]);
-    if (id === null || lat === null || lon === null) return [];
+    const id = readText(a["NIDID"]);
+    const lat = readNumber(a["LATITUDE"]);
+    const lon = readNumber(a["LONGITUDE"]);
+    if (id === undefined || lat === undefined || lon === undefined) return [];
     const eap = a["EAP_PREPARED"];
     return [
       {
@@ -379,11 +370,11 @@ export function damsOf(reply: unknown): readonly Dam[] | NoExposure {
         hazard: damHazardOf(a["HAZARD_POTENTIAL"]),
         lat,
         lon,
-        river: textOf(a["RIVER_OR_STREAM"]),
-        condition: textOf(a["CONDITION_ASSESSMENT"]),
-        eap: typeof eap === "number" && Number.isFinite(eap) ? new Date(eap).toISOString().slice(0, 10) : textOf(eap),
-        storageAcreFeet: numberOf(a["NID_STORAGE"]),
-        heightFt: numberOf(a["NID_HEIGHT"]),
+        river: readText(a["RIVER_OR_STREAM"]) ?? null,
+        condition: readText(a["CONDITION_ASSESSMENT"]) ?? null,
+        eap: typeof eap === "number" && Number.isFinite(eap) ? new Date(eap).toISOString().slice(0, 10) : (readText(eap) ?? null),
+        storageAcreFeet: readNumber(a["NID_STORAGE"]) ?? null,
+        heightFt: readNumber(a["NID_HEIGHT"]) ?? null,
       },
     ];
   });

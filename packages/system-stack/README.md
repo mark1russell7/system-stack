@@ -201,7 +201,8 @@ A case is an event that stops some parts at the same time, for example a winter 
 | `CaseCuts` | A case: its code, its name, its cuts and the changes that it makes to the add-ons. |
 | `Cut` | A part that the case stops, the source of the cut and the curve of the duration of the stop. |
 | `Survival` | The chance that a cut lasts more than a time: points `[days, chance]` from `[0, 1]` down to a chance of 0. |
-| `Prior` | The events of a case in one year in an area (`perYear`), and the share of them that reach one place (`reach`). |
+| `Prior` | The events of a case in one year in an area (`perYear`), and the share of them that reach one place (`reach`). The optional `interval` gives the sampling error of `perYear`. |
+| `RateInterval`, `intervalFault` | The interval of a count of events in one year at a level, and its first fault. |
 | `curveFault(curve)` | The first fault of a survival curve, or `undefined`. |
 | `DurationBand`, `bandFault(curve, band)` | The sampling band of the curve of a cut (`Cut.band`): a low curve and a high curve. `bandFault` gives the first fault of a band: an end with a fault, or an end on the wrong side of the curve. The shortfall reads only the curve. Since 0.1.14. |
 | `survivalAt(curve, days)` | The chance that a cut lasts more than `days`, linear between the points. After the last point it is 0. stack-endurance and stack-hazards read their curves with it. Since 0.1.13. |

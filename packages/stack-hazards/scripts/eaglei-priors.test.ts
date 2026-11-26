@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkHazards } from "../src/check.ts";
 import { eagleRegion } from "../src/eaglei.ts";
 import { HAZARDS_SCHEMA, type AreaUnits, type CountyPooling, type HazardSource, type PriorTable, type StatePooling } from "../src/hazard.ts";
-import { pooledTable } from "../src/priors.ts";
+import { pooledTable, PRIOR_LEVEL } from "../src/priors.ts";
 import { EAGLE_ARTICLE, LAWS_SCHEMA, OUTAGE_CASE, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { POOL_HOLDOUT_SEED } from "./eaglei-pooling.ts";
@@ -14,7 +14,7 @@ import { COUNTY_SCHEME, eaglePriors, PRIOR_LIMIT, priorModules } from "./eaglei-
  */
 function runModule(text: string, out: Record<string, unknown>): void {
   const script = text.replaceAll(/^import .*$/gmu, "").replaceAll(/export const (\w+)(?:: [^=]+)? =/gu, "const $1 = out.$1 =");
-  new Function("out", "pooledTable", "eagleRegion", "PRIOR_LIMIT", script)(out, pooledTable, eagleRegion, PRIOR_LIMIT);
+  new Function("out", "pooledTable", "eagleRegion", "PRIOR_LIMIT", "PRIOR_LEVEL", script)(out, pooledTable, eagleRegion, PRIOR_LIMIT, PRIOR_LEVEL);
 }
 
 // Made-up counties of the made-up states 98 and 99. The county 99003 has no event, and the county 98001 has no customers.
@@ -118,7 +118,13 @@ describe("priorModules", () => {
       runModule(text, out);
     }
     // The county module keeps the counts, the laws and the reach. Its table is made from them at the import.
-    expect(out["EAGLEI_COUNTY_PRIORS"]).toEqual(tables.county);
+    // The import also gives the interval of each rate (PRIOR_LEVEL). The law of each state of the record has no spread, so each interval is one point at its rate.
+    const madeCounty = out["EAGLEI_COUNTY_PRIORS"] as PriorTable;
+    expect({ ...madeCounty, intervals: undefined }).toEqual({ ...tables.county, intervals: undefined });
+    expect(madeCounty.intervals?.level).toBe(PRIOR_LEVEL);
+    for (const [name, rates] of Object.entries(madeCounty.rates)) {
+      expect(madeCounty.intervals?.rates[name]).toEqual(Object.fromEntries(Object.entries(rates).map(([code, [perYear]]) => [code, [perYear, perYear]])));
+    }
     expect(out["EAGLEI_COUNTY_COUNTS"] as unknown as AreaUnits).toEqual(tables.counts);
     // The reach of 99001: 3 events in one year that reach 900 customers in one year, of its 3000 customers. The tornado reaches half of it.
     expect(out["EAGLEI_COUNTY_REACH"]).toEqual({ [OUTAGE_CASE]: [0.1], "met.tornado": [0.5] });
