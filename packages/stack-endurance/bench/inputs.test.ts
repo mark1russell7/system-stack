@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { curveFault } from "../src/check.ts";
+import { bestEndurance } from "../src/best.ts";
+import { checkEndurance, curveFault } from "../src/check.ts";
 import { independentStop, MINIMAL_STOP_CUTS, minimalStops } from "../src/shortfall.ts";
-import { BENCH_CUTS, caseId, cutsOf, independentInput } from "./inputs.ts";
+import { BENCH_CASES, BENCH_CUTS, BEST_CASE, BEST_HORIZON, bestInput, caseId, cutsOf, independentInput } from "./inputs.ts";
 
 describe("the inputs of the bench", () => {
   it("are the same for the same seed and count, and differ for another seed", () => {
@@ -46,5 +47,25 @@ describe("the inputs of the bench", () => {
     expect(BENCH_CUTS.map((cuts) => cutsOf(caseId(cuts)))).toEqual([...BENCH_CUTS]);
     expect(cutsOf("m5")).toBeUndefined();
     expect(cutsOf("12")).toBeUndefined();
+    expect(cutsOf(BEST_CASE)).toBeUndefined();
+    expect(BENCH_CASES).toEqual([...BENCH_CUTS.map(caseId), BEST_CASE]);
+  });
+});
+
+describe("the input of the case best", () => {
+  it("is a layer that the gate passes, with a case that stops each supply", () => {
+    const { layer, caseCuts } = bestInput();
+    expect(checkEndurance(layer)).toEqual([]);
+    expect(new Set(caseCuts.cuts.map((cut) => cut.part))).toEqual(new Set(layer.draws.map((draw) => draw.supply)));
+    expect(bestInput()).toEqual(bestInput());
+  });
+
+  it("gives each draw its days, with draws at the horizon and draws below it, so the bench times each kind of step", () => {
+    const { layer, caseCuts, options } = bestInput();
+    const endurance = bestEndurance(layer, caseCuts, options);
+    const needs = layer.draws.map((draw) => endurance.needs[draw.need]);
+    expect(needs.every((held) => held !== undefined && held.days >= 0 && held.days <= BEST_HORIZON)).toBe(true);
+    expect(needs.some((held) => held?.atHorizon === true)).toBe(true);
+    expect(needs.some((held) => held?.atHorizon !== true)).toBe(true);
   });
 });

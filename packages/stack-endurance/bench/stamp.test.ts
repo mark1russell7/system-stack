@@ -13,8 +13,10 @@ describe("the stamp config of the bench", () => {
     const stamp = await configStamp(root, config);
     expect(stamp.inputs).toContain("bench/child.ts");
     expect(stamp.inputs).toContain("src/shortfall.ts");
-    // independentStop calls survivalAt of the core (since system-stack 0.1.13). The other imports of shortfall.ts from the core serve other functions, so the tree shake drops them.
-    expect(stamp.inputs.filter((input) => input.includes("system-stack/src/"))).toEqual(["../system-stack/src/cuts.ts"]);
+    expect(stamp.inputs).toContain("src/best.ts");
+    // independentStop calls survivalAt of the core (since system-stack 0.1.13). bestEndurance of the case best also reads
+    // the dates, the stack and the working parts of the core. The other imports from the core serve other functions, so the tree shake drops them.
+    expect(stamp.inputs.filter((input) => input.includes("system-stack/src/"))).toEqual(["../system-stack/src/cuts.ts", "../system-stack/src/dates.ts", "../system-stack/src/stack.ts", "../system-stack/src/working.ts"]);
     const engines = stampRecord(stamp).engines.map((engine) => engine.replace(/@[^@]*$/, ""));
     expect(engines).toEqual(expect.arrayContaining(["@mark1russell7/collections", "@mark1russell7/rigor-bench", "@mark1russell7/rigor-generators"]));
     expect(engines).not.toContain("@mark1russell7/system-stack");

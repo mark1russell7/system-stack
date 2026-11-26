@@ -2,7 +2,7 @@ import { CEILING_ONLY, runLimit } from "@mark1russell7/rigor-bench";
 import type { ArmProcess, BenchEnv, FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
+import { BENCH_CASES, BENCH_SEED } from "./inputs.ts";
 import {
   AA_ARM,
   AA_CASE,
@@ -39,7 +39,7 @@ const STAMP = { commit: "0".repeat(40), date: "2026-11-22" };
 
 /** This function gives the record of a job. Each arm has the time `scale * base` in each round. The A/A ratio of round `r` is `aa(r)`. */
 function jobRecord(job: string, scale: number, aa: (round: number) => number = () => 1, env: BenchEnv = ENV): JobRecord {
-  const base: Record<string, number> = { m4: 0.2, m8: 5, m12: 120, m14: 400, [AA_ARM]: 120 };
+  const base: Record<string, number> = { m4: 0.2, m8: 5, m12: 120, m14: 400, best: 3, [AA_ARM]: 120 };
   const rounds = 8;
   const processes: ArmProcess[] = [];
   const aaRecords: FreshRecord[] = [];
@@ -55,7 +55,7 @@ function jobRecord(job: string, scale: number, aa: (round: number) => number = (
   return { schema: RECORD_SCHEMA, job, run: job, seed: BENCH_SEED, env, rounds, warnings: [], processes, aa: aaRecords };
 }
 
-const IDS = BENCH_CUTS.map(caseId);
+const IDS = BENCH_CASES;
 const JOBS = [1, 1.05, 0.98, 1.1, 1.02].map((scale, index) => jobRecord(`job-${String(index + 1)}`, scale, (round) => (round % 2 === 0 ? 1.01 : 0.99)));
 const frozen = (): FrozenLimits => freezeLimits(JOBS.map(jobRead), STAMP);
 
@@ -92,6 +92,11 @@ describe("the frozen limits", () => {
 
   it("need 5 jobs or more", () => {
     expect(() => freezeLimits(JOBS.slice(1).map(jobRead), STAMP)).toThrow(RangeError);
+  });
+
+  it("refuse to give a file with a fault, for example a short commit", () => {
+    expect(() => freezeLimits(JOBS.map(jobRead), { ...STAMP, commit: "fb98e99" })).toThrow(/not a full SHA/);
+    expect(() => freezeLimits(JOBS.map(jobRead), { ...STAMP, date: "26-11-2026" })).toThrow(/not YYYY-MM-DD/);
   });
 
   it("show a limit that is not runLimit of its values as a fault", () => {

@@ -14,15 +14,15 @@
  */
 import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, recentRuns, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
-import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
+import { BENCH_CASES, BENCH_SEED, caseId } from "./inputs.ts";
 import { stampChanges, type StampRecord } from "@mark1russell7/rigor-bench/stamp-gate";
 
 /** The schema of the record of one job. */
-export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
+export const RECORD_SCHEMA = "stack-endurance/independent-bench/2";
 /** The schema of the file of the frozen limits. */
-export const LIMITS_SCHEMA = "stack-endurance/independent-limits/4";
+export const LIMITS_SCHEMA = "stack-endurance/independent-limits/5";
 /** The measure of each value and each limit. */
-export const MEASURE = "the median time of one call of independentStop over the fresh children of one job, in milliseconds";
+export const MEASURE = "the median time of one call of the function of the case (independentStop for the cases m, bestEndurance for the case best) over the fresh children of one job, in milliseconds";
 /** The rule of each limit. */
 export const RULE =
   "runLimit of rigor-bench: the worst value of 5 runs or more plus their spread (max - min). Each CPU model with jobs of 5 runs or more has its own limit. The other models of the freeze get the limit over all the jobs, the ceiling. The group limit of a model is runLimit of the lowest value of each run of the model. A group of 2 jobs or more reads against it. A group of 1 job reads against the limit of one job.";
@@ -63,7 +63,6 @@ export interface JobRecord {
 /** The value of one case in one job. */
 export interface CaseValue {
   readonly case: string;
-  readonly cuts: number;
   /** The median time of one call over the children of the arm, in milliseconds. */
   readonly ms: number;
   readonly p10: number;
@@ -89,9 +88,9 @@ export interface JobRead {
 /** This function gives the read of one job. Only the arm with the id of its case gives the value. The A/A copy gives only the noise. */
 export function jobRead(record: JobRecord): JobRead {
   const times = new Map(armTimes(record.processes).map((arm) => [arm.arm, arm]));
-  const cases = BENCH_CUTS.flatMap((cuts) => {
-    const arm = times.get(caseId(cuts));
-    return arm === undefined ? [] : [{ case: arm.case, cuts, ms: arm.median, p10: arm.p10, p90: arm.p90, processes: arm.processes }];
+  const cases = BENCH_CASES.flatMap((id) => {
+    const arm = times.get(id);
+    return arm === undefined ? [] : [{ case: arm.case, ms: arm.median, p10: arm.p10, p90: arm.p90, processes: arm.processes }];
   });
   const aa = record.aa.length === 0 ? undefined : aaStats(record.aa).find((stat) => stat.case === AA_CASE);
   return {
@@ -186,6 +185,7 @@ export interface FreezeStamp {
  *
  * @throws RangeError when there are fewer than `MIN_JOBS` jobs in the window. Also when a job has no run, no A/A read or no value of each case. Also when the order does not name each run one time
  * @throws RangeError when the jobs of the window have different stamps, or only some of them have a stamp
+ * @throws RangeError when the file has a fault of `limitFaults`, for example a commit that is not a full SHA
  */
 export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): FrozenLimits {
   for (const read of all) {
@@ -198,8 +198,7 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
   const code = freezeStamp(reads);
   const order = stamp.runs ?? [...new Set(all.map((read) => read.run ?? ""))];
   const cases: Record<string, RunLimit> = {};
-  for (const cuts of BENCH_CUTS) {
-    const id = caseId(cuts);
+  for (const id of BENCH_CASES) {
     const values = reads.map((read) => {
       const value = read.cases.find((item) => item.case === id);
       if (value === undefined) throw new RangeError(`The job ${read.job} has no value of ${id}.`);
@@ -212,7 +211,7 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
     return read.aa.spread;
   });
   const jobs = reads.map((read, index) => ({ job: read.job, cpu: read.cpu, run: runs[index] ?? "", commit: read.commit ?? stamp.commit }));
-  return {
+  const file: FrozenLimits = {
     schema: LIMITS_SCHEMA,
     measure: MEASURE,
     rule: RULE,
@@ -229,6 +228,10 @@ export function freezeLimits(all: readonly JobRead[], stamp: FreezeStamp): Froze
     groups: groupTables(jobs, cases),
     ...(code === undefined ? {} : { stamp: code }),
   };
+  // A freeze never gives a file that the gate refuses: the read of the file would fail only later, in CI.
+  const faults = limitFaults(file);
+  if (faults.length > 0) throw new RangeError(`The freeze gives a file with faults:\n${faults.join("\n")}`);
+  return file;
 }
 
 /** This function gives the one stamp of the jobs of a freeze, or undefined when no job has a stamp. */
@@ -274,7 +277,7 @@ export function limitFaults(file: FrozenLimits): string[] {
     if (typeof job.run !== "string" || job.run === "") faults.push(`The job ${job.job} has no run.`);
     if (typeof job.commit !== "string" || !/^[0-9a-f]{40}$/.test(job.commit)) faults.push(`The job ${job.job} has no full SHA of its commit.`);
   }
-  for (const cuts of BENCH_CUTS) check(caseId(cuts), file.cases[caseId(cuts)]);
+  for (const id of BENCH_CASES) check(id, file.cases[id]);
   if (file.stamp !== undefined && stampChanges(file.stamp, file.stamp).length > 0) faults.push("The stamp of the file is not a stamp record.");
   faults.push(...windowFaults(file));
   faults.push(...noiseCapFaults(file));
@@ -321,8 +324,7 @@ export function recordFaults(file: FrozenLimits, reads: readonly JobRead[]): str
     }
     const read = found[0] as JobRead;
     if (read.cpu !== job.cpu) faults.push(`${name} has the CPU model ${read.cpu} in its record, not ${job.cpu}.`);
-    for (const cuts of BENCH_CUTS) {
-      const id = caseId(cuts);
+    for (const id of BENCH_CASES) {
       const value = read.cases.find((item) => item.case === id)?.ms;
       if (value !== file.cases[id]?.values[index]) faults.push(`${name} has the value ${String(value)} of ${id} in its record, not ${String(file.cases[id]?.values[index])}.`);
     }
@@ -447,8 +449,7 @@ export interface JobGate {
 export function jobGate(read: JobRead, limits: FrozenLimits | undefined): JobGate {
   const why = jobNoRead(read, limits);
   const tables = limits === undefined ? {} : modelTables(limits);
-  const cases = BENCH_CUTS.map((cuts): CaseOutcome => {
-    const id = caseId(cuts);
+  const cases = BENCH_CASES.map((id): CaseOutcome => {
     const ms = read.cases.find((item) => item.case === id)?.ms;
     const table = tables[id];
     const own = table !== undefined && read.cpu !== "other" && Object.hasOwn(table, read.cpu) ? table[read.cpu] : undefined;
@@ -584,8 +585,7 @@ export interface RunCase {
  * - Each other case is `cannot decide`. A job on a CPU model with no frozen value, a noisy job and a missing job do not read.
  */
 export function runCases(gates: readonly JobGate[]): RunCase[] {
-  return BENCH_CUTS.map((cuts): RunCase => {
-    const id = caseId(cuts);
+  return BENCH_CASES.map((id): RunCase => {
     const groups = groupCases(gates, id);
     const jobs = groups.flatMap((group) => group.jobs);
     const reads = jobs.length;
@@ -622,9 +622,9 @@ export function inMargin(group: GroupCase): boolean {
 
 /** This function gives the Markdown report of a read: the value of each case in each job, the gate, and the candidate limits. */
 export function readReport(reads: readonly JobRead[], gates: readonly JobGate[], candidate: FrozenLimits | undefined): string {
-  const ids = BENCH_CUTS.map((cuts) => caseId(cuts));
+  const ids = BENCH_CASES;
   const lines = [
-    "## The cost of independentStop",
+    "## The cost of independentStop and bestEndurance",
     "",
     `The value of a case is ${MEASURE}.`,
     "",
