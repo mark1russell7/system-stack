@@ -14,7 +14,7 @@ on:
         type: boolean
         default: true
   # Each pull request starts the workflow. The job changes skips the bench when the pull request changes only text files (CI.md, "A gate with paths").
-  # Then the job timed compares the stamp of the timed code at the head and at the merge base (bench/stamp.ts). The bench runs only when they differ.
+  # Then the job timed compares the stamp of the timed code at the head and at the merge base (the shared action stamp-gate, with bench/stamp.json). The bench runs only when they differ.
   pull_request:
 
 permissions:
@@ -67,11 +67,6 @@ jobs:
     timeout-minutes: 10
     outputs:
       match: ${{ steps.decide.outputs.match }}
-    env:
-      EVENT: ${{ github.event_name }}
-      CHANGES: ${{ needs.changes.outputs.match }}
-      BASE: ${{ github.event.pull_request.base.sha }}
-      HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - id: checkout
         if: github.event_name == 'pull_request' && needs.changes.outputs.match == 'true'
@@ -95,32 +90,17 @@ jobs:
         continue-on-error: true
         run: pnpm install --frozen-lockfile
       - id: decide
-        name: Compare the stamps of the head and the merge base
         if: ${{ !cancelled() }}
-        env:
-          INSTALL: ${{ steps.install.outcome }}
-        run: |
-          times() {
-            echo "$1 So the bench runs."
-            echo "match=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-          if [ "$CHANGES" = false ]; then
-            echo "The job changes found no file of the gate. So the bench does not run."
-            echo "match=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          [ "$EVENT" = pull_request ] || times "The event is $EVENT, not a pull request."
-          [ "$INSTALL" = success ] || times "The install of the head gave $INSTALL."
-          base=$(git merge-base "$BASE" "$HEAD") || times "The merge base of $BASE and $HEAD is not known."
-          git diff --quiet "$base" "$HEAD" -- packages/stack-endurance/bench .github/workflows/bench.yml ':(exclude)*.md' || times "The pull request changes the bench or its workflow."
-          git worktree add --detach "$RUNNER_TEMP/base" "$base" > /dev/null 2>&1 || times "The checkout of the merge base $base failed."
-          (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile) > "$RUNNER_TEMP/base-install.log" 2>&1 || times "The install of the merge base failed."
-          cd packages/stack-endurance
-          mkdir -p "$RUNNER_TEMP/stamps"
-          node bench/main.ts stamp --out "$RUNNER_TEMP/stamps/head.json" > /dev/null || times "The stamp of the head failed."
-          node bench/main.ts stamp --root "$RUNNER_TEMP/base" --out "$RUNNER_TEMP/stamps/base.json" > /dev/null || times "The stamp of the merge base failed."
-          node bench/main.ts changed --base "$RUNNER_TEMP/stamps/base.json" --head "$RUNNER_TEMP/stamps/head.json" || times "The comparison of the stamps failed."
+        uses: mark1russell7/template/.github/actions/stamp-gate@19a14ae7da54e6e529ef90c5c4ab872867f152b9 # main
+        with:
+          config: packages/stack-endurance/bench/stamp.json
+          package: packages/stack-endurance
+          changes: ${{ needs.changes.outputs.match }}
+          install: ${{ steps.install.outcome }}
+          always: |
+            packages/stack-endurance/bench
+            .github/workflows/bench.yml
+            :(exclude)*.md
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:

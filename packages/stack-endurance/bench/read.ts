@@ -15,7 +15,7 @@
 import { aaStats, CEILING_ONLY, gateOf, limitOnModel, modelRuns, modelTable, recentRuns, runLimit, type CaseAaStat, type Gate, type LimitOutcome, type ModelTable, type RunLimit, type RunValue } from "@mark1russell7/rigor-bench";
 import { armTimes, type ArmProcess, type BenchEnv, type FreshRecord } from "@mark1russell7/rigor-bench/fresh";
 import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
-import { stampChanges, type StampRecord } from "./stamp.ts";
+import { stampChanges, type StampRecord } from "@mark1russell7/rigor-bench/stamp-gate";
 
 /** The schema of the record of one job. */
 export const RECORD_SCHEMA = "stack-endurance/independent-bench/1";
@@ -56,7 +56,7 @@ export interface JobRecord {
   readonly warnings: readonly string[];
   readonly processes: readonly ArmProcess[];
   readonly aa: readonly FreshRecord[];
-  /** The stamp of the timed code of the job (`bench/stamp.ts`). A record from before the stamp has none. */
+  /** The stamp of the timed code of the job (`bench/stamp.json`). A record from before the stamp has none. */
   readonly stamp?: StampRecord;
 }
 

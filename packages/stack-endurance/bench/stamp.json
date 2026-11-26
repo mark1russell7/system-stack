@@ -1,0 +1,8 @@
+{
+  "schema": "stamp-config/1",
+  "package": "packages/stack-endurance",
+  "entries": [
+    "bench/child.ts"
+  ],
+  "reads": []
+}

@@ -32,7 +32,7 @@ import {
   type JobGate,
   type JobRecord,
 } from "./read.ts";
-import type { StampRecord } from "./stamp.ts";
+import type { StampRecord } from "@mark1russell7/rigor-bench/stamp-gate";
 
 const ENV: BenchEnv = { cpu: "cpu-a", cores: 4, os: "linux", arch: "x64", node: "v26.0.0" };
 const STAMP = { commit: "0".repeat(40), date: "2026-11-22" };
