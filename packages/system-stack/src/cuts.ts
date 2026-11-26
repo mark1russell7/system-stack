@@ -10,7 +10,7 @@ export type Survival = readonly (readonly [days: number, chance: number])[];
 
 /**
  * The pointwise sampling band of a survival curve: a low curve and a high curve. Since 0.1.14.
- * At each day, the chance of `low` is at or below the chance of the estimate, and the chance of `high` is at or above it.
+ * At each day, the chance of `low` is at or below the estimate. The chance of `high` is at or above it.
  * Thus `low` gives shorter cuts and `high` gives longer cuts. The band holds each day only pointwise, not all days together.
  */
 export interface DurationBand {

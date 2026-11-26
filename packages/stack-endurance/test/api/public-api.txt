@@ -6,6 +6,7 @@
 
 ## . (build/index.d.ts): names
 
+BandValues: build/index.d.ts#BandValues
 BestOptions: build/index.d.ts#BestOptions
 type CaseCuts: @mark1russell7/system-stack#CaseCuts (external)
 CaseOptions: build/index.d.ts#CaseOptions
@@ -16,6 +17,7 @@ type Cut: @mark1russell7/system-stack#Cut (external)
 type CutBound: @mark1russell7/system-stack#CutBound (external)
 DirectUse: build/layer.chunk.d.ts#DirectUse
 Draw: build/layer.chunk.d.ts#Draw
+DrawBand: build/index.d.ts#DrawBand
 DrawEndurance: build/layer.chunk.d.ts#DrawEndurance
 DrawOutlook: build/index.d.ts#DrawOutlook
 ENDURANCE_CODES: build/index.d.ts#ENDURANCE_CODES
@@ -88,6 +90,12 @@ enduranceAddOn: build/add-on.d.ts#enduranceAddOn
 ### build/add-on.d.ts#enduranceAddOn
 export declare function enduranceAddOn(): StackJoiner<EnduranceLayer>;
 
+### build/index.d.ts#BandValues
+export interface BandValues {
+  readonly lasts: CurveValues;
+  readonly shortfall: CurveValues;
+}
+
 ### build/index.d.ts#BestOptions
 export interface BestOptions extends CaseOptions {
   readonly horizon?: number | undefined;
@@ -120,6 +128,12 @@ export interface CurveValues {
   readonly upper: number;
 }
 
+### build/index.d.ts#DrawBand
+export interface DrawBand {
+  readonly shorter: BandValues;
+  readonly longer: BandValues;
+}
+
 ### build/index.d.ts#DrawOutlook
 export interface DrawOutlook {
   readonly need: string;
@@ -132,6 +146,7 @@ export interface DrawOutlook {
   readonly shortfall: CurveValues;
   readonly bound: CutBound$1;
   readonly coarse: boolean;
+  readonly band?: DrawBand | undefined;
 }
 
 ### build/index.d.ts#ENDURANCE_CODES

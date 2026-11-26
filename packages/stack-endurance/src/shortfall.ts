@@ -709,7 +709,7 @@ export interface DrawOutlook {
   readonly coarse: boolean;
   /**
    * The values at the two ends of the sampling bands of the cuts, with the same days. Since 0.8.14.
-   * It is missing when a cut that can be part of the stop has a curve and no band: then the sampling error has no read.
+   * It is missing when a cut that can be part of the stop has a curve and no band. Then the sampling error has no read.
    */
   readonly band?: DrawBand | undefined;
 }

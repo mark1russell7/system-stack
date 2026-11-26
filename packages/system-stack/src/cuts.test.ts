@@ -60,8 +60,8 @@ describe("bandFault", () => {
   it("gives the first fault of a band", () => {
     expect(bandFault(curve, { low: [[0, 1], [1, 0.6], [3, 0]], high: curve })).toBe("At 1 days, the low end is above the curve.");
     expect(bandFault(curve, { low: curve, high: [[0, 1], [1, 0.4], [3, 0]] })).toBe("At 1 days, the high end is below the curve.");
-    // Between the points of the curve: the low end is above it at 2 days.
-    expect(bandFault(curve, { low: [[0, 1], [2, 0.3], [3, 0]], high: [[0, 1], [4, 0]] })).toBe("At 2 days, the low end is above the curve.");
+    // Between the points of the curve: the low end is below it at 1 day, and above it at 2 days (0.3 against 0.25).
+    expect(bandFault(curve, { low: [[0, 1], [1, 0.45], [2, 0.3], [3, 0]], high: [[0, 1], [4, 0]] })).toBe("At 2 days, the low end is above the curve.");
     expect(bandFault(curve, { low: [[0, 1], [1, 0.5]], high: curve })).toBe("The low end: The curve does not end at a chance of 0.");
   });
 });

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { countOf } from "@mark1russell7/text";
+import type { DurationBand } from "@mark1russell7/system-stack";
 import type { DurationLaw, HazardSource } from "../src/hazard.ts";
 import type { RegionCurve } from "../src/law.ts";
 import { LAWS_SCHEMA, type CauseLaws, type EagleLaws } from "./eaglei-fit.ts";
@@ -69,8 +70,13 @@ const hours = (seconds: number): string => countOf(seconds / 3600, "hour");
  * A record of a fit before the bands has no band, so its laws have no `bands`.
  */
 function bandsOf(regions: Readonly<Record<string, Partial<RegionCurve>>>, kept: readonly string[]): DurationLaw["bands"] {
-  const pairs = kept.map((code) => [code, regions[code]?.band] as const);
-  return pairs.every(([, band]) => band !== undefined) ? Object.fromEntries(pairs) : undefined;
+  const bands: Record<string, DurationBand> = {};
+  for (const code of kept) {
+    const band = regions[code]?.band;
+    if (band === undefined) return undefined;
+    bands[code] = band;
+  }
+  return bands;
 }
 
 /** This function gives the law of each storm case with one state of `MIN_EVENTS` events or more, and the sources of the causes. */
