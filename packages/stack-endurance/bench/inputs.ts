@@ -1,5 +1,7 @@
 /**
- * The seeded inputs of the bench of `independentStop`: `m` cuts of one supply with two feeds.
+ * The inputs of the bench: the seeded inputs of `independentStop`, and one fixed input of `bestEndurance`.
+ *
+ * The cases `m4` to `m14` time `independentStop` on `m` cuts of one supply with two feeds.
  *
  * Each cut has a survival curve with `CURVE_POINTS` points between day 0 and day `CURVE_DAYS`.
  * The cuts are in two feeds, `a` and `b`. The supply stops when one cut of each feed is on.
@@ -8,7 +10,8 @@
  * The curves fall over the same days, so the count of points is near its limit of approximately `m / sqrt(7.2e-6)`.
  */
 import { random } from "@mark1russell7/rigor-generators";
-import type { Survival } from "../src/layer.ts";
+import type { BestOptions } from "../src/best.ts";
+import { ENDURANCE_SCHEMA, type CaseCuts, type EnduranceLayer, type Survival } from "../src/layer.ts";
 
 /** The seed of each input of the bench. A change of the seed is a change of the measure. */
 export const BENCH_SEED = "stack-endurance/independent-stop/1";
@@ -31,6 +34,12 @@ export interface IndependentInput {
 
 /** This function gives the id of the case of `m` cuts, for example `m12`. */
 export const caseId = (cuts: number): string => `m${String(cuts)}`;
+
+/** The id of the case of `bestEndurance` (`bestInput`). */
+export const BEST_CASE = "best";
+
+/** The ids of the cases of the bench, in their order: the cases of `independentStop`, then the case of `bestEndurance`. */
+export const BENCH_CASES: readonly string[] = [...BENCH_CUTS.map(caseId), BEST_CASE];
 
 /** This function gives the count of cuts of a case id, or `undefined` for an id that is not a case of the bench. */
 export function cutsOf(id: string): number | undefined {
@@ -70,3 +79,75 @@ function curveOf(next: () => number): Survival {
   curve.push([CURVE_DAYS, 0]);
   return curve;
 }
+
+/** The date of the case `best`. The stores have no due date, so the date does not change the result. */
+export const BEST_AT = "2026-12-01";
+/** The horizon of the case `best`, in days. */
+export const BEST_HORIZON = 14;
+
+/** The input of the case `best`: a layer, a case that stops each supply, and the options of `bestEndurance`. */
+export interface BestInput {
+  readonly layer: EnduranceLayer;
+  readonly caseCuts: CaseCuts;
+  readonly options: BestOptions;
+}
+
+/**
+ * This function gives the fixed input of the case `best`. It has no seed: a change of it is a change of the measure.
+ *
+ * Five draws of three levels share seven resources. Two cook converters share the water and the propane with the
+ * drink, the wash and the heat, and a generator with a limit for each day makes battery energy from gasoline. The
+ * case stops each supply, so each draw takes from the stores, and the horizon of 14 days fixes the draws that reach it.
+ */
+export function bestInput(): BestInput {
+  const layer: EnduranceLayer = {
+    schema: ENDURANCE_SCHEMA,
+    levels: ["life", "health", "comfort"],
+    resources: [
+      { code: "water.stored", unit: "L" },
+      { code: "food.ready", unit: "kcal" },
+      { code: "food.grain-dry", unit: "kg" },
+      { code: "food.beans-dry", unit: "kg" },
+      { code: "fuel.propane", unit: "kg" },
+      { code: "fuel.gasoline", unit: "L" },
+      { code: "energy.battery", unit: "Wh" },
+    ],
+    stores: [
+      { id: "jugs", resource: "water.stored", amount: 120 },
+      { id: "bottles", resource: "water.stored", amount: 24 },
+      { id: "cans", resource: "food.ready", amount: 6000 },
+      { id: "rice", resource: "food.grain-dry", amount: 9 },
+      { id: "beans", resource: "food.beans-dry", amount: 4 },
+      { id: "propane", resource: "fuel.propane", amount: 2 },
+      { id: "gasoline", resource: "fuel.gasoline", amount: 20 },
+      { id: "battery", resource: "energy.battery", amount: 2000 },
+    ],
+    draws: [
+      { need: "hydration.drink", level: "life", perDay: 11.355, users: 3, supply: "water-main" },
+      { need: "food.energy", level: "health", perDay: 5400, users: 3, supply: "road" },
+      { need: "hygiene.wash", level: "health", perDay: 6, users: 3, supply: "water-main" },
+      { need: "power.electric", level: "comfort", perDay: 150, users: 3, supply: "grid" },
+      { need: "heat.space", level: "comfort", perDay: 0.2, supply: "gas-line" },
+    ],
+    direct: [
+      { resource: "water.stored", need: "hydration.drink", amount: 1 },
+      { resource: "food.ready", need: "food.energy", amount: 1 },
+      { resource: "water.stored", need: "hygiene.wash", amount: 1 },
+      { resource: "energy.battery", need: "power.electric", amount: 1 },
+      { resource: "fuel.propane", need: "heat.space", amount: 1 },
+    ],
+    converters: [
+      { id: "cook-rice", device: "stove", takes: [{ resource: "food.grain-dry", amount: 1 }, { resource: "water.stored", amount: 2 }, { resource: "fuel.propane", amount: 0.05 }], gives: { need: "food.energy", amount: 3600 } },
+      { id: "cook-beans", device: "stove", takes: [{ resource: "food.beans-dry", amount: 1 }, { resource: "water.stored", amount: 3 }, { resource: "fuel.propane", amount: 0.08 }], gives: { need: "food.energy", amount: 3400 } },
+      { id: "generator", device: "generator", takes: [{ resource: "fuel.gasoline", amount: 1 }], gives: { resource: "energy.battery", amount: 2500 }, perDay: 4 },
+    ],
+  };
+  const curve: Survival = [[0, 1], [1, 0.6], [3, 0.25], [10, 0.05], [30, 0]];
+  const caseCuts: CaseCuts = {
+    case: "storm",
+    title: "Winter storm",
+    cuts: ["grid", "road", "water-main", "gas-line"].map((part) => ({ part, title: part, duration: curve, source: "bench" })),
+  };
+  return { layer, caseCuts, options: { at: BEST_AT, horizon: BEST_HORIZON } };
+}
+

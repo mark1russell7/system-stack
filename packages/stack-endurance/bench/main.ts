@@ -19,11 +19,11 @@ import { parseArgs } from "node:util";
 import { gateLine, gateOf, writeGateLine, writeGateVerdict } from "@mark1russell7/rigor-bench";
 import { freshArms } from "@mark1russell7/rigor-bench/fresh";
 import { configStamp, stampConfig, stampRecord } from "@mark1russell7/rigor-bench/stamp-gate";
-import { BENCH_CUTS, BENCH_SEED, caseId } from "./inputs.ts";
+import { BENCH_CASES, BENCH_SEED } from "./inputs.ts";
 import { AA_ARM, AA_CASE, FREEZE_WINDOW, freezeLimits, jobGate, jobRead, limitFaults, readReport, RECORD_SCHEMA, recordFaults, runCases, runGate, stampNote, type FrozenLimits, type JobGate, type JobRecord } from "./read.ts";
 
 /** The rounds of one job: 4 times the count of arms (the cases and the A/A copy), so the order of `armOrder` is balanced. */
-export const JOB_ROUNDS: number = 4 * (BENCH_CUTS.length + 1);
+export const JOB_ROUNDS: number = 4 * (BENCH_CASES.length + 1);
 /** The longest time of one child, in milliseconds. */
 const CHILD_MS = 120_000;
 
@@ -51,7 +51,7 @@ async function run(args: Record<string, string | boolean | undefined>): Promise<
   const rounds = Number(args["rounds"] ?? JOB_ROUNDS);
   // The stamp comes before the timed children, so a checkout that the stamp cannot read fails fast.
   const code = stampRecord(await configStamp(checkoutRoot(args), STAMP_CONFIG));
-  const arms = [...BENCH_CUTS.map((cuts) => ({ id: caseId(cuts), case: caseId(cuts) })), { id: AA_ARM, case: AA_CASE }];
+  const arms = [...BENCH_CASES.map((id) => ({ id, case: id })), { id: AA_ARM, case: AA_CASE }];
   const result = await freshArms({
     arms,
     command: [process.execPath, join(here, "child.ts")],
@@ -94,7 +94,7 @@ function recordFiles(folder: string): string[] {
 
 /** This function gives the gate of a job with no record: each case is a no read. */
 function missingJob(job: string): JobGate {
-  const cases = BENCH_CUTS.map((cuts) => ({ case: caseId(cuts), outcome: "cannot decide" as const, ms: undefined, limit: undefined, reason: "The job gave no record." }));
+  const cases = BENCH_CASES.map((id) => ({ case: id, outcome: "cannot decide" as const, ms: undefined, limit: undefined, reason: "The job gave no record." }));
   return { job, cpu: "unknown", run: job, cases, gate: gateOf(cases) };
 }
 
@@ -141,7 +141,7 @@ function read(args: Record<string, string | boolean | undefined>): number {
   const gate = runGate(gates);
   const enforced = args["enforce"] === true;
   const models = [...new Set(reads.map((item) => item.cpu))].map((model) => ({ model, jobs: reads.filter((item) => item.cpu === model).length }));
-  writeGateLine(gateLine(runCases(gates), { title: "independentStop cost", enforced, reason: gate.reason, models }));
+  writeGateLine(gateLine(runCases(gates), { title: "independentStop and bestEndurance cost", enforced, reason: gate.reason, models }));
   if (enforced) writeGateVerdict(gate.outcome);
   process.stdout.write(`gate: ${gate.outcome}. ${gate.reason}\n`);
   return enforced && gate.outcome !== "pass" ? 1 : 0;

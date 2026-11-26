@@ -1,9 +1,10 @@
-# The bench of independentStop
+# The bench of independentStop and bestEndurance
 
 Up to 12 cuts in the minimal sets, `independentStop` sums `2^m` states at each point, for `m` cuts. This folder measures this cost at 4, 8 and 12 cuts. Past 12 cuts, `independentStop` uses the Shannon expansion of `pathSetReliability`. The case of 14 cuts measures that cost. It is in the default budget `INDEPENDENT_MAX_WORK`, and 15 cuts are too. At 16 cuts, the expansion has 17662 steps, and the budget refuses it.
 
 - Each input has a fixed seed (`BENCH_SEED`). Each cut is in a minimal set, so a state has `m` bits.
-- The workflow `bench.yml` starts 6 jobs in CI. Each job has 20 rounds: 4 times the count of arms (`JOB_ROUNDS`). Each job times each case in fresh child processes with `freshArms` of `@mark1russell7/rigor-bench`.
+- The case `best` times `bestEndurance` on one fixed input (`bestInput`). Five draws of three levels share seven resources, with two cook converters and a generator. The case stops each supply, and the horizon is 14 days. Thus the case holds the cost of the program of the best share, for example the columns of each draw.
+- The workflow `bench.yml` starts 6 jobs in CI. Each job has 24 rounds: 4 times the count of arms (`JOB_ROUNDS`). Each job times each case in fresh child processes with `freshArms` of `@mark1russell7/rigor-bench`.
 - The value of a case in a job is the median time of one call over the children of its arm.
 - An A/A arm repeats the case of 12 cuts. Its spread is the noise of the job.
 - `limits.json` keeps the frozen limit of each case, with its values, the commit and the date. The rule is `runLimit`: the worst value of 5 runs or more plus their spread.
