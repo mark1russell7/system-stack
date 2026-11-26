@@ -1,5 +1,5 @@
 import { stronglyConnectedComponents } from "@mark1russell7/collections/graph";
-import { CUT_BOUNDS, curveFault, dayNumber, isCutBound, type Fault, type Stack } from "@mark1russell7/system-stack";
+import { bandFault, CUT_BOUNDS, curveFault, dayNumber, intervalFault, isCutBound, type Fault, type Stack } from "@mark1russell7/system-stack";
 import { giftNeed, giftResource } from "./endurance.ts";
 import type { Converter, EnduranceLayer } from "./layer.ts";
 
@@ -183,10 +183,13 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
         add("error", "endurance-bound", at, `The bound of the cut "${at}" is ${JSON.stringify(cut.bound)}. It must be one of ${CUT_BOUNDS.join(", ")}.`);
       if (cut.duration === undefined) {
         add("warning", "endurance-cut-no-curve", at, `The cut "${at}" has no curve of its duration, so the draws that it can stop are no read.`);
+        if (cut.band !== undefined) add("error", "endurance-curve", at, `The cut "${at}" has a band and no curve of its duration.`);
         continue;
       }
       const fault = curveFault(cut.duration);
       if (fault !== undefined) add("error", "endurance-curve", at, `The duration of the cut "${at}": ${fault}`);
+      const band = cut.band === undefined || fault !== undefined ? undefined : bandFault(cut.duration, cut.band);
+      if (band !== undefined) add("error", "endurance-curve", at, `The band of the cut "${at}": ${band}`);
     }
     for (const [need, factor] of Object.entries(item.factors ?? {})) range(`${item.case}/${need}`, "factor", factor);
     if (item.leadSeconds !== undefined) range(item.case, "lead time", item.leadSeconds);
@@ -203,6 +206,8 @@ export function checkEndurance(layer: EnduranceLayer, stack?: Stack): EnduranceF
     range(at, "count of events in one year", prior.perYear);
     if (!(prior.reach >= 0 && prior.reach <= 1)) add("error", "endurance-range", at, `The reach of "${at}" is ${String(prior.reach)}. It must be from 0 to 1.`);
     date(at, prior.asOf);
+    const fault = prior.interval === undefined ? undefined : intervalFault(prior.interval);
+    if (fault !== undefined) add("error", "endurance-range", at, `The interval of the count of events in one year of "${at}" is not valid. ${fault}`);
   }
   return faults;
 }

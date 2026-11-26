@@ -52,6 +52,7 @@ describe("eagleLaw", () => {
     expect(source).toMatchObject({ id: EAGLEI_SOURCE_ID, url: "https://doi.org/10.0000/test.1", license: "cc-by-4.0", terms: "https://creativecommons.org/licenses/by/4.0/", updated: "2026-02-25", checked: "2026-11-22", regions: { scheme: "us-state-fips", codes: ["99"] } });
     expect(law).toMatchObject({ source: EAGLEI_SOURCE_ID, scheme: "us-state-fips", fit: { family: "kaplan-meier", count: MIN_EVENTS } });
     expect(Object.keys(law.curves)).toEqual(["99"]);
+    expect(Object.keys(law.bands ?? {})).toEqual(["99"]);
     const faults = checkHazards({
       schema: HAZARDS_SCHEMA,
       sources: { [EAGLEI_SOURCE_ID]: source },
@@ -107,17 +108,26 @@ describe("lawModule", () => {
     const text = lawModule(result);
     const source = /export const EAGLEI_SOURCE: HazardSource = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
     expect(JSON.parse(source)).toEqual(result.source);
-    const curves = text.split("\n").flatMap((line) => {
-      const match = /^ {4}("\d+"): (.*),$/u.exec(line);
-      return match === null ? [] : [[JSON.parse(match[1] ?? "") as string, JSON.parse(match[2] ?? "") as unknown]];
-    });
-    expect(Object.fromEntries(curves)).toEqual(result.law.curves);
+    // The lines of one section of the grid law: its curves or its bands, each at an indent of 4.
+    const grid = text.slice(text.indexOf("export const EAGLEI_GRID_LAW"), text.indexOf("export const STORM_EVENTS_SOURCE"));
+    const section = (name: string): Record<string, unknown> => {
+      const lines = grid.slice(grid.indexOf(`  ${name}: {`)).split("\n");
+      return Object.fromEntries(
+        lines.slice(1, lines.indexOf("  },")).flatMap((line) => {
+          const match = /^ {4}("\d+"): (.*),$/u.exec(line);
+          return match === null ? [] : [[JSON.parse(match[1] ?? "") as string, JSON.parse(match[2] ?? "") as unknown]];
+        }),
+      );
+    };
+    expect(section("curves")).toEqual(result.law.curves);
+    expect(section("bands")).toEqual(result.law.bands);
     expect(text).toContain(`fit: ${JSON.stringify(result.law.fit)},`);
     const tornado = result.causes.laws["met.tornado"];
     expect(text).toContain('  "eaglei.met.tornado": {');
     expect(text).toContain('    "codes": ["99"]');
     expect(text).toContain(`    fit: ${JSON.stringify(tornado?.law.fit)},`);
     expect(text).toContain(`      "99": ${JSON.stringify(tornado?.law.curves["99"])},`);
+    expect(text).toContain(`      "99": ${JSON.stringify(tornado?.law.bands?.["99"])},`);
     const storms = /export const STORM_EVENTS_SOURCE: HazardSource = (\{[\s\S]*?\n\});/u.exec(text)?.[1] ?? "";
     expect(JSON.parse(storms)).toEqual(result.causes.storms);
     expect(text).not.toContain("met.flood");

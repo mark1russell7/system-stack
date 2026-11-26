@@ -48,6 +48,17 @@ describe("checkEndurance", () => {
     expect(codes(layer)).toEqual(expect.arrayContaining(["endurance-range", "endurance-date", "endurance-prior-case"]));
   });
 
+  it("refuses a bad interval of a prior, and takes a good one", () => {
+    const prior = SAMPLE_ENDURANCE.priors?.[0];
+    if (prior === undefined) throw new Error("The sample has no prior.");
+    for (const interval of [{ level: 1, low: 0, high: 1 }, { level: 0.95, low: -1, high: 1 }, { level: 0.95, low: 2, high: 1 }]) {
+      const faults = checkEndurance({ ...SAMPLE_ENDURANCE, priors: [{ ...prior, interval }] });
+      expect(faults.map((fault) => fault.code)).toEqual(["endurance-range"]);
+      expect(faults[0]?.message).toMatch(/^The interval of the count of events in one year of "storm@home" is not valid\./);
+    }
+    expect(codes({ ...SAMPLE_ENDURANCE, priors: [{ ...prior, interval: { level: 0.95, low: 0.2, high: 0.7 } }] })).toEqual([]);
+  });
+
   it("finds an empty converter and a draw with no way", () => {
     const layer: EnduranceLayer = {
       ...SAMPLE_ENDURANCE,
@@ -66,6 +77,21 @@ describe("checkEndurance", () => {
     if (storm === undefined) throw new Error("no case");
     const layer: EnduranceLayer = { ...SAMPLE_ENDURANCE, cases: [{ ...storm, cuts: [{ ...(storm.cuts[0] as (typeof storm.cuts)[number]), duration: [[0, 1], [1, 0.5]] }] }] };
     expect(codes(layer)).toContain("endurance-curve");
+  });
+
+  it("passes a band on each side of the curve, and refuses a band on the wrong side or with no curve", () => {
+    const storm = SAMPLE_ENDURANCE.cases?.[0];
+    if (storm === undefined) throw new Error("no case");
+    const first = storm.cuts[0] as (typeof storm.cuts)[number];
+    const curve = first.duration ?? [];
+    const scaled = (factor: number): typeof curve => curve.map(([day, chance], index) => [day, index === 0 || chance === 0 ? chance : Math.min(1, chance * factor)] as const);
+    const withCut = (cut: typeof first): EnduranceLayer => ({ ...SAMPLE_ENDURANCE, cases: [{ ...storm, cuts: [cut, ...storm.cuts.slice(1)] }, ...(SAMPLE_ENDURANCE.cases ?? []).slice(1)] });
+    expect(codes(withCut({ ...first, band: { low: scaled(0.8), high: scaled(1.1) } }))).toEqual([]);
+    const wrong = checkEndurance(withCut({ ...first, band: { low: scaled(1.1), high: scaled(1.2) } }), SAMPLE_ENDURANCE_STACK);
+    expect(wrong.find((fault) => fault.code === "endurance-curve")?.message).toMatch(/band of the cut .*low end is above the curve/);
+    const { duration: _, ...bare } = first;
+    const lone = checkEndurance(withCut({ ...bare, band: { low: scaled(0.8), high: scaled(1.1) } }), SAMPLE_ENDURANCE_STACK);
+    expect(lone.find((fault) => fault.code === "endurance-curve")).toMatchObject({ level: "error", at: `storm/${first.part}` });
   });
 
   it("refuses a cut with a bound that is not a value of CUT_BOUNDS, and passes each value", () => {

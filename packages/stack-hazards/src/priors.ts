@@ -1,6 +1,6 @@
 import { isRecord } from "@mark1russell7/optional/read";
 import { fitTwoLevelGammaRates, pooledRate, pooledRateUpper, type GammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
-import type { Prior } from "@mark1russell7/system-stack";
+import { intervalFault, type Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
 import type { AreaUnits, HazardList, PoolLaw, PriorTable } from "./hazard.ts";
 import type { OutageCount, OutageEvent } from "./outages.ts";
@@ -287,7 +287,9 @@ export function hazardPriors(list: HazardList, options: HazardPriorOptions = {})
       const [perYear, reach] = table.rates[hazard.case]?.[region.code] ?? [0, 0];
       const source = list.sources[table.source]?.url ?? table.source;
       const code = `${region.scheme}:${region.code}`;
-      priors.push({ case: hazard.case, place: place ?? code, region: code, perYear, reach, source, asOf: table.asOf });
+      const ends = table.intervals?.rates[hazard.case]?.[region.code];
+      const interval = ends === undefined || table.intervals === undefined ? undefined : { level: table.intervals.level, low: ends[0], high: ends[1] };
+      priors.push({ case: hazard.case, place: place ?? code, region: code, perYear, reach, source, asOf: table.asOf, ...(interval === undefined ? {} : { interval }) });
       break;
     }
   }
@@ -352,6 +354,30 @@ export function upperRates(units: AreaUnits, lawOf: LawOf, level = 0.95): Record
 }
 
 /**
+ * This function gives the interval of the pooled rate of each area in each case at a level. Since 0.7.11.
+ * - The ends are the quantiles `(1 - level) / 2` and `(1 + level) / 2` of the gamma law of the rate of the area after its events in its years (`pooledRateUpper`).
+ * - The law is skewed, so its mean, the pooled rate, can be above the high end when the shape is small.
+ * - A law with the shape `Infinity` or the mean 0 gives an interval of one point at its mean.
+ *
+ * @throws RangeError when an area has no law in a case, or when the level is not in (0, 1)
+ */
+export function rateIntervals(units: AreaUnits, lawOf: LawOf, level = 0.95): Record<string, Record<string, readonly [number, number]>> {
+  if (!(level > 0 && level < 1)) throw new RangeError(`rateIntervals: the level is ${String(level)}. It must be in (0, 1).`);
+  const intervals: Record<string, Record<string, readonly [number, number]>> = {};
+  for (const [name, events] of Object.entries(units.events)) {
+    const entry: Record<string, readonly [number, number]> = {};
+    units.codes.forEach((code, at) => {
+      const law = lawOf(name, code);
+      if (law === undefined) throw new RangeError(`rateIntervals: the area ${code} has no law in the case ${name}.`);
+      const unit = { count: events[at] ?? 0, exposure: units.years[at] ?? 0 };
+      entry[code] = [pooledRateUpper(unit, law, (1 - level) / 2), pooledRateUpper(unit, law, (1 + level) / 2)];
+    });
+    intervals[name] = entry;
+  }
+  return intervals;
+}
+
+/**
  * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
  * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
  * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
@@ -365,7 +391,7 @@ export const PRIOR_LIMIT = 12;
 /** The input of `pooledTable`: the counts, the laws and the reach of the areas of one fit, and the head of the table. */
 export interface PooledTableInput {
   /** The source, the date, the scheme and the method of the table. */
-  readonly head: Omit<PriorTable, "codes" | "rates">;
+  readonly head: Omit<PriorTable, "codes" | "rates" | "intervals">;
   /** The years of each observed area and its events in each case. */
   readonly units: AreaUnits;
   /** The law of each group in each case, by the code of the case and the code of the group. */
@@ -379,7 +405,12 @@ export interface PooledTableInput {
   readonly group: (area: string) => string;
   /** The most events at one customer in one year in one case (`PRIOR_LIMIT`). An area above it in a case is not in the table. */
   readonly limit: number;
+  /** The level of the intervals of the rates (`rateIntervals`), for example `PRIOR_LEVEL`. With no level, the table has no intervals. Since 0.7.11. */
+  readonly level?: number | undefined;
 }
+
+/** The level of the intervals of the rates of the tables of the package: 0.95. Since 0.7.11. */
+export const PRIOR_LEVEL = 0.95;
 
 /**
  * This function gives the table of the pooled rates of the areas from their counts, the laws of their groups and their reach.
@@ -389,8 +420,10 @@ export interface PooledTableInput {
  * - `reach` of an area with events is its reach. An area with no event gets the plain mean of the reach of the areas of its group with events.
  *   In a group with no event, it gets the plain mean of the reach of all areas with events in the case. These are the rules of `pooledRates`.
  * - An area with `perYear * reach` above the limit in a case is not in the table: its code and its rates go.
+ * - With a level, each rate of the table has its interval from `rateIntervals` with the same law.
  *
  * @throws RangeError when an area has no law in a case, or when the reach of a case does not have one value for each area
+ * @throws RangeError when the level is not in (0, 1)
  */
 export function pooledTable(input: PooledTableInput): PriorTable {
   const { units, group } = input;
@@ -423,11 +456,21 @@ export function pooledTable(input: PooledTableInput): PriorTable {
     all[name] = entry;
   }
   const over = new Set(units.codes.filter((code) => Object.values(all).some((entry) => { const rate = entry[code]; return rate !== undefined && rate[0] * rate[1] > input.limit; })));
-  return {
-    ...input.head,
-    codes: units.codes.filter((code) => !over.has(code)),
-    rates: Object.fromEntries(Object.entries(all).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
-  };
+  const rates = Object.fromEntries(Object.entries(all).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))]));
+  const table: PriorTable = { ...input.head, codes: units.codes.filter((code) => !over.has(code)), rates };
+  if (input.level === undefined) return table;
+  const ends = rateIntervals(units, (name, area) => input.laws[name]?.[group(area)], input.level);
+  // rateIntervals gives each area of each case, so each kept rate has its interval.
+  const intervals: Record<string, Record<string, readonly [number, number]>> = {};
+  for (const [name, entry] of Object.entries(rates)) {
+    const kept: Record<string, readonly [number, number]> = {};
+    for (const code of Object.keys(entry)) {
+      const pair = ends[name]?.[code];
+      if (pair !== undefined) kept[code] = pair;
+    }
+    intervals[name] = kept;
+  }
+  return { ...table, intervals: { level: input.level, rates: intervals } };
 }
 
 function observedAreas(observation: Observation): string[] {
@@ -461,6 +504,36 @@ export function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>):
       const [perYear, reach]: readonly unknown[] = Array.isArray(pair) && pair.length === 2 ? pair : [];
       if (!(typeof perYear === "number" && Number.isFinite(perYear) && perYear >= 0 && typeof reach === "number" && reach >= 0 && reach <= 1))
         faults.push(`has a rate of "${code}" in "${region}" that is not a pair of a count of 0 or more and a share from 0 to 1`);
+    }
+  }
+  if (table.intervals !== undefined) faults.push(...intervalFaults(table));
+  return faults;
+}
+
+/**
+ * This function gives the faults of the intervals of a table as the ends of sentences.
+ * The faults are a bad level, an interval of no rate, a bad pair and a low end above the rate.
+ * The mean of a skewed law can be above the high end, so a rate above the high end is not a fault.
+ */
+function intervalFaults(table: PriorTable): string[] {
+  const intervals: unknown = table.intervals;
+  const rates = isRecord(intervals) ? intervals["rates"] : undefined;
+  if (!isRecord(intervals) || !isRecord(rates)) return ["has intervals that are not a level and a record of cases"];
+  const faults: string[] = [];
+  const level = intervals["level"];
+  if (!(typeof level === "number" && level > 0 && level < 1)) faults.push("has intervals with a level that is not in (0, 1)");
+  for (const [code, entry] of Object.entries(rates)) {
+    if (!isRecord(entry)) {
+      faults.push(`has intervals of "${code}" that are not a record of regions`);
+      continue;
+    }
+    for (const [region, pair] of Object.entries(entry)) {
+      const rate = table.rates[code]?.[region];
+      if (rate === undefined) faults.push(`has an interval of "${code}" in "${region}", which has no rate`);
+      const [low, high]: readonly unknown[] = Array.isArray(pair) && pair.length === 2 ? pair : [];
+      if (!(typeof low === "number" && typeof high === "number" && intervalFault({ level: 0.5, low, high }) === undefined))
+        faults.push(`has an interval of "${code}" in "${region}" that is not a pair of finite counts with 0 <= low <= high`);
+      else if (rate !== undefined && low > rate[0]) faults.push(`has an interval of "${code}" in "${region}" with a low end above the rate`);
     }
   }
   return faults;

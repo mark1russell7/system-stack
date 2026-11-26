@@ -15,6 +15,7 @@ Cut: build/index.d.ts#Cut
 CutBound: build/index.d.ts#CutBound
 CutFollows: build/index.d.ts#CutFollows
 DEFAULT_MAX_SETS: build/index.d.ts#DEFAULT_MAX_SETS
+DurationBand: build/index.d.ts#DurationBand
 FAULT_LEVELS: build/known.chunk.d.ts#FAULT_LEVELS
 Fault: build/known.chunk.d.ts#Fault
 FaultLevel: build/known.chunk.d.ts#FaultLevel
@@ -36,6 +37,7 @@ Part: build/known.chunk.d.ts#Part
 PartSets: build/index.d.ts#PartSets
 PathOptions: build/index.d.ts#PathOptions
 Prior: build/index.d.ts#Prior
+RateInterval: build/index.d.ts#RateInterval
 type RecordTwice: @mark1russell7/coeval/layers#RecordTwice (external)
 type RecordsJoin: @mark1russell7/coeval/layers#RecordsJoin (external)
 type RecordsJoinOptions: @mark1russell7/coeval/layers#RecordsJoinOptions (external)
@@ -57,12 +59,14 @@ StackJoiner: build/index.d.ts#StackJoiner
 StopOptions: build/index.d.ts#StopOptions
 Survival: build/index.d.ts#Survival
 anyCount: build/known.chunk.d.ts#anyCount
+bandFault: build/index.d.ts#bandFault
 checkStack: build/known.chunk.d.ts#checkStack
 checkStackLayers: build/index.d.ts#checkStackLayers
 curveFault: build/index.d.ts#curveFault
 cutBound: build/index.d.ts#cutBound
 dayNumber: build/index.d.ts#dayNumber
 holdKnown: build/known.chunk.d.ts#holdKnown
+intervalFault: build/index.d.ts#intervalFault
 isAllOf: build/known.chunk.d.ts#isAllOf
 isCutBound: build/index.d.ts#isCutBound
 isLayerName: @mark1russell7/coeval/layers#isLayerName (external)
@@ -117,6 +121,7 @@ export interface Cut {
   readonly title: string;
   readonly duration?: Survival | undefined;
   readonly bound?: CutBound | undefined;
+  readonly band?: DurationBand | undefined;
   readonly source: string;
   readonly follows?: CutFollows | undefined;
 }
@@ -134,6 +139,12 @@ export interface CutFollows {
 
 ### build/index.d.ts#DEFAULT_MAX_SETS
 export declare const DEFAULT_MAX_SETS = 4096;
+
+### build/index.d.ts#DurationBand
+export interface DurationBand {
+  readonly low: Survival;
+  readonly high: Survival;
+}
 
 ### build/index.d.ts#FollowSide
 export type FollowSide = "upper" | "lower";
@@ -168,6 +179,14 @@ export interface Prior {
   readonly reach: number;
   readonly source: string;
   readonly asOf: string;
+  readonly interval?: RateInterval | undefined;
+}
+
+### build/index.d.ts#RateInterval
+export interface RateInterval {
+  readonly level: number;
+  readonly low: number;
+  readonly high: number;
 }
 
 ### build/index.d.ts#SAMPLE_STACK
@@ -224,6 +243,9 @@ export interface StopOptions extends PathOptions {
 ### build/index.d.ts#Survival
 export type Survival = readonly (readonly [days: number, chance: number])[];
 
+### build/index.d.ts#bandFault
+export declare function bandFault(curve: Survival, band: DurationBand): string | undefined;
+
 ### build/index.d.ts#checkStackLayers
 export declare function checkStackLayers(stack: Stack, addOns: readonly StackAddOn<unknown>[]): LayerFinding$1[];
 
@@ -235,6 +257,9 @@ export declare function cutBound(cut: Cut): CutBound | undefined;
 
 ### build/index.d.ts#dayNumber
 export declare function dayNumber(date: string): number | undefined;
+
+### build/index.d.ts#intervalFault
+export declare function intervalFault(interval: RateInterval): string | undefined;
 
 ### build/index.d.ts#isCutBound
 export declare function isCutBound(value: unknown): value is CutBound;

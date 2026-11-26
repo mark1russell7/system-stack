@@ -552,6 +552,36 @@ describe("yearShortfall", () => {
     for (const level of SAMPLE_ENDURANCE.levels) expect(two.levels[level] ?? 0).toBeLessThanOrEqual(full.levels[level] ?? 0);
   });
 
+  it("gives the range of the intervals of the rates, and no range with no interval", () => {
+    const plain = yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT });
+    expect(plain.range).toBeUndefined();
+    expect(plain.cases.every((item) => item.rateInterval === undefined)).toBe(true);
+    const storm = { level: 0.95, low: 0.4, high: 1.6 };
+    const priors = (SAMPLE_ENDURANCE.priors ?? []).map((prior) => (prior.case === "storm" ? { ...prior, reach: 0.5, interval: storm } : prior));
+    const year = yearShortfall({ ...SAMPLE_ENDURANCE, priors }, "home", { at: AT });
+    const range = year.range;
+    if (range === undefined) throw new Error("The year has no range.");
+    expect(range.level).toBe(0.95);
+    expect(range.without).toEqual(["fire"]);
+    expect(year.cases[0]?.rateInterval).toEqual([0.2, 0.8]);
+    // The fire has no interval, so its rate is at the two ends. The storm counts with its rate at each end.
+    const [stormCase, fire] = year.cases;
+    for (const curve of ["levels", "independent", "upper"] as const) {
+      for (const level of SAMPLE_ENDURANCE.levels) {
+        const days = (rate: number): number => rate * (stormCase?.shortfall[curve][level] ?? 0) + (fire?.rate ?? 0) * (fire?.shortfall[curve][level] ?? 0);
+        expect(range.low[curve][level]).toBeCloseTo(days(0.2), 12);
+        expect(range.high[curve][level]).toBeCloseTo(days(0.8), 12);
+        expect(year[curve][level]).toBeCloseTo(days(0.4), 12);
+      }
+    }
+    // The least level of the cases gives the level of the range.
+    const both = (SAMPLE_ENDURANCE.priors ?? []).map((prior) => ({ ...prior, interval: { level: prior.case === "fire" ? 0.9 : 0.95, low: 0, high: prior.perYear * 2 } }));
+    const wide = yearShortfall({ ...SAMPLE_ENDURANCE, priors: both }, "home", { at: AT }).range;
+    expect(wide?.level).toBe(0.9);
+    expect(wide?.without).toEqual([]);
+    expect(wide?.low.levels).toEqual({ life: 0, health: 0, comfort: 0 });
+  });
+
   it("refuses a horizon that is not more than 0", () => {
     expect(() => yearShortfall(SAMPLE_ENDURANCE, "home", { at: AT, horizon: 0 })).toThrow(RangeError);
     expect(() => caseShortfall(SAMPLE_ENDURANCE, storm, enduranceOf(SAMPLE_ENDURANCE, storm, { at: AT }), { horizon: Number.NaN })).toThrow(RangeError);

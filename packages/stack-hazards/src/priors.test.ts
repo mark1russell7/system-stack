@@ -17,7 +17,10 @@ import {
   observedRegions,
   pooledRates,
   pooledTable,
+  PRIOR_LEVEL,
   PRIOR_LIMIT,
+  priorTableFaults,
+  rateIntervals,
   regionCounts,
   regionObservation,
   regionRates,
@@ -360,6 +363,16 @@ describe("hazardPriors", () => {
     expect(hazardPriors(list, { region: [{ scheme: "test-region", code: "A" }, { scheme: "test-county", code: "A1" }] })[0]?.place).toBe("test-region:A");
   });
 
+  it("gives the interval of the rate of the table to the prior, and no interval when the table has none for the rate", () => {
+    const intervals = { level: 0.95, rates: { "infra.power.outage": { A1: [1.2, 3.1] as const } } };
+    const priors = hazardPriors({ ...list, priors: [{ ...county, intervals }] }, { region: { scheme: "test-county", code: "A1" } });
+    expect(priors.map((prior) => [prior.case, prior.interval])).toEqual([
+      ["infra.power.outage", { level: 0.95, low: 1.2, high: 3.1 }],
+      ["met.flood", undefined],
+    ]);
+    expect(priors[1]).not.toHaveProperty("interval");
+  });
+
   it("gives a prior of 0 in an observed region with no event, and no prior with no table: that is no read", () => {
     const priors = hazardPriors(list, { region: { scheme: "test-county", code: "A2" } });
     expect(priors.map((prior) => [prior.case, prior.perYear, prior.reach])).toEqual([
@@ -467,6 +480,76 @@ describe("the counts of the areas and the upper bounds of their pooled rates", (
     expect(limited.rates["met.tornado"]?.["C1"]).toEqual([2 / 9, (0.2 + 0.4 + 0.9) / 3]);
     expect(() => pooledTable({ head, units: made, laws: { ...laws, "met.flood": {} }, reach, group: letter, limit: PRIOR_LIMIT })).toThrow(/the area A1 has no law in the case met.flood/);
     expect(() => pooledTable({ head, units: made, laws, reach: { ...reach, "met.flood": [0] }, group: letter, limit: PRIOR_LIMIT })).toThrow(/the reach of the case met.flood/);
+  });
+
+  it("gives the interval of the pooled rate of each area: the two quantiles of the same gamma law", () => {
+    const law = { shape: 2, mean: 1 };
+    const intervals = rateIntervals(units, () => law, 0.9);
+    // A1 has 1 event in 2 years: the law after its events has the shape 3 and the rate 4.
+    expect(intervals["met.tornado"]?.["A1"]?.[0]).toBeCloseTo(gammaQuantile(0.05, 3, 4), 12);
+    expect(intervals["met.tornado"]?.["A1"]?.[1]).toBeCloseTo(gammaQuantile(0.95, 3, 4), 12);
+    // The high end at the level 0.9 is the bound of upperRates at 0.95, and the low end is below the pooled rate.
+    const bounds = upperRates(units, () => law, 0.95)["met.tornado"] ?? {};
+    units.codes.forEach((code, at) => {
+      const [low = Number.NaN, high = Number.NaN] = intervals["met.tornado"]?.[code] ?? [];
+      expect(high).toBeCloseTo(bounds[code] ?? Number.NaN, 12);
+      expect(low).toBeLessThan(pooledMean(law, units.events["met.tornado"]?.[at] ?? 0, units.years[at] ?? 0));
+    });
+    // A wider level gives a wider interval. A law with no spread gives one point at its mean.
+    const wide = rateIntervals(units, () => law, 0.99)["met.tornado"]?.["B1"] ?? [0, 0];
+    const narrow = intervals["met.tornado"]?.["B1"] ?? [0, 0];
+    expect(wide[0]).toBeLessThan(narrow[0]);
+    expect(wide[1]).toBeGreaterThan(narrow[1]);
+    expect(rateIntervals(units, () => ({ shape: Number.POSITIVE_INFINITY, mean: 0.5 }))["met.tornado"]).toEqual({ A1: [0.5, 0.5], A2: [0.5, 0.5], B1: [0.5, 0.5] });
+    expect(() => rateIntervals(units, (_name, area) => (area === "B1" ? undefined : law))).toThrow(/the area B1 has no law in the case met\.tornado/);
+    for (const level of [0, 1, Number.NaN]) expect(() => rateIntervals(units, () => law, level)).toThrow(RangeError);
+  });
+
+  it("gives a table with a level the interval of each kept rate, and the gate takes it", () => {
+    const made: AreaUnits = { codes: ["A1", "A2", "B1"], years: [2, 4, 3], events: { "met.tornado": [1, 3, 2], "met.flood": [0, 0, 0] } };
+    const laws = {
+      "met.tornado": { A: { shape: 2, mean: 0.5 }, B: { shape: 2, mean: 1 } },
+      "met.flood": { A: { shape: Number.POSITIVE_INFINITY, mean: 0 }, B: { shape: Number.POSITIVE_INFINITY, mean: 0 } },
+    };
+    const reach = { "met.tornado": [0.2, 0.4, 0.9], "met.flood": [0, 0, 0] };
+    const head = { source: "test", asOf: "2026-01-01", scheme: "test-area", method: "made up" };
+    const plain = pooledTable({ head, units: made, laws, reach, group: letter, limit: PRIOR_LIMIT });
+    const table = pooledTable({ head, units: made, laws, reach, group: letter, limit: PRIOR_LIMIT, level: PRIOR_LEVEL });
+    expect(plain.intervals).toBeUndefined();
+    expect({ ...table, intervals: undefined }).toEqual({ ...plain, intervals: undefined });
+    expect(table.intervals?.level).toBe(0.95);
+    // The intervals have the keys of the rates: the flood has no rate, so it has no interval.
+    expect(table.intervals?.rates).toEqual({ "met.tornado": rateIntervals(made, (name, area) => laws[name as keyof typeof laws][letter(area) as "A"], 0.95)["met.tornado"], "met.flood": {} });
+    // B1 has the pooled rate (2 + 2) / (3 + 2) = 0.8 and the reach 0.9: 0.72 events at one customer in one year. Above the limit 0.5, it has no rate and no interval.
+    const limited = pooledTable({ head, units: made, laws, reach, group: letter, limit: 0.5, level: PRIOR_LEVEL });
+    expect(Object.keys(limited.intervals?.rates["met.tornado"] ?? {})).toEqual(["A1", "A2"]);
+    expect(() => pooledTable({ head, units: made, laws, reach, group: letter, limit: PRIOR_LIMIT, level: 1 })).toThrow(RangeError);
+    const cases = new Set(["met.tornado", "met.flood"]);
+    expect(priorTableFaults(table, cases)).toEqual([]);
+    // The gate refuses a bad level, an interval of no rate, a bad pair and a low end above the rate. A rate above the high end is not a fault.
+    const bad = (intervals: unknown): string[] => priorTableFaults({ ...table, intervals } as PriorTable, cases);
+    const tornado = table.intervals?.rates["met.tornado"] ?? {};
+    expect(bad({ level: 1, rates: {} })).toEqual(["has intervals with a level that is not in (0, 1)"]);
+    expect(bad({ level: 0.95, rates: { "met.flood": { A1: [0, 1] } } })).toEqual(['has an interval of "met.flood" in "A1", which has no rate']);
+    expect(bad({ level: 0.95, rates: { "met.tornado": { ...tornado, A1: [2, 1] } } })).toEqual(['has an interval of "met.tornado" in "A1" that is not a pair of finite counts with 0 <= low <= high']);
+    expect(bad({ level: 0.95, rates: { "met.tornado": { ...tornado, A1: [1] } } })).toEqual(['has an interval of "met.tornado" in "A1" that is not a pair of finite counts with 0 <= low <= high']);
+    expect(bad({ level: 0.95, rates: { "met.tornado": { ...tornado, A1: [0.9, 2] } } })).toEqual(['has an interval of "met.tornado" in "A1" with a low end above the rate']);
+    expect(bad({ level: 0.95, rates: { "met.tornado": { ...tornado, A1: [0.1, 0.2] } } })).toEqual([]);
+    expect(bad("no")).toEqual(["has intervals that are not a level and a record of cases"]);
+  });
+
+  it("gives an interval to each rate of the tables of the fit", () => {
+    for (const table of [EAGLEI_COUNTY_PRIORS, EAGLEI_STATE_PRIORS]) {
+      expect(table.intervals?.level).toBe(PRIOR_LEVEL);
+      for (const [name, rates] of Object.entries(table.rates)) {
+        expect(Object.keys(table.intervals?.rates[name] ?? {})).toEqual(Object.keys(rates));
+        for (const [code, [perYear]] of Object.entries(rates)) {
+          const [low = Number.NaN, high = Number.NaN] = table.intervals?.rates[name]?.[code] ?? [];
+          expect(low).toBeLessThanOrEqual(perYear);
+          expect(high).toBeGreaterThanOrEqual(low);
+        }
+      }
+    }
   });
 
   it("gives each rate of the table of the counties from the counts and the laws of the fit", () => {

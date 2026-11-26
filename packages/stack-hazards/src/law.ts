@@ -1,5 +1,5 @@
-import { kaplanMeier, survivalAt, survivalQuantile, type SurvivalCurve } from "@mark1russell7/rigor-statistics";
-import type { Survival } from "@mark1russell7/system-stack";
+import { kaplanMeier, survivalAt, survivalBand, survivalQuantile, type SurvivalCurve } from "@mark1russell7/rigor-statistics";
+import type { DurationBand, Survival } from "@mark1russell7/system-stack";
 import type { OutageEvent } from "./outages.ts";
 
 // The curves of a law of a duration from events: the Kaplan-Meier estimate of rigor-statistics, read at fixed days, in the form of the core.
@@ -27,20 +27,42 @@ export interface SurvivalOptions {
  * An open tail is a curve that does not get to 0, because of a censored time at the end. Its last chance falls linearly to 0 at `end`.
  */
 export function survivalOf(curve: SurvivalCurve, options: SurvivalOptions = {}): Survival {
+  return curvePoints("survivalOf", curve, (time) => survivalAt(curve, time), options);
+}
+
+/**
+ * This function gives the pointwise sampling band of a Kaplan-Meier curve in days, as a `DurationBand` of the core.
+ * Each end is the end of `survivalBand` of rigor-statistics at each day of `days`, with the steps of `survivalOf`.
+ * The two curves read the same days and close at the same end. Thus at each day, low <= estimate <= high.
+ * The band holds each day only pointwise, not all days together.
+ *
+ * @param curve - The Kaplan-Meier curve, in days
+ * @param options - The form of each curve, as for `survivalOf`
+ * @param z - The normal quantile of the level. The default of `survivalBand` gives a 95% band
+ */
+export function bandOf(curve: SurvivalCurve, options: SurvivalOptions = {}, z?: number): DurationBand {
+  return {
+    low: curvePoints("bandOf", curve, (time) => survivalBand(curve, time, z)?.low, options),
+    high: curvePoints("bandOf", curve, (time) => survivalBand(curve, time, z)?.high, options),
+  };
+}
+
+/** This function gives the points of a curve of the core from the chance `read` of a Kaplan-Meier curve at each day. */
+function curvePoints(name: string, curve: SurvivalCurve, read: (time: number) => number | undefined, options: SurvivalOptions): Survival {
   const days = options.days ?? LAW_DAYS;
-  if (curve.steps[0]?.time === 0) throw new RangeError("survivalOf: the curve has a step at 0 days.");
+  if (curve.steps[0]?.time === 0) throw new RangeError(`${name}: the curve has a step at 0 days.`);
   const points: [number, number][] = [[0, 1]];
   let previous = 0;
   for (const day of days) {
-    if (!(Number.isFinite(day) && day > previous)) throw new RangeError("survivalOf: the days are not more than 0, or they do not increase.");
+    if (!(Number.isFinite(day) && day > previous)) throw new RangeError(`${name}: the days are not more than 0, or they do not increase.`);
     previous = day;
     if (day > curve.last) break;
-    const chance = survivalAt(curve, day) ?? 0;
+    const chance = read(day) ?? 0;
     points.push([day, chance]);
     if (chance === 0) return points;
   }
   const lastDay = points[points.length - 1]?.[0] ?? 0;
-  const open = survivalAt(curve, curve.last) ?? 0;
+  const open = read(curve.last) ?? 0;
   if (open === 0) {
     const zero = curve.steps.find((step) => step.chance === 0)?.time ?? curve.last;
     points.push([zero, 0]);
@@ -48,7 +70,7 @@ export function survivalOf(curve: SurvivalCurve, options: SurvivalOptions = {}):
   }
   if (curve.last > lastDay) points.push([curve.last, open]);
   const end = options.end ?? 2 * curve.last;
-  if (!(Number.isFinite(end) && end > curve.last)) throw new RangeError("survivalOf: the end is not more than the largest observed time.");
+  if (!(Number.isFinite(end) && end > curve.last)) throw new RangeError(`${name}: the end is not more than the largest observed time.`);
   points.push([end, 0]);
   return points;
 }
@@ -65,6 +87,8 @@ export interface RegionCurve {
   readonly open: number;
   /** The median duration in days, or `undefined` when the curve does not get to a chance of 0.5. */
   readonly median: number | undefined;
+  /** The pointwise 95% sampling band of `curve` (`bandOf`). */
+  readonly band: DurationBand;
 }
 
 /**
@@ -88,6 +112,7 @@ export function outageCurves(events: readonly OutageEvent[], region: (area: stri
     const estimate = kaplanMeier(byRegion.get(code) ?? []);
     curves[code] = {
       curve: survivalOf(estimate, options),
+      band: bandOf(estimate, options),
       count: estimate.count,
       censored: estimate.censored,
       open: survivalAt(estimate, estimate.last) ?? 0,

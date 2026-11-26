@@ -50,6 +50,8 @@ With the option `horizon` of `h` days, the shortfall counts only the first `h` d
 
 The option `share` of `yearShortfall` sets the share of the stores in each case. The default `take` uses `enduranceOf`. With `best`, the query uses `bestEndurance`, and the horizon of the shortfall is the horizon of the share. Thus a draw at the horizon keeps back only `h` times its demand, and the lower levels get the rest.
 
+Since 0.8.15, a prior can have an `interval` of its `perYear` at a level (`RateInterval` of the core). Then `yearShortfall` gives a `range`. It is the same sum with the rate of each case at the low end of its interval, and at the high end. Each end holds only for each case alone, so the range shows the sampling error of the rates. It is not a joint interval. A case with no interval is in `range.without`, and its rate is at the two ends.
+
 A draw that only the parts of `down` stop has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
 
 A cut can have no `duration`, as before a source gives its curve. Then each draw whose stop the cut can be part of goes in `unread`. A draw whose minimal stop sets do not have the cut keeps its curves. When the query has no minimal sets, it cannot tell, so the draw goes in `unread`. The gate gives the warning `endurance-cut-no-curve` for each such cut.
@@ -85,6 +87,7 @@ Two groups of cuts that share no minimal set are independent, so the independent
 - Each value has one number for each curve of `stopCurves`: `event`, `independent` and `upper`.
 - The chance of `upper` is not more than the true chance, for each dependence of the cuts. Thus the range from `upper` to the other two shows the doubt of the dependence.
 - `holds` names the draws whose supply the case does not stop. `unread` names the draws whose stop has no curve.
+- `band` gives the same values with each cut at the low end of its band (`shorter`) and at the high end (`longer`). The days do not change. Each end holds only at each day, so the two values are a range of the sampling error, not a joint interval. A draw has no `band` when a cut of its stop has a curve and no band. Since 0.8.14.
 
 ## The joint days
 

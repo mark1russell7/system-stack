@@ -603,11 +603,42 @@ export interface YearShortfallOptions extends CaseOptions, ShortfallOptions {
   readonly share?: Share | undefined;
 }
 
+/** The user-days of each level for each curve of the stop: the three sums of a shortfall. Since 0.8.15. */
+export type ShortfallDays = Pick<Shortfall, "levels" | "independent" | "upper">;
+
+/**
+ * The range of the shortfall of one year from the intervals of the rates of its cases (`Prior.interval`). Since 0.8.15.
+ * `low` puts the rate of each case at the low end of its interval, and `high` puts it at the high end.
+ * Each end holds only for each case alone, so the two values are a range of the sampling error, not a joint interval.
+ * The mean of a skewed law can be above the high end, so the expected value can be above `high`.
+ */
+export interface RateRange {
+  /** The least level of the intervals of the cases in the sum. */
+  readonly level: number;
+  readonly low: ShortfallDays;
+  readonly high: ShortfallDays;
+  /** The cases in the sum with no interval of their rate. Their rate is at the two ends. */
+  readonly without: readonly string[];
+}
+
+/** The part of one case in the shortfall of one year. */
+export interface YearCase {
+  readonly case: string;
+  /** The expected count of the events of the case at the place in one year (`yearRate`). */
+  readonly rate: number;
+  /** The interval of `rate` from the interval of the prior, times its reach. A prior with no interval gives none. Since 0.8.15. */
+  readonly rateInterval?: readonly [low: number, high: number] | undefined;
+  readonly endurance: Endurance;
+  readonly shortfall: Shortfall;
+}
+
 /** The shortfall of one year at one place, with the part of each case. */
 export interface YearShortfall extends Shortfall {
   readonly place: string;
   /** The part of each case. `rate` is the expected count of its events in one year. */
-  readonly cases: readonly { readonly case: string; readonly rate: number; readonly endurance: Endurance; readonly shortfall: Shortfall }[];
+  readonly cases: readonly YearCase[];
+  /** The range from the intervals of the rates. A year with no case with an interval has no range. Since 0.8.15. */
+  readonly range?: RateRange | undefined;
 }
 
 /**
@@ -620,6 +651,7 @@ export interface YearShortfall extends Shortfall {
  * - `bound` is the weakest bound of the cases in the sum. A case with no prior, or with an expected count of 0, adds 0, so it does not change the bound.
  *
  * - With `share: "best"`, the endurance of each case comes from `bestEndurance` with the horizon of the shortfall.
+ * - `range` is the same sum with the rate of each case at each end of its interval (`RateRange`).
  *
  * @param layer - The endurance layer, with its cases and priors
  * @param place - The place of the priors
@@ -636,24 +668,39 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Yea
   const unread: string[] = [];
   const coarse: string[] = [];
   const independentUpper: string[] = [];
-  const cases: YearShortfall["cases"][number][] = [];
+  const cases: YearCase[] = [];
   const bounds: CutBound[] = [];
+  const low = { levels: zeroLevels(layer), independent: zeroLevels(layer), upper: zeroLevels(layer) };
+  const high = { levels: zeroLevels(layer), independent: zeroLevels(layer), upper: zeroLevels(layer) };
+  const without: string[] = [];
+  let level = Infinity;
   for (const caseCuts of layer.cases ?? []) {
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
     if (prior === undefined) continue;
     const rate = yearRate(prior);
     const endurance = shareEndurance(layer, caseCuts, options, share);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
-    for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
-    for (const [level, days] of Object.entries(shortfall.independent)) independent[level] = (independent[level] ?? 0) + rate * days;
-    for (const [level, days] of Object.entries(shortfall.upper)) upper[level] = (upper[level] ?? 0) + rate * days;
+    addDays({ levels, independent, upper }, shortfall, rate);
+    const rateInterval = prior.interval === undefined ? undefined : ([prior.interval.low * prior.reach, prior.interval.high * prior.reach] as const);
+    if (rateInterval === undefined) without.push(caseCuts.case);
+    else level = Math.min(level, prior.interval?.level ?? level);
+    addDays(low, shortfall, rateInterval?.[0] ?? rate);
+    addDays(high, shortfall, rateInterval?.[1] ?? rate);
     for (const need of shortfall.unread) if (!unread.includes(need)) unread.push(need);
     for (const need of shortfall.coarse) if (!coarse.includes(need)) coarse.push(need);
     for (const need of shortfall.independentUpper) if (!independentUpper.includes(need)) independentUpper.push(need);
     if (rate > 0) bounds.push(shortfall.bound);
-    cases.push({ case: caseCuts.case, rate, endurance, shortfall });
+    cases.push({ case: caseCuts.case, rate, ...(rateInterval === undefined ? {} : { rateInterval }), endurance, shortfall });
   }
-  return { place, levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds), cases };
+  const range = Number.isFinite(level) ? { range: { level, low, high, without } } : {};
+  return { place, levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds), cases, ...range };
+}
+
+/** This function adds the user-days of a shortfall times a count of events to each sum of the days. */
+function addDays(days: { levels: Record<string, number>; independent: Record<string, number>; upper: Record<string, number> }, shortfall: ShortfallDays, count: number): void {
+  for (const [level, value] of Object.entries(shortfall.levels)) days.levels[level] = (days.levels[level] ?? 0) + count * value;
+  for (const [level, value] of Object.entries(shortfall.independent)) days.independent[level] = (days.independent[level] ?? 0) + count * value;
+  for (const [level, value] of Object.entries(shortfall.upper)) days.upper[level] = (days.upper[level] ?? 0) + count * value;
 }
 
 /** The options of `caseOutlook`: the date, the stack or the parts that are also down, the horizon and the share. */
@@ -667,6 +714,22 @@ export interface CurveValues {
   readonly independent: number;
   /** The value of the upper curve: the safe side for each dependence of the cuts. */
   readonly upper: number;
+}
+
+/** The chance and the shortfall of a draw at one end of the sampling bands of its cuts. Since 0.8.14. */
+export interface BandValues {
+  readonly lasts: CurveValues;
+  readonly shortfall: CurveValues;
+}
+
+/**
+ * The values of a draw at the two ends of the sampling bands of its cuts (`Cut.band`). Since 0.8.14.
+ * `shorter` puts each cut at the low end of its band, and `longer` puts each cut at the high end.
+ * Each end holds only pointwise, so the two values are a range of the sampling error, not a joint interval.
+ */
+export interface DrawBand {
+  readonly shorter: BandValues;
+  readonly longer: BandValues;
 }
 
 /** The outlook of one draw in one event of a case. */
@@ -691,6 +754,11 @@ export interface DrawOutlook {
   readonly bound: CutBound;
   /** This is true when the upper curve is coarse (`StopCurves.coarse`). */
   readonly coarse: boolean;
+  /**
+   * The values at the two ends of the sampling bands of the cuts, with the same days. Since 0.8.14.
+   * It is missing when a cut that can be part of the stop has a curve and no band. Then the sampling error has no read.
+   */
+  readonly band?: DrawBand | undefined;
 }
 
 /** The outlook of one event of a case: the days, the chance and the shortfall of each draw. */
@@ -718,6 +786,7 @@ export interface CaseOutlook {
  * - The days come from the share of the stores: `enduranceOf` for `take`, `bestEndurance` with the horizon for `best`.
  * - The chance and the shortfall use the curves of `stopCurves`. They count the stop only up to the horizon.
  * - `upper` is the safe side: its chance is not more, and its shortfall is not less, than the true value for each dependence.
+ * - `band` gives the same values with each cut at each end of its sampling band (`Cut.band`). The days do not change.
  *
  * @param layer - The endurance layer
  * @param caseCuts - The case
@@ -732,6 +801,10 @@ export function caseOutlook(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
   const stopped = caseDraws(layer, caseCuts, caseStopped(caseCuts, options));
   const stoppedNeeds = new Set(stopped.map((draw) => draw.need));
   const stoppedOf = stoppedMemo(caseCuts, options);
+  // Each end of the bands: a cut with a band takes that end as its curve, and a cut with no band has no curve.
+  const banded = caseCuts.cuts.some((cut) => cut.band !== undefined);
+  const endCuts = (end: "low" | "high"): CaseCuts => ({ ...caseCuts, cuts: caseCuts.cuts.map(({ duration: _, band, ...cut }) => (band === undefined ? cut : { ...cut, duration: band[end], band })) });
+  const ends = banded ? { shorter: endCuts("low"), longer: endCuts("high") } : undefined;
   const draws: DrawOutlook[] = [];
   const unread: string[] = [];
   const bounds: CutBound[] = [];
@@ -745,6 +818,13 @@ export function caseOutlook(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
     const users = draw.users ?? 1;
     const lasts = (curve: Survival): number => (held.days >= horizon ? 1 : 1 - survivalAt(curve, held.days));
     const short = (curve: Survival): number => tailDays(curve, held.days, horizon) * users;
+    const values = (stop: StopCurves): BandValues => ({
+      lasts: { event: lasts(stop.event), independent: lasts(stop.independent), upper: lasts(stop.upper) },
+      shortfall: { event: short(stop.event), independent: short(stop.independent), upper: short(stop.upper) },
+    });
+    const shorter = ends === undefined ? undefined : stopCurvesWith(ends.shorter, draw, options, stoppedOf);
+    const longer = ends === undefined ? undefined : stopCurvesWith(ends.longer, draw, options, stoppedOf);
+    const band = shorter === undefined || longer === undefined ? {} : { band: { shorter: values(shorter), longer: values(longer) } };
     bounds.push(curves.bound);
     draws.push({
       need: draw.need,
@@ -753,10 +833,10 @@ export function caseOutlook(layer: EnduranceLayer, caseCuts: CaseCuts, options: 
       users,
       days: held.days,
       ...(held.atHorizon === true ? { atHorizon: true as const } : {}),
-      lasts: { event: lasts(curves.event), independent: lasts(curves.independent), upper: lasts(curves.upper) },
-      shortfall: { event: short(curves.event), independent: short(curves.independent), upper: short(curves.upper) },
+      ...values(curves),
       bound: curves.bound,
       coarse: curves.coarse,
+      ...band,
     });
   }
   const holds = layer.draws.filter((draw) => !stoppedNeeds.has(draw.need)).map((draw) => draw.need);
