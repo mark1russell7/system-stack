@@ -9,12 +9,15 @@
 BestOptions: build/index.d.ts#BestOptions
 type CaseCuts: @mark1russell7/system-stack#CaseCuts (external)
 CaseOptions: build/index.d.ts#CaseOptions
+CaseOutlook: build/index.d.ts#CaseOutlook
 Converter: build/layer.chunk.d.ts#Converter
+CurveValues: build/index.d.ts#CurveValues
 type Cut: @mark1russell7/system-stack#Cut (external)
 type CutBound: @mark1russell7/system-stack#CutBound (external)
 DirectUse: build/layer.chunk.d.ts#DirectUse
 Draw: build/layer.chunk.d.ts#Draw
 DrawEndurance: build/layer.chunk.d.ts#DrawEndurance
+DrawOutlook: build/index.d.ts#DrawOutlook
 ENDURANCE_CODES: build/index.d.ts#ENDURANCE_CODES
 ENDURANCE_SCHEMA: build/layer.chunk.d.ts#ENDURANCE_SCHEMA
 Endurance: build/layer.chunk.d.ts#Endurance
@@ -27,6 +30,7 @@ INDEPENDENT_TOLERANCE: build/index.d.ts#INDEPENDENT_TOLERANCE
 IsoDate: build/layer.chunk.d.ts#IsoDate
 JointDays: build/index.d.ts#JointDays
 MINIMAL_STOP_CUTS: build/index.d.ts#MINIMAL_STOP_CUTS
+OutlookOptions: build/index.d.ts#OutlookOptions
 type Prior: @mark1russell7/system-stack#Prior (external)
 Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
@@ -43,6 +47,7 @@ YearShortfall: build/index.d.ts#YearShortfall
 YearShortfallOptions: build/index.d.ts#YearShortfallOptions
 bestEndurance: build/index.d.ts#bestEndurance
 caseDraws: build/index.d.ts#caseDraws
+caseOutlook: build/index.d.ts#caseOutlook
 caseShortfall: build/index.d.ts#caseShortfall
 caseStopped: build/index.d.ts#caseStopped
 checkEndurance: build/index.d.ts#checkEndurance
@@ -95,6 +100,40 @@ export interface CaseOptions {
   readonly down?: readonly string[] | undefined;
 }
 
+### build/index.d.ts#CaseOutlook
+export interface CaseOutlook {
+  readonly case: string;
+  readonly title: string;
+  readonly at: string;
+  readonly share: Share;
+  readonly horizon: number | undefined;
+  readonly draws: readonly DrawOutlook[];
+  readonly holds: readonly string[];
+  readonly unread: readonly string[];
+  readonly bound: CutBound$1;
+}
+
+### build/index.d.ts#CurveValues
+export interface CurveValues {
+  readonly event: number;
+  readonly independent: number;
+  readonly upper: number;
+}
+
+### build/index.d.ts#DrawOutlook
+export interface DrawOutlook {
+  readonly need: string;
+  readonly level: string;
+  readonly supply: string;
+  readonly users: number;
+  readonly days: number;
+  readonly atHorizon?: true;
+  readonly lasts: CurveValues;
+  readonly shortfall: CurveValues;
+  readonly bound: CutBound$1;
+  readonly coarse: boolean;
+}
+
 ### build/index.d.ts#ENDURANCE_CODES
 export declare const ENDURANCE_CODES: readonly ["endurance-twice", "endurance-level-unknown", "endurance-resource-unknown", "endurance-part-unknown", "endurance-range", "endurance-date", "endurance-converter-empty", "endurance-curve", "endurance-bound", "endurance-prior-case", "endurance-cycle", "endurance-devices", "endurance-device-mix", "endurance-no-way", "endurance-cut-no-curve"];
 
@@ -127,6 +166,9 @@ export interface JointDays {
 
 ### build/index.d.ts#MINIMAL_STOP_CUTS
 export declare const MINIMAL_STOP_CUTS = 12;
+
+### build/index.d.ts#OutlookOptions
+export type OutlookOptions = YearShortfallOptions;
 
 ### build/index.d.ts#SAMPLE_ENDURANCE
 export declare const SAMPLE_ENDURANCE: EnduranceLayer;
@@ -192,6 +234,9 @@ export declare function bestEndurance(layer: EnduranceLayer, caseCuts: CaseCuts,
 
 ### build/index.d.ts#caseDraws
 export declare function caseDraws(layer: EnduranceLayer, caseCuts: CaseCuts, stoppedParts: ReadonlySet<string>): Draw[];
+
+### build/index.d.ts#caseOutlook
+export declare function caseOutlook(layer: EnduranceLayer, caseCuts: CaseCuts, options: OutlookOptions): CaseOutlook;
 
 ### build/index.d.ts#caseShortfall
 export declare function caseShortfall(layer: EnduranceLayer, caseCuts: CaseCuts, endurance: Endurance, options?: ShortfallOptions): Shortfall;

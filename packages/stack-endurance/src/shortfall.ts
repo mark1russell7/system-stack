@@ -581,6 +581,18 @@ export type Share = "take" | "best";
 /** The shares, with the default first. */
 export const SHARES: readonly Share[] = ["take", "best"];
 
+/** This function gives the share of the options. The default is `take`. */
+function shareOf(options: { readonly share?: Share | undefined }): Share {
+  const share = options.share ?? "take";
+  if (!SHARES.includes(share)) throw new RangeError(`The share ${String(options.share)} is not ${SHARES.join(" or ")}.`);
+  return share;
+}
+
+/** This function gives the endurance of a case with a share: `enduranceOf` for `take`, `bestEndurance` with the horizon for `best`. */
+function shareEndurance(layer: EnduranceLayer, caseCuts: CaseCuts, options: CaseOptions & ShortfallOptions, share: Share): Endurance {
+  return share === "best" ? bestEndurance(layer, caseCuts, options) : enduranceOf(layer, caseCuts, options);
+}
+
 /** The options of `yearShortfall`: the date, the stack or the parts that are also down, the horizon and the share. */
 export interface YearShortfallOptions extends CaseOptions, ShortfallOptions {
   /**
@@ -607,18 +619,17 @@ export interface YearShortfall extends Shortfall {
  * - `unread` is the union of the needs that a case cannot read, in the order of the cases. `coarse` and `independentUpper` are unions too.
  * - `bound` is the weakest bound of the cases in the sum. A case with no prior, or with an expected count of 0, adds 0, so it does not change the bound.
  *
- * @param layer - The endurance layer, with its cases and priors
- * @param place - The place of the priors
  * - With `share: "best"`, the endurance of each case comes from `bestEndurance` with the horizon of the shortfall.
  *
+ * @param layer - The endurance layer, with its cases and priors
+ * @param place - The place of the priors
  * @param options - The date, the stack or the parts that are also down, the horizon and the share
  * @throws RangeError for a bad date, horizon, `maxSets` or share: refer to `caseShortfall` and `enduranceOf`
  */
 export function yearShortfall(layer: EnduranceLayer, place: string, options: YearShortfallOptions): YearShortfall {
   horizonOf(options);
   budgetsOf(options);
-  const share = options.share ?? "take";
-  if (!SHARES.includes(share)) throw new RangeError(`The share ${String(options.share)} is not ${SHARES.join(" or ")}.`);
+  const share = shareOf(options);
   const levels = zeroLevels(layer);
   const independent = zeroLevels(layer);
   const upper = zeroLevels(layer);
@@ -631,7 +642,7 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Yea
     const prior = (layer.priors ?? []).find((item) => item.case === caseCuts.case && item.place === place);
     if (prior === undefined) continue;
     const rate = yearRate(prior);
-    const endurance = share === "best" ? bestEndurance(layer, caseCuts, options) : enduranceOf(layer, caseCuts, options);
+    const endurance = shareEndurance(layer, caseCuts, options, share);
     const shortfall = caseShortfall(layer, caseCuts, endurance, options);
     for (const [level, days] of Object.entries(shortfall.levels)) levels[level] = (levels[level] ?? 0) + rate * days;
     for (const [level, days] of Object.entries(shortfall.independent)) independent[level] = (independent[level] ?? 0) + rate * days;
@@ -643,4 +654,121 @@ export function yearShortfall(layer: EnduranceLayer, place: string, options: Yea
     cases.push({ case: caseCuts.case, rate, endurance, shortfall });
   }
   return { place, levels, independent, upper, unread, coarse, independentUpper, bound: weakestBound(bounds), cases };
+}
+
+/** The options of `caseOutlook`: the date, the stack or the parts that are also down, the horizon and the share. */
+export type OutlookOptions = YearShortfallOptions;
+
+/** A value for each curve of the stop of a draw (`StopCurves`). */
+export interface CurveValues {
+  /** The value when one event makes each cut longer together. */
+  readonly event: number;
+  /** The value when the cuts are independent. */
+  readonly independent: number;
+  /** The value of the upper curve: the safe side for each dependence of the cuts. */
+  readonly upper: number;
+}
+
+/** The outlook of one draw in one event of a case. */
+export interface DrawOutlook {
+  readonly need: string;
+  readonly level: string;
+  readonly supply: string;
+  readonly users: number;
+  /** The days that the stores give the draw (`DrawEndurance.days`). */
+  readonly days: number;
+  /** This is true when the draw holds to the horizon of a best share. */
+  readonly atHorizon?: true;
+  /**
+   * The chance that the draw gets its need through the event: `P(min(D, h) <= T)`, for each curve of the stop.
+   * `D` is the duration of the stop, `T` is `days` and `h` is the horizon. A draw that holds to the horizon has the chance 1.
+   * The chance of `upper` is not more than the true chance, for each dependence of the cuts.
+   */
+  readonly lasts: CurveValues;
+  /** The user-days of the shortfall in one event, `E[max(0, min(D, h) - T)] * users`, for each curve. */
+  readonly shortfall: CurveValues;
+  /** The bound of the curves of the stop (`StopCurves.bound`). */
+  readonly bound: CutBound;
+  /** This is true when the upper curve is coarse (`StopCurves.coarse`). */
+  readonly coarse: boolean;
+}
+
+/** The outlook of one event of a case: the days, the chance and the shortfall of each draw. */
+export interface CaseOutlook {
+  readonly case: string;
+  readonly title: string;
+  readonly at: string;
+  readonly share: Share;
+  /** The horizon in days, or `undefined` for no horizon. */
+  readonly horizon: number | undefined;
+  /** Each draw whose supply the case stops and whose stop has a curve, in the order of the layer. */
+  readonly draws: readonly DrawOutlook[];
+  /** The needs of the draws whose supply the case does not stop. They get their need through the event. */
+  readonly holds: readonly string[];
+  /** The needs of the draws whose stop has no curve (`stopCurves`). They are no read, not a pass. */
+  readonly unread: readonly string[];
+  /** The weakest bound of the curves of `draws`. */
+  readonly bound: CutBound;
+}
+
+/**
+ * This function gives the outlook of one event of a case. For each draw, it gives the days, the chance that the
+ * stores last through the stop, and the shortfall. A page of a place can show it for each case of its region.
+ *
+ * - The days come from the share of the stores: `enduranceOf` for `take`, `bestEndurance` with the horizon for `best`.
+ * - The chance and the shortfall use the curves of `stopCurves`. They count the stop only up to the horizon.
+ * - `upper` is the safe side: its chance is not more, and its shortfall is not less, than the true value for each dependence.
+ *
+ * @param layer - The endurance layer
+ * @param caseCuts - The case
+ * @param options - The date, the stack or the parts that are also down, the horizon and the share
+ * @throws RangeError for a bad date, horizon, `maxSets` or share: refer to `caseShortfall` and `enduranceOf`
+ */
+export function caseOutlook(layer: EnduranceLayer, caseCuts: CaseCuts, options: OutlookOptions): CaseOutlook {
+  const horizon = horizonOf(options);
+  budgetsOf(options);
+  const share = shareOf(options);
+  const endurance = shareEndurance(layer, caseCuts, options, share);
+  const stopped = caseDraws(layer, caseCuts, caseStopped(caseCuts, options));
+  const stoppedNeeds = new Set(stopped.map((draw) => draw.need));
+  const stoppedOf = stoppedMemo(caseCuts, options);
+  const draws: DrawOutlook[] = [];
+  const unread: string[] = [];
+  const bounds: CutBound[] = [];
+  for (const draw of stopped) {
+    const held = endurance.needs[draw.need];
+    const curves = stopCurvesWith(caseCuts, draw, options, stoppedOf);
+    if (held === undefined || curves === undefined) {
+      unread.push(draw.need);
+      continue;
+    }
+    const users = draw.users ?? 1;
+    const lasts = (curve: Survival): number => (held.days >= horizon ? 1 : 1 - survivalAt(curve, held.days));
+    const short = (curve: Survival): number => tailDays(curve, held.days, horizon) * users;
+    bounds.push(curves.bound);
+    draws.push({
+      need: draw.need,
+      level: draw.level,
+      supply: draw.supply,
+      users,
+      days: held.days,
+      ...(held.atHorizon === true ? { atHorizon: true as const } : {}),
+      lasts: { event: lasts(curves.event), independent: lasts(curves.independent), upper: lasts(curves.upper) },
+      shortfall: { event: short(curves.event), independent: short(curves.independent), upper: short(curves.upper) },
+      bound: curves.bound,
+      coarse: curves.coarse,
+    });
+  }
+  const holds = layer.draws.filter((draw) => !stoppedNeeds.has(draw.need)).map((draw) => draw.need);
+  return {
+    case: caseCuts.case,
+    title: caseCuts.title,
+    at: endurance.at,
+    share,
+    horizon: Number.isFinite(horizon) ? horizon : undefined,
+    draws,
+    holds,
+    unread,
+    bound: weakestBound(bounds),
+  };
 }

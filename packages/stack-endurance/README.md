@@ -75,6 +75,17 @@ Only the cuts of the supply, and of the parts that it needs through the stack, c
 
 Two groups of cuts that share no minimal set are independent, so the independent stop takes the product over the groups. In a group of up to 12 cuts, it adds the chance of each state of the cuts. In a larger group, it uses the Shannon expansion of `pathSetReliability` (`@mark1russell7/collections`). The expansion merges two states with the same sets left, so sets with few shared cuts give a small expansion. The expansion is exponential in the worst case. The groups share one budget, `INDEPENDENT_MAX_WORK`, and the option `maxWork` changes it. When the expansions pass the budget, `independent` is `upper`, and `independentUpper` names the need.
 
+## The outlook of a case
+
+`caseOutlook(layer, caseCuts, options)` gives the outlook of one event of a case, for each draw. A page of a place can show it for each case of its region.
+
+- `days` are the days that the stores give the draw. The option `share` sets the share, as for `yearShortfall`.
+- `lasts` is the chance that the draw gets its need through the event: `P(min(D, h) <= T)`. A draw that holds to the horizon has the chance 1.
+- `shortfall` is the user-days of one event, `E[max(0, min(D, h) - T)] * users`. The sum of each level is the value of `caseShortfall`.
+- Each value has one number for each curve of `stopCurves`: `event`, `independent` and `upper`.
+- The chance of `upper` is not more than the true chance, for each dependence of the cuts. Thus the range from `upper` to the other two shows the doubt of the dependence.
+- `holds` names the draws whose supply the case does not stop. `unread` names the draws whose stop has no curve.
+
 ## The joint days
 
 `jointDays(layer, caseCuts, options, needs)` gives the joint days of a set of draws. These are the largest count of days `d` at which each draw of the set holds `d` days together.
