@@ -19,7 +19,7 @@ import { HostScheduler, realClock } from "polite-crawler/politeness";
 import { EAGLE_INTERVAL, EAGLE_SCHEME, eagleCustomers, eagleLine, eagleRegion } from "../src/eaglei.ts";
 import { outageCurves, type RegionCurve } from "../src/law.ts";
 import { outageReader, type OutageCount, type OutageEvent, type OutageRuns, type OutageTally } from "../src/outages.ts";
-import { areaCounts, coverageTally, regionRates, type AreaCount, type Observation } from "../src/priors.ts";
+import { areaCounts, coverageTally, PRIOR_LIMIT, regionRates, type AreaCount, type Observation } from "../src/priors.ts";
 import { CAUSE_AFTER, CAUSE_BEFORE, STORM_CLASSES, type CauseOptions } from "../src/storms.ts";
 import { TryFault, get, passing, withTries, type FitContext } from "./fetch.ts";
 import { readStorms, type StormRecord } from "./storm-files.ts";
@@ -171,16 +171,8 @@ export interface CauseLaws {
   readonly cases: Readonly<Record<string, { readonly types: readonly string[]; readonly events: number; readonly regions: Readonly<Record<string, RegionCurve>> }>>;
 }
 
-/**
- * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
- * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
- * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
- * of an event many times. A true rate can also be above the limit, for example in Puerto Rico. Such a region is not
- * in the table, so its prior is no read. The measures are not the same. EIA counts each interruption of more than 5
- * minutes at a customer. The table counts the events of a county at 1% or more of its customers. So the comparison
- * holds only for the order of the number.
- */
-export const PRIOR_LIMIT = 12;
+/** The most events at one customer in one year that a region of a table can have in one case (`PRIOR_LIMIT` of `src/priors.ts`). */
+export { PRIOR_LIMIT };
 
 /** The join times of the sweep of the workflow, in seconds: none, 1 hour, 4 hours, 12 hours and 24 hours. */
 export const JOIN_SWEEP: readonly number[] = [0, 3600, 4 * 3600, 12 * 3600, 24 * 3600];

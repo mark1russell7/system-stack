@@ -1,5 +1,5 @@
 import { isRecord } from "@mark1russell7/optional/read";
-import { fitTwoLevelGammaRates, pooledRateUpper, type GammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
+import { fitTwoLevelGammaRates, pooledRate, pooledRateUpper, type GammaRates, type GroupLaw } from "@mark1russell7/rigor-statistics";
 import type { Prior } from "@mark1russell7/system-stack";
 import { hazardRegions, type HazardCaseOptions } from "./case.ts";
 import type { AreaUnits, HazardList, PoolLaw, PriorTable } from "./hazard.ts";
@@ -349,6 +349,85 @@ export function upperRates(units: AreaUnits, lawOf: LawOf, level = 0.95): Record
     bounds[name] = entry;
   }
   return bounds;
+}
+
+/**
+ * The most events at one customer in one year (perYear * reach) that a region of a table can have in one case: one a
+ * month. For the United States as a whole, the utilities report one or two interruptions a year at a customer to EIA.
+ * The method of the table is not reliable above the limit. An example of a fault is one outage that crosses the line
+ * of an event many times. A true rate can also be above the limit, for example in Puerto Rico. Such a region is not
+ * in the table, so its prior is no read. The measures are not the same. EIA counts each interruption of more than 5
+ * minutes at a customer. The table counts the events of a county at 1% or more of its customers. So the comparison
+ * holds only for the order of the number.
+ */
+export const PRIOR_LIMIT = 12;
+
+/** The input of `pooledTable`: the counts, the laws and the reach of the areas of one fit, and the head of the table. */
+export interface PooledTableInput {
+  /** The source, the date, the scheme and the method of the table. */
+  readonly head: Omit<PriorTable, "codes" | "rates">;
+  /** The years of each observed area and its events in each case. */
+  readonly units: AreaUnits;
+  /** The law of each group in each case, by the code of the case and the code of the group. */
+  readonly laws: Readonly<Record<string, Readonly<Record<string, GammaRates>>>>;
+  /**
+   * The reach of each area in each case: the mean peak share of its events, in the order of `units.codes`.
+   * The value of an area with no event in the case is not read, so it is 0.
+   */
+  readonly reach: Readonly<Record<string, readonly number[]>>;
+  /** This function gives the code of the group of an area, for example `eagleRegion`. */
+  readonly group: (area: string) => string;
+  /** The most events at one customer in one year in one case (`PRIOR_LIMIT`). An area above it in a case is not in the table. */
+  readonly limit: number;
+}
+
+/**
+ * This function gives the table of the pooled rates of the areas from their counts, the laws of their groups and their reach.
+ * Thus a module keeps only the counts, the laws and the reach, and its table cannot differ from them.
+ *
+ * - `perYear` of an area is `pooledRate` of its events in its years under the law of its group. An area with a rate of 0 has no rate in the table.
+ * - `reach` of an area with events is its reach. An area with no event gets the plain mean of the reach of the areas of its group with events.
+ *   In a group with no event, it gets the plain mean of the reach of all areas with events in the case. These are the rules of `pooledRates`.
+ * - An area with `perYear * reach` above the limit in a case is not in the table: its code and its rates go.
+ *
+ * @throws RangeError when an area has no law in a case, or when the reach of a case does not have one value for each area
+ */
+export function pooledTable(input: PooledTableInput): PriorTable {
+  const { units, group } = input;
+  const all: Record<string, Record<string, readonly [number, number]>> = {};
+  for (const [name, events] of Object.entries(units.events)) {
+    const reach = input.reach[name];
+    if (reach === undefined || reach.length !== units.codes.length) throw new RangeError(`pooledTable: the reach of the case ${name} does not have one value for each of the ${String(units.codes.length)} areas.`);
+    const sums = new Map<string, { sum: number; areas: number }>();
+    let allSum = 0;
+    let allAreas = 0;
+    units.codes.forEach((code, at) => {
+      if ((events[at] ?? 0) === 0) return;
+      const entry = sums.get(group(code)) ?? { sum: 0, areas: 0 };
+      sums.set(group(code), { sum: entry.sum + (reach[at] ?? 0), areas: entry.areas + 1 });
+      allSum += reach[at] ?? 0;
+      allAreas += 1;
+    });
+    const allReach = allAreas > 0 ? allSum / allAreas : 0;
+    const entry: Record<string, readonly [number, number]> = {};
+    units.codes.forEach((code, at) => {
+      const law = input.laws[name]?.[group(code)];
+      if (law === undefined) throw new RangeError(`pooledTable: the area ${code} has no law in the case ${name}.`);
+      const count = events[at] ?? 0;
+      const perYear = pooledRate({ count, exposure: units.years[at] ?? 0 }, law);
+      if (perYear <= 0) return;
+      const groupSum = sums.get(group(code));
+      const areaReach = count > 0 ? (reach[at] ?? 0) : groupSum === undefined ? allReach : groupSum.sum / groupSum.areas;
+      entry[code] = [perYear, Math.min(1, areaReach)];
+    });
+    all[name] = entry;
+  }
+  const over = new Set(units.codes.filter((code) => Object.values(all).some((entry) => { const rate = entry[code]; return rate !== undefined && rate[0] * rate[1] > input.limit; })));
+  return {
+    ...input.head,
+    codes: units.codes.filter((code) => !over.has(code)),
+    rates: Object.fromEntries(Object.entries(all).map(([name, entry]) => [name, Object.fromEntries(Object.entries(entry).filter(([code]) => !over.has(code)))])),
+  };
 }
 
 function observedAreas(observation: Observation): string[] {

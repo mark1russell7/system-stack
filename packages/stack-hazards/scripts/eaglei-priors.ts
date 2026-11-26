@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import type { AreaUnits, CountyPooling, PoolHoldout, PoolLaw, PoolTimeHoldout, PoolTimeScore, PriorTable, StatePooling } from "../src/hazard.ts";
 import { eagleRegion } from "../src/eaglei.ts";
-import { areaUnits, observedRegions, pooledRates, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
-import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, PRIOR_LIMIT, type CaseOverlap, type EagleLaws } from "./eaglei-fit.ts";
+import { areaUnits, observedRegions, pooledRates, pooledTable, PRIOR_LIMIT, regionCounts, regionObservation, withoutSilentAreas, type AreaCount, type Observation } from "../src/priors.ts";
+import { HELD_DAYS, LAWS_SCHEMA, OUTAGE_CASE, type CaseOverlap, type EagleLaws } from "./eaglei-fit.ts";
 import { EAGLEI_LICENSE, EAGLEI_SOURCE_ID } from "./eaglei-law.ts";
 import { poolHoldout, POOL_HOLDOUT_ROUNDS, POOL_HOLDOUT_SEED, regionPart, splitYears, timeHoldout } from "./eaglei-pooling.ts";
 
@@ -35,6 +35,8 @@ export interface EaglePriorTables {
   readonly statePooling: StatePooling;
   /** The counts of the observed counties, also of a county over the limit of the table. With the laws, they give each pooled rate and its bound. */
   readonly counts: AreaUnits;
+  /** The reach of each observed county in each case, in the order of the codes of `counts`. It is the mean peak share of its events, or 0 with no event. */
+  readonly reach: Readonly<Record<string, readonly number[]>>;
 }
 
 /** The rates of the regions of one case, from the counts of the areas. */
@@ -130,6 +132,7 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     state,
     nation,
     counts: areaUnits(priors.counts, observation),
+    reach: reachOf(priors.counts, areaUnits(priors.counts, observation).codes),
     pooling: {
       laws: Object.fromEntries(Object.entries(pooled).map(([name, entry]) => [name, entry.laws])),
       holdout: poolHoldout({ ...priors, observation }),
@@ -143,6 +146,42 @@ export function eaglePriors(laws: EagleLaws): EaglePriorTables {
     },
   };
 }
+
+/** This function gives the reach of each area in each case, in the order of `codes`. It is the mean peak share of its events, or 0 with no event. */
+function reachOf(counts: Readonly<Record<string, Readonly<Record<string, AreaCount>>>>, codes: readonly string[]): Record<string, number[]> {
+  return Object.fromEntries(
+    Object.entries(counts).map(([name, entry]) => [
+      name,
+      codes.map((code) => {
+        const count = entry[code];
+        return count !== undefined && count.events > 0 ? count.share / count.events : 0;
+      }),
+    ]),
+  );
+}
+
+/**
+ * This function is the gate of the county module: `pooledTable` of the rounded counts, laws and reach gives the table of the fit.
+ * The codes and the keys of the rates are the same. Each value has the same 4 significant digits, less the error of the rounding of the laws.
+ *
+ * @throws RangeError when the made table is not the table of the fit
+ */
+function checkMadeTable(made: PriorTable, fit: PriorTable): void {
+  if (JSON.stringify(made.codes) !== JSON.stringify(fit.codes)) throw new RangeError("priorModules: the made table of the counties does not have the codes of the fit. The limit moved a county.");
+  for (const [name, entry] of Object.entries(fit.rates)) {
+    const madeEntry = made.rates[name] ?? {};
+    if (JSON.stringify(Object.keys(madeEntry)) !== JSON.stringify(Object.keys(entry))) throw new RangeError(`priorModules: the made table of the counties does not have the rates of the fit in the case ${name}.`);
+    for (const [code, rate] of Object.entries(entry)) {
+      const madeRate = madeEntry[code] ?? [0, 0];
+      if (rate.some((value, at) => Math.abs((madeRate[at] ?? 0) / value - 1) > MADE_TOLERANCE)) {
+        throw new RangeError(`priorModules: the made rate of ${code} in the case ${name} is ${JSON.stringify(madeRate)}, not ${JSON.stringify(rate)}.`);
+      }
+    }
+  }
+}
+
+/** The most relative change of a rate of the table from the rounding of the laws and the reach to `DIGITS` digits. */
+const MADE_TOLERANCE = 2e-3;
 
 /** This function gives the rates with `DIGITS` significant digits. */
 function rounded(rates: Readonly<Record<string, readonly [number, number]>>): Record<string, readonly [number, number]> {
@@ -253,12 +292,15 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
   ];
   const pooling = roundedPooling(tables.pooling);
   const statePooling = roundedStatePooling(tables.statePooling);
+  const reach = Object.fromEntries(Object.entries(tables.reach).map(([name, values]) => [name, values.map(digits)]));
+  const { codes: _codes, rates: _rates, ...countyHead } = tables.county;
+  checkMadeTable(pooledTable({ head: countyHead, units: tables.counts, laws: pooling.laws, reach, group: eagleRegion, limit: PRIOR_LIMIT }), tables.county);
   return {
     "eaglei-county-priors.ts": [
       ...head.slice(0, -2),
+      'import { eagleRegion } from "./eaglei.ts";',
       'import type { AreaUnits, CountyPooling, PriorTable } from "./hazard.ts";',
-      "",
-      ...tableLines("EAGLEI_COUNTY_PRIORS", "The yearly priors of the power outage and of each storm case in each county, from the outages of EAGLE-I.", tables.county),
+      'import { pooledTable, PRIOR_LIMIT } from "./priors.ts";',
       "",
       "/**",
       " * The gamma law of the rates of the counties of each state in each case. The holdout compares the pooled rates with the raw rates and the state rates.",
@@ -284,6 +326,24 @@ export function priorModules(tables: EaglePriorTables, laws: EagleLaws, run: str
       ...Object.entries(tables.counts.events).map(([name, events]) => `    ${JSON.stringify(name)}: ${JSON.stringify(events)},`),
       "  },",
       "};",
+      "",
+      "/** The reach of each observed county in each case, in the order of the codes of `EAGLEI_COUNTY_COUNTS`. It is the mean peak share of its events, or 0 with no event. */",
+      "export const EAGLEI_COUNTY_REACH: Readonly<Record<string, readonly number[]>> = {",
+      ...Object.entries(reach).map(([name, values]) => `  ${JSON.stringify(name)}: ${JSON.stringify(values)},`),
+      "};",
+      "",
+      "/**",
+      " * The yearly priors of the power outage and of each storm case in each county, from the outages of EAGLE-I.",
+      " * The import makes the table from the counts, the laws and the reach (`pooledTable`). Thus the table cannot differ from them.",
+      " */",
+      "export const EAGLEI_COUNTY_PRIORS: PriorTable = pooledTable({",
+      `  head: ${JSON.stringify(countyHead)},`,
+      "  units: EAGLEI_COUNTY_COUNTS,",
+      "  laws: EAGLEI_COUNTY_POOLING.laws,",
+      "  reach: EAGLEI_COUNTY_REACH,",
+      "  group: eagleRegion,",
+      "  limit: PRIOR_LIMIT,",
+      "});",
       "",
     ].join("\n"),
     "eaglei-state-priors.ts": [

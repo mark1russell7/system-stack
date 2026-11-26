@@ -107,6 +107,7 @@ OutageReader: build/index.d.ts#OutageReader
 OutageRuns: build/index.d.ts#OutageRuns
 OutageTally: build/index.d.ts#OutageTally
 PLUME_ZONE_MILES: build/index.d.ts#PLUME_ZONE_MILES
+PRIOR_LIMIT: build/index.d.ts#PRIOR_LIMIT
 PlantDistance: build/index.d.ts#PlantDistance
 PoolHoldout: build/hazard.chunk.d.ts#PoolHoldout
 PoolLaw: build/hazard.chunk.d.ts#PoolLaw
@@ -114,6 +115,7 @@ PoolScore: build/hazard.chunk.d.ts#PoolScore
 PoolTimeHoldout: build/hazard.chunk.d.ts#PoolTimeHoldout
 PoolTimeScore: build/hazard.chunk.d.ts#PoolTimeScore
 PooledRates: build/index.d.ts#PooledRates
+PooledTableInput: build/index.d.ts#PooledTableInput
 PriorTable: build/hazard.chunk.d.ts#PriorTable
 REACTOR_LAYER: build/index.d.ts#REACTOR_LAYER
 ReachScore: build/hazard.chunk.d.ts#ReachScore
@@ -175,6 +177,7 @@ oe417YearCounts: build/index.d.ts#oe417YearCounts
 outageCurves: build/index.d.ts#outageCurves
 outageReader: build/index.d.ts#outageReader
 pooledRates: build/index.d.ts#pooledRates
+pooledTable: build/index.d.ts#pooledTable
 priorTableFaults: build/index.d.ts#priorTableFaults
 priorTableOverlaps: build/index.d.ts#priorTableOverlaps
 reactorRequest: build/index.d.ts#reactorRequest
@@ -198,6 +201,7 @@ zoneCounties: build/index.d.ts#zoneCounties
 EAGLEI_COUNTY_COUNTS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_COUNTS
 EAGLEI_COUNTY_POOLING: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_POOLING
 EAGLEI_COUNTY_PRIORS: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
+EAGLEI_COUNTY_REACH: build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_REACH
 
 ## Declarations
 
@@ -209,6 +213,9 @@ export declare const EAGLEI_COUNTY_POOLING: CountyPooling;
 
 ### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_PRIORS
 export declare const EAGLEI_COUNTY_PRIORS: PriorTable;
+
+### build/eaglei-county-priors.d.ts#EAGLEI_COUNTY_REACH
+export declare const EAGLEI_COUNTY_REACH: Readonly<Record<string, readonly number[]>>;
 
 ### build/hazard.chunk.d.ts#AreaUnits
 interface AreaUnits {
@@ -829,6 +836,9 @@ export interface OutageTally {
 ### build/index.d.ts#PLUME_ZONE_MILES
 export declare const PLUME_ZONE_MILES = 10;
 
+### build/index.d.ts#PRIOR_LIMIT
+export declare const PRIOR_LIMIT = 12;
+
 ### build/index.d.ts#PlantDistance
 export interface PlantDistance {
   readonly plant: string;
@@ -840,6 +850,16 @@ export interface PlantDistance {
 export interface PooledRates {
   readonly rates: Record<string, readonly [number, number]>;
   readonly laws: Record<string, PoolLaw>;
+}
+
+### build/index.d.ts#PooledTableInput
+export interface PooledTableInput {
+  readonly head: Omit<PriorTable, "codes" | "rates">;
+  readonly units: AreaUnits;
+  readonly laws: Readonly<Record<string, Readonly<Record<string, GammaRates>>>>;
+  readonly reach: Readonly<Record<string, readonly number[]>>;
+  readonly group: (area: string) => string;
+  readonly limit: number;
 }
 
 ### build/index.d.ts#REACTOR_LAYER
@@ -1040,6 +1060,9 @@ export declare function outageReader(options: OutageOptions): OutageReader;
 
 ### build/index.d.ts#pooledRates
 export declare function pooledRates(counts: Readonly<Record<string, AreaCount>>, observation: Observation, group: (area: string) => string): PooledRates;
+
+### build/index.d.ts#pooledTable
+export declare function pooledTable(input: PooledTableInput): PriorTable;
 
 ### build/index.d.ts#priorTableFaults
 export declare function priorTableFaults(table: PriorTable, cases: ReadonlySet<string>): string[];
