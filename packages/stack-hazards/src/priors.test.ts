@@ -16,6 +16,8 @@ import {
   hazardPriors,
   observedRegions,
   pooledRates,
+  pooledTable,
+  PRIOR_LIMIT,
   regionCounts,
   regionObservation,
   regionRates,
@@ -436,6 +438,35 @@ describe("the counts of the areas and the upper bounds of their pooled rates", (
     });
     expect(() => upperRates(units, (_name, area) => (area === "B1" ? undefined : law))).toThrow(/the area B1 has no law in the case met\.tornado/);
     expect(() => upperRates(units, () => law, 1)).toThrow(RangeError);
+  });
+
+  it("makes a table from the counts, the laws and the reach, with the rules of pooledRates and the limit", () => {
+    // The groups A and B have events. The group C has none. A3 has no event, so it gets the plain mean of the reach of A1 and A2.
+    const made: AreaUnits = { codes: ["A1", "A2", "A3", "B1", "C1"], years: [2, 4, 1, 3, 5], events: { "met.tornado": [1, 3, 0, 2, 0], "met.flood": [0, 0, 0, 0, 0] } };
+    const laws = {
+      "met.tornado": { A: { shape: 2, mean: 0.5 }, B: { shape: Number.POSITIVE_INFINITY, mean: 0.6 }, C: { shape: 2, mean: 0.5 } },
+      "met.flood": { A: { shape: Number.POSITIVE_INFINITY, mean: 0 }, B: { shape: Number.POSITIVE_INFINITY, mean: 0 }, C: { shape: Number.POSITIVE_INFINITY, mean: 0 } },
+    };
+    const reach = { "met.tornado": [0.2, 0.4, 0, 0.9, 0], "met.flood": [0, 0, 0, 0, 0] };
+    const head = { source: "test", asOf: "2026-01-01", scheme: "test-area", method: "made up" };
+    const table = pooledTable({ head, units: made, laws, reach, group: letter, limit: PRIOR_LIMIT });
+    expect(table).toEqual({
+      ...head,
+      codes: made.codes,
+      rates: {
+        // The pooled rate (events + shape) / (years + shape / mean). C1 gets the plain mean of the reach of all areas with events: (0.2 + 0.4 + 0.9) / 3.
+        "met.tornado": { A1: [3 / 6, 0.2], A2: [5 / 8, 0.4], A3: [2 / 5, (0.2 + 0.4) / 2], B1: [0.6, 0.9], C1: [2 / 9, (0.2 + 0.4 + 0.9) / 3] },
+        // A law with the mean 0 gives the rate 0, so the case has no rate.
+        "met.flood": {},
+      },
+    });
+    // B1 has 0.6 * 0.9 = 0.54 events at one customer in one year. Above a limit of 0.5, it is not in the table, and its group keeps the reach of its other areas.
+    const limited = pooledTable({ head, units: made, laws, reach, group: letter, limit: 0.5 });
+    expect(limited.codes).toEqual(["A1", "A2", "A3", "C1"]);
+    expect(Object.keys(limited.rates["met.tornado"] ?? {})).toEqual(["A1", "A2", "A3", "C1"]);
+    expect(limited.rates["met.tornado"]?.["C1"]).toEqual([2 / 9, (0.2 + 0.4 + 0.9) / 3]);
+    expect(() => pooledTable({ head, units: made, laws: { ...laws, "met.flood": {} }, reach, group: letter, limit: PRIOR_LIMIT })).toThrow(/the area A1 has no law in the case met.flood/);
+    expect(() => pooledTable({ head, units: made, laws, reach: { ...reach, "met.flood": [0] }, group: letter, limit: PRIOR_LIMIT })).toThrow(/the reach of the case met.flood/);
   });
 
   it("gives each rate of the table of the counties from the counts and the laws of the fit", () => {

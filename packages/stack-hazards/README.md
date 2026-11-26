@@ -305,6 +305,8 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
   `upperRates` gives the quantile of the gamma law of each county after its events in its years. The mean of the same law is the pooled rate of the table.
   `regionUnits` gives the counts of the states from the counts of the counties. Then `upperRates` with the laws of `EAGLEI_STATE_POOLING` gives the bounds of the states.
   A test makes each rate of the two tables from the counts and the laws. Each rate agrees to within the 4 digits of the tables.
+- Since 0.7.9, the module keeps the counts, the laws and `EAGLEI_COUNTY_REACH`, the reach of each observed county in each case. The import makes `EAGLEI_COUNTY_PRIORS` from them with `pooledTable`. Thus the table cannot differ from its counts.
+  `pooledTable` uses the rules of `pooledRates` and removes each county above `PRIOR_LIMIT`, one event at one customer in a month.
 
   ```ts
   const county = upperRates(EAGLEI_COUNTY_COUNTS, (name, area) => EAGLEI_COUNTY_POOLING.laws[name]?.[eagleRegion(area)]);
@@ -313,7 +315,7 @@ const list = { ...HAZARD_LIST, priors: [EAGLEI_COUNTY_PRIORS, ...(HAZARD_LIST.pr
 - Give a county first and its state next. Then a county with no table of a case gets the prior of its state.
 - The list also has the table `OE417_NATION_PRIORS` of the scheme `us-nation`. It gives the prior of a physical attack, in the section of its law. Give the region `{ scheme: "us-nation", code: "US" }` last, for this prior.
 
-The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING` and `EAGLEI_COUNTY_COUNTS`, and the state module has `EAGLEI_STATE_POOLING`.
+The workflow `hazards-fit` gives the counts in the artifact `eaglei-laws`. The script `scripts/eaglei-priors.ts` makes the modules `src/eaglei-county-priors.ts` and `src/eaglei-state-priors.ts` from them. The county module also has `EAGLEI_COUNTY_POOLING`, `EAGLEI_COUNTY_COUNTS` and `EAGLEI_COUNTY_REACH`, and the state module has `EAGLEI_STATE_POOLING`. The script makes the county table again from the rounded data, and stops if a rate moves more than 0.2%.
 
 The state module also has `EAGLEI_NATION_CUSTOMERS`, the sum of the customers of each observed county. A county in a state over the limit of the table is also in the sum. The header of each module tells the run, the version and the DOI of the dataset, and the options of the fit. The rates are a derived work of EAGLE-I (CC BY 4.0) and of the storm events of NOAA (public domain).
 
@@ -435,4 +437,4 @@ if (!("read" in dams)) console.log(damExposure(site, dams, radius).counts.high);
 | Entry | What it has |
 | --- | --- |
 | `@mark1russell7/stack-hazards` | The records, the reference data, the gate and `hazardCase`. |
-| `@mark1russell7/stack-hazards/county-priors` | `EAGLEI_COUNTY_PRIORS`, `EAGLEI_COUNTY_POOLING` and `EAGLEI_COUNTY_COUNTS`. This entry is large, so the root entry does not import it. |
+| `@mark1russell7/stack-hazards/county-priors` | `EAGLEI_COUNTY_PRIORS`, `EAGLEI_COUNTY_POOLING`, `EAGLEI_COUNTY_COUNTS` and `EAGLEI_COUNTY_REACH`. This entry is large, so the root entry does not import it. |
