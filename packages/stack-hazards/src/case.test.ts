@@ -1,7 +1,7 @@
 import { caseShortfall, checkEndurance, enduranceOf, SAMPLE_ENDURANCE, SAMPLE_ENDURANCE_STACK, stopCurves, type EnduranceLayer, type Survival } from "@mark1russell7/stack-endurance";
 import { parseEndurance } from "@mark1russell7/stack-endurance/schema";
 import { describe, expect, it } from "vitest";
-import { curveFault } from "@mark1russell7/system-stack";
+import { bandFault, curveFault } from "@mark1russell7/system-stack";
 import { followCurve, hazardCase, hazardOf, NO_TOLD_LAW, supplyState, type HazardCaseOptions } from "./case.ts";
 import { HAZARD_LIST, HAZARD_SOURCES, WATER_RECOVERY } from "./data.ts";
 import { EAGLEI_GRID_LAW } from "./eaglei-law.ts";
@@ -338,6 +338,28 @@ describe("a hazard case with cuts that follow another cut", () => {
       ["air.main", followCurve(curve, 0, 1), "https://data.example.net/outages https://data.example.net/rule"],
       ["gas.main", undefined, "definition"],
     ]);
+  });
+
+  it("gives the band of the law to its cut, and the shifted band of the cause to each dependent cut", () => {
+    const band = {
+      low: [[0, 1], [1, 0.3], [3, 0]],
+      high: [[0, 1], [1, 0.7], [3, 0]],
+    } as const;
+    const grid = hazard.cuts[0]!;
+    const law = grid.duration.read ? { ...grid.duration, bands: { A: band } } : grid.duration;
+    const banded: HazardList = { ...list, hazards: [{ ...hazard, cuts: [{ ...grid, duration: law }, ...hazard.cuts.slice(1)] }] };
+    const cuts = hazardCase(banded, banded.hazards[0]!, { region }).cuts;
+    const terms: Record<string, [number, number]> = { "power.grid": [0, 0], "phone.network": [0, 0], "water.main": [0, 2], "road.local": [0.5, 2], "food.retail": [0, 1] };
+    for (const [part, [onset, recovery]] of Object.entries(terms)) {
+      const cut = cuts.find((item) => item.part === part);
+      expect(cut?.band).toEqual({ low: followCurve(band.low, onset, recovery), high: followCurve(band.high, onset, recovery) });
+      expect(bandFault(cut?.duration ?? [], cut?.band ?? band)).toBeUndefined();
+    }
+    expect(cuts.find((cut) => cut.part === "gas.main")?.band).toBeUndefined();
+    // A law with no bands gives no band.
+    expect(hazardCase(list, hazard, { region }).cuts.some((cut) => cut.band !== undefined)).toBe(false);
+    // Another region has no curve, so no band.
+    expect(hazardCase(banded, banded.hazards[0]!, { region: { scheme: "test-region", code: "B" } }).cuts.some((cut) => cut.band !== undefined)).toBe(false);
   });
 
   it("states the side of each term, and claims a bound only when each term is an upper bound", () => {

@@ -1,4 +1,4 @@
-import { survivalAt, type CaseCuts, type Cut, type CutFollows, type FollowSide, type FollowTerm, type Survival } from "@mark1russell7/system-stack";
+import { survivalAt, type CaseCuts, type Cut, type CutFollows, type DurationBand, type FollowSide, type FollowTerm, type Survival } from "@mark1russell7/system-stack";
 import type { CitedSpan, Hazard, HazardCut, HazardList, NoLaw } from "./hazard.ts";
 
 // The bind of a hazard case to a stack: the values of `CaseCuts` of stack-endurance, with the curve of the region of the user.
@@ -102,7 +102,8 @@ export function hazardCase(list: HazardList, hazard: Hazard, options: HazardCase
     const read = cutCurve({ list, hazard, regions, options }, item, new Set());
     const source = read === undefined ? claimSources(list, item) : read.source;
     const follows = read?.follows === undefined ? {} : { follows: read.follows };
-    return ids.map((part) => ({ part, title: item.title, ...(read === undefined ? {} : { duration: read.curve, bound: read.bound }), source, ...follows }));
+    const band = read?.band === undefined ? {} : { band: read.band };
+    return ids.map((part) => ({ part, title: item.title, ...(read === undefined ? {} : { duration: read.curve, bound: read.bound }), ...band, source, ...follows }));
   });
   return { case: hazard.case, title: hazard.title, cuts };
 }
@@ -139,6 +140,8 @@ interface CurveRead {
   readonly curve: Survival;
   readonly source: string;
   readonly bound: "law" | FollowRead["bound"];
+  /** The sampling band of the curve: the band of the law, or the band of the cause with the shift of the terms. */
+  readonly band?: DurationBand | undefined;
   readonly follows?: FollowRead | undefined;
 }
 
@@ -151,7 +154,9 @@ function cutCurve(context: CurveContext, cut: HazardCut, seen: ReadonlySet<strin
     const law = cut.duration;
     const code = context.regions.find((region) => region.scheme === law.scheme)?.code;
     const curve = code === undefined ? undefined : law.curves[code];
-    return curve === undefined ? undefined : { curve, source: sourceUrl(context.list, law.source), bound: "law" };
+    if (curve === undefined) return undefined;
+    const band = code === undefined ? undefined : law.bands?.[code];
+    return { curve, source: sourceUrl(context.list, law.source), bound: "law", ...(band === undefined ? {} : { band }) };
   }
   const follows = cut.follows;
   // A cut with only assessed claims and the option drop has no law, so it follows no cause.
@@ -163,10 +168,13 @@ function cutCurve(context: CurveContext, cut: HazardCut, seen: ReadonlySet<strin
   const recovery = followTerm("recovery", follows.recovery);
   const curve = followCurve(read.curve, onset.days, recovery.days);
   if (curve === undefined) return undefined;
+  const low = read.band === undefined ? undefined : followCurve(read.band.low, onset.days, recovery.days);
+  const high = read.band === undefined ? undefined : followCurve(read.band.high, onset.days, recovery.days);
+  const band = low === undefined || high === undefined ? {} : { band: { low, high } };
   const bound = onset.side === "upper" && recovery.side === "upper" && read.bound !== "none" ? "upper" : "none";
   const urls = [read.source, ...[follows.onset, follows.recovery].flatMap((span) => (span === undefined ? [] : spanSources(context.list, span)))];
   const source = [...new Set(urls.flatMap((url) => url.split(" ")))].join(" ");
-  return { curve, source, bound, follows: { part: follows.part, onset, recovery, bound } };
+  return { curve, source, bound, ...band, follows: { part: follows.part, onset, recovery, bound } };
 }
 
 /**

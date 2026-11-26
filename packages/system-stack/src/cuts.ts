@@ -9,6 +9,16 @@
 export type Survival = readonly (readonly [days: number, chance: number])[];
 
 /**
+ * The pointwise sampling band of a survival curve: a low curve and a high curve. Since 0.1.14.
+ * At each day, the chance of `low` is at or below the chance of the estimate, and the chance of `high` is at or above it.
+ * Thus `low` gives shorter cuts and `high` gives longer cuts. The band holds each day only pointwise, not all days together.
+ */
+export interface DurationBand {
+  readonly low: Survival;
+  readonly high: Survival;
+}
+
+/**
  * What the curve of a cut tells about the true days of the cut. Since 0.1.12.
  *
  * - `law`: the curve is a cited law of the days.
@@ -102,6 +112,11 @@ export interface Cut {
    * A cut with a curve and no bound has a cited law, so an old record keeps its meaning. A cut with no curve has no bound to read.
    */
   readonly bound?: CutBound | undefined;
+  /**
+   * The pointwise sampling band of `duration` (`DurationBand`), when the law of the curve gives one. Since 0.1.14.
+   * The shortfall reads only `duration`. A cut with a band and no curve is a fault (`bandFault`).
+   */
+  readonly band?: DurationBand | undefined;
   /** The source of the curve, or of the cut when it has no curve. */
   readonly source: string;
   /** The terms of a dependent cut, when its curve comes from the curve of a cause cut (`CutFollows`). The shortfall does not read them. Since 0.1.13. */
@@ -145,6 +160,25 @@ export function curveFault(curve: Survival): string | undefined {
     if (!(p1 >= 0 && p1 <= p0)) return `The chance of the point ${String(index)} is not from 0 to the chance of the point before it.`;
   }
   if (curve[curve.length - 1]?.[1] !== 0) return "The curve does not end at a chance of 0.";
+  return undefined;
+}
+
+/**
+ * This function gives the first fault of the band of a survival curve, or `undefined`. Since 0.1.14.
+ * Each end must be a curve with no fault (`curveFault`). At each day of a point of the three curves, low <= estimate <= high.
+ * The comparison has a tolerance of `1e-12`, so that a float error does not give a fault.
+ */
+export function bandFault(curve: Survival, band: DurationBand): string | undefined {
+  for (const end of ["low", "high"] as const) {
+    const fault = curveFault(band[end]);
+    if (fault !== undefined) return `The ${end} end: ${fault}`;
+  }
+  const days = [...new Set([curve, band.low, band.high].flatMap((points) => points.map(([day]) => day)))].sort((a, b) => a - b);
+  for (const day of days) {
+    const chance = survivalAt(curve, day);
+    if (survivalAt(band.low, day) - chance > 1e-12) return `At ${String(day)} days, the low end is above the curve.`;
+    if (chance - survivalAt(band.high, day) > 1e-12) return `At ${String(day)} days, the high end is below the curve.`;
+  }
   return undefined;
 }
 

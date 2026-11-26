@@ -225,6 +225,7 @@ These functions make a law of a duration from the records of a source of outages
 | `eagleLine(line)`, `eagleCustomers(text)`, `eagleRegion(area)` | They read a line of an outage file of EAGLE-I, the file of the customers of each county, and the state of a county. |
 | `outageCurves(events, region)` | It gives the Kaplan-Meier curve of the durations of each region, with its counts and its median. |
 | `survivalOf(curve)` | It gives a Kaplan-Meier curve in the form of the core, read at the days of `LAW_DAYS`, from 15 minutes to 90 days. |
+| `bandOf(curve, options, z)` | It gives the pointwise 95% band of a Kaplan-Meier curve on the log-log scale (`survivalBand`), at the days of `survivalOf`. A law keeps it in `bands`, and `hazardCase` gives it to each cut as `band`. Since 0.7.10. |
 
 - An event is a run of the times of an area with a count at or above the threshold of the area. The threshold is a share of the customers of the area.
 - A gap of the collection, or the end of the data, censors an event. A run that starts at the start of the data or after a gap is not an event.

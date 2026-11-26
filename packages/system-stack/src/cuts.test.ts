@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CUT_BOUNDS, curveFault, cutBound, isCutBound, survivalAt, weakestBound, type CaseCuts, type Cut } from "./cuts.ts";
+import { bandFault, CUT_BOUNDS, curveFault, cutBound, isCutBound, survivalAt, weakestBound, type CaseCuts, type Cut } from "./cuts.ts";
 
 describe("the bound of a cut", () => {
   const curve = [
@@ -47,6 +47,22 @@ describe("survivalAt", () => {
       expect(chance).toBeLessThanOrEqual(last);
       last = chance;
     }
+  });
+});
+
+describe("bandFault", () => {
+  const curve = [[0, 1], [1, 0.5], [3, 0]] as const;
+  it("takes a band with each end on its side of the curve, also with other days", () => {
+    expect(bandFault(curve, { low: [[0, 1], [1, 0.4], [3, 0]], high: [[0, 1], [1, 0.6], [2, 0.3], [3, 0]] })).toBeUndefined();
+    expect(bandFault(curve, { low: curve, high: curve })).toBeUndefined();
+  });
+
+  it("gives the first fault of a band", () => {
+    expect(bandFault(curve, { low: [[0, 1], [1, 0.6], [3, 0]], high: curve })).toBe("At 1 days, the low end is above the curve.");
+    expect(bandFault(curve, { low: curve, high: [[0, 1], [1, 0.4], [3, 0]] })).toBe("At 1 days, the high end is below the curve.");
+    // Between the points of the curve: the low end is above it at 2 days.
+    expect(bandFault(curve, { low: [[0, 1], [2, 0.3], [3, 0]], high: [[0, 1], [4, 0]] })).toBe("At 2 days, the low end is above the curve.");
+    expect(bandFault(curve, { low: [[0, 1], [1, 0.5]], high: curve })).toBe("The low end: The curve does not end at a chance of 0.");
   });
 });
 

@@ -85,6 +85,7 @@ Two groups of cuts that share no minimal set are independent, so the independent
 - Each value has one number for each curve of `stopCurves`: `event`, `independent` and `upper`.
 - The chance of `upper` is not more than the true chance, for each dependence of the cuts. Thus the range from `upper` to the other two shows the doubt of the dependence.
 - `holds` names the draws whose supply the case does not stop. `unread` names the draws whose stop has no curve.
+- `band` gives the same values with each cut at the low end of its band (`shorter`) and at the high end (`longer`). The days do not change. Each end holds only at each day, so the two values are a range of the sampling error, not a joint interval. A draw has no `band` when a cut of its stop has a curve and no band. Since 0.8.14.
 
 ## The joint days
 

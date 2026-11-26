@@ -1,5 +1,5 @@
 import { checkSources, LICENSES, permits, type FindingCode, type GateOptions, type Use } from "@mark1russell7/guidebook";
-import { curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
+import { bandFault, curveFault, dayNumber, type Fault, type Part } from "@mark1russell7/system-stack";
 import { CLAIM_BASES, SPAN_BASES, SPAN_UNITS, SUPPLY_PARTS, type CitedSpan, type Claim, type DurationLaw, type Hazard, type HazardCut, type HazardList, type HazardSource } from "./hazard.ts";
 import { priorTableFaults, priorTableOverlaps } from "./priors.ts";
 
@@ -247,6 +247,11 @@ function lawFaults(law: DurationLaw, sources: HazardList["sources"]): [HazardCod
   for (const [code, curve] of Object.entries(law.curves)) {
     const fault = curveFault(curve);
     if (fault !== undefined) faults.push(["hazards-curve", `the curve of the region "${code}": ${fault}`]);
+  }
+  for (const [code, band] of Object.entries(law.bands ?? {})) {
+    const curve = law.curves[code];
+    const fault = curve === undefined ? "the law has no curve of the region." : bandFault(curve, band);
+    if (fault !== undefined) faults.push(["hazards-curve", `the band of the region "${code}": ${fault}`]);
   }
   return faults;
 }

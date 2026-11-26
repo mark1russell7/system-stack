@@ -1,6 +1,6 @@
 import type { Source } from "@mark1russell7/guidebook";
 import type { GammaRates } from "@mark1russell7/rigor-statistics";
-import type { Part, Survival } from "@mark1russell7/system-stack";
+import type { DurationBand, Part, Survival } from "@mark1russell7/system-stack";
 
 // The model of the hazard cases: the reference parts of the public supplies, the sources, the cuts and the laws of their durations.
 
@@ -99,6 +99,11 @@ export interface DurationLaw {
   readonly scheme: string;
   /** The survival curve of the duration in each region, by the code of the region. */
   readonly curves: Readonly<Record<string, Survival>>;
+  /**
+   * The pointwise 95% sampling band of the curve of each region, by the code of the region. Since 0.7.10.
+   * Each code is a code of `curves`. A law with no bands, or a region with no band, has no read of its sampling error.
+   */
+  readonly bands?: Readonly<Record<string, DurationBand>> | undefined;
 }
 
 /** No law of a duration: no source with a law is read yet. A cut with no law has no curve, so its draws are no read, not a pass. */
