@@ -48,6 +48,8 @@ With a base stack, a cut also stops each part that cannot work without the cut p
 
 With the option `horizon` of `h` days, the shortfall counts only the first `h` days of each cut: `E[max(0, min(D, h) - T)] * users`. A draw that holds `h` days has no shortfall. Thus a buy plan can aim at a target, for example 14 days and then 90 days.
 
+The option `share` of `yearShortfall` sets the share of the stores in each case. The default `take` uses `enduranceOf`. With `best`, the query uses `bestEndurance`, and the horizon of the shortfall is the horizon of the share. Thus a draw at the horizon keeps back only `h` times its demand, and the lower levels get the rest.
+
 A draw that only the parts of `down` stop has no curve of its duration. The query puts it in `unread`, and its shortfall is not in the sum. A gate shows it as no read, not as a pass.
 
 A cut can have no `duration`, as before a source gives its curve. Then each draw whose stop the cut can be part of goes in `unread`. A draw whose minimal stop sets do not have the cut keeps its curves. When the query has no minimal sets, it cannot tell, so the draw goes in `unread`. The gate gives the warning `endurance-cut-no-curve` for each such cut.

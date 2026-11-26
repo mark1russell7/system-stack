@@ -31,6 +31,8 @@ type Prior: @mark1russell7/system-stack#Prior (external)
 Resource: build/layer.chunk.d.ts#Resource
 SAMPLE_ENDURANCE: build/index.d.ts#SAMPLE_ENDURANCE
 SAMPLE_ENDURANCE_STACK: build/index.d.ts#SAMPLE_ENDURANCE_STACK
+SHARES: build/index.d.ts#SHARES
+Share: build/index.d.ts#Share
 Shortfall: build/index.d.ts#Shortfall
 ShortfallOptions: build/index.d.ts#ShortfallOptions
 StopCurveOptions: build/index.d.ts#StopCurveOptions
@@ -38,6 +40,7 @@ StopCurves: build/index.d.ts#StopCurves
 Store: build/layer.chunk.d.ts#Store
 type Survival: @mark1russell7/system-stack#Survival (external)
 YearShortfall: build/index.d.ts#YearShortfall
+YearShortfallOptions: build/index.d.ts#YearShortfallOptions
 bestEndurance: build/index.d.ts#bestEndurance
 caseDraws: build/index.d.ts#caseDraws
 caseShortfall: build/index.d.ts#caseShortfall
@@ -131,6 +134,12 @@ export declare const SAMPLE_ENDURANCE: EnduranceLayer;
 ### build/index.d.ts#SAMPLE_ENDURANCE_STACK
 export declare const SAMPLE_ENDURANCE_STACK: Stack;
 
+### build/index.d.ts#SHARES
+export declare const SHARES: readonly Share[];
+
+### build/index.d.ts#Share
+export type Share = "take" | "best";
+
 ### build/index.d.ts#Shortfall
 export interface Shortfall {
   readonly levels: Readonly<Record<string, number>>;
@@ -171,6 +180,11 @@ export interface YearShortfall extends Shortfall {
     readonly endurance: Endurance;
     readonly shortfall: Shortfall;
   }[];
+}
+
+### build/index.d.ts#YearShortfallOptions
+export interface YearShortfallOptions extends CaseOptions, ShortfallOptions {
+  readonly share?: Share | undefined;
 }
 
 ### build/index.d.ts#bestEndurance
@@ -243,7 +257,7 @@ export declare function yearChance(prior: Prior): number;
 export declare function yearRate(prior: Prior): number;
 
 ### build/index.d.ts#yearShortfall
-export declare function yearShortfall(layer: EnduranceLayer, place: string, options: CaseOptions & ShortfallOptions): YearShortfall;
+export declare function yearShortfall(layer: EnduranceLayer, place: string, options: YearShortfallOptions): YearShortfall;
 
 ### build/layer.chunk.d.ts#Converter
 interface Converter {
