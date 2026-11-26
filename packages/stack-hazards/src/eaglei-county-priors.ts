@@ -1,6 +1,6 @@
 // This module is made by `scripts/eaglei-priors.ts` from the artifact `eaglei-laws` of the workflow `hazards-fit`. Do not change it by hand.
-// The run of the fit: https://github.com/mark1russell7/system-stack/actions/runs/45497257588 attempt 1.
-// The dataset: EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.6084/m9.figshare.24237376.v4, read 2026-11-24T22:26:31.352Z.
+// The run of the fit: https://github.com/mark1russell7/system-stack/actions/runs/45884539447 attempt 1.
+// The dataset: EAGLE-I version 4, modified 2026-02-25T18:52:23Z, DOI 10.6084/m9.figshare.24237376.v4, read 2026-11-26T19:52:20.697Z.
 // The options of the fit: share 0.01, interval 900 s.
 // The rates are a derived work of the EAGLE-I dataset (CC BY 4.0) and of the storm events of NOAA (public domain).
 import { eagleRegion } from "./eaglei.ts";
