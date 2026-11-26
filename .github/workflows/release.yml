@@ -67,7 +67,7 @@ jobs:
   # changed after that run gives a no, and the gates start.
   tree:
     name: Tree
-    uses: mark1russell7/template/.github/workflows/reusable-release-tree.yml@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+    uses: mark1russell7/template/.github/workflows/reusable-release-tree.yml@7c83f30551e066c06852ea75bf0140eadfc49961 # main
     permissions:
       actions: read
       contents: read
@@ -92,7 +92,7 @@ jobs:
     if: >-
       ${{ !cancelled() && (needs.verify.result == 'success'
       || (needs.verify.result == 'skipped' && needs.tree.result == 'success' && needs.tree.outputs.verified == 'true')) }}
-    uses: mark1russell7/template/.github/workflows/reusable-release-build.yml@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+    uses: mark1russell7/template/.github/workflows/reusable-release-build.yml@7c83f30551e066c06852ea75bf0140eadfc49961 # main
     permissions:
       contents: read
 
@@ -124,14 +124,14 @@ jobs:
       # the pin. Renovate does not move it: the release session moves it at a quiet time, because a
       # workflow change between a version merge and its tag job makes GitHub refuse the tag (HTTP 403).
       - id: publish
-        uses: mark1russell7/template/.github/actions/npm-publish@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+        uses: mark1russell7/template/.github/actions/npm-publish@7c83f30551e066c06852ea75bf0140eadfc49961 # main
 
   tag:
     name: Git tag and GitHub release
     needs: [build, publish]
     # Also after a failed publish: each version that it published before the failure gets its tag.
     if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: mark1russell7/template/.github/workflows/reusable-release-tag.yml@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+    uses: mark1russell7/template/.github/workflows/reusable-release-tag.yml@7c83f30551e066c06852ea75bf0140eadfc49961 # main
     permissions:
       contents: write
     with:

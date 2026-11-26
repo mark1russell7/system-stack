@@ -47,9 +47,9 @@ jobs:
       - id: pull
         if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
         continue-on-error: true
-        uses: mark1russell7/template/.github/actions/pull-of-run@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+        uses: mark1russell7/template/.github/actions/pull-of-run@7c83f30551e066c06852ea75bf0140eadfc49961 # main
       - id: changes
-        uses: mark1russell7/template/.github/actions/changes@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+        uses: mark1russell7/template/.github/actions/changes@7c83f30551e066c06852ea75bf0140eadfc49961 # main
         with:
           pull-request: ${{ steps.pull.outputs.found == 'true' && steps.pull.outputs.number || '' }}
           # A coarse filter only: the job timed decides from the stamp, so this list names no source file.
@@ -91,7 +91,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - id: decide
         if: ${{ !cancelled() }}
-        uses: mark1russell7/template/.github/actions/stamp-gate@19a14ae7da54e6e529ef90c5c4ab872867f152b9 # main
+        uses: mark1russell7/template/.github/actions/stamp-gate@7c83f30551e066c06852ea75bf0140eadfc49961 # main
         with:
           config: packages/stack-endurance/bench/stamp.json
           package: packages/stack-endurance
@@ -193,7 +193,7 @@ jobs:
     timeout-minutes: 2
     permissions: {}
     steps:
-      - uses: mark1russell7/template/.github/actions/gate-summary@02fda5f29cc4edb08cd7e3c493be8fea055ffb22 # main
+      - uses: mark1russell7/template/.github/actions/gate-summary@7c83f30551e066c06852ea75bf0140eadfc49961 # main
         with:
           needs: ${{ toJSON(needs) }}
           changes: timed
